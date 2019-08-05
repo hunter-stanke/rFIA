@@ -989,19 +989,19 @@ standStruct <- function(db,
 
 
 
-  ### Keeping only years where all states represented are reported for
-  if (length(unique(db$POP_EVAL$STATECD)) > 1){
-    # Counting number of states measured by year, remove years which don't include all states
-    numStates <- db$POP_EVAL %>%
-      group_by(END_INVYR, STATECD) %>%
-      summarize() %>%
-      group_by(END_INVYR) %>%
-      summarize(n = n()) %>%
-      filter(n == length(unique(db$POP_EVAL$STATECD)))
-
-    db$POP_EVAL <- db$POP_EVAL %>%
-      filter(END_INVYR %in% numStates$END_INVYR)
-  }
+  # ### Keeping only years where all states represented are reported for
+  # if (length(unique(db$POP_EVAL$STATECD)) > 1){
+  #   # Counting number of states measured by year, remove years which don't include all states
+  #   numStates <- db$POP_EVAL %>%
+  #     group_by(END_INVYR, STATECD) %>%
+  #     summarize() %>%
+  #     group_by(END_INVYR) %>%
+  #     summarize(n = n()) %>%
+  #     filter(n == length(unique(db$POP_EVAL$STATECD)))
+  #
+  #   db$POP_EVAL <- db$POP_EVAL %>%
+  #     filter(END_INVYR %in% numStates$END_INVYR)
+  # }
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
   ids <- db$POP_EVAL %>%
@@ -1310,19 +1310,19 @@ diversity <- function(db,
   message('Joining FIA Tables.....')
 
 
-  ### Keeping only years where all states represented are reported for
-  if (length(unique(db$POP_EVAL$STATECD)) > 1){
-    # Counting number of states measured by year, remove years which don't include all states
-    numStates <- db$POP_EVAL %>%
-      group_by(END_INVYR, STATECD) %>%
-      summarize() %>%
-      group_by(END_INVYR) %>%
-      summarize(n = n()) %>%
-      filter(n == length(unique(db$POP_EVAL$STATECD)))
-
-    db$POP_EVAL <- db$POP_EVAL %>%
-      filter(END_INVYR %in% numStates$END_INVYR)
-  }
+  # ### Keeping only years where all states represented are reported for
+  # if (length(unique(db$POP_EVAL$STATECD)) > 1){
+  #   # Counting number of states measured by year, remove years which don't include all states
+  #   numStates <- db$POP_EVAL %>%
+  #     group_by(END_INVYR, STATECD) %>%
+  #     summarize() %>%
+  #     group_by(END_INVYR) %>%
+  #     summarize(n = n()) %>%
+  #     filter(n == length(unique(db$POP_EVAL$STATECD)))
+  #
+  #   db$POP_EVAL <- db$POP_EVAL %>%
+  #     filter(END_INVYR %in% numStates$END_INVYR)
+  # }
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
   ids <- db$POP_EVAL %>%
@@ -1609,19 +1609,19 @@ tpa <- function(db,
 
 
 
-  ### Keeping only years where all states represented are reported for
-  if (length(unique(db$POP_EVAL$STATECD)) > 1){
-    # Counting number of states measured by year, remove years which don't include all states
-    numStates <- db$POP_EVAL %>%
-      group_by(END_INVYR, STATECD) %>%
-      summarize() %>%
-      group_by(END_INVYR) %>%
-      summarize(n = n()) %>%
-      filter(n == length(unique(db$POP_EVAL$STATECD)))
-
-    db$POP_EVAL <- db$POP_EVAL %>%
-      filter(END_INVYR %in% numStates$END_INVYR)
-  }
+  # ### Keeping only years where all states represented are reported for
+  # if (length(unique(db$POP_EVAL$STATECD)) > 1){
+  #   # Counting number of states measured by year, remove years which don't include all states
+  #   numStates <- db$POP_EVAL %>%
+  #     group_by(END_INVYR, STATECD) %>%
+  #     summarize() %>%
+  #     group_by(END_INVYR) %>%
+  #     summarize(n = n()) %>%
+  #     filter(n == length(unique(db$POP_EVAL$STATECD)))
+  #
+  #   db$POP_EVAL <- db$POP_EVAL %>%
+  #     filter(END_INVYR %in% numStates$END_INVYR)
+  # }
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
   ids <- db$POP_EVAL %>%
@@ -1937,19 +1937,19 @@ growMort <- function(db,
       mutate(CONDPROP_UNADJ = ifelse(COND_CHANGE_CD == 1, CONDPROP_UNADJ, 0)) # Has to be forested currently and at last measurment
   }
 
-  ### Keeping only years where all states represented are reported for
-  if (length(unique(db$POP_EVAL$STATECD)) > 1){
-    # Counting number of states measured by year, remove years which don't include all states
-    numStates <- db$POP_EVAL %>%
-      group_by(END_INVYR, STATECD) %>%
-      summarize() %>%
-      group_by(END_INVYR) %>%
-      summarize(n = n()) %>%
-      filter(n == length(unique(db$POP_EVAL$STATECD)))
-
-    db$POP_EVAL <- db$POP_EVAL %>%
-      filter(END_INVYR %in% numStates$END_INVYR)
-  }
+  # ### Keeping only years where all states represented are reported for
+  # if (length(unique(db$POP_EVAL$STATECD)) > 1){
+  #   # Counting number of states measured by year, remove years which don't include all states
+  #   numStates <- db$POP_EVAL %>%
+  #     group_by(END_INVYR, STATECD) %>%
+  #     summarize() %>%
+  #     group_by(END_INVYR) %>%
+  #     summarize(n = n()) %>%
+  #     filter(n == length(unique(db$POP_EVAL$STATECD)))
+  #
+  #   db$POP_EVAL <- db$POP_EVAL %>%
+  #     filter(END_INVYR %in% numStates$END_INVYR)
+  # }
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
   ids <- db$POP_EVAL %>%
@@ -2268,19 +2268,19 @@ vitalRates <- function(db,
       mutate(CONDPROP_UNADJ = ifelse(COND_CHANGE_CD == 1, CONDPROP_UNADJ, 0)) # Has to be forested currently and at last measurment
   }
 
-  ### Keeping only years where all states represented are reported for
-  if (length(unique(db$POP_EVAL$STATECD)) > 1){
-    # Counting number of states measured by year, remove years which don't include all states
-    numStates <- db$POP_EVAL %>%
-      group_by(END_INVYR, STATECD) %>%
-      summarize() %>%
-      group_by(END_INVYR) %>%
-      summarize(n = n()) %>%
-      filter(n == length(unique(db$POP_EVAL$STATECD)))
-
-    db$POP_EVAL <- db$POP_EVAL %>%
-      filter(END_INVYR %in% numStates$END_INVYR)
-  }
+  # ### Keeping only years where all states represented are reported for
+  # if (length(unique(db$POP_EVAL$STATECD)) > 1){
+  #   # Counting number of states measured by year, remove years which don't include all states
+  #   numStates <- db$POP_EVAL %>%
+  #     group_by(END_INVYR, STATECD) %>%
+  #     summarize() %>%
+  #     group_by(END_INVYR) %>%
+  #     summarize(n = n()) %>%
+  #     filter(n == length(unique(db$POP_EVAL$STATECD)))
+  #
+  #   db$POP_EVAL <- db$POP_EVAL %>%
+  #     filter(END_INVYR %in% numStates$END_INVYR)
+  # }
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
   ids <- db$POP_EVAL %>%
@@ -2589,19 +2589,19 @@ biomass <- function(db,
 
 
 
-  ### Keeping only years where all states represented are reported for
-  if (length(unique(db$POP_EVAL$STATECD)) > 1){
-    # Counting number of states measured by year, remove years which don't include all states
-    numStates <- db$POP_EVAL %>%
-      group_by(END_INVYR, STATECD) %>%
-      summarize() %>%
-      group_by(END_INVYR) %>%
-      summarize(n = n()) %>%
-      filter(n == length(unique(db$POP_EVAL$STATECD)))
-
-    db$POP_EVAL <- db$POP_EVAL %>%
-      filter(END_INVYR %in% numStates$END_INVYR)
-  }
+  # ### Keeping only years where all states represented are reported for
+  # if (length(unique(db$POP_EVAL$STATECD)) > 1){
+  #   # Counting number of states measured by year, remove years which don't include all states
+  #   numStates <- db$POP_EVAL %>%
+  #     group_by(END_INVYR, STATECD) %>%
+  #     summarize() %>%
+  #     group_by(END_INVYR) %>%
+  #     summarize(n = n()) %>%
+  #     filter(n == length(unique(db$POP_EVAL$STATECD)))
+  #
+  #   db$POP_EVAL <- db$POP_EVAL %>%
+  #     filter(END_INVYR %in% numStates$END_INVYR)
+  # }
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
   ids <- db$POP_EVAL %>%
@@ -2902,20 +2902,20 @@ dwm <- function(db,
   # }
 
 
-
-  ### Keeping only years where all states represented are reported for
-  if (length(unique(db$POP_EVAL$STATECD)) > 1){
-    # Counting number of states measured by year, remove years which don't include all states
-    numStates <- db$POP_EVAL %>%
-      group_by(END_INVYR, STATECD) %>%
-      summarize() %>%
-      group_by(END_INVYR) %>%
-      summarize(n = n()) %>%
-      filter(n == length(unique(db$POP_EVAL$STATECD)))
-
-    db$POP_EVAL <- db$POP_EVAL %>%
-      filter(END_INVYR %in% numStates$END_INVYR)
-  }
+#
+#   ### Keeping only years where all states represented are reported for
+#   if (length(unique(db$POP_EVAL$STATECD)) > 1){
+#     # Counting number of states measured by year, remove years which don't include all states
+#     numStates <- db$POP_EVAL %>%
+#       group_by(END_INVYR, STATECD) %>%
+#       summarize() %>%
+#       group_by(END_INVYR) %>%
+#       summarize(n = n()) %>%
+#       filter(n == length(unique(db$POP_EVAL$STATECD)))
+#
+#     db$POP_EVAL <- db$POP_EVAL %>%
+#       filter(END_INVYR %in% numStates$END_INVYR)
+#   }
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
   ids <- db$POP_EVAL %>%
@@ -3265,13 +3265,13 @@ invasive <- function(db,
   #   PET <- db$POP_EVAL_TYP
   #   PEG <- db$POP_EVAL_GRP
   # }
-
-  if (length(unique(db$POP_EVAL$STATECD)) > 1) {
-    numStates <- db$POP_EVAL %>% group_by(END_INVYR, STATECD) %>%
-      summarize() %>% group_by(END_INVYR) %>% summarize(n = n()) %>%
-      filter(n == length(unique(db$POP_EVAL$STATECD)))
-    db$POP_EVAL <- db$POP_EVAL %>% filter(END_INVYR %in% numStates$END_INVYR)
-  }
+#
+#   if (length(unique(db$POP_EVAL$STATECD)) > 1) {
+#     numStates <- db$POP_EVAL %>% group_by(END_INVYR, STATECD) %>%
+#       summarize() %>% group_by(END_INVYR) %>% summarize(n = n()) %>%
+#       filter(n == length(unique(db$POP_EVAL$STATECD)))
+#     db$POP_EVAL <- db$POP_EVAL %>% filter(END_INVYR %in% numStates$END_INVYR)
+#   }
 
   ids <- db$POP_EVAL %>% select("CN", "END_INVYR", "EVALID") %>%
     inner_join(select(db$POP_EVAL_TYP, c("EVAL_CN", "EVAL_TYP")), by = c(CN = "EVAL_CN")) %>%
