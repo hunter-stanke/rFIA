@@ -206,7 +206,7 @@ queries\!
 tpaRI_own <- tpa(fiaRI_MR, 
                      grpBy = 'OWNGRPCD', 
                      treeDomain = DIA > 12 & CCLCD %in% c(1,2),
-                     areaDomain = PHYSCLCD %in% c(20:29))
+                     areaDomain = PHYSCLCD %in% 20:29)
 head(tpaRI_own)
 #>   YEAR OWNGRPCD      TPA      BAA TPA_PERC BAA_PERC   TPA_SE   BAA_SE
 #> 1 2017       30 1.238332 4.783645      100      100 49.84574 49.34242
