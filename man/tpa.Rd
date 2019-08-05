@@ -1,0 +1,146 @@
+\name{tpa}
+\alias{tpa}
+
+\title{Estimate trees per acre & basal area per acre from FIADB}
+
+\description{
+Produces tree per acre (TPA) and basal area per acre (BAA) estimates from FIA data, along with population totals for each variable. Estimates can be produced for regions defined within the FIA Database (ex. counties), at the plot level, or within user-defined areal units. Options to group estimates by species, size class, and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (ex. \code{grpBy = 'STATECD'}). Easy options to implement parallel processing.
+}
+
+\usage{
+tpa(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE,
+    bySizeClass = FALSE, landType = 'forest', treeType = 'live',
+    treeDomain = NULL, areaDomain = NULL, totals = FALSE,
+    byPlot = FALSE, SE = TRUE, progress = TRUE, nCores = 1)
+}
+
+\arguments{
+  \item{db}{\code{FIA.Database} object produced from \code{\link{readFIA}}. Function requires that PLOT, TREE, COND, POP_PLOT_STRATUM_ASSGN, POP_ESTN_UNIT, POP_EVAL, POP_STRATUM, POP_EVAL_TYP, POP_EVAL_GRP tables exist in FIA.Database object.}
+
+\item{grpBy}{character; variables from PLOT, COND, or TREE tables to group estimates by. Multiple grouping variables should be combined with \code{c()}, and grouping will occur heirarchically. For example, to produce seperate estimates for each ownership group within ecoregion subsections, specify \code{c('ECOSUBCD', 'OWNGRPCD')}.}
+
+  \item{polys}{sp or sf Polygon/MultiPolgyon object; Areal units to bin data for estimation. Seperate estimates will be produces for region encompassed by each areal unit.}
+
+  \item{returnSpatial}{logical; if TRUE, return sf spatial object (polys must also be specified).}
+
+  \item{bySpecies}{logical; if TRUE, returns estimates grouped by species.}
+
+  \item{bySizeClass}{logical; if TRUE, returns estimates grouped by size class (2-inch intervals, see \code{\link{makeClasses}} to compute different size class intervals).}
+
+  \item{landType}{character ('forest' or 'timber'); Type of land which estimates will be produced for. Timberland is a subset of forestland (default) which has high site potential and non-reserve status (see details).}
+
+  \item{treeType}{character ('all', 'live', 'dead', or 'gs'); Type of tree which estimates will be produced for. All (default) includes all stems, live and dead, greater than 1 in. DBH. Live/Dead includes all stems greater than 1 in. DBH which are live or dead (leaning less than 45 degrees), respectively. GS (growing-stock) includes live stems greater than 5 in. DBH which contain at least one 8 ft merchantable log.}
+
+  \item{treeDomain}{Logical predicates defined in terms of the variables in PLOT, TREE, and/or COND tables. Used to define the type of trees for which estimates will be produced (ex. DBH greater than 20 inches: \code{DIA > 20}, Dominant/Co-dominant crowns only: \code{CCLCD \%in\% c(2,3))}. Multiple conditions are combined with \code{&} (and) or \code{|} (or). Only trees where the condition evaluates to TRUE are used in producing estimates. Should NOT be quoted.}
+
+  \item{areaDomain}{Logical predicates defined in terms of the variables in PLOT and/or COND tables. Used to define the area for which estimates will be produced (ex. within 1 mile of improved road: \code{RDDISTCD \%in\% c(1:6)}, Hard maple/basswood forest type: \code{FORTYPCD == 805)}. Multiple conditions are combined with \code{&} (and) or \code{|} (or). Only plots within areas where the condition evaluates to TRUE are used in producing estimates. Should NOT be quoted.}
+
+  \item{totals}{logical; if TRUE, return population estimates (ex. total area, total trees) along with ratio estimates (ex. mean trees per acre).}
+
+  \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations (population totals not returned).}
+
+  \item{SE}{logical; if TRUE, returns estimates with samping error (approx. 5x faster without returning samping errors)}
+
+  \item{progress}{logical; if TRUE, a dynamic progress bar is displayed. Approximately 30\% faster when FALSE.}
+
+  \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
+}
+
+\details{
+Estimation of attributes follows the procedures documented in Bechtold & Patterson (2005). Specifically, TPA and BAA are computed using a sample-based ratio-of-means estimator of total trees (BA) / total land area within the domain of interest. Percentages of TPA and BAA in the domain of interest are represented as the total number of trees of a particular type (live, white pine) / total number of trees (live & dead, all species) within the region. The total populations used to compute these percentages will not change by changing treeType, but will vary if the user specifies an areaDomain or treeDomain.
+
+Stratified random sampling techniques are most often employed to compute estimates in recent inventories, although double sampling and simple random sampling may be employed for early inventories. Estimates are adjusted for non-response bias by assuming attributes of non-response plot locations to be equal to the mean of other plots included within thier respective stratum or population.
+
+Forest land must be at least 10-percent stocked by trees of any size, including land that formerly had such tree cover and that will be naturally or artificially regenerated. Forest land includes transition zones, such as areas between heavily forested and nonforested lands that are at least 10-percent stocked with trees and forest areas adjacent to urban and builtup lands. The minimum area for classification of forest land is 1 acre and 120 feet wide measured stem-to-stem from the outer-most edge. Unimproved roads and trails, streams, and clearings in forest areas are classified as forest if less than 120 feet wide. Timber land is a subset of forest land that is producing or is capable of producing crops of industrial wood and not withdrawn from timber utilization by statute or administrative regulation. (Note: Areas qualifying as timberland are capable of producing at least 20 cubic feet per acre per year of industrial wood in natural stands. Currently inaccessible and inoperable areas are NOT included).
+
+Easy, efficient parallelization is implemented with the \code{\link{parallel}} package. Users must only specify the \code{nCores} argument with a value greater than 1 in order to implement parallel processing on their machines. Parallel implementation is achieved using a snow type cluster on any Windows OS, and with multicore forking on any Unix OS (Linux, Mac). Implementing parallel processing may substantially decrease free memory during processing, particularly on Windows OS. Thus, users should be cautious when running in parallel, and consider implementing serial processing for this task (\code{nCores = 1}).
+}
+
+
+\note{All sampling error estimates are returned as percentages, and represent ~68\% confidence (1 standard deviation). To compute sampling error percent with 95\% confidence, multiply by 1.96.}
+
+\value{
+Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}, values are returned for each plot. All variables with names ending in \code{SE}, represent the estimate of sampling error (\%) of the variable. All variables with names ending in \code{TOTAL} represent the population total of the variable.
+
+\itemize{
+      \item{\strong{YEAR}: reporting year associated with estimates}
+      \item{\strong{TPA}: estimate of mean trees per acre}
+      \item{\strong{BAA}: estimate of mean basal area (sq. ft.) per acre }
+      \item{\strong{TPA_PERC}: estimate of mean proportion of trees falling within the domain of interest, with respect to trees per acre}
+      \item{\strong{BAA_PERC}: estimate of mean proportion of trees falling within the domain of interest, with respect to basal area per acre}
+      \item{\strong{nPlots_TREE}: number of non-zero plots used to compute tree and basal area estimates}
+      \item{\strong{nPlots_AREA}: number of non-zero plots used to compute land area estimates}
+      }
+}
+
+\author{
+Hunter Stanke & Andrew Finley, Michigan State University
+}
+
+\references{
+FIA Database User Guide: \url{https://www.fia.fs.fed.us/library/database-documentation/}
+
+Bechtold, W.A.; Patterson, P.L., eds. 2005. The Enhanced Forest Inventory and Analysis Program - National Sampling Design and Estimation Procedures. Gen. Tech. Rep. SRS - 80. Asheville, NC: U.S. Department of Agriculture, Forest Service, Southern Research Station. 85 p. \url{https://www.srs.fs.usda.gov/pubs/gtr/gtr_srs080/gtr_srs080.pdf}
+}
+
+\seealso{
+\code{\link{biomass}}, \code{\link{growMort}}
+}
+
+
+\examples{
+\dontrun{
+
+## Load data from rFIA package
+library(rFIA)
+data(fiaRI)
+data(countiesRI)
+
+
+## Most recent estimates for live stems on forest land by species
+tpa(db = clipFIA(fiaRI, mostRecent = TRUE),
+    landType = 'forest',
+    treeType = 'live',
+    bySpecies = TRUE)
+
+## Most recent estimates for growing-stock on timber land by species
+tpa(db = clipFIA(fiaRI, mostRecent = TRUE),
+    landType = 'timber',
+    treeType = 'gs',
+    bySpecies = TRUE)
+
+## Estimates for snags greater than 20 in DBH on forestland for all
+##  available inventories (time-series)
+tpa(db = fiaRI,
+    landType = 'forest',
+    treeType = 'dead',
+    treeDomain = DIA > 20)
+
+## Same as above, but implemented in parallel (much quicker)
+detectCores() # 4 cores available, we will take 3
+tpa(db = fiaRI,
+    landType = 'forest',
+    treeType = 'dead',
+    treeDomain = DIA > 20,
+    nCores = 3)
+
+## Most recent estimates grouped by stand age on forest land
+# Make a categorical variable which represents stand age (grouped by 10 yr intervals)
+fiaRI$COND$STAND_AGE <- makeClasses(fiaRI$COND$STDAGE, interval = 10)
+tpa(db = clipFIA(fiaRI, mostRecent = TRUE),
+    grpBy = 'STAND_AGE')
+
+## Estimates for live white pine ( > 12" DBH) on forested mesic sites (all available inventories)
+tpa(fiaRI,
+    treeType = 'live',
+    treeDomain = SPCD == 129 & DIA > 12, # Species code for white pine
+    areaDomain = PHYSCLCD \%in\% c(21:29)) # Mesic Physiographic classes
+
+## Most recent estimates for all stems on forest land grouped by user-defined areal units
+ctSF <- tpa(clipFIA(fiaRI, mostRecent = TRUE),
+            polys = countiesRI,
+            returnSpatial = TRUE)
+plot(ctSF) # Plot multiple variables simultaneously
+plot(ctSF['TPA']) # Plot of TPA with color scale
+}
+}
