@@ -18,8 +18,8 @@ the flexibility and potential inherent to the Enhanced FIA design.
 Specifically, `rFIA` improves accessibility to the spatio-temporal
 estimation capacity of the FIA Database by producing space-time indexed
 summaries of forest variables within user-defined population boundaries.
-Direct integration with other popular R packages (e.g., dplyr, sp, and
-sf) facilitates efficient space-time query and data summary, and
+Direct integration with other popular R packages (e.g., `dplyr`, `sp`,
+and `sf`) facilitates efficient space-time query and data summary, and
 supports common data representations and API design. The package
 implements design-based estimation procedures outlined by Bechtold &
 Patterson (2005), and has been validated against estimates and sampling
@@ -64,9 +64,11 @@ devtools::install_github('hunter-stanke/rFIA')
 
 ## Example Usage
 
-\#\#\#\#*Load FIA Data into R* The first step to using `rFIA` is to
-download subsets of the FIA Database from the FIA Datamart. Download a
-state subset by clicking the state of interest here:
+#### *Load FIA Data into R*
+
+The first step to using `rFIA` is to download subsets of the FIA
+Database from the FIA Datamart. Download a state subset by clicking the
+state of interest here:
 <https://apps.fs.usda.gov/fia/datamart/CSV/datamart_csv.html>.
 
 Note: given the massive size of the full FIA Database, users are
@@ -75,15 +77,15 @@ interest.
 
 Once downloaded, simply unzip the files in thier own directory (all
 files in the same directory, with no non-FIA files present), and load
-the database into r using `readFIA`:
+the database into R using `readFIA`:
 
 ``` r
 ## Load FIA Data from a local directory
 db <- readFIA('/path/to/your/directory/')
 ```
 
-By default, readFIA only loads the portions of the database required to
-produce summaries with `rFIA` functions (common = TRUE)
+By default, `readFIA` only loads the portions of the database required
+to produce summaries with `rFIA` functions (`common = TRUE`)
 
 **But what if I want to load multiple states worth of FIA data into R?**
 No problem\! Simply unzip the files from each state download and place
@@ -94,17 +96,18 @@ polygons which straddle state boundaries\!
 
 -----
 
-\#\#\#\#*Compute Estimates of Forest Variables* Now that you have loaded
-your FIA data into R, it’s time to put it to work. Let’s explore the
-basic functionality of `rFIA` with `tpa`, a function to compute tree
-abundance estimates (TPA, BAA, & relative abundance) from FIA data, and
-`fiaRI`, a subset of the FIA Database for Rhode Island including all
-inventories up to 2017.
+#### *Compute Estimates of Forest Variables*
+
+Now that you have loaded your FIA data into R, it’s time to put it to
+work. Let’s explore the basic functionality of `rFIA` with `tpa`, a
+function to compute tree abundance estimates (TPA, BAA, & relative
+abundance) from FIA data, and `fiaRI`, a subset of the FIA Database for
+Rhode Island including all inventories up to 2017.
 
 **Estimate the abundance of live trees in Rhode Island:**
 
 ``` r
-library(`rFIA`)
+library(rFIA)
 ## Load the Rhode Island subset of the FIADB (included w/ rFIA)
 ## NOTE: This object was produced using readFIA
 data("fiaRI")

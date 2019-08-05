@@ -19,7 +19,7 @@ knitr::opts_chunk$set(
 
 The goal of `rFIA` is to increase the accessibility and use of the USFS Forest Inventory and Analysis (FIA) Database by providing a user-friendly, open source platform to easily query and analyze FIA Data. Designed to accommodate a wide range of potential user objectives, `rFIA` simplifies the estimation of forest variables from the FIA Database and allows all R users (experts and newcomers alike) to unlock the flexibility and potential inherent to the Enhanced FIA design.
 
-Specifically, `rFIA` improves accessibility to the spatio-temporal estimation capacity of the FIA Database by producing space-time indexed summaries of forest variables within user-defined population boundaries. Direct integration with other popular R packages (e.g., dplyr, sp, and sf) facilitates efficient space-time query and data summary, and supports common data representations and API design. The package implements design-based estimation procedures outlined by Bechtold & Patterson (2005), and has been validated against estimates and sampling errors produced by EVALIDator. Current development is focused on the implementation of spatially-enabled model-assisted estimators to improve population, change, and ratio estimates.
+Specifically, `rFIA` improves accessibility to the spatio-temporal estimation capacity of the FIA Database by producing space-time indexed summaries of forest variables within user-defined population boundaries. Direct integration with other popular R packages (e.g., `dplyr`, `sp`, and `sf`) facilitates efficient space-time query and data summary, and supports common data representations and API design. The package implements design-based estimation procedures outlined by Bechtold & Patterson (2005), and has been validated against estimates and sampling errors produced by EVALIDator. Current development is focused on the implementation of spatially-enabled model-assisted estimators to improve population, change, and ratio estimates.
 
 You can download subsets of the FIA Database at the FIA Datamart: https://apps.fs.usda.gov/fia/datamart/CSV/datamart_csv.html
 
@@ -56,29 +56,31 @@ devtools::install_github('hunter-stanke/rFIA')
 
 ## Example Usage
 
-####_Load FIA Data into R_
+#### _Load FIA Data into R_
+
 The first step to using `rFIA` is to download subsets of the FIA Database from the FIA Datamart. Download a state subset by clicking the state of interest here: https://apps.fs.usda.gov/fia/datamart/CSV/datamart_csv.html. 
 
 Note: given the massive size of the full FIA Database, users are cautioned to only download the subsets containing their region of interest.
 
-Once downloaded, simply unzip the files in thier own directory (all files in the same directory, with no non-FIA files present), and load the database into r using `readFIA`:
+Once downloaded, simply unzip the files in thier own directory (all files in the same directory, with no non-FIA files present), and load the database into R using `readFIA`:
 ```{r eval = FALSE}
 ## Load FIA Data from a local directory
 db <- readFIA('/path/to/your/directory/')
 ```
-By default, readFIA only loads the portions of the database required to 
-produce summaries with `rFIA` functions (common = TRUE)
+By default, `readFIA` only loads the portions of the database required to 
+produce summaries with `rFIA` functions (`common = TRUE`)
 
 **But what if I want to load multiple states worth of FIA data into R?** No problem! Simply unzip the files from each state download and place them in the same directory. Point `readFIA` to this directory, and it will load and merge the states into a single `FIA.Database` object. This will allow you to use other `rFIA` functions to produce estimates within polygons which straddle state boundaries!
 
 ----
 
-####_Compute Estimates of Forest Variables_
+#### _Compute Estimates of Forest Variables_
+
 Now that you have loaded your FIA data into R, it's time to put it to work. Let's explore the basic functionality of `rFIA` with `tpa`, a function to compute tree abundance estimates (TPA, BAA, & relative abundance) from FIA data, and `fiaRI`, a subset of the FIA Database for Rhode Island including all inventories up to 2017.  
 
 **Estimate the abundance of live trees in Rhode Island:**
 ```{r warning= FALSE, message=FALSE}
-library(`rFIA`)
+library(rFIA)
 ## Load the Rhode Island subset of the FIADB (included w/ rFIA)
 ## NOTE: This object was produced using readFIA
 data("fiaRI")
