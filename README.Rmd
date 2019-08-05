@@ -58,6 +58,7 @@ devtools::install_github('hunter-stanke/rFIA')
 
 #### _Load FIA Data into R_
 
+
 The first step to using `rFIA` is to download subsets of the FIA Database from the FIA Datamart. Download a state subset by clicking the state of interest here: https://apps.fs.usda.gov/fia/datamart/CSV/datamart_csv.html. 
 
 Note: given the massive size of the full FIA Database, users are cautioned to only download the subsets containing their region of interest.
