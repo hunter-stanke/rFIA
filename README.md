@@ -37,7 +37,11 @@ Functionality
 | `dwm`           | Estimate volume, biomass, and carbon stocks of down woody material |
 | `growMort`      | Estimate recruitment, mortality, and harvest rates                 |
 | `invasive`      | Estimate areal coverage of invasive species                        |
+<<<<<<< HEAD
 | `plotFIA`       | Produce static & animated plots of spatial FIA summaries           |
+=======
+| `animateFIA`    | Produce static & animated plots of spatial FIA summaries           |
+>>>>>>> 4a10485314172ed72dfd28251e69fc66ccac46d0
 | `readFIA`       | Load FIA database into R environment                               |
 | `standStruct`   | Estimate forest structural stage distributions                     |
 | `tpa`           | Estimate abundance of standing trees (TPA & BAA)                   |
@@ -72,7 +76,7 @@ Now that you have loaded your FIA data into R, it's time to put it to work. Let'
 **Estimate the abundance of live trees in Rhode Island:**
 
 ``` r
-library(rFIA)
+library(`rFIA`)
 ## Load the Rhode Island subset of the FIADB (included w/ rFIA)
 ## NOTE: This object was produced using readFIA
 data("fiaRI")

@@ -78,7 +78,7 @@ Now that you have loaded your FIA data into R, it's time to put it to work. Let'
 
 **Estimate the abundance of live trees in Rhode Island:**
 ```{r warning= FALSE, message=FALSE}
-library(rFIA)
+library(`rFIA`)
 ## Load the Rhode Island subset of the FIADB (included w/ rFIA)
 ## NOTE: This object was produced using readFIA
 data("fiaRI")
@@ -124,6 +124,7 @@ head(tpaRI_own)
 **What if I want to produce estimates within my own population boundaries (within user-defined spatial zones/polygons)?** This is where things get really exciting. 
 ``` {r warning = FALSE, message = FALSE}
 ## Load the county boundaries for Rhode Island
+library(rFIA)
 data('countiesRI') ## Load your own spatial data from shapefiles using readOGR() (rgdal)
 
 ## polys specifies the polygons (zones) where you are interested in producing estimates
