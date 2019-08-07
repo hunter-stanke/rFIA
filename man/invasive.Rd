@@ -122,7 +122,7 @@ ctSF <- invasive(clipFIA(fiaRI, mostRecent = TRUE),
                  polys = countiesRI,
                  returnSpatial = TRUE)
 plot(ctSF) # Plot multiple variables simultaneously
-plot(ctSF['COVER_PCT'][ctSF$SYMBOL == 'ROMU',]) # Plot Multiflora rose coverage
+plotFIA(ctSF[ctSF$SYMBOL == 'ROMU',], 'COVER_PCT') # Plot Multiflora rose coverage
 }
 }
 

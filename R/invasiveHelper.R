@@ -5,11 +5,11 @@ invasiveHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
   ad = 1
   for (n in 1:ncol(combos[[x]])){
     # Tree domain indicator for each column in
-    tObs <- combos[[x]][[grpBy[n]]] == data[[grpBy[n]]]
+    tObs <- as.character(combos[[x]][[grpBy[n]]]) == as.character(data[[grpBy[n]]])
     td <- data$aDI * tObs * td
     # Area domain indicator for each column in
     if(grpBy[n] %in% aGrpBy){
-      aObs <- combos[[x]][[aGrpBy[n]]] == data[[aGrpBy[n]]]
+      aObs <- as.character(combos[[x]][[aGrpBy[n]]]) == as.character(data[[aGrpBy[n]]])
       aObs[is.na(aObs)] <- 0
       ad <- data$aDI * aObs * ad
 

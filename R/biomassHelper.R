@@ -2,15 +2,34 @@ biomassHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
   # Update domain indicator for each each column speficed in grpBy
   td = 1 # Start both at 1, update as we iterate through
   ad = 1
+  # for (n in 1:ncol(combos[[x]])){
+  #   # Tree domain indicator for each column in
+  #   da <- as.factor(data[[grpBy[n]]])
+  #   co <- factor(combos[[x]][[grpBy[n]]], levels = levels(da))
+  #   tObs <- da == co
+  #   td <- data$tDI * tObs * td
+  #   # Area domain indicator for each column in
+  #   if(grpBy[n] %in% aGrpBy){
+  #     daA <- as.factor(data[[aGrpBy[n]]])
+  #     coA <- factor(combos[[x]][[aGrpBy[n]]], levels = levels(daA))
+  #     aObs <- coA == daA
+  #     aObs[is.na(aObs)] <- 0
+  #     ad <- data$aDI * aObs * ad
+  #   }
+  # }
+
   for (n in 1:ncol(combos[[x]])){
     # Tree domain indicator for each column in
-    tObs <- combos[[x]][[grpBy[n]]] == data[[grpBy[n]]]
+    tObs <- as.character(combos[[x]][[grpBy[n]]]) == as.character(data[[grpBy[n]]])
     td <- data$tDI * tObs * td
+    #pd <- data$pDI * pd
     # Area domain indicator for each column in
     if(grpBy[n] %in% aGrpBy){
-      aObs <- combos[[x]][[aGrpBy[n]]] == data[[aGrpBy[n]]]
+      aObs <- as.character(combos[[x]][[aGrpBy[n]]]) == as.character(data[[aGrpBy[n]]])
       aObs[is.na(aObs)] <- 0
       ad <- data$aDI * aObs * ad
+      pd <- data$pDI * pd * aObs
+
     }
   }
 
@@ -31,12 +50,14 @@ biomassHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
       summarize(nvPlot = sum(VOLCFNET * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
                 svPlot = sum(VOLCSNET * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                bagPlot = sum(DRYBIO_AG * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                bbgPlot = sum(DRYBIO_BG * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                btPlot = sum(sum(DRYBIO_AG,DRYBIO_BG,na.rm = TRUE) * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                cagPlot = sum(CARBON_AG * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                cbgPlot = sum(CARBON_BG * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                ctPlot = sum(sum(CARBON_AG,CARBON_BG,na.rm=TRUE) * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
+                bagPlot = sum(DRYBIO_AG * TPA_UNADJ * tAdj * tDI  / 2000, na.rm = TRUE),
+                bbgPlot = sum(DRYBIO_BG * TPA_UNADJ * tAdj * tDI  / 2000, na.rm = TRUE),
+                #btPlot = sum(sum(DRYBIO_AG,DRYBIO_BG,na.rm = TRUE) * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
+                btPlot = sum(bagPlot, bbgPlot, na.rm = TRUE),
+                cagPlot = sum(CARBON_AG * TPA_UNADJ * tAdj * tDI / 2000, na.rm = TRUE),
+                cbgPlot = sum(CARBON_BG * TPA_UNADJ * tAdj * tDI / 2000, na.rm = TRUE),
+                #ctPlot = sum(sum(CARBON_AG,CARBON_BG,na.rm=TRUE) * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
+                ctPlot = sum(cagPlot, cbgPlot, na.rm = TRUE),
                 plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0),
                 a = first(AREA_USED),
                 p1EU = first(P1PNTCNT_EU),
@@ -279,10 +300,10 @@ biomassHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
       group_by(.dots = grpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
       summarize(nvPlot = sum(VOLCFNET * TPA_UNADJ * tAdj * tDI * EXPNS, na.rm = TRUE),
                 svPlot = sum(VOLCSNET * TPA_UNADJ * tAdj * tDI * EXPNS, na.rm = TRUE),
-                bagPlot = sum(DRYBIO_AG * TPA_UNADJ * tAdj * tDI * EXPNS, na.rm = TRUE),
-                bbgPlot = sum(DRYBIO_BG * TPA_UNADJ * tAdj * tDI * EXPNS, na.rm = TRUE),
-                cagPlot = sum(CARBON_AG * TPA_UNADJ * tAdj * tDI * EXPNS, na.rm = TRUE),
-                cbgPlot = sum(CARBON_BG * TPA_UNADJ * tAdj * tDI * EXPNS, na.rm = TRUE),
+                bagPlot = sum(DRYBIO_AG * TPA_UNADJ * tAdj * tDI * EXPNS  / 2000, na.rm = TRUE),
+                bbgPlot = sum(DRYBIO_BG * TPA_UNADJ * tAdj * tDI * EXPNS  / 2000, na.rm = TRUE),
+                cagPlot = sum(CARBON_AG * TPA_UNADJ * tAdj * tDI * EXPNS  / 2000, na.rm = TRUE),
+                cbgPlot = sum(CARBON_BG * TPA_UNADJ * tAdj * tDI * EXPNS  / 2000, na.rm = TRUE),
                 plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0)) %>%
       group_by(.dots = grpBy) %>%
       summarize(NETVOL_TOTAL = sum(nvPlot, na.rm = TRUE),

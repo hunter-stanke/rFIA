@@ -52,7 +52,7 @@ Estimation of attributes follows the procedures documented in Bechtold & Patters
 
 Net volume estimates (\code{NETVOL}) include only the volume of wood in the central stem of a sample tree, from a 1-foot stump to a minimum 4-inch top diameter, or to where the central stem breaks into limbs all of which are <4.0 inches in diameter. Does not include rotten, missing, and form cull portions of the main stem. Saw Volume estimates (\code{SAWVOL}) incldue the net volume in the sawlog portion of the tree, from a 1-foot stump to a 9 inches (hardwood) or 7 inches (softwood) top. All volume estimates are reported in cubic feet (cu. ft. / acre). For estimates in board feet, multiply output values by 12.
 
-Biomass (\code{BIO}) and carbon (\code{CARB}) estimates are computed seperately for aboveground (AG) and belowground (BG) stocks, and their totals are the summation of above and belowground stocks. All biomass and carbon estimates are reported in oven-dry mass (pounds). Belowground mass for an individual tree includes modeled estimates for coarse roots (> 0.1"). Above ground mass includes all portions of a tree above the root collar, excluding foliage.
+Biomass (\code{BIO}) and carbon (\code{CARB}) estimates are computed seperately for aboveground (AG) and belowground (BG) stocks, and their totals are the summation of above and belowground stocks. All biomass and carbon estimates are reported in oven-dry mass (short tons). Belowground mass for an individual tree includes modeled estimates for coarse roots (> 0.1"). Above ground mass includes all portions of a tree above the root collar, excluding foliage.
 
 Stratified random sampling techniques are most often employed to compute estimates in recent inventories, although double sampling and simple random sampling may be employed for early inventories. Estimates are adjusted for non-response bias by assuming attributes of non-response plot locations to be equal to the mean of other plots included within thier respective stratum or population.
 
@@ -70,12 +70,12 @@ Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}
       \item{\strong{YEAR}: reporting year associated with estimates}
       \item{\strong{NETVOL_ACRE}: estimate of mean net volume per acre (cu.ft./acre)}
       \item{\strong{SAWVOL_ACRE}: estimate of mean merchantable saw volume per acre (cu.ft./acre)}
-      \item{\strong{BIO_AG_ACRE}: estimate of mean aboveground biomass per acre (lbs/acre)}
-      \item{\strong{BIO_BG_ACRE}: estimate of mean belowground biomass per acre (lbs/acre)}
-      \item{\strong{BIO_ACRE}: estimate of mean total biomass per acre (lbs/acre)}
-      \item{\strong{CARB_AG_ACRE}: estimate of mean aboveground carbon per acre (lbs/acre)}
-      \item{\strong{CARB_BG_ACRE}: estimate of mean belowground carbon per acre (lbs/acre)}
-      \item{\strong{CARB_ACRE}: estimate of mean total carbon per acre (lbs/acre)}
+      \item{\strong{BIO_AG_ACRE}: estimate of mean aboveground biomass per acre (tons/acre)}
+      \item{\strong{BIO_BG_ACRE}: estimate of mean belowground biomass per acre (tons/acre)}
+      \item{\strong{BIO_ACRE}: estimate of mean total biomass per acre (tons/acre)}
+      \item{\strong{CARB_AG_ACRE}: estimate of mean aboveground carbon per acre (tons/acre)}
+      \item{\strong{CARB_BG_ACRE}: estimate of mean belowground carbon per acre (tons/acre)}
+      \item{\strong{CARB_ACRE}: estimate of mean total carbon per acre (tons/acre)}
       \item{\strong{nPlots_VOL}: number of non-zero plots used to compute volume, biomass, & carbon estimates}
       \item{\strong{nPlots_AREA}: number of non-zero plots used to compute land area estimates}
       }
@@ -147,7 +147,7 @@ ctSF <- biomass(clipFIA(fiaRI, mostRecent = TRUE),
                 polys = countiesRI,
                 returnSpatial = TRUE)
 plot(ctSF) # Plot multiple variables simultaneously
-plot(ctSF['BIO_AG_ACRE'], key.pos = 1) # Plot of aboveground biomass per acre with color scale
+plotFIA(ctSF, 'BIO_AG_ACRE') # Plot of aboveground biomass per acre
 
 }
 }

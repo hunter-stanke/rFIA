@@ -145,6 +145,6 @@ ctSF <- vitalRates(clipFIA(fiaRI, mostRecent = TRUE),
                    polys = countiesRI,
                    returnSpatial = TRUE)
 plot(ctSF) # Plot multiple variables simultaneously
-plot(ctSF['BAA_GROW']) # Plot of BAA Growth with color scale
+plotFIA(ctSF, 'BAA_GROW') # Plot of BAA Growth with color scale
 }
 }

@@ -138,7 +138,7 @@ ctSF <- growMort(clipFIA(fiaRI, mostRecent = TRUE),
                  polys = countiesRI,
                  returnSpatial = TRUE)
 plot(ctSF) # Plot multiple variables simultaneously
-plot(ctSF['MORT_TPA']) # Plot of Mortality TPA with color scale
+plotFIA(ctSF, 'MORT_TPA') # Plot of Mortality TPA with color scale
 }
 }
 

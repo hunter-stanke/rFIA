@@ -119,7 +119,7 @@ dwmSF <- dwm(clipFIA(fiaRI, mostRecent = TRUE),
             returnSpatial = TRUE,
             tidy = FALSE)
 plot(dwmSF)
-plot(dwmSF['BIO_ACRE'], key.pos = 1) # TOTAL BIOMASS / ACRE (tons)
+plotFIA(dwmSF, 'BIO_ACRE') # TOTAL BIOMASS / ACRE (tons)
 }
 }
 

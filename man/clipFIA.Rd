@@ -18,7 +18,7 @@ clipFIA(db, mostRecent = TRUE, mask = NULL, matchEval = FALSE,
 
   \item{mask}{sp or sf Polygon/MultiPolgyon object; defines the boundaries of spatial intersection with FIA tables.}
 
-  \item{matchEval}{logical; if TRUE, returns subset of data for which there are matching reporting years across states. Only useful if db contains mulitple state subsets of the FIA database.}
+  \item{matchEval}{logical; if TRUE, returns subset of data for which there are matching reporting years across states. Only useful if db contains mulitple state subsets of the FIA database. If \code{mostRecent = TRUE} & \code{mask} contains polygon objects which cross state boundaries, will return the most recent subset of data within each polygon, disregarding differences in reporting years between states.}
 
   \item{evalID}{character; unique value which identifies an inventory year and inventory type for a state. If you would like to subset data for an inventory year other than the most recent, use \code{\link{findEVALID}} to look locate this value (see Examples below).}
 

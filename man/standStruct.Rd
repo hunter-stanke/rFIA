@@ -134,6 +134,6 @@ sdSF <- standStruct(clipFIA(fiaRI, mostRecent = TRUE),
             returnSpatial = TRUE,
             tidy = FALSE)
 plot(sdSF)
-plot(sdSF['POLE_PERC'], key.pos = 1)
+plotFIA(sdSF, 'POLE_PERC')
 }
 }
