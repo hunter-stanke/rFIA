@@ -3,7 +3,7 @@ dwmHelper <- function(x, combos, data, grpBy, totals, SE){
   ad = 1
   for (n in 1:ncol(combos[[x]])){
     # Area domain indicator for each column in
-    aObs <- combos[[x]][[grpBy[n]]] == data[[grpBy[n]]]
+    aObs <- as.character(combos[[x]][[grpBy[n]]]) == as.character(data[[grpBy[n]]])
     ad <- data$aDI * aObs * ad
   }
 

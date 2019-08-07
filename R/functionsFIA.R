@@ -295,7 +295,7 @@ print.FIA.Database <- function(x, ...){
 #' @import sf
 #' @import stringr
 #' @import gganimate
-#' @importFrom ggplot2 ggplot geom_sf labs scale_fill_viridis_c theme_minimal theme aes element_blank element_text unit
+#' @importFrom ggplot2 ggplot geom_sf labs scale_fill_viridis_c theme_minimal theme aes element_blank element_text unit ggsave
 #' @importFrom parallel makeCluster detectCores mclapply parLapply
 #' @importFrom tidyr gather
 #' @importFrom pbapply pblapply
@@ -343,6 +343,9 @@ readFIA <- function(dir,
     }
   }
 
+  # Only csvs
+  files <- files[str_sub(files,-4,-1) == '.csv']
+
   # Only extract the tables needed to run functions in rFIA
   if (common){
     cFiles <- c('COND', 'COND_DWM_CALC', 'INVASIVE_SUBPLOT_SPP', 'PLOT', 'POP_ESTN_UNIT',
@@ -354,6 +357,7 @@ readFIA <- function(dir,
       files <- files[str_sub(files,1,-5) %in% cFiles]
     }
   }
+
 
   ## Compute estimates in parallel -- Clusters in windows, forking otherwise
   if (Sys.info()['sysname'] == 'Windows'){
@@ -376,7 +380,7 @@ readFIA <- function(dir,
         subList <- inTables[str_sub(tableNames, 4) == unique(str_sub(tableNames,4))[i]]
         name <- unique(str_sub(tableNames, 4, -5))[i]
         # Give a ton of warnings about factors and characters, don't do that
-        outTables[[name]] <- suppressWarnings(bind_rows(subList))
+        outTables[[name]] <- suppressWarnings(do.call(rbind, subList))
       }
     } else {
       outTables <- inTables
@@ -388,7 +392,7 @@ readFIA <- function(dir,
         subList <- inTables[tableNames == unique(tableNames)[i]]
         name <- unique(str_sub(tableNames, 1, -5))[i]
         # Give a ton of warnings about factors and characters, don't do that
-        outTables[[name]] <- suppressWarnings(bind_rows(subList))
+        outTables[[name]] <- suppressWarnings(do.call(rbind, subList))
       }
     } else {
       outTables <- inTables
@@ -503,24 +507,6 @@ clipFIA <- function(db,
   }
 
 
-  if(matchEval){
-    ### Keeping only years where all states represented are reported for
-    if (length(unique(db$POP_EVAL$STATECD)) > 1){
-      # Counting number of states measured by year, remove years which don't include all states
-      numStates <- db$POP_EVAL %>%
-        group_by(END_INVYR, STATECD) %>%
-        summarize() %>%
-        group_by(END_INVYR) %>%
-        summarize(n = n()) %>%
-        filter(n == length(unique(db$POP_EVAL$STATECD)))
-
-      db$POP_EVAL <- db$POP_EVAL %>%
-        filter(END_INVYR %in% numStates$END_INVYR)
-    }
-  }
-
-
-
   if('GRM_COND' %in% names(db) == FALSE & mostRecent & nrow(db$SUBP_COND_CHNG_MTRX) > 1){
     ## Modify the Subplot Condition Change matrix to include current and previous condition status
     db$SUBP_COND_CHNG_MTRX <- db$SUBP_COND_CHNG_MTRX %>%
@@ -554,29 +540,22 @@ clipFIA <- function(db,
     # Extract plots which relate to specified EVALID
     db$PLOT <- db$PLOT[db$PLOT$CN %in% tempData$PLT_CN,]
   }
+
   ## Locate the most recent EVALID and subset plots
   if (mostRecent){
-    # # Join appropriate tables and filter out specified EVALIDs
-    # tempData <- db$PLOT %>%
-    #   mutate(PLT_CN = CN) %>%
-    #   inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID')), by = 'PLT_CN') %>%
-    #   #inner_join(select(POP_ESTN_UNIT, c('EVAL_GRP_CN', 'EVALID')), by = 'EVAL_GRP_CN') %>%
-    #   inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'END_INVYR')), by = 'EVALID') %>%
-    #   inner_join(db$POP_EVAL_GRP, by = c('EVAL_GRP_CN' = 'CN'))
-
     tempData <- db$PLOT %>%
       mutate(PLT_CN = CN) %>%
       inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
       inner_join(select(db$POP_STRATUM, -c('STATECD', 'RSCD')), by = c('STRATUM_CN' = 'CN')) %>%
       inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-      inner_join(select(db$POP_EVAL, c('EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+      inner_join(select(db$POP_EVAL, c('EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM', 'LOCATION_NM')), by = c('EVAL_CN' = 'CN')) %>%
       inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
       inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) #%>%
 
      if(any(unique(db$PLOT$STATECD) %in% c(69, 72, 78, 41, 53))){
       tempMR <- tempData %>%
         filter(STATECD %in% c(69, 72, 78, 41, 53) == FALSE) %>%
-        group_by(STATECD) %>%
+        group_by(LOCATION_NM) %>%
         filter(END_INVYR == max(END_INVYR, na.rm = TRUE))
       tempFULL <- tempData %>%
         filter(STATECD %in% c(69, 72, 78, 41, 53))
@@ -584,31 +563,9 @@ clipFIA <- function(db,
 
      } else {
       tempData <- tempData %>%
-        group_by(STATECD) %>%
+        group_by(LOCATION_NM) %>%
         filter(END_INVYR == max(END_INVYR, na.rm = TRUE))
      }
-
-
-    #   # Different states have different most recents
-    # for (i in 1:length(unique(db$PLOT$STATECD))){
-    #   sts <- unique(db$PLOT$STATECD)
-    #   if(sts[i] %in% c(69, 72, 78, 41, 53) == FALSE){
-    #     tempData <- tempData[]
-    #   }
-    # }
-    #   group_by(STATECD) %>%
-    #   filter(if (first(STATECD) %in% c(69, 72, 78, 41, 53) == FALSE) END_INVYR == max(END_INVYR, na.rm = TRUE)) #%>%
-    #   {if (STATECD %in% c(69, 72, 78, 41, 53)) . else filter(., END_INVYR == max(END_INVYR, na.rm = TRUE))} #%>%
-    #   #filter(END_INVYR == max(END_INVYR, na.rm = TRUE))
-
-
-    # ## For each state present, snag the most recent evaluation group
-    # grps <- tempData %>%
-    #   group_by(STATECD) %>%
-    #   filter(END_INVYR == max(END_INVYR, na.rm = TRUE))
-    # # Filter out only data pertaining to these eval groups
-    # tempData <- tempData %>%
-    #   filter(EVAL_GRP %in% grps$EVAL_GRP)
 
     # Both most recent and EVALID is specified, pulls most recent subset of the evalids given
     if (!is.null(evalID)){
@@ -625,6 +582,22 @@ clipFIA <- function(db,
 
     # Write out evalids sot aht we don't have to repeat above later
     evalid <- unique(tempData$EVALID)
+
+    ## If not most recent, but still want matching evals, go for it.
+    } else if (matchEval){
+    ### Keeping only years where all states represented are reported for
+    if (length(unique(db$POP_EVAL$STATECD)) > 1){
+      # Counting number of states measured by year, remove years which don't include all states
+      numStates <- db$POP_EVAL %>%
+        group_by(END_INVYR, STATECD) %>%
+        summarize() %>%
+        group_by(END_INVYR) %>%
+        summarize(n = n()) %>%
+        filter(n == length(unique(db$POP_EVAL$STATECD)))
+
+      db$POP_EVAL <- db$POP_EVAL %>%
+        filter(END_INVYR %in% numStates$END_INVYR)
+    }
   }
 
 
@@ -658,7 +631,6 @@ clipFIA <- function(db,
                  fct_explicit_na,
                  na_level = "NA")
 
-
      ## Make plot data spatial, projected same as polygon layer
      pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
      coordinates(pltSF) <- ~LON+LAT
@@ -666,16 +638,13 @@ clipFIA <- function(db,
      pltSF <- as(pltSF, 'sf') %>%
        st_transform(crs = st_crs(mask)$proj4string)
 
-
-
      # Intersect plot with polygons
-     #mask$polyID <- 1:nrow(mask)
+     mask$polyID <- 1:nrow(mask)
      suppressMessages({
        pltSF <- st_intersection(pltSF, mask) %>%
          as.data.frame() %>%
          select(-c('geometry')) # removes artifact of SF object
      })
-
 
      # Identify the estimation units to which plots within the mask belong to
      estUnits <- pltSF %>%
@@ -683,7 +652,6 @@ clipFIA <- function(db,
        inner_join(select(db$POP_STRATUM, c('CN', 'ESTN_UNIT_CN')), by = c('STRATUM_CN' = 'CN')) %>%
        group_by(ESTN_UNIT_CN) %>%
        summarize()
-
 
      # Identify all the plots which fall inside the above estimation units
      plts <- db$PLOT %>%
@@ -693,54 +661,8 @@ clipFIA <- function(db,
        group_by(PLT_CN) %>%
        summarize()
 
-
      # Clip out the above plots from the full database, will reduce size by a shit pile
      db$PLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% plts$PLT_CN)
-
-
-    # ## Make a seperate spatial object
-    # plotSP <- db$PLOT
-    # ## Make plot data spatial
-    # coordinates(plotSP) <- ~LON+LAT
-    # proj4string(plotSP) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-    #
-    # ## Deal with projections and different spatial data types
-    # if(any(class(mask) == 'SpatialPolygonsDataFrame') | any(class(mask) == 'SpatialPolygons')) {
-    #   plotSP <- spTransform(plotSP, CRSobj = proj4string(mask))
-    #   polysSF <- as(mask, 'sf')
-    #   plotSF <- as(plotSP, 'sf')
-    # } else if(any(class(mask) == 'sf')){
-    #   plotSF <- as(plotSP, 'sf')
-    #   plotSF <- st_transform(plotSF, crs = st_crs(mask)$proj4string)
-    #   polysSF <- mask
-    # }
-    #
-    # ## Intersect plot with areal unit & UD temporal window and grab all the unique estimation units
-    # #PLOT <- st_intersection(plotSF, polysSF)
-    #
-    # # Identify the estimation units that we need
-    # suppressMessages({
-    # estUnits <- st_intersection(select(plotSF, 'PLT_CN'), polysSF) %>%
-    #   data.frame() %>%
-    #   inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'STRATUM_CN')), by = 'PLT_CN') %>%
-    #   inner_join(select(db$POP_STRATUM, c('CN', 'ESTN_UNIT_CN')), by = c('STRATUM_CN' = 'CN')) %>%
-    #   distinct(ESTN_UNIT_CN)
-    # })
-    #
-    # # Snag only the plots which fall inside the estimation units we are interested in
-    # plts <- db$POP_STRATUM %>%
-    #   select(c('CN', 'ESTN_UNIT_CN')) %>%
-    #   inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'STRATUM_CN')), by = c('CN' = 'STRATUM_CN')) %>%
-    #   filter(ESTN_UNIT_CN %in% estUnits$ESTN_UNIT_CN)
-    # db$PLOT <- db$PLOT %>%
-    #   filter(PLT_CN %in% plts$PLT_CN)
-
-    # ## Add coordinates back in to dataframe
-    # coords <- st_coordinates(PLOT)
-    # PLOT <- PLOT %>%
-    #   data.frame() %>%
-    #   mutate(LAT = coords[,2]) %>%
-    #   mutate(LON = coords[,1])
 
     ## IF ozone is specified, do a seperate intersection (PLOTs not colocated w/ veg PLOTs)
     if (!is.null(db$OZONE_PLOT)) {
@@ -764,6 +686,13 @@ clipFIA <- function(db,
     }
    }
 
+  #### TO deal with polygons which cross state boundaries with different most recent inventory years
+  if(matchEval & mostRecent & !is.null(mask)){
+    # do a spatial intersection with plot to id poly, then merge the years in pop_eval
+    evals <- pltSF %>%
+      inner_join(db$POP_EVAL)
+    # use pltSF from above
+  }
 
 
 

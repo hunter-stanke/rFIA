@@ -141,6 +141,6 @@ ctSF <- tpa(clipFIA(fiaRI, mostRecent = TRUE),
             polys = countiesRI,
             returnSpatial = TRUE)
 plot(ctSF) # Plot multiple variables simultaneously
-plot(ctSF['TPA']) # Plot of TPA with color scale
+plotFIA(ctSF, 'TPA') # Plot of TPA with color scale
 }
 }

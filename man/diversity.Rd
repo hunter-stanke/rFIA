@@ -137,6 +137,6 @@ ctSF <- diversity(clipFIA(fiaRI, mostRecent = TRUE),
                   polys = countiesRI,
                   returnSpatial = TRUE)
 plot(ctSF) # Plot multiple variables simultaneously
-plot(ctSF['H_a']) # Plot of TPA with color scale
+plotFIA(ctSF, 'H_a') # Plot of mean Shannons Index of stands
 }
 }
