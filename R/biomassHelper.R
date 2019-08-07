@@ -22,14 +22,11 @@ biomassHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
     # Tree domain indicator for each column in
     tObs <- as.character(combos[[x]][[grpBy[n]]]) == as.character(data[[grpBy[n]]])
     td <- data$tDI * tObs * td
-    #pd <- data$pDI * pd
     # Area domain indicator for each column in
     if(grpBy[n] %in% aGrpBy){
       aObs <- as.character(combos[[x]][[aGrpBy[n]]]) == as.character(data[[aGrpBy[n]]])
       aObs[is.na(aObs)] <- 0
       ad <- data$aDI * aObs * ad
-      pd <- data$pDI * pd * aObs
-
     }
   }
 
