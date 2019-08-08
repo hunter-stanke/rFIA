@@ -598,6 +598,7 @@ clipFIA <- function(db,
       db$POP_EVAL <- db$POP_EVAL %>%
         filter(END_INVYR %in% numStates$END_INVYR)
     }
+
   }
 
 
@@ -686,13 +687,15 @@ clipFIA <- function(db,
     }
    }
 
-  #### TO deal with polygons which cross state boundaries with different most recent inventory years
-  if(matchEval & mostRecent & !is.null(mask)){
-    # do a spatial intersection with plot to id poly, then merge the years in pop_eval
-    evals <- pltSF %>%
-      inner_join(db$POP_EVAL)
-    # use pltSF from above
-  }
+  # Starting w/ the most recent subset by state, just want to merge END_INVYR where we have overlapping polygons
+
+  # #### TO deal with polygons which cross state boundaries with different most recent inventory years
+  # if(matchEval & mostRecent & !is.null(mask)){
+  #   # do a spatial intersection with plot to id poly, then merge the years in pop_eval
+  #   evals <- pltSF %>%
+  #     inner_join(db$POP_EVAL)
+  #   # use pltSF from above
+  # }
 
 
 
@@ -856,6 +859,8 @@ clipFIA <- function(db,
     clippedData <- list(db$PLOT, db$OZONE_PLOT)
   }
 
+  if (mostRecent) clippedData$mostRecent <- TRUE
+
   class(clippedData) <- 'FIA.Database'
   return(clippedData)
 }
@@ -916,21 +921,6 @@ standStruct <- function(db,
 
   message('Joining FIA Tables.....')
 
-
-
-  # ### Keeping only years where all states represented are reported for
-  # if (length(unique(db$POP_EVAL$STATECD)) > 1){
-  #   # Counting number of states measured by year, remove years which don't include all states
-  #   numStates <- db$POP_EVAL %>%
-  #     group_by(END_INVYR, STATECD) %>%
-  #     summarize() %>%
-  #     group_by(END_INVYR) %>%
-  #     summarize(n = n()) %>%
-  #     filter(n == length(unique(db$POP_EVAL$STATECD)))
-  #
-  #   db$POP_EVAL <- db$POP_EVAL %>%
-  #     filter(END_INVYR %in% numStates$END_INVYR)
-  # }
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
   ids <- db$POP_EVAL %>%
@@ -1003,6 +993,19 @@ standStruct <- function(db,
                             `Subsampling units of unequal size` = 'simple')
   if(!is.null(polys)){
     data <- left_join(data, pltSF, by = 'PLT_CN')
+
+    # Test if any polygons cross state boundaries w/ different recent inventory years
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+      mergeYears <- pltSF %>%
+        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        group_by(polyID) %>%
+        summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+    }
+    # Replace YEAR from above w/ max year so that data is pooled across states
+    data <- inner_join(data, mergeYears, by = 'polyID') %>%
+      select(-c(YEAR)) %>%
+      mutate(YEAR = maxYear)
   }
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
   # Land type domain indicator
@@ -1322,6 +1325,19 @@ diversity <- function(db,
                             `Subsampling units of unequal size` = 'simple')
   if(!is.null(polys)){
     data <- left_join(data, pltSF, by = 'PLT_CN')
+
+    # Test if any polygons cross state boundaries w/ different recent inventory years
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+      mergeYears <- pltSF %>%
+        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        group_by(polyID) %>%
+        summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+    }
+    # Replace YEAR from above w/ max year so that data is pooled across states
+    data <- inner_join(data, mergeYears, by = 'polyID') %>%
+      select(-c(YEAR)) %>%
+      mutate(YEAR = maxYear)
   }
 
 
@@ -1585,12 +1601,6 @@ tpa <- function(db,
         as.data.frame() %>%
         select(-c('geometry')) # removes artifact of SF object
     })
-    # Produces bugs, no idea why
-    #db$PLOT <- left_join(db$PLOT, pltSF, by = 'PLT_CN')
-
-    # # Convert back to dataframe
-    # db$PLOT <- as.data.frame(db$PLOT) %>%
-    #   select(-c('geometry')) # removes artifact of SF object
 
   } else if (byPlot & returnSpatial){
     ## Make plot data spatial, projected same as polygon layer
@@ -1623,6 +1633,19 @@ tpa <- function(db,
                             `Subsampling units of unequal size` = 'simple')
   if(!is.null(polys)){
     data <- left_join(data, pltSF, by = 'PLT_CN')
+
+    # Test if any polygons cross state boundaries w/ different recent inventory years
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+      mergeYears <- pltSF %>%
+        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        group_by(polyID) %>%
+        summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+    }
+    # Replace YEAR from above w/ max year so that data is pooled across states
+    data <- inner_join(data, mergeYears, by = 'polyID') %>%
+      select(-c(YEAR)) %>%
+      mutate(YEAR = maxYear)
   }
 
 
@@ -1955,6 +1978,19 @@ growMort <- function(db,
                             `Subsampling units of unequal size` = 'simple')
   if(!is.null(polys)){
     data <- left_join(data, pltSF, by = 'PLT_CN')
+
+    # Test if any polygons cross state boundaries w/ different recent inventory years
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+      mergeYears <- pltSF %>%
+        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        group_by(polyID) %>%
+        summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+    }
+    # Replace YEAR from above w/ max year so that data is pooled across states
+    data <- inner_join(data, mergeYears, by = 'polyID') %>%
+      select(-c(YEAR)) %>%
+      mutate(YEAR = maxYear)
   }
 
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
@@ -2197,19 +2233,6 @@ vitalRates <- function(db,
       mutate(CONDPROP_UNADJ = ifelse(COND_CHANGE_CD == 1, CONDPROP_UNADJ, 0)) # Has to be forested currently and at last measurment
   }
 
-  # ### Keeping only years where all states represented are reported for
-  # if (length(unique(db$POP_EVAL$STATECD)) > 1){
-  #   # Counting number of states measured by year, remove years which don't include all states
-  #   numStates <- db$POP_EVAL %>%
-  #     group_by(END_INVYR, STATECD) %>%
-  #     summarize() %>%
-  #     group_by(END_INVYR) %>%
-  #     summarize(n = n()) %>%
-  #     filter(n == length(unique(db$POP_EVAL$STATECD)))
-  #
-  #   db$POP_EVAL <- db$POP_EVAL %>%
-  #     filter(END_INVYR %in% numStates$END_INVYR)
-  # }
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
   ids <- db$POP_EVAL %>%
@@ -2288,8 +2311,21 @@ vitalRates <- function(db,
                             `Double sampling for stratification` = 'double',
                             `Simple random sampling` = 'simple',
                             `Subsampling units of unequal size` = 'simple')
-  if (!is.null(polys)){
+  if(!is.null(polys)){
     data <- left_join(data, pltSF, by = 'PLT_CN')
+
+    # Test if any polygons cross state boundaries w/ different recent inventory years
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+      mergeYears <- pltSF %>%
+        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        group_by(polyID) %>%
+        summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+    }
+    # Replace YEAR from above w/ max year so that data is pooled across states
+    data <- inner_join(data, mergeYears, by = 'polyID') %>%
+      select(-c(YEAR)) %>%
+      mutate(YEAR = maxYear)
   }
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
   # Land type domain indicator
@@ -2516,21 +2552,22 @@ biomass <- function(db,
   #   PEG <- db$POP_EVAL_GRP
   # }
 
+  if(!is.null(polys)){
+    data <- left_join(data, pltSF, by = 'PLT_CN')
 
-
-  # ### Keeping only years where all states represented are reported for
-  # if (length(unique(db$POP_EVAL$STATECD)) > 1){
-  #   # Counting number of states measured by year, remove years which don't include all states
-  #   numStates <- db$POP_EVAL %>%
-  #     group_by(END_INVYR, STATECD) %>%
-  #     summarize() %>%
-  #     group_by(END_INVYR) %>%
-  #     summarize(n = n()) %>%
-  #     filter(n == length(unique(db$POP_EVAL$STATECD)))
-  #
-  #   db$POP_EVAL <- db$POP_EVAL %>%
-  #     filter(END_INVYR %in% numStates$END_INVYR)
-  # }
+    # Test if any polygons cross state boundaries w/ different recent inventory years
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+      mergeYears <- pltSF %>%
+        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        group_by(polyID) %>%
+        summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+    }
+    # Replace YEAR from above w/ max year so that data is pooled across states
+    data <- inner_join(data, mergeYears, by = 'polyID') %>%
+      select(-c(YEAR)) %>%
+      mutate(YEAR = maxYear)
+  }
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
   ids <- db$POP_EVAL %>%
@@ -2831,21 +2868,6 @@ dwm <- function(db,
   # }
 
 
-#
-#   ### Keeping only years where all states represented are reported for
-#   if (length(unique(db$POP_EVAL$STATECD)) > 1){
-#     # Counting number of states measured by year, remove years which don't include all states
-#     numStates <- db$POP_EVAL %>%
-#       group_by(END_INVYR, STATECD) %>%
-#       summarize() %>%
-#       group_by(END_INVYR) %>%
-#       summarize(n = n()) %>%
-#       filter(n == length(unique(db$POP_EVAL$STATECD)))
-#
-#     db$POP_EVAL <- db$POP_EVAL %>%
-#       filter(END_INVYR %in% numStates$END_INVYR)
-#   }
-
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
   ids <- db$POP_EVAL %>%
     select('CN', 'END_INVYR', 'EVALID') %>%
@@ -2913,6 +2935,19 @@ dwm <- function(db,
                             `Subsampling units of unequal size` = 'simple')
   if(!is.null(polys)){
     data <- left_join(data, pltSF, by = 'PLT_CN')
+
+    # Test if any polygons cross state boundaries w/ different recent inventory years
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+      mergeYears <- pltSF %>%
+        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        group_by(polyID) %>%
+        summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+    }
+    # Replace YEAR from above w/ max year so that data is pooled across states
+    data <- inner_join(data, mergeYears, by = 'polyID') %>%
+      select(-c(YEAR)) %>%
+      mutate(YEAR = maxYear)
   }
 
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
@@ -3194,13 +3229,7 @@ invasive <- function(db,
   #   PET <- db$POP_EVAL_TYP
   #   PEG <- db$POP_EVAL_GRP
   # }
-#
-#   if (length(unique(db$POP_EVAL$STATECD)) > 1) {
-#     numStates <- db$POP_EVAL %>% group_by(END_INVYR, STATECD) %>%
-#       summarize() %>% group_by(END_INVYR) %>% summarize(n = n()) %>%
-#       filter(n == length(unique(db$POP_EVAL$STATECD)))
-#     db$POP_EVAL <- db$POP_EVAL %>% filter(END_INVYR %in% numStates$END_INVYR)
-#   }
+
 
   ids <- db$POP_EVAL %>% select("CN", "END_INVYR", "EVALID") %>%
     inner_join(select(db$POP_EVAL_TYP, c("EVAL_CN", "EVAL_TYP")), by = c(CN = "EVAL_CN")) %>%
@@ -3265,6 +3294,19 @@ invasive <- function(db,
 
   if(!is.null(polys)){
     data <- left_join(data, pltSF, by = 'PLT_CN')
+
+    # Test if any polygons cross state boundaries w/ different recent inventory years
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+      mergeYears <- pltSF %>%
+        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        group_by(polyID) %>%
+        summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+    }
+    # Replace YEAR from above w/ max year so that data is pooled across states
+    data <- inner_join(data, mergeYears, by = 'polyID') %>%
+      select(-c(YEAR)) %>%
+      mutate(YEAR = maxYear)
   }
 
   if (tolower(landType) == "forest") {
