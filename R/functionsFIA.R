@@ -1001,11 +1001,13 @@ standStruct <- function(db,
         inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+
+      # Replace YEAR from above w/ max year so that data is pooled across states
+      data <- inner_join(data, mergeYears, by = 'polyID') %>%
+        select(-c(YEAR)) %>%
+        mutate(YEAR = maxYear)
     }
-    # Replace YEAR from above w/ max year so that data is pooled across states
-    data <- inner_join(data, mergeYears, by = 'polyID') %>%
-      select(-c(YEAR)) %>%
-      mutate(YEAR = maxYear)
+
   }
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
   # Land type domain indicator
@@ -1241,21 +1243,6 @@ diversity <- function(db,
 
   message('Joining FIA Tables.....')
 
-
-  # ### Keeping only years where all states represented are reported for
-  # if (length(unique(db$POP_EVAL$STATECD)) > 1){
-  #   # Counting number of states measured by year, remove years which don't include all states
-  #   numStates <- db$POP_EVAL %>%
-  #     group_by(END_INVYR, STATECD) %>%
-  #     summarize() %>%
-  #     group_by(END_INVYR) %>%
-  #     summarize(n = n()) %>%
-  #     filter(n == length(unique(db$POP_EVAL$STATECD)))
-  #
-  #   db$POP_EVAL <- db$POP_EVAL %>%
-  #     filter(END_INVYR %in% numStates$END_INVYR)
-  # }
-
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
   ids <- db$POP_EVAL %>%
     select('CN', 'END_INVYR', 'EVALID') %>%
@@ -1333,11 +1320,13 @@ diversity <- function(db,
         inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+
+      # Replace YEAR from above w/ max year so that data is pooled across states
+      data <- inner_join(data, mergeYears, by = 'polyID') %>%
+        select(-c(YEAR)) %>%
+        mutate(YEAR = maxYear)
     }
-    # Replace YEAR from above w/ max year so that data is pooled across states
-    data <- inner_join(data, mergeYears, by = 'polyID') %>%
-      select(-c(YEAR)) %>%
-      mutate(YEAR = maxYear)
+
   }
 
 
@@ -1553,21 +1542,6 @@ tpa <- function(db,
   message('Joining FIA Tables.....')
 
 
-
-  # ### Keeping only years where all states represented are reported for
-  # if (length(unique(db$POP_EVAL$STATECD)) > 1){
-  #   # Counting number of states measured by year, remove years which don't include all states
-  #   numStates <- db$POP_EVAL %>%
-  #     group_by(END_INVYR, STATECD) %>%
-  #     summarize() %>%
-  #     group_by(END_INVYR) %>%
-  #     summarize(n = n()) %>%
-  #     filter(n == length(unique(db$POP_EVAL$STATECD)))
-  #
-  #   db$POP_EVAL <- db$POP_EVAL %>%
-  #     filter(END_INVYR %in% numStates$END_INVYR)
-  # }
-
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
   ids <- db$POP_EVAL %>%
     select('CN', 'END_INVYR', 'EVALID') %>%
@@ -1641,11 +1615,13 @@ tpa <- function(db,
         inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+
+      # Replace YEAR from above w/ max year so that data is pooled across states
+      data <- inner_join(data, mergeYears, by = 'polyID') %>%
+        select(-c(YEAR)) %>%
+        mutate(YEAR = maxYear)
     }
-    # Replace YEAR from above w/ max year so that data is pooled across states
-    data <- inner_join(data, mergeYears, by = 'polyID') %>%
-      select(-c(YEAR)) %>%
-      mutate(YEAR = maxYear)
+
   }
 
 
@@ -1889,19 +1865,6 @@ growMort <- function(db,
       mutate(CONDPROP_UNADJ = ifelse(COND_CHANGE_CD == 1, CONDPROP_UNADJ, 0)) # Has to be forested currently and at last measurment
   }
 
-  # ### Keeping only years where all states represented are reported for
-  # if (length(unique(db$POP_EVAL$STATECD)) > 1){
-  #   # Counting number of states measured by year, remove years which don't include all states
-  #   numStates <- db$POP_EVAL %>%
-  #     group_by(END_INVYR, STATECD) %>%
-  #     summarize() %>%
-  #     group_by(END_INVYR) %>%
-  #     summarize(n = n()) %>%
-  #     filter(n == length(unique(db$POP_EVAL$STATECD)))
-  #
-  #   db$POP_EVAL <- db$POP_EVAL %>%
-  #     filter(END_INVYR %in% numStates$END_INVYR)
-  # }
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
   ids <- db$POP_EVAL %>%
@@ -1986,11 +1949,13 @@ growMort <- function(db,
         inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+
+      # Replace YEAR from above w/ max year so that data is pooled across states
+      data <- inner_join(data, mergeYears, by = 'polyID') %>%
+        select(-c(YEAR)) %>%
+        mutate(YEAR = maxYear)
     }
-    # Replace YEAR from above w/ max year so that data is pooled across states
-    data <- inner_join(data, mergeYears, by = 'polyID') %>%
-      select(-c(YEAR)) %>%
-      mutate(YEAR = maxYear)
+
   }
 
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
@@ -2321,11 +2286,13 @@ vitalRates <- function(db,
         inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+
+      # Replace YEAR from above w/ max year so that data is pooled across states
+      data <- inner_join(data, mergeYears, by = 'polyID') %>%
+        select(-c(YEAR)) %>%
+        mutate(YEAR = maxYear)
     }
-    # Replace YEAR from above w/ max year so that data is pooled across states
-    data <- inner_join(data, mergeYears, by = 'polyID') %>%
-      select(-c(YEAR)) %>%
-      mutate(YEAR = maxYear)
+
   }
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
   # Land type domain indicator
@@ -2552,22 +2519,6 @@ biomass <- function(db,
   #   PEG <- db$POP_EVAL_GRP
   # }
 
-  if(!is.null(polys)){
-    data <- left_join(data, pltSF, by = 'PLT_CN')
-
-    # Test if any polygons cross state boundaries w/ different recent inventory years
-    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
-      mergeYears <- pltSF %>%
-        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
-        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
-        group_by(polyID) %>%
-        summarize(maxYear = max(END_INVYR, na.rm = TRUE))
-    }
-    # Replace YEAR from above w/ max year so that data is pooled across states
-    data <- inner_join(data, mergeYears, by = 'polyID') %>%
-      select(-c(YEAR)) %>%
-      mutate(YEAR = maxYear)
-  }
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
   ids <- db$POP_EVAL %>%
@@ -2638,6 +2589,19 @@ biomass <- function(db,
                             `Subsampling units of unequal size` = 'simple')
   if(!is.null(polys)){
     data <- left_join(data, pltSF, by = 'PLT_CN')
+
+    # Test if any polygons cross state boundaries w/ different recent inventory years
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+      mergeYears <- pltSF %>%
+        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        group_by(polyID) %>%
+        summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+      # Replace YEAR from above w/ max year so that data is pooled across states
+      data <- inner_join(data, mergeYears, by = 'polyID') %>%
+        select(-c(YEAR)) %>%
+        mutate(YEAR = maxYear)
+      }
   }
 
 
@@ -2943,11 +2907,13 @@ dwm <- function(db,
         inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+
+      # Replace YEAR from above w/ max year so that data is pooled across states
+      data <- inner_join(data, mergeYears, by = 'polyID') %>%
+        select(-c(YEAR)) %>%
+        mutate(YEAR = maxYear)
     }
-    # Replace YEAR from above w/ max year so that data is pooled across states
-    data <- inner_join(data, mergeYears, by = 'polyID') %>%
-      select(-c(YEAR)) %>%
-      mutate(YEAR = maxYear)
+
   }
 
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
@@ -3302,11 +3268,13 @@ invasive <- function(db,
         inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+
+      # Replace YEAR from above w/ max year so that data is pooled across states
+      data <- inner_join(data, mergeYears, by = 'polyID') %>%
+        select(-c(YEAR)) %>%
+        mutate(YEAR = maxYear)
     }
-    # Replace YEAR from above w/ max year so that data is pooled across states
-    data <- inner_join(data, mergeYears, by = 'polyID') %>%
-      select(-c(YEAR)) %>%
-      mutate(YEAR = maxYear)
+
   }
 
   if (tolower(landType) == "forest") {
