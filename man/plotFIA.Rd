@@ -1,20 +1,20 @@
 \name{plotFIA}
 \alias{plotFIA}
-\title{Static & animated plots of spatial FIA summaries}
+\title{Static and animated plots of spatial FIA summaries}
 \description{
-Produce static and temporally animated plots of spatial FIA summaries. Requires that summaries be returned as spatial objects (ex. specify \code{returnSpatial = TRUE} when computing summaries using \code{\link{tpa}}). For animated plots, also requires that multiple reporting years be present in the summary data (animations iterate through time). Specify \code{savePath} & \code{fileName} to save plots (animations saved as .gif files).
+Produce static and temporally animated plots of spatial FIA summaries. Requires that summaries be returned as spatial objects (e.g. specify \code{returnSpatial = TRUE} when computing summaries using \code{\link{tpa}}). For animated plots, also requires that multiple reporting years be present in the summary data (animations iterate through time). Specify \code{savePath} and \code{fileName} to save plots (animations saved as .gif files).
 }
 
 \usage{
 plotFIA(data, fillVar, animate = FALSE, title = NULL, colOption = 'viridis',
-        minYear = 2005, direction = 1, alpha = .9,
-        transform = "identity", text.size = 1, text.font = '',
-        lab.width = 1, legend.height = 1, legend.width = 1,
-        savePath, fileName, ...)
+        lineCol = "gray30", lineWidth =1, minYear = 2005, direction = 1,
+        alpha = .9, transform = "identity", text.size = 1, text.font = '',
+        lab.width = 1, legend.height = 1, legend.width = 1, device = NULL,
+        savePath = NULL, fileName = NULL, ...)
            }
 
 \arguments{
-  \item{data}{sf object; spatial FIA summary produced from other \code{rFIA} functions (ex. \code{\link{tpa}}, \code{\link{biomass}}, etc.).}
+  \item{data}{sf object; spatial FIA summary produced from other \code{rFIA} functions (e.g. \code{\link{tpa}}, \code{\link{biomass}}, etc.).}
 
   \item{fillVar}{character; variable contained in \code{data} which will be used to fill polygons. Variable name must be quoted.}
 
@@ -22,7 +22,11 @@ plotFIA(data, fillVar, animate = FALSE, title = NULL, colOption = 'viridis',
 
   \item{title}{character; plot title.}
 
-  \item{colOption}{character; One of: "viridis" (default), "magma", "inferno", "plasma", or "cividis".}
+  \item{colOption}{character; one of: "viridis" (default), "magma", "inferno", "plasma", or "cividis".}
+
+  \item{lineCol}{character; polygon outline color.}
+
+  \item{lineWidth}{numeric; scalar for polygon outline width. Specify \code{lineWidth = 0} for no outline.}
 
   \item{minYear}{numeric; earliest year to be included in animation. FIA data is sparse in years prior to 2005 and estimates are unlikely to be available.}
 
@@ -32,7 +36,7 @@ plotFIA(data, fillVar, animate = FALSE, title = NULL, colOption = 'viridis',
 
   \item{transform}{character; transformations to apply to plotted variable \code{fillVar}. Options include: "asn", "atanh", "boxcox", "exp", "identity", "log", "log10", "log1p", "log2", "logit", "reciprocal", "reverse", "sqrt".}
 
-  \item{text.size}{numeric; scalar for text size (ex. text.size = 2 would be twice the default size).}
+  \item{text.size}{numeric; scalar for text size (e.g. text.size = 2 would be twice the default size).}
 
   \item{text.font}{character; font family. Choose from: 'Short', 'Canonical', 'mono', 'Courier', 'sans', 'Helvetica', 'serif', 'Times', 'AvantGarde', 'Bookman', 'Helvetica-Narrow', 'NewCenturySchoolbook', 'Palatino', 'URWGothic',  'URWBookman', 'NimbusMon', 'URWHelvetica', 'NimbusSan', 'NimbusSanCond', 'CenturySch', 'URWPalladio', 'URWTimes', or 'NimbusRom'.}
 
@@ -46,12 +50,12 @@ plotFIA(data, fillVar, animate = FALSE, title = NULL, colOption = 'viridis',
 
   \item{fileName}{character; file name to create on disk.}
 
-  \item{...}{Other arguments passed on to \code{\link{scale_fill_viridis_c}}.}
+  \item{...}{other arguments passed on to \code{\link{scale_fill_viridis_c}}.}
 }
 
 
 \author{
-Hunter Stanke & Andrew Finley, Michigan State University
+Hunter Stanke and Andrew Finley
 }
 
 \examples{

@@ -3,7 +3,7 @@
 
 \title{Find EVALIDs used in the FIADB}
 \description{
-Lookup Evaluation IDs (EVALIDs) associated with reporting years and evaluation types used in the Forest Inventory and Analysis Database. NOT required to run other \code{rFIA} functions. Only use if you are interested in subsetting an \code{FIA.Database} object for a specific reporting year or evaluation type using \code{\link{clipFIA}}.
+Lookup Evaluation IDs (EVALIDs) associated with reporting years and evaluation types used in the Forest Inventory and Analysis Database. NOT required to run other \pkg{rFIA} functions. Only use if you are interested in subsetting an \code{FIA.Database} object for a specific reporting year or evaluation type using \code{\link{clipFIA}}.
 }
 
 \usage{
@@ -15,13 +15,13 @@ findEVALID(db, mostRecent = TRUE, state = NULL, year = NULL, type = NULL)
 
   \item{mostRecent}{logical; if TRUE, returns EVALIDs associated with most recent inventory.}
 
-  \item{state}{character vector containing full names of states of interest (ex. \code{c('Michigan', 'Minnesota', 'Wisconsin')})}
-  \item{year}{numeric vector containing years of interest (ex. \code{c(2015, 2016, 2017)})}
+  \item{state}{character vector containing full names of states of interest (e.g. \code{c('Michigan', 'Minnesota', 'Wisconsin')})}
+  \item{year}{numeric vector containing years of interest (e.g. \code{c(2015, 2016, 2017)})}
   \item{type}{character ('ALL', 'CURR', 'VOL', 'GROW', 'MORT', 'REMV', 'CHANGE', 'DWM', 'REGEN'). See Reference Population Evaluation Table Description Type Table in FIADB P2 User Guide (References) for descriptions of evaluation types. }
 }
 
 \details{
-EVALIDs in the FIA Database are used to reference data points associated with particular inventory years and evaluation types within a state (ex. 2017 Current Volume in Michigan). They are often extraordinarily confusing for those not familiar for the FIA Database. With this in mind, \code{rFIA} has been designed to eliminate users dependence on identifying and specifying appropriate EVALIDs to produce desired estimates, and we therefore do not recommend users attempt to identify EVALIDs independently.
+EVALIDs in the FIA Database are used to reference data points associated with particular inventory years and evaluation types within a state (e.g. 2017 Current Volume in Michigan). They are often extraordinarily confusing for those not familiar for the FIA Database. With this in mind, \pkg{rFIA} has been designed to eliminate users dependence on identifying and specifying appropriate EVALIDs to produce desired estimates, and we therefore do not recommend users attempt to identify EVALIDs independently.
 
 Any \code{state} or \code{year} specified must be present in \code{db} to return associated EVALIDS.
 }
@@ -33,9 +33,8 @@ FIA Database User Guide: \url{https://www.fia.fs.fed.us/library/database-documen
 }
 
 \author{
-Hunter Stanke & Andrew Finley, Michigan State University
+Hunter Stanke and Andrew Finley
 }
-
 
 %% ~Make other sections like Warning with \section{Warning }{....} ~
 

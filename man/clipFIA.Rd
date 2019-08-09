@@ -1,6 +1,6 @@
 \name{clipFIA}
 \alias{clipFIA}
-\title{Spatial & temporal queries for FIADB
+\title{Spatial and temporal queries for FIADB
 }
 
 \description{
@@ -26,7 +26,7 @@ clipFIA(db, mostRecent = TRUE, mask = NULL, matchEval = FALSE,
 }
 
 \details{
-Not required to run other rFIA functions, but may help conserve free memory and reduce processing time if user is interested in producing estimates for a specific inventory year or within a region not explicitly described in the database (w/in user defined polygons).
+Not required to run other \pkg{rFIA} functions, but may help conserve free memory and reduce processing time if user is interested in producing estimates for a specific inventory year or within a region not explicitly described in the database (w/in user defined polygons).
 
 Spatial intersections do not adhere strictly to absolute plot locations, all plots which fall within an estimation unit (often a county) which intersects with a user defined region will be returned. The plots which fall slightly outside of the region do NOT bias estimates (removed from computations), but as FIA often employs stratified random sampling estimators, all plots within intersecting estimation units must be present to proudce unbiased variance estimates.
 }
@@ -36,7 +36,7 @@ List object containing spatially intersected FIADB tables.
 }
 
 \author{
-Hunter Stanke & Andrew Finley, Michigan State University
+Hunter Stanke and Andrew Finley
 }
 
 \references{

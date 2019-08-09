@@ -1,10 +1,16 @@
 readFIAHelper1 <- function(x, dir, ...){
   # Read in and append each file to a list
   file <- read.csv(paste(dir, x, sep = ""), ...)
-
+  # suppressMessages({suppressWarnings({
+  # f <- read_csv(paste(dir, x, sep = ""), progress = FALSE, col_type = cols(.default = col_character()), ...)
+  # f <- type_convert(f)
+  # })})
   gc()
+
   file
+
 }
+
 
 readFIAHelper2 <- function(x, tables){
   subList <- tables[str_sub(x, 4) == unique(str_sub(x,4))]

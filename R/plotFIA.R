@@ -1,7 +1,7 @@
 #' @export
 plotFIA <- function(data, fillVar, animate = FALSE, title = NULL, colOption = 'viridis',
-                    minYear = 2005, direction = 1, alpha = .9,
-                    transform = "identity", text.size = 1, text.font = '',
+                    lineCol = "gray30", lineWidth =1, minYear = 2005, direction = 1,
+                    alpha = .9, transform = "identity", text.size = 1, text.font = '',
                     lab.width = 1, legend.height = 1, legend.width = 1, device = NULL,
                     savePath = NULL, fileName = NULL, ...) {
   ## Some dummy checks
@@ -30,7 +30,7 @@ plotFIA <- function(data, fillVar, animate = FALSE, title = NULL, colOption = 'v
     # Make the animation
     map <- data %>%
       ggplot() +
-      geom_sf(aes(fill = data[[fillVar]])) +
+      geom_sf(aes(fill = data[[fillVar]]), colour = lineCol, lwd = lineWidth) +
       labs(fill = ifelse(is.null(title), str_wrap(fillVar, width = 10 * lab.width), str_wrap(title, width = 10 * lab.width))) +
       scale_fill_viridis_c(alpha = alpha, option = colOption, direction = direction, trans = transform, ... = ...) +
       theme_minimal() +
@@ -50,7 +50,7 @@ plotFIA <- function(data, fillVar, animate = FALSE, title = NULL, colOption = 'v
     # Make the animation
     map <- data %>%
       ggplot() +
-      geom_sf(aes(fill = data[[fillVar]])) +
+      geom_sf(aes(fill = data[[fillVar]]), colour = lineCol, lwd = lineWidth) +
       labs(fill = ifelse(is.null(title), str_wrap(fillVar, width = 10 * lab.width), str_wrap(title, width = 10 * lab.width))) +
       scale_fill_viridis_c(alpha = alpha, option = colOption, direction = direction, trans = transform, ... = ...) +
       theme_minimal() +

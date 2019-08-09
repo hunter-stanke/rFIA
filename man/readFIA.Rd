@@ -13,7 +13,7 @@ readFIA(dir, common = TRUE, tables = NULL, nCores = 1, ...)}
 \arguments{
   \item{dir}{directory where FIA Datatables are stored.}
   \item{common}{logical; if TRUE, only import most commonly used tables, including all required for \code{rFIA} functions (see Details for list of tables).}
-  \item{tables}{character vector; names of specific tables to be imported (ex. 'PLOT', 'TREE', 'COND', 'TREE_GRM_COMPONENT').}
+  \item{tables}{character vector; names of specific tables to be imported (e.g. 'PLOT', 'TREE', 'COND', 'TREE_GRM_COMPONENT').}
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
   \item{\dots}{other arguments to pass to \code{\link{read.csv}}.}
 }
@@ -23,15 +23,15 @@ Download subsets of the FIA Database from the FIA Datamart: \url{https://apps.fs
 
 If \code{common = TRUE}, the following tables will be imported: COND, COND_DWM_CALC, INVASIVE_SUBPLOT_SPP, PLOT, POP_ESTN_UNIT, POP_EVAL, POP_EVAL_GRP, POP_EVAL_TYP, POP_PLOT_STRATUM_ASSGN, POP_STRATUM, SUBPLOT, TREE, TREE_GRM_COMPONENT. These tables currently support all functionality with \code{rFIA}, and it is recommended that only these tables be imported to conserve RAM and reduce processing time.
 
-If you wish to merge multiple state downloads of FIA data (ex. Michigan and Indiana state downloads), simply place both sets of datatables in the same directory and import with \code{readFIA}. Upon import, corresponding tables (ex. MI_PLOT & IN_PLOT) will be merged, and analysis can be completed for the entire region or within spatial units which transcend state boundaries (ex. Ecoregion subsections).
+If you wish to merge multiple state downloads of FIA data (e.g. Michigan and Indiana state downloads), simply place both sets of datatables in the same directory and import with \code{readFIA}. Upon import, corresponding tables (e.g. MI_PLOT and IN_PLOT) will be merged, and analysis can be completed for the entire region or within spatial units which transcend state boundaries (e.g. Ecoregion subsections).
 }
 
 \value{
 List object containing FIA Datatables. List elements represent individual FIA Datatables stored as \code{data.frame} objects. Names of list elements reflect names of files from which they were read into R environment (File names should not be changed after download from FIA Datamart).
 
-If multiple subsets of the FIA database are held in the same directory (ex. Michigan and Indiana state downloads), corresponding tables will be merged (ex. PLOT table returned contains plots in both Michigan and Indiana).
+If multiple subsets of the FIA database are held in the same directory (e.g. Michigan and Indiana state downloads), corresponding tables will be merged (e.g. PLOT table returned contains plots in both Michigan and Indiana).
 
-Easy, efficient parallelization is implemented with the \code{\link{parallel}} package. Users must only specify the \code{nCores} argument with a value greater than 1 in order to implement parallel processing on their machines. Parallel implementation is achieved using a snow type cluster on any Windows OS, and with multicore forking on any Unix OS (Linux, Mac). Implementing parallel processing may substantially decrease free memory during processing, particularly on Windows OS. Thus, users should be cautious when reading in parallel, and consider implementing serial processing for this task (\code{nCores = 1}).
+Easy, efficient parallelization is implemented with the \code{\link{parallel}} package. Users must only specify the \code{nCores} argument with a value greater than 1 in order to implement parallel processing on their machines. Parallel implementation is achieved using a snow type cluster on any Windows OS, and with multicore forking on any Unix OS (Linux, Mac). Implementing parallel processing may substantially decrease decrease free memory during processing, particularly on Windows OS. Thus, users should be cautious when running in parallel, and consider implementing serial processing for this task if computational resources are limited (\code{nCores = 1}).
 }
 
 \references{
@@ -41,7 +41,7 @@ FIA Database User Guide: \url{https://www.fia.fs.fed.us/library/database-documen
 }
 
 \author{
-Hunter Stanke & Andrew Finley, Michigan State University
+Hunter Stanke and Andrew Finley
 }
 
 \note{

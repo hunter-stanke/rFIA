@@ -1,10 +1,16 @@
 
-#data(REF_SPECIES_2018, envir=environment())
-
 #### A Start up Message ------------
 .onAttach <- function(libname, pkgname){
   packageStartupMessage('Download FIA Data Here: https://apps.fs.usda.gov/fia/datamart/datamart.html')
 }
+
+
+# ### Check if columns could be converted to numeric
+# numericcharacters <- function(x) {
+#   x <- !any(is.na(suppressWarnings(as.numeric(x)))) & is.character(x)
+#
+#   return(x)
+# }
 
 
 ################ PREVIOUS FUNCTIONS ######################
@@ -302,7 +308,7 @@ print.FIA.Database <- function(x, ...){
 #' @importFrom sp over proj4string<- coordinates<- spTransform proj4string
 #' @importFrom forcats fct_explicit_na
 #' @importFrom stats cov var
-#' @importFrom utils object.size read.csv tail globalVariables
+#' @importFrom utils object.size read.csv tail globalVariables type.convert
 NULL
 
 #globalVariables(c('.'))
@@ -555,7 +561,7 @@ clipFIA <- function(db,
      if(any(unique(db$PLOT$STATECD) %in% c(69, 72, 78, 41, 53))){
       tempMR <- tempData %>%
         filter(STATECD %in% c(69, 72, 78, 41, 53) == FALSE) %>%
-        group_by(LOCATION_NM) %>%
+        group_by(LOCATION_NM, EVAL_TYP) %>%
         filter(END_INVYR == max(END_INVYR, na.rm = TRUE))
       tempFULL <- tempData %>%
         filter(STATECD %in% c(69, 72, 78, 41, 53))
@@ -563,7 +569,7 @@ clipFIA <- function(db,
 
      } else {
       tempData <- tempData %>%
-        group_by(LOCATION_NM) %>%
+        group_by(LOCATION_NM, EVAL_TYP) %>%
         filter(END_INVYR == max(END_INVYR, na.rm = TRUE))
      }
 
@@ -3404,431 +3410,431 @@ invasive <- function(db,
 
 }
 
-# Area Estimates
-area <- function(db,
-                 landType = 'all',
-                 treeType = NULL,
-                 treeDomain = NULL,
-                 areaDomain = NULL,
-                 byLandType = FALSE,
-                 bySpecies = FALSE,
-                 bySizeClass = FALSE,
-                 grpBy = NULL,
-                 polys = NULL,
-                 returnSpatial = FALSE,
-                 byPlot = FALSE,
-                 SE = TRUE) {
-#   '''
-# Total forested area in CT (%) -->
-# Total area occupied by each species (%), on forestland --> forested area total
-# Total forested area by county, areal unit --> use land area total
-# Within a state, and county, total area of forestland --> need land area total
-# Total area occupied by a phyiographic class on forestland --> use forested area total
-# What if they want to group by state and county? which to use as denominator?
+# # Area Estimates
+# area <- function(db,
+#                  landType = 'all',
+#                  treeType = NULL,
+#                  treeDomain = NULL,
+#                  areaDomain = NULL,
+#                  byLandType = FALSE,
+#                  bySpecies = FALSE,
+#                  bySizeClass = FALSE,
+#                  grpBy = NULL,
+#                  polys = NULL,
+#                  returnSpatial = FALSE,
+#                  byPlot = FALSE,
+#                  SE = TRUE) {
+# #   '''
+# # Total forested area in CT (%) -->
+# # Total area occupied by each species (%), on forestland --> forested area total
+# # Total forested area by county, areal unit --> use land area total
+# # Within a state, and county, total area of forestland --> need land area total
+# # Total area occupied by a phyiographic class on forestland --> use forested area total
+# # What if they want to group by state and county? which to use as denominator?
+# #
+# # ALWAYS DEFAULT PROPORTION ESTIMATES TO THE LOWEST GROUPING VALUE, ONLY WAY TO GO ABOUT IT
+# #
+# # not sure. Leaving area alone for now, play again when all other functions required by NPS area complete
+# #
+# # '''
 #
-# ALWAYS DEFAULT PROPORTION ESTIMATES TO THE LOWEST GROUPING VALUE, ONLY WAY TO GO ABOUT IT
+#   # if(!is.null(eval(areaDomain))){
+#   #   print('test')
+#   # }
 #
-# not sure. Leaving area alone for now, play again when all other functions required by NPS area complete
+#   # Save original grpByfor pretty return with spatial objects
+#   grpBy <- c('YEAR', grpBy)
+#   grpByOrig <- grpBy
 #
-# '''
-
-  # if(!is.null(eval(areaDomain))){
-  #   print('test')
-  # }
-
-  # Save original grpByfor pretty return with spatial objects
-  grpBy <- c('YEAR', grpBy)
-  grpByOrig <- grpBy
-
-  ## Pull out individual tables from database object
-  if (!is.null(db)){
-    TREE <- db[['TREE']]
-    COND <- db[['COND']]
-    PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
-    POP_PLOT_STRATUM_ASSGN <- db[['POP_PLOT_STRATUM_ASSGN_STRATUM_ASSGN']]
-    PEU <- db$POP_ESTN_UNIT
-    POP_EVAL <- db$POP_EVAL
-    POP_STRATUM <- db$POP_STRATUM
-    PET <- db$POP_EVAL_TYP
-    PEG <- db$POP_EVAL_GRP
-  }
-
-
-
-  ### Keeping only years where all states represented are reported for
-  if (length(unique(POP_EVAL$STATECD)) > 1){
-    # Counting number of states measured by year, remove years which don't include all states
-    numStates <- POP_EVAL %>%
-      group_by(END_INVYR, STATECD) %>%
-      summarize() %>%
-      group_by(END_INVYR) %>%
-      summarize(n = n()) %>%
-      filter(n == length(unique(POP_EVAL$STATECD)))
-
-    POP_EVAL <- POP_EVAL %>%
-      filter(END_INVYR %in% numStates$END_INVYR)
-  }
-
-  ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
-  ids <- POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID') %>%
-    inner_join(select(PET, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP == 'EXPCURR') %>%
-    distinct(EVALID)
-  POP_EVAL <- POP_EVAL %>%
-    filter(EVALID %in% ids$EVALID)
-
-
-  ### AREAL SUMMARY PREP
-  if(!is.null(polys)) {
-    # Convert polygons to an sf object
-    polys <- polys %>%
-      as('sf') %>%
-      mutate_if(is.factor,
-                fct_explicit_na,
-                na_level = "NA")
-    # Add shapefile names to grpBy
-    grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
-    ## Make plot data spatial, projected same as polygon layer
-    coordinates(PLOT) <- ~LON+LAT
-    proj4string(PLOT) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-    PLOT <- as(PLOT, 'sf') %>%
-      st_transform(plotSF, crs = st_crs(polys)$proj4string)
-    # Intersect plot with polygons
-    polys$polyID <- 1:nrow(polys)
-    suppressMessages({
-      PLOT <- st_intersection(PLOT, polys)
-    })
-
-    # Convert back to dataframe
-    PLOT <- as.data.frame(PLOT) %>%
-      select(-c('geometry')) # removes artifact of SF object
-
-  } else if (byPlot & returnSpatial){
-    ## Make plot data spatial, projected same as polygon layer
-    coordinates(PLOT) <- ~LON+LAT
-    proj4string(PLOT) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-    PLOT <- as(PLOT, 'sf')
-  }
-
-
-  ## Prep joins and filters
-  data <- PLOT %>%
-    inner_join(select(COND, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN')) %>%
-    inner_join(select(POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    inner_join(select(POP_STRATUM, -c('STATECD', 'RSCD')), by = c('STRATUM_CN' = 'CN')) %>%
-    inner_join(select(PEU, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    inner_join(select(POP_EVAL, c('EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
-    inner_join(select(PET, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
-    inner_join(select(PEG, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-    left_join(select(TREE, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN', 'CONDID')) %>%
-    mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
-    distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, TREE, .keep_all = TRUE) %>%
-    mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
-    rename(YEAR = END_INVYR,
-           YEAR_RANGE = REPORT_YEAR_NM)
-  # # Make s the data huge, so only join up if the user wants to specify a criteria in the tree database
-  # if (!is.null(eval(treeDomain, data)) | bySpecies | bySizeClass){
-  #   data <- data %>%
-  #
-  # } else {
-  #   data <- data %>%
-  #     distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, .keep_all = TRUE)
-  # }
-
-  ## Recode a few of the estimation methods to make things easier below
-  data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
-                            `Post-Stratification` = 'strat',
-                            `Stratified random sampling` = 'strat',
-                            `Double sampling for stratification` = 'double',
-                            `Simple random sampling` = 'simple',
-                            `Subsampling units of unequal size` = 'simple')
-
-  if(byLandType == FALSE){
-    ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
-    # Land type domain indicator
-    if (tolower(landType) == 'forest'){
-      landD <- ifelse(data$COND_STATUS_CD == 1, 1, 0)
-    } else if (tolower(landType) == 'timber'){
-      landD <- ifelse(data$COND_STATUS_CD == 1 & data$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & data$RESERVCD == 0, 1, 0)
-    } else if (tolower(landType) == 'non-forest'){
-      landD <- ifelse(data$COND_STATUS_CD == 2)
-    } else if (tolower(landType) == 'water'){
-      landD <- ifelse(data$COND_STATUS_CD == 3 | data$COND_STATUS_CD == 4)
-    } else if (tolower(landType) == 'census water'){
-      landD <- ifelse(data$COND_STATUS_CD == 4)
-    } else if (tolower(landType) == 'non-census water'){
-      landD <- ifelse(data$COND_STATUS_CD == 4)
-    } else if (tolower(landType) == 'all') {
-      landD <- 1
-    }
-  } else {
-    landD <- 1
-  }
-  # Tree Type domain indicator
-  if(is.null(treeType)) {
-    typeD <- 1
-  } else if (tolower(treeType) == 'live'){
-    typeD <- ifelse(data$STATUSCD == 1, 1, 0)
-  } else if (tolower(treeType) == 'dead'){
-    typeD <- ifelse(data$STATUSCD == 2 & data$STANDING_DEAD_CD == 1, 1, 0)
-  } else if (tolower(treeType) == 'gs'){
-    typeD <- ifelse(data$STATUSCD == 1 & data$DIA >= 5 & data$TREECLCD == 2, 1, 0)
-  } else if (tolower(treeType) == 'all'){
-    typeD <- 1
-  }
-  # User defined domain indicator for area (ex. specific forest type)
-  areaDomain <- substitute(areaDomain)
-  aD <- eval(areaDomain, data) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
-  if(!is.null(aD)) aD[is.na(aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
-  if(is.null(aD)) aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
-  # Same as above for tree (ex. trees > 20 ft tall)
-  treeDomain <- substitute(treeDomain)
-  tD <- eval(treeDomain, data) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
-  if(!is.null(tD)) tD[is.na(tD)] <- 0 # Make NAs 0s. Causes bugs otherwise
-  if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
-  ## Comprehensive indicator function
-  data$aDI <- landD * aD
-  data$tDI <- landD * aD * tD * typeD
-
-
-  ## Add species to groups
-  if (bySpecies) {
-    data <- data %>%
-      left_join(select(intData$REF_SPECIES_2018, c('SPCD','COMMON_NAME', 'GENUS', 'SPECIES')), by = 'SPCD') %>%
-      mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' '))
-    # data$SPCD <- fct_explicit_na(data, SPCD)
-    # data$COMMON_NAME <- fct_explicit_na(data, COMMON_NAME)
-    # data$GENUS <- fct_explicit_na(data, GENUS)
-    # data$SPECIES <- fct_explicit_na(data, SPECIES)
-
-    grpBy <- c(grpBy, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
-    grpByOrig <- c(grpByOrig, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
-  }
-
-  ## Break into size classes
-  if (bySizeClass){
-    grpBy <- c(grpBy, 'sizeClass')
-    grpByOrig <- c(grpByOrig, 'sizeClass')
-    data$sizeClass <- makeClasses(data$DIA, interval = 2) %>%
-      fct_explicit_na()
-  }
-
-  # Make a new column that describes the land type
-  if (byLandType){
-    grpBy <- c(grpBy, 'landType')
-    grpByOrig <- c(grpByOrig, 'landType')
-    data <- data %>%
-      mutate(landType = case_when(
-        COND_STATUS_CD == 1 & SITECLCD %in% c(1:6) & RESERVCD ==0 ~ 'Timber',
-        COND_STATUS_CD == 1 ~ 'Non-Timber Forest',
-        COND_STATUS_CD == 2 ~ 'Non-Forest',
-        COND_STATUS_CD == 3 | COND_STATUS_CD == 4 ~ 'Water'))
-    #data$landType <- fct_explicit_na(data$landType)
-  }
-
-
-
-  ####################  COMPUTE ESTIMATES  ###########################
-  ### -- BYPLOT -- TPA Estimates at each plot location
-  if (byPlot) {
-    aOut <- data %>%
-      group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, CONDID) %>%
-      summarize(CONDPROP_UNADJ = first(CONDPROP_UNADJ),
-                tDI = ifelse(sum(tDI > 0, na.rm = TRUE), 1, 0),
-                a = first(AREA_USED),
-                p1EU = first(P1PNTCNT_EU),
-                p1 = first(P1POINTCNT),
-                p2 = first(P2POINTCNT),
-                aAdj = first(aAdj),
-                aDI = first(aDI)) %>%
-      group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-      summarize(propArea = sum(CONDPROP_UNADJ * tDI * aAdj, na.rm = TRUE),
-                total = sum(CONDPROP_UNADJ * aDI * aAdj, na.rm = TRUE),
-                plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
-
-    ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
-  } else {
-    if (SE){
-      # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
-      ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
-      ## estimation unit, and cause estimates to be inflated substantially
-      combos <- data %>%
-        as.data.frame() %>%
-        group_by(.dots = grpBy) %>%
-        summarize()
-
-      # Seperate area grouping names, (ex. TPA red oak in total land area of ingham county, rather than only area where red oak occurs)
-      aGrpBy <- c('YEAR', grpBy[grpBy %in% names(PLOT) | grpBy %in% names(COND)]) # Can't group by columns specific to TREE (or made from)
-
-
-
-      for (i in 1:nrow(combos)){
-        if (ncol(combos) > 0){
-          # Update domain indicator for each each column speficed in grpBy
-          td = 1 # Start both at 1, update as we iterate through
-          ad = 1
-          for (n in 1:ncol(combos)){
-            # Tree domain indicator for each column in
-            tObs <- combos[i,][[grpBy[n]]] == data[[grpBy[n]]]
-            td <- landD * aD * tD * typeD * tObs * td
-            # Area domain indicator for each column in
-            if(grpBy[n] %in% aGrpBy){
-              aObs <- combos[i,][[aGrpBy[n]]] == data[[aGrpBy[n]]]
-              aObs[is.na(aObs)] <- 0
-              ad <- landD * aD * aObs * ad
-            }
-          }
-          data$tDI <- td
-          data$tDI[is.na(data$tDI)] <- 0
-          data$fullDI <- ad
-          data$fullDI[is.na(data$aDI)] <- 0
-        } # Close DI loop & conditional
-
-        # Compute estimates
-        a <- data %>%
-          group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, CONDID) %>%
-          # filter(tDI > 0) %>%
-          summarize(CONDPROP_UNADJ = first(CONDPROP_UNADJ),
-                    aDI = ifelse(sum(tDI > 0, na.rm = TRUE), 1, 0),
-                    a = first(AREA_USED),
-                    p1EU = first(P1PNTCNT_EU),
-                    p1 = first(P1POINTCNT),
-                    p2 = first(P2POINTCNT),
-                    aAdj = first(aAdj),
-                    fullDI = first(fullDI)) %>%
-          group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-          summarize(fa = sum(CONDPROP_UNADJ * aDI * aAdj, na.rm = TRUE),
-                    faFull = sum(CONDPROP_UNADJ * fullDI * aAdj, na.rm = TRUE),
-                    plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0),
-                    p1EU = first(p1EU),
-                    a = first(a),
-                    p1 = first(p1),
-                    p2 = first(p2)) %>%
-          # Continue through totals
-          #d <- dInt %>%
-          #filter(plotIn > 0) %>%
-          group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN) %>%
-          summarize(aStrat = mean(fa, na.rm = TRUE),
-                    fullStrat = mean(faFull, na.rm = TRUE),
-                    plotIn = sum(plotIn, na.rm = TRUE),
-                    a = first(a),
-                    w = first(p1) / first(p1EU), # Stratum weight
-                    nh = first(p2), # Number plots in stratum
-                    # Strata level variances
-                    av = ifelse(first(ESTN_METHOD == 'simple'),
-                                var(fa * first(a) / nh),
-                                (sum(fa^2, na.rm = TRUE) - sum(nh * aStrat^2, na.rm = TRUE)) / (nh * (nh-1))),
-                    fullv = ifelse(first(ESTN_METHOD == 'simple'),
-                                   var(faFull * first(a) / nh),
-                                   (sum(faFull^2, na.rm = TRUE) - sum(nh * fullStrat^2, na.rm = TRUE)) / (nh * (nh-1))),
-                    # cvStrat_t = ifelse(first(ESTN_METHOD == 'simple'),
-                    #                    cov(fa,tPlot),
-                    #                    (sum(fa*tPlot) - sum(nh * aStrat *tStrat)) / (nh * (nh-1))), # Stratified and double cases
-                    cvStrat = ifelse(first(ESTN_METHOD == 'simple'),
-                                       cov(faFull,fa),
-                                       (sum(faFull*fa, na.rm = TRUE) - sum(nh * aStrat *fullStrat, na.rm = TRUE)) / (nh * (nh-1)))) %>% # Stratified and double cases) %>% # Stratified and double cases
-          group_by(ESTN_UNIT_CN) %>%
-          summarize(aEst = unitMean(ESTN_METHOD, a, nh, w, aStrat),
-                    fullEst = unitMean(ESTN_METHOD, a, nh, w, fullStrat),
-                    plotIn = sum(plotIn, na.rm = TRUE),
-                    # Estimation of unit variance,
-                    aVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, av, aStrat, aEst),
-                    fullVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, fullv, fullStrat, fullEst),
-                    cvEst = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat, aStrat, aEst, fullStrat, fullEst)) %>%
-          # Compute totals
-          summarize(AREA = sum(aEst, na.rm = TRUE),
-                    TOTAL_AREA = sum(fullEst, na.rm = TRUE),
-                    PERC_AREA = AREA / TOTAL_AREA * 100,
-                    nPlots = sum(plotIn, na.rm = TRUE),
-                    areaVar = sum(aVar, na.rm = TRUE),
-                    fVar = sum(fullVar, na.rm = TRUE),
-                    cv = sum(cvEst, na.rm = TRUE),
-                    propVar = (1/TOTAL_AREA^2) * (areaVar + (PERC_AREA^2 * fVar) - 2 * PERC_AREA * cv),
-                    AREA_SE = ifelse(nPlots > 1, sqrt(areaVar) / AREA * 100,0),
-                    PERC_SE = ifelse(nPlots > 1, sqrt(propVar) / PERC_AREA * 100,0),
-                    TOTAL_SE = ifelse(nPlots > 1, sqrt(fVar) / TOTAL_AREA * 100,0)) %>%
-          select(AREA, PERC_AREA, TOTAL_AREA, AREA_SE, PERC_SE, TOTAL_SE, nPlots)
-
-
-        ## Add each row onto the output dataset
-        if(i > 1){
-          aOut <- bind_rows(aOut, a)
-        } else { # On the first iteration
-          aOut <- a
-        }
-      } # End Combo loop
-
-      # If grpBy was specified, rejoin with these names
-      if (ncol(combos) > 0){
-        aOut <- bind_cols(combos, aOut) #%>%
-        #filter(S_a > 0)
-      }
-
-      # Return a spatial object
-      if (!is.null(polys) & returnSpatial) {
-        suppressMessages({aOut <- left_join(polys, aOut) %>%
-          select(c(grpByOrig, 'AREA', 'PERC_AREA', 'TOTAL_AREA', 'AREA_SE', 'PERC_SE', 'TOTAL_SE', 'nPlots', names(polys)))})
-      } else if (!is.null(polys) & returnSpatial == FALSE){
-        aOut <- select(aOut, c(grpByOrig, 'AREA', 'PERC_AREA', 'TOTAL_AREA', 'AREA_SE', 'PERC_SE', 'TOTAL_SE', 'nPlots', everything()))
-      }
-    } else {# End SE == FALSE
-      ### BELOW DOES NOT PRODUCE SAMPLING ERRORS, use EXPNS instead (much quicker)
-      # IF they want tree level variables, have to switch it up a bit
-      # if(!is.null(treeDomain) | bySpecies | bySizeClass){
-      #   data <- data %>%
-      #     distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, EVALID, COND_STATUS_CD, .keep_all = TRUE)
-      # } else {
-      #   data <- data %>%
-      #     distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, EVALID, COND_STATUS_CD, .keep_all = TRUE)
-      # }
-      data$fullDI <- landD * aD
-
-      # Compute estimates
-      aSub <- data %>%
-        group_by(.dots = grpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, CONDID) %>%
-        # filter(tDI > 0) %>%
-        summarize(CONDPROP_UNADJ = first(CONDPROP_UNADJ),
-                  aDI = ifelse(sum(tDI > 0, na.rm = TRUE), 1, 0),
-                  a = first(AREA_USED),
-                  p1EU = first(P1PNTCNT_EU),
-                  p1 = first(P1POINTCNT),
-                  p2 = first(P2POINTCNT),
-                  aAdj = first(aAdj),
-                  EXPNS = EXPNS) %>%
-        group_by(.dots = grpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-        summarize(fa = sum(CONDPROP_UNADJ * aDI * EXPNS * aAdj, na.rm = TRUE),
-                  plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0)) %>%
-        group_by(.dots = grpBy) %>%
-        summarize(AREA = sum(fa, na.rm = TRUE),
-                  nPlots = sum(plotIn, na.rm = TRUE))
-
-      suppressMessages({
-        aOut <- data %>%
-          group_by(YEAR, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-          summarize(fa = sum(CONDPROP_UNADJ * fullDI * EXPNS * aAdj, na.rm = TRUE)) %>%
-          group_by(YEAR) %>%
-          summarize(TOTAL_AREA = sum(fa, na.rm = TRUE)) %>%
-          inner_join(aSub) %>%
-          mutate(PERC_AREA = AREA / TOTAL_AREA * 100) %>%
-          select(grpBy, AREA, PERC_AREA, TOTAL_AREA, nPlots)
-      })
-
-
-      # Return a spatial object
-      if (!is.null(polys) & returnSpatial) {
-        suppressMessages({aOut <- left_join(polys, aOut) %>%
-          select(c(grpByOrig, 'AREA', 'PERC_AREA', 'TOTAL_AREA', 'nPlots', names(polys)))})
-      } else if (!is.null(polys) & returnSpatial == FALSE){
-        aOut <- select(aOut, c(grpByOrig, 'AREA', 'PERC_AREA', 'TOTAL_AREA', 'nPlots', everything()))
-      }
-
-    }
-
-  }
-
-  return(aOut)
-}
+#   ## Pull out individual tables from database object
+#   if (!is.null(db)){
+#     TREE <- db[['TREE']]
+#     COND <- db[['COND']]
+#     PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
+#     POP_PLOT_STRATUM_ASSGN <- db[['POP_PLOT_STRATUM_ASSGN_STRATUM_ASSGN']]
+#     PEU <- db$POP_ESTN_UNIT
+#     POP_EVAL <- db$POP_EVAL
+#     POP_STRATUM <- db$POP_STRATUM
+#     PET <- db$POP_EVAL_TYP
+#     PEG <- db$POP_EVAL_GRP
+#   }
+#
+#
+#
+#   ### Keeping only years where all states represented are reported for
+#   if (length(unique(POP_EVAL$STATECD)) > 1){
+#     # Counting number of states measured by year, remove years which don't include all states
+#     numStates <- POP_EVAL %>%
+#       group_by(END_INVYR, STATECD) %>%
+#       summarize() %>%
+#       group_by(END_INVYR) %>%
+#       summarize(n = n()) %>%
+#       filter(n == length(unique(POP_EVAL$STATECD)))
+#
+#     POP_EVAL <- POP_EVAL %>%
+#       filter(END_INVYR %in% numStates$END_INVYR)
+#   }
+#
+#   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
+#   ids <- POP_EVAL %>%
+#     select('CN', 'END_INVYR', 'EVALID') %>%
+#     inner_join(select(PET, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+#     filter(EVAL_TYP == 'EXPCURR') %>%
+#     distinct(EVALID)
+#   POP_EVAL <- POP_EVAL %>%
+#     filter(EVALID %in% ids$EVALID)
+#
+#
+#   ### AREAL SUMMARY PREP
+#   if(!is.null(polys)) {
+#     # Convert polygons to an sf object
+#     polys <- polys %>%
+#       as('sf') %>%
+#       mutate_if(is.factor,
+#                 fct_explicit_na,
+#                 na_level = "NA")
+#     # Add shapefile names to grpBy
+#     grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
+#     ## Make plot data spatial, projected same as polygon layer
+#     coordinates(PLOT) <- ~LON+LAT
+#     proj4string(PLOT) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+#     PLOT <- as(PLOT, 'sf') %>%
+#       st_transform(plotSF, crs = st_crs(polys)$proj4string)
+#     # Intersect plot with polygons
+#     polys$polyID <- 1:nrow(polys)
+#     suppressMessages({
+#       PLOT <- st_intersection(PLOT, polys)
+#     })
+#
+#     # Convert back to dataframe
+#     PLOT <- as.data.frame(PLOT) %>%
+#       select(-c('geometry')) # removes artifact of SF object
+#
+#   } else if (byPlot & returnSpatial){
+#     ## Make plot data spatial, projected same as polygon layer
+#     coordinates(PLOT) <- ~LON+LAT
+#     proj4string(PLOT) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+#     PLOT <- as(PLOT, 'sf')
+#   }
+#
+#
+#   ## Prep joins and filters
+#   data <- PLOT %>%
+#     inner_join(select(COND, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN')) %>%
+#     inner_join(select(POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
+#     inner_join(select(POP_STRATUM, -c('STATECD', 'RSCD')), by = c('STRATUM_CN' = 'CN')) %>%
+#     inner_join(select(PEU, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
+#     inner_join(select(POP_EVAL, c('EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+#     inner_join(select(PET, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
+#     inner_join(select(PEG, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
+#     left_join(select(TREE, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN', 'CONDID')) %>%
+#     mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
+#     distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, TREE, .keep_all = TRUE) %>%
+#     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
+#     rename(YEAR = END_INVYR,
+#            YEAR_RANGE = REPORT_YEAR_NM)
+#   # # Make s the data huge, so only join up if the user wants to specify a criteria in the tree database
+#   # if (!is.null(eval(treeDomain, data)) | bySpecies | bySizeClass){
+#   #   data <- data %>%
+#   #
+#   # } else {
+#   #   data <- data %>%
+#   #     distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, .keep_all = TRUE)
+#   # }
+#
+#   ## Recode a few of the estimation methods to make things easier below
+#   data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
+#                             `Post-Stratification` = 'strat',
+#                             `Stratified random sampling` = 'strat',
+#                             `Double sampling for stratification` = 'double',
+#                             `Simple random sampling` = 'simple',
+#                             `Subsampling units of unequal size` = 'simple')
+#
+#   if(byLandType == FALSE){
+#     ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
+#     # Land type domain indicator
+#     if (tolower(landType) == 'forest'){
+#       landD <- ifelse(data$COND_STATUS_CD == 1, 1, 0)
+#     } else if (tolower(landType) == 'timber'){
+#       landD <- ifelse(data$COND_STATUS_CD == 1 & data$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & data$RESERVCD == 0, 1, 0)
+#     } else if (tolower(landType) == 'non-forest'){
+#       landD <- ifelse(data$COND_STATUS_CD == 2)
+#     } else if (tolower(landType) == 'water'){
+#       landD <- ifelse(data$COND_STATUS_CD == 3 | data$COND_STATUS_CD == 4)
+#     } else if (tolower(landType) == 'census water'){
+#       landD <- ifelse(data$COND_STATUS_CD == 4)
+#     } else if (tolower(landType) == 'non-census water'){
+#       landD <- ifelse(data$COND_STATUS_CD == 4)
+#     } else if (tolower(landType) == 'all') {
+#       landD <- 1
+#     }
+#   } else {
+#     landD <- 1
+#   }
+#   # Tree Type domain indicator
+#   if(is.null(treeType)) {
+#     typeD <- 1
+#   } else if (tolower(treeType) == 'live'){
+#     typeD <- ifelse(data$STATUSCD == 1, 1, 0)
+#   } else if (tolower(treeType) == 'dead'){
+#     typeD <- ifelse(data$STATUSCD == 2 & data$STANDING_DEAD_CD == 1, 1, 0)
+#   } else if (tolower(treeType) == 'gs'){
+#     typeD <- ifelse(data$STATUSCD == 1 & data$DIA >= 5 & data$TREECLCD == 2, 1, 0)
+#   } else if (tolower(treeType) == 'all'){
+#     typeD <- 1
+#   }
+#   # User defined domain indicator for area (ex. specific forest type)
+#   areaDomain <- substitute(areaDomain)
+#   aD <- eval(areaDomain, data) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+#   if(!is.null(aD)) aD[is.na(aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+#   if(is.null(aD)) aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+#   # Same as above for tree (ex. trees > 20 ft tall)
+#   treeDomain <- substitute(treeDomain)
+#   tD <- eval(treeDomain, data) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+#   if(!is.null(tD)) tD[is.na(tD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+#   if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+#   ## Comprehensive indicator function
+#   data$aDI <- landD * aD
+#   data$tDI <- landD * aD * tD * typeD
+#
+#
+#   ## Add species to groups
+#   if (bySpecies) {
+#     data <- data %>%
+#       left_join(select(intData$REF_SPECIES_2018, c('SPCD','COMMON_NAME', 'GENUS', 'SPECIES')), by = 'SPCD') %>%
+#       mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' '))
+#     # data$SPCD <- fct_explicit_na(data, SPCD)
+#     # data$COMMON_NAME <- fct_explicit_na(data, COMMON_NAME)
+#     # data$GENUS <- fct_explicit_na(data, GENUS)
+#     # data$SPECIES <- fct_explicit_na(data, SPECIES)
+#
+#     grpBy <- c(grpBy, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
+#     grpByOrig <- c(grpByOrig, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
+#   }
+#
+#   ## Break into size classes
+#   if (bySizeClass){
+#     grpBy <- c(grpBy, 'sizeClass')
+#     grpByOrig <- c(grpByOrig, 'sizeClass')
+#     data$sizeClass <- makeClasses(data$DIA, interval = 2) %>%
+#       fct_explicit_na()
+#   }
+#
+#   # Make a new column that describes the land type
+#   if (byLandType){
+#     grpBy <- c(grpBy, 'landType')
+#     grpByOrig <- c(grpByOrig, 'landType')
+#     data <- data %>%
+#       mutate(landType = case_when(
+#         COND_STATUS_CD == 1 & SITECLCD %in% c(1:6) & RESERVCD ==0 ~ 'Timber',
+#         COND_STATUS_CD == 1 ~ 'Non-Timber Forest',
+#         COND_STATUS_CD == 2 ~ 'Non-Forest',
+#         COND_STATUS_CD == 3 | COND_STATUS_CD == 4 ~ 'Water'))
+#     #data$landType <- fct_explicit_na(data$landType)
+#   }
+#
+#
+#
+#   ####################  COMPUTE ESTIMATES  ###########################
+#   ### -- BYPLOT -- TPA Estimates at each plot location
+#   if (byPlot) {
+#     aOut <- data %>%
+#       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, CONDID) %>%
+#       summarize(CONDPROP_UNADJ = first(CONDPROP_UNADJ),
+#                 tDI = ifelse(sum(tDI > 0, na.rm = TRUE), 1, 0),
+#                 a = first(AREA_USED),
+#                 p1EU = first(P1PNTCNT_EU),
+#                 p1 = first(P1POINTCNT),
+#                 p2 = first(P2POINTCNT),
+#                 aAdj = first(aAdj),
+#                 aDI = first(aDI)) %>%
+#       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
+#       summarize(propArea = sum(CONDPROP_UNADJ * tDI * aAdj, na.rm = TRUE),
+#                 total = sum(CONDPROP_UNADJ * aDI * aAdj, na.rm = TRUE),
+#                 plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
+#
+#     ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
+#   } else {
+#     if (SE){
+#       # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
+#       ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
+#       ## estimation unit, and cause estimates to be inflated substantially
+#       combos <- data %>%
+#         as.data.frame() %>%
+#         group_by(.dots = grpBy) %>%
+#         summarize()
+#
+#       # Seperate area grouping names, (ex. TPA red oak in total land area of ingham county, rather than only area where red oak occurs)
+#       aGrpBy <- c('YEAR', grpBy[grpBy %in% names(PLOT) | grpBy %in% names(COND)]) # Can't group by columns specific to TREE (or made from)
+#
+#
+#
+#       for (i in 1:nrow(combos)){
+#         if (ncol(combos) > 0){
+#           # Update domain indicator for each each column speficed in grpBy
+#           td = 1 # Start both at 1, update as we iterate through
+#           ad = 1
+#           for (n in 1:ncol(combos)){
+#             # Tree domain indicator for each column in
+#             tObs <- combos[i,][[grpBy[n]]] == data[[grpBy[n]]]
+#             td <- landD * aD * tD * typeD * tObs * td
+#             # Area domain indicator for each column in
+#             if(grpBy[n] %in% aGrpBy){
+#               aObs <- combos[i,][[aGrpBy[n]]] == data[[aGrpBy[n]]]
+#               aObs[is.na(aObs)] <- 0
+#               ad <- landD * aD * aObs * ad
+#             }
+#           }
+#           data$tDI <- td
+#           data$tDI[is.na(data$tDI)] <- 0
+#           data$fullDI <- ad
+#           data$fullDI[is.na(data$aDI)] <- 0
+#         } # Close DI loop & conditional
+#
+#         # Compute estimates
+#         a <- data %>%
+#           group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, CONDID) %>%
+#           # filter(tDI > 0) %>%
+#           summarize(CONDPROP_UNADJ = first(CONDPROP_UNADJ),
+#                     aDI = ifelse(sum(tDI > 0, na.rm = TRUE), 1, 0),
+#                     a = first(AREA_USED),
+#                     p1EU = first(P1PNTCNT_EU),
+#                     p1 = first(P1POINTCNT),
+#                     p2 = first(P2POINTCNT),
+#                     aAdj = first(aAdj),
+#                     fullDI = first(fullDI)) %>%
+#           group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
+#           summarize(fa = sum(CONDPROP_UNADJ * aDI * aAdj, na.rm = TRUE),
+#                     faFull = sum(CONDPROP_UNADJ * fullDI * aAdj, na.rm = TRUE),
+#                     plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0),
+#                     p1EU = first(p1EU),
+#                     a = first(a),
+#                     p1 = first(p1),
+#                     p2 = first(p2)) %>%
+#           # Continue through totals
+#           #d <- dInt %>%
+#           #filter(plotIn > 0) %>%
+#           group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN) %>%
+#           summarize(aStrat = mean(fa, na.rm = TRUE),
+#                     fullStrat = mean(faFull, na.rm = TRUE),
+#                     plotIn = sum(plotIn, na.rm = TRUE),
+#                     a = first(a),
+#                     w = first(p1) / first(p1EU), # Stratum weight
+#                     nh = first(p2), # Number plots in stratum
+#                     # Strata level variances
+#                     av = ifelse(first(ESTN_METHOD == 'simple'),
+#                                 var(fa * first(a) / nh),
+#                                 (sum(fa^2, na.rm = TRUE) - sum(nh * aStrat^2, na.rm = TRUE)) / (nh * (nh-1))),
+#                     fullv = ifelse(first(ESTN_METHOD == 'simple'),
+#                                    var(faFull * first(a) / nh),
+#                                    (sum(faFull^2, na.rm = TRUE) - sum(nh * fullStrat^2, na.rm = TRUE)) / (nh * (nh-1))),
+#                     # cvStrat_t = ifelse(first(ESTN_METHOD == 'simple'),
+#                     #                    cov(fa,tPlot),
+#                     #                    (sum(fa*tPlot) - sum(nh * aStrat *tStrat)) / (nh * (nh-1))), # Stratified and double cases
+#                     cvStrat = ifelse(first(ESTN_METHOD == 'simple'),
+#                                        cov(faFull,fa),
+#                                        (sum(faFull*fa, na.rm = TRUE) - sum(nh * aStrat *fullStrat, na.rm = TRUE)) / (nh * (nh-1)))) %>% # Stratified and double cases) %>% # Stratified and double cases
+#           group_by(ESTN_UNIT_CN) %>%
+#           summarize(aEst = unitMean(ESTN_METHOD, a, nh, w, aStrat),
+#                     fullEst = unitMean(ESTN_METHOD, a, nh, w, fullStrat),
+#                     plotIn = sum(plotIn, na.rm = TRUE),
+#                     # Estimation of unit variance,
+#                     aVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, av, aStrat, aEst),
+#                     fullVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, fullv, fullStrat, fullEst),
+#                     cvEst = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat, aStrat, aEst, fullStrat, fullEst)) %>%
+#           # Compute totals
+#           summarize(AREA = sum(aEst, na.rm = TRUE),
+#                     TOTAL_AREA = sum(fullEst, na.rm = TRUE),
+#                     PERC_AREA = AREA / TOTAL_AREA * 100,
+#                     nPlots = sum(plotIn, na.rm = TRUE),
+#                     areaVar = sum(aVar, na.rm = TRUE),
+#                     fVar = sum(fullVar, na.rm = TRUE),
+#                     cv = sum(cvEst, na.rm = TRUE),
+#                     propVar = (1/TOTAL_AREA^2) * (areaVar + (PERC_AREA^2 * fVar) - 2 * PERC_AREA * cv),
+#                     AREA_SE = ifelse(nPlots > 1, sqrt(areaVar) / AREA * 100,0),
+#                     PERC_SE = ifelse(nPlots > 1, sqrt(propVar) / PERC_AREA * 100,0),
+#                     TOTAL_SE = ifelse(nPlots > 1, sqrt(fVar) / TOTAL_AREA * 100,0)) %>%
+#           select(AREA, PERC_AREA, TOTAL_AREA, AREA_SE, PERC_SE, TOTAL_SE, nPlots)
+#
+#
+#         ## Add each row onto the output dataset
+#         if(i > 1){
+#           aOut <- bind_rows(aOut, a)
+#         } else { # On the first iteration
+#           aOut <- a
+#         }
+#       } # End Combo loop
+#
+#       # If grpBy was specified, rejoin with these names
+#       if (ncol(combos) > 0){
+#         aOut <- bind_cols(combos, aOut) #%>%
+#         #filter(S_a > 0)
+#       }
+#
+#       # Return a spatial object
+#       if (!is.null(polys) & returnSpatial) {
+#         suppressMessages({aOut <- left_join(polys, aOut) %>%
+#           select(c(grpByOrig, 'AREA', 'PERC_AREA', 'TOTAL_AREA', 'AREA_SE', 'PERC_SE', 'TOTAL_SE', 'nPlots', names(polys)))})
+#       } else if (!is.null(polys) & returnSpatial == FALSE){
+#         aOut <- select(aOut, c(grpByOrig, 'AREA', 'PERC_AREA', 'TOTAL_AREA', 'AREA_SE', 'PERC_SE', 'TOTAL_SE', 'nPlots', everything()))
+#       }
+#     } else {# End SE == FALSE
+#       ### BELOW DOES NOT PRODUCE SAMPLING ERRORS, use EXPNS instead (much quicker)
+#       # IF they want tree level variables, have to switch it up a bit
+#       # if(!is.null(treeDomain) | bySpecies | bySizeClass){
+#       #   data <- data %>%
+#       #     distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, EVALID, COND_STATUS_CD, .keep_all = TRUE)
+#       # } else {
+#       #   data <- data %>%
+#       #     distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, EVALID, COND_STATUS_CD, .keep_all = TRUE)
+#       # }
+#       data$fullDI <- landD * aD
+#
+#       # Compute estimates
+#       aSub <- data %>%
+#         group_by(.dots = grpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, CONDID) %>%
+#         # filter(tDI > 0) %>%
+#         summarize(CONDPROP_UNADJ = first(CONDPROP_UNADJ),
+#                   aDI = ifelse(sum(tDI > 0, na.rm = TRUE), 1, 0),
+#                   a = first(AREA_USED),
+#                   p1EU = first(P1PNTCNT_EU),
+#                   p1 = first(P1POINTCNT),
+#                   p2 = first(P2POINTCNT),
+#                   aAdj = first(aAdj),
+#                   EXPNS = EXPNS) %>%
+#         group_by(.dots = grpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
+#         summarize(fa = sum(CONDPROP_UNADJ * aDI * EXPNS * aAdj, na.rm = TRUE),
+#                   plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0)) %>%
+#         group_by(.dots = grpBy) %>%
+#         summarize(AREA = sum(fa, na.rm = TRUE),
+#                   nPlots = sum(plotIn, na.rm = TRUE))
+#
+#       suppressMessages({
+#         aOut <- data %>%
+#           group_by(YEAR, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
+#           summarize(fa = sum(CONDPROP_UNADJ * fullDI * EXPNS * aAdj, na.rm = TRUE)) %>%
+#           group_by(YEAR) %>%
+#           summarize(TOTAL_AREA = sum(fa, na.rm = TRUE)) %>%
+#           inner_join(aSub) %>%
+#           mutate(PERC_AREA = AREA / TOTAL_AREA * 100) %>%
+#           select(grpBy, AREA, PERC_AREA, TOTAL_AREA, nPlots)
+#       })
+#
+#
+#       # Return a spatial object
+#       if (!is.null(polys) & returnSpatial) {
+#         suppressMessages({aOut <- left_join(polys, aOut) %>%
+#           select(c(grpByOrig, 'AREA', 'PERC_AREA', 'TOTAL_AREA', 'nPlots', names(polys)))})
+#       } else if (!is.null(polys) & returnSpatial == FALSE){
+#         aOut <- select(aOut, c(grpByOrig, 'AREA', 'PERC_AREA', 'TOTAL_AREA', 'nPlots', everything()))
+#       }
+#
+#     }
+#
+#   }
+#
+#   return(aOut)
+# }
 
 
 

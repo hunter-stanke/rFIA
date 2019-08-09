@@ -3,7 +3,7 @@
 
 \title{Convert numeric variables to class intervals (factor)}
 
-\description{Convert continuous numeric variables to class intervals with output as factor or numeric classes. Simplified implementation of \code{\link[base]{cut}}. Example uses include computing diameter or height classes for summarization with \code{rFIA} functions (ex. \code{\link{tpa}}, \code{\link{biomass}}).}
+\description{Convert continuous numeric variables to class intervals with output as factor or numeric classes. Simplified implementation of \code{\link[base]{cut}}. Example uses include computing diameter or height classes for summarization with \pkg{rFIA} functions (e.g. \code{\link{tpa}}, \code{\link{biomass}}).}
 
 \usage{
 makeClasses(x, interval = NULL, lower = NULL, upper = NULL,
@@ -13,21 +13,21 @@ makeClasses(x, interval = NULL, lower = NULL, upper = NULL,
 \arguments{
   \item{x}{numeric vector to be converted to factor (class intervals).}
 
-  \item{interval}{numeric; interval of desired output classes. Ex. specify \code{x = DIA} & \code{interval = 2} for 2-inch diameter class intervals.}
-  \item{lower}{lower bound of output classes, included in lowest class. Ex. [\code{lower}, ...).}
-  \item{upper}{upper bound of output classes, NOT included in highest class. Ex. [..., \code{upper}).}
+  \item{interval}{numeric; interval of desired output classes. e.g. specify \code{x = DIA} and \code{interval = 2} for 2-inch diameter class intervals.}
+  \item{lower}{lower bound of output classes, included in lowest class. e.g. [\code{lower}, ...).}
+  \item{upper}{upper bound of output classes, NOT included in highest class. e.g. [..., \code{upper}).}
   \item{brks}{numeric vector of desired breakpoints (bounds) of class intervals.}
   \item{numLabs}{logical; if TRUE, return class intervals as numeric vector with values representing the lower bounds of each interval. If FALSE, return factor with labels of form \code{'[b1, b2)'}.}
 }
 
 
 \value{
-Factor or integer vector. Factor values represent class intervals with \code{[b1, b2)} notation, values of integer vectors represent the lower bounds of class intervals (ex. \code{b1}).
+Factor or integer vector. Factor values represent class intervals with \code{[b1, b2)} notation, values of integer vectors represent the lower bounds of class intervals (e.g. \code{b1}).
 }
 
 
 \author{
-Hunter Stanke & Andrew Finley, Michigan State University
+Hunter Stanke and Andrew Finley
 }
 
 
