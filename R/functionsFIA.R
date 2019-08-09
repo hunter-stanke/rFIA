@@ -1009,7 +1009,7 @@ standStruct <- function(db,
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
 
       # Replace YEAR from above w/ max year so that data is pooled across states
-      data <- inner_join(data, mergeYears, by = 'polyID') %>%
+      data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
         mutate(YEAR = maxYear)
     }
@@ -1328,7 +1328,7 @@ diversity <- function(db,
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
 
       # Replace YEAR from above w/ max year so that data is pooled across states
-      data <- inner_join(data, mergeYears, by = 'polyID') %>%
+      data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
         mutate(YEAR = maxYear)
     }
@@ -1623,7 +1623,7 @@ tpa <- function(db,
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
 
       # Replace YEAR from above w/ max year so that data is pooled across states
-      data <- inner_join(data, mergeYears, by = 'polyID') %>%
+      data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
         mutate(YEAR = maxYear)
     }
@@ -1957,7 +1957,7 @@ growMort <- function(db,
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
 
       # Replace YEAR from above w/ max year so that data is pooled across states
-      data <- inner_join(data, mergeYears, by = 'polyID') %>%
+      data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
         mutate(YEAR = maxYear)
     }
@@ -2294,7 +2294,7 @@ vitalRates <- function(db,
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
 
       # Replace YEAR from above w/ max year so that data is pooled across states
-      data <- inner_join(data, mergeYears, by = 'polyID') %>%
+      data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
         mutate(YEAR = maxYear)
     }
@@ -2604,7 +2604,7 @@ biomass <- function(db,
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
       # Replace YEAR from above w/ max year so that data is pooled across states
-      data <- inner_join(data, mergeYears, by = 'polyID') %>%
+      data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
         mutate(YEAR = maxYear)
       }
@@ -2915,7 +2915,7 @@ dwm <- function(db,
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
 
       # Replace YEAR from above w/ max year so that data is pooled across states
-      data <- inner_join(data, mergeYears, by = 'polyID') %>%
+      data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
         mutate(YEAR = maxYear)
     }
@@ -3276,7 +3276,7 @@ invasive <- function(db,
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
 
       # Replace YEAR from above w/ max year so that data is pooled across states
-      data <- inner_join(data, mergeYears, by = 'polyID') %>%
+      data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
         mutate(YEAR = maxYear)
     }

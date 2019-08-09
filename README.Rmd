@@ -56,7 +56,7 @@ devtools::install_github('hunter-stanke/rFIA')
 
 ## Example Usage
 
-#### _Load FIA Data into R_
+### _Load FIA Data into R_
 The first step to using `rFIA` is to download subsets of the FIA Database from the FIA Datamart. Download a state subset by clicking the state of interest here: https://apps.fs.usda.gov/fia/datamart/CSV/datamart_csv.html. 
 
 Note: given the massive size of the full FIA Database, users are cautioned to only download the subsets containing their region of interest.
@@ -73,7 +73,7 @@ produce summaries with `rFIA` functions (common = TRUE)
 
 ----
 
-#### _Compute Estimates of Forest Variables_
+### _Compute Estimates of Forest Variables_
 Now that you have loaded your FIA data into R, it's time to put it to work. Let's explore the basic functionality of `rFIA` with `tpa`, a function to compute tree abundance estimates (TPA, BAA, & relative abundance) from FIA data, and `fiaRI`, a subset of the FIA Database for Rhode Island including all inventories up to 2017.  
 
 **Estimate the abundance of live trees in Rhode Island:**
@@ -124,7 +124,6 @@ head(tpaRI_own)
 **What if I want to produce estimates within my own population boundaries (within user-defined spatial zones/polygons)?** This is where things get really exciting. 
 ``` {r warning = FALSE, message = FALSE}
 ## Load the county boundaries for Rhode Island
-library(rFIA)
 data('countiesRI') ## Load your own spatial data from shapefiles using readOGR() (rgdal)
 
 ## polys specifies the polygons (zones) where you are interested in producing estimates
