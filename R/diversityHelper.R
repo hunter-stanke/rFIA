@@ -1,4 +1,4 @@
-diversityHelper <- function(x, combos, data, grpBy, totals, SE){
+diversityHelper <- function(x, combos, data, grpBy, SE){
   # Update domain indicator for each each column speficed in grpBy
   td = 1 # Start both at 1, update as we iterate through
   #ad = 1

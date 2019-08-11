@@ -887,6 +887,8 @@ standStruct <- function(db,
                         nCores = 1) {
   reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
+  grpNames <- c(names(db$PLOT), names(db$COND))
+
   ## Some warnings
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
@@ -906,6 +908,11 @@ standStruct <- function(db,
   if (any(reqTables %in% names(db) == FALSE)){
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
+  }
+  if (any(grpBy %in% grpNames == FALSE)){
+    missG <- grpNames[grpNames %in% grpBy == FALSE]
+    stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT or COND tables.'))
+
   }
 
   # Save original grpByfor pretty return with spatial objects
@@ -973,20 +980,22 @@ standStruct <- function(db,
     db$PLOT <- as(db$PLOT, 'sf')
   }
 
+  ## Which grpByNames are in which table? Helps us subset below
+  grpP <- names(db$PLOT)[grpBy %in% names(db$PLOT)]
+  grpC <- names(db$COND)[grpBy %in% names(db$COND)]
 
   ## Prep joins and filters
-  data <- db$PLOT %>%
-    inner_join(select(db$COND, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN')) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
+    inner_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
     inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_STRATUM, -c('STATECD', 'RSCD')), by = c('STRATUM_CN' = 'CN')) %>%
+    inner_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL, c('EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-    left_join(select(db$TREE, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN', 'CONDID')) %>%
-    mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
-    distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, TREE, .keep_all = TRUE) %>%
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'CCLCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE')), by = c('PLT_CN', 'CONDID')) %>%
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
+    mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     rename(YEAR = END_INVYR,
            YEAR_RANGE = REPORT_YEAR_NM)
 
@@ -1211,6 +1220,8 @@ diversity <- function(db,
 
   reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
+  grpNames <- c(names(db$PLOT), names(db$TREE), names(db$COND))
+
   ## Some warnings
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
@@ -1227,6 +1238,11 @@ diversity <- function(db,
   if (any(reqTables %in% names(db) == FALSE)){
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
+  }
+  if (any(grpBy %in% grpNames == FALSE)){
+    missG <- grpNames[grpNames %in% grpBy == FALSE]
+    stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT, COND, or TREE tables.'))
+
   }
 
 
@@ -1295,20 +1311,26 @@ diversity <- function(db,
   }
 
 
+  ## Which grpByNames are in which table? Helps us subset below
+  grpP <- names(db$PLOT)[grpBy %in% names(db$PLOT)]
+  grpC <- names(db$COND)[grpBy %in% names(db$COND)]
+  grpT <- names(db$TREE)[grpBy %in% names(db$TREE)]
+
   ## Prep joins and filters
-  data <- db$PLOT %>%
-    inner_join(select(db$COND, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN')) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
+    inner_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
     inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_STRATUM, -c('STATECD', 'RSCD')), by = c('STRATUM_CN' = 'CN')) %>%
+    inner_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL, c('EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-    left_join(select(db$TREE, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT)), by = c('PLT_CN', 'CONDID')) %>%
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     rename(YEAR = END_INVYR,
            YEAR_RANGE = REPORT_YEAR_NM)
+
   ## Recode a few of the estimation methods to make things easier below
   data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
                             `Post-Stratification` = 'strat',
@@ -1420,16 +1442,16 @@ diversity <- function(db,
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
       if(progress){ # Include progress Bar
-        dOut <- pblapply(names(combos), FUN = diversityHelper, combos, data, grpBy, totals, SE, cl = cl)
+        dOut <- pblapply(names(combos), FUN = diversityHelper, combos, data, grpBy, SE, cl = cl)
       } else { # No progress Bar
-        dOut <- parLapply(cl, names(combos), FUN = diversityHelper, combos, data, grpBy, totals, SE)
+        dOut <- parLapply(cl, names(combos), FUN = diversityHelper, combos, data, grpBy, SE)
       }
     } else { # Unix systems
       if(progress){
-        dOut <- pblapply(names(combos), FUN = diversityHelper, combos, data, grpBy, totals, SE, cl = nCores)
+        dOut <- pblapply(names(combos), FUN = diversityHelper, combos, data, grpBy, SE, cl = nCores)
         #dOut <- pbapply(names(combos), FUN = diversityHelper, combos, data, grpBy, totals, SE)
       } else { # No progress Bar, much quicker
-        dOut <- mclapply(names(combos), FUN = diversityHelper, combos, data, grpBy, totals, SE, mc.cores = nCores)
+        dOut <- mclapply(names(combos), FUN = diversityHelper, combos, data, grpBy, SE, mc.cores = nCores)
       }
     }
 
@@ -1510,6 +1532,7 @@ tpa <- function(db,
 
   reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
+  grpNames <- c(names(db$PLOT), names(db$TREE), names(db$COND))
   ## Some warnings
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
@@ -1527,30 +1550,25 @@ tpa <- function(db,
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
   }
+  if (any(grpBy %in% grpNames == FALSE)){
+    missG <- grpNames[grpNames %in% grpBy == FALSE]
+    stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT, COND, or TREE tables.'))
+
+  }
 
   # Save original grpByfor pretty return with spatial objects
   grpBy <- c('YEAR', grpBy)
   grpByOrig <- grpBy
 
-  # ## Pull out individual tables from database object
-  # if (!is.null(db)){
-  #   TREE <- db[['TREE']]
-  #   COND <- db[['COND']]
-  db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
-  #   POP_PLOT_STRATUM_ASSGN <- db[['POP_PLOT_STRATUM_ASSGN_STRATUM_ASSGN']]
-  #   PEU <- db$POP_ESTN_UNIT
-  #   POP_EVAL <- db$POP_EVAL
-  #   POP_STRATUM <- db$POP_STRATUM
-  #   PET <- db$POP_EVAL_TYP
-  #   PEG <- db$POP_EVAL_GRP
-  # }
+  ## Need a plotCN
+  db$PLOT <- db$PLOT %>% mutate(PLT_CN = CN)
+
 
   message('Joining FIA Tables.....')
 
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
-  ids <- db$POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID') %>%
+  ids <- select(db$POP_EVAL, c('CN', 'END_INVYR', 'EVALID')) %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
     filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
     distinct(EVALID)
@@ -1587,19 +1605,23 @@ tpa <- function(db,
     coordinates(db$PLOT) <- ~LON+LAT
     proj4string(db$PLOT) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
     db$PLOT <- as(db$PLOT, 'sf')
-  }
+  } # END AREAL
 
+  ## Which grpByNames are in which table? Helps us subset below
+  grpP <- names(db$PLOT)[grpBy %in% names(db$PLOT)]
+  grpC <- names(db$COND)[grpBy %in% names(db$COND)]
+  grpT <- names(db$TREE)[grpBy %in% names(db$TREE)]
 
   ## Prep joins and filters
-  data <- db$PLOT %>%
-    inner_join(select(db$COND, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN')) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
+    inner_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
     inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_STRATUM, -c('STATECD', 'RSCD')), by = c('STRATUM_CN' = 'CN')) %>%
+    inner_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL, c('EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-    left_join(select(db$TREE, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT)), by = c('PLT_CN', 'CONDID')) %>%
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     rename(YEAR = END_INVYR,
@@ -1634,23 +1656,23 @@ tpa <- function(db,
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
   # Land type domain indicator
   if (tolower(landType) == 'forest'){
-    landD <- ifelse(data$COND_STATUS_CD == 1, 1, 0)
+    landD <- data$COND_STATUS_CD == 1
   } else if (tolower(landType) == 'timber'){
-    landD <- ifelse(data$COND_STATUS_CD == 1 & data$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & data$RESERVCD == 0, 1, 0)
+    landD <- data$COND_STATUS_CD == 1 & data$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & data$RESERVCD == 0
   }
   # Tree Type domain indicator
   if (tolower(treeType) == 'live'){
-    typeD <- ifelse(data$STATUSCD == 1, 1, 0)
+    typeD <- data$STATUSCD == 1
   } else if (tolower(treeType) == 'dead'){
-    typeD <- ifelse(data$STATUSCD == 2 & data$STANDING_DEAD_CD == 1, 1, 0)
+    typeD <- data$STATUSCD == 2 & data$STANDING_DEAD_CD == 1
   } else if (tolower(treeType) == 'gs'){
-    typeD <- ifelse(data$STATUSCD == 1 & data$DIA >= 5 & data$TREECLCD == 2, 1, 0)
+    typeD <- data$STATUSCD == 1 & data$DIA >= 5 & data$TREECLCD == 2
   } else if (tolower(treeType) == 'all'){
     typeD <- 1
   }
   # update spatial domain indicator
   if(!is.null(polys)){
-    sp <- ifelse(data$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+    sp <- data$PLT_CN %in% pltSF$PLT_CN
   } else {
     sp <- 1
   }
@@ -1819,6 +1841,7 @@ growMort <- function(db,
   reqTables <- c('PLOT', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_ESTN', 'COND',
                  'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
+  grpNames <- c(names(db$PLOT), names(db$TREE), names(db$COND))
   ## Some warnings
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
@@ -1835,6 +1858,11 @@ growMort <- function(db,
   if (any(reqTables %in% names(db) == FALSE)){
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
+  }
+  if (any(grpBy %in% grpNames == FALSE)){
+    missG <- grpNames[grpNames %in% grpBy == FALSE]
+    stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT, COND, or TREE tables.'))
+
   }
 
   # These states do not allow change estimates.
@@ -1916,21 +1944,23 @@ growMort <- function(db,
     proj4string(db$PLOT) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
     db$PLOT <- as(db$PLOT, 'sf')
   }
+  ## Which grpByNames are in which table? Helps us subset below
+  grpP <- names(db$PLOT)[grpBy %in% names(db$PLOT)]
+  grpC <- names(db$COND)[grpBy %in% names(db$COND)]
+  grpT <- names(db$TREE)[grpBy %in% names(db$TREE)]
 
   ## Prep joins and filters
-  ## Prep joins and filters
-  data <- db$PLOT %>%
-    inner_join(select(db$GRM_COND, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN')) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
+    inner_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
     inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_STRATUM, -c('STATECD', 'RSCD')), by = c('STRATUM_CN' = 'CN')) %>%
+    inner_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL, c('EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-    left_join(select(db$TREE, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN', 'CONDID'))%>%
-    left_join(select(db$TREE_GRM_COMPONENT, c('PLT_CN', 'TRE_CN', 'ANN_DIA_GROWTH', 'ANN_HT_GROWTH', 'DIA_BEGIN', 'DIA_MIDPT', 'DIA_END',
-                            'HT_BEGIN', 'HT_MIDPT', 'HT_END')), by = c('PLT_CN', 'TRE_CN')) %>%
-    left_join(select(db$TREE_GRM_ESTN, c('PLT_CN', 'TRE_CN', 'SUBPTYP_GRM', 'ANN_NET_GROWTH', 'COMPONENT')), by = c('PLT_CN', 'TRE_CN')) %>%
+    left_join(select(db$TREE, c('TRE_CN', 'PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT)), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE_GRM_COMPONENT, c('PLT_CN', 'TRE_CN')), by = c('PLT_CN', 'TRE_CN')) %>%
+    left_join(select(db$TREE_GRM_ESTN, c('PLT_CN', 'TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT')), by = c('PLT_CN', 'TRE_CN')) %>%
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     mutate(tAdj = grmAdj(SUBPTYP_GRM, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     rename(YEAR = END_INVYR,
@@ -2152,6 +2182,7 @@ vitalRates <- function(db,
   reqTables <- c('PLOT', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_ESTN', 'COND',
                  'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
+  grpNames <- c(names(db$PLOT), names(db$TREE), names(db$COND))
   ## Some warnings
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
@@ -2168,6 +2199,11 @@ vitalRates <- function(db,
   if (any(reqTables %in% names(db) == FALSE)){
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
+  }
+  if (any(grpBy %in% grpNames == FALSE)){
+    missG <- grpNames[grpNames %in% grpBy == FALSE]
+    stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT, COND, or TREE tables.'))
+
   }
 
   # These states do not allow change estimates.
@@ -2250,21 +2286,24 @@ vitalRates <- function(db,
     db$PLOT <- as(db$PLOT, 'sf')
   }
 
-
+  ## Which grpByNames are in which table? Helps us subset below
+  grpP <- names(db$PLOT)[grpBy %in% names(db$PLOT)]
+  grpC <- names(db$COND)[grpBy %in% names(db$COND)]
+  grpT <- names(db$TREE)[grpBy %in% names(db$TREE)]
 
   ## Prep joins and filters
-  data <- db$PLOT %>%
-    inner_join(select(db$GRM_COND, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN')) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'REMPER', grpP)) %>%
+    inner_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
     inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_STRATUM, -c('STATECD', 'RSCD')), by = c('STRATUM_CN' = 'CN')) %>%
+    inner_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL, c('EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-    left_join(select(db$TREE, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN', 'CONDID'))%>%
+    left_join(select(db$TREE, c('TRE_CN', 'PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT)), by = c('PLT_CN', 'CONDID')) %>%
     left_join(select(db$TREE_GRM_COMPONENT, c('PLT_CN', 'TRE_CN', 'ANN_DIA_GROWTH', 'ANN_HT_GROWTH', 'DIA_BEGIN', 'DIA_MIDPT', 'DIA_END',
                             'HT_BEGIN', 'HT_MIDPT', 'HT_END')), by = c('PLT_CN', 'TRE_CN')) %>%
-    left_join(select(db$TREE_GRM_ESTN, c('PLT_CN', 'TRE_CN', 'SUBPTYP_GRM', 'ANN_NET_GROWTH')), by = c('PLT_CN', 'TRE_CN')) %>%
+    left_join(select(db$TREE_GRM_ESTN, c('PLT_CN', 'TRE_CN', 'TPAGROW_UNADJ', 'SUBPTYP_GRM', 'ANN_NET_GROWTH')), by = c('PLT_CN', 'TRE_CN')) %>%
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     mutate(tAdj = grmAdj(SUBPTYP_GRM, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     rename(YEAR = END_INVYR,
@@ -2489,6 +2528,7 @@ biomass <- function(db,
                     nCores = 1) {
   reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
+  grpNames <- c(names(db$PLOT), names(db$TREE), names(db$COND))
   ## Some warnings
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
@@ -2505,6 +2545,11 @@ biomass <- function(db,
   if (any(reqTables %in% names(db) == FALSE)){
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
+  }
+  if (any(grpBy %in% grpNames == FALSE)){
+    missG <- grpNames[grpNames %in% grpBy == FALSE]
+    stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT, COND, or TREE tables.'))
+
   }
   # Save original grpByfor pretty return with spatial objects
   grpBy <- c('YEAR', grpBy)
@@ -2573,15 +2618,22 @@ biomass <- function(db,
 
 
   ## Prep joins and filters
-  data <- db$PLOT %>%
-    inner_join(select(db$COND, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN')) %>%
+  ## Which grpByNames are in which table? Helps us subset below
+  grpP <- names(db$PLOT)[grpBy %in% names(db$PLOT)]
+  grpC <- names(db$COND)[grpBy %in% names(db$COND)]
+  grpT <- names(db$TREE)[grpBy %in% names(db$TREE)]
+
+  ## Prep joins and filters
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
+    inner_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
     inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_STRATUM, -c('STATECD', 'RSCD')), by = c('STRATUM_CN' = 'CN')) %>%
+    inner_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL, c('EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-    left_join(select(db$TREE, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE',
+                                'VOLCFNET', 'VOLCSNET', 'DRYBIO_AG', 'DRYBIO_BG', 'CARBON_AG', 'CARBON_BG', grpT)), by = c('PLT_CN', 'CONDID')) %>%
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     rename(YEAR = END_INVYR,
@@ -2675,7 +2727,7 @@ biomass <- function(db,
       # Compute estimates at plot level
       group_by(.dots = grpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
       summarize(NETVOL = sum(VOLCFNET * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                SAWVOL = sum(VOLCFNET * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
+                SAWVOL = sum(VOLCSNET * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
                 BIO_AG = sum(DRYBIO_AG * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
                 BIO_BG = sum(DRYBIO_BG * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
                 BIO = sum(sum(DRYBIO_AG,DRYBIO_BG,na.rm = TRUE) * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
@@ -2797,6 +2849,7 @@ dwm <- function(db,
                 nCores = 1) {
   reqTables <- c('PLOT', 'COND_DWM_CALC', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
+  grpNames <- c(names(db$PLOT), names(db$COND))
   ## Some warnings
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
@@ -2807,15 +2860,17 @@ dwm <- function(db,
   if (!is.null(grpBy) & class(grpBy) != 'character'){
     stop('grpBy must be of class character. Please specify variable names to group by as quoted list. Example: grpBy = c("OWNGRPCD", "SITECLCD")')
   }
-  if (tidy & returnSpatial){
-    warning('Returning multiple observations for each areal unit. If returnSpatial = TRUE, tidy = FALSE is recommended.')
-  }
   if (landType %in% c('timber', 'forest') == FALSE){
     stop('landType must be one of: "forest" or "timber".')
   }
   if (any(reqTables %in% names(db) == FALSE)){
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
+  }
+  if (any(grpBy %in% grpNames == FALSE)){
+    missG <- grpNames[grpNames %in% grpBy == FALSE]
+    stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT or COND tables.'))
+
   }
 
   # Save original grpByfor pretty return with spatial objects
@@ -2883,12 +2938,18 @@ dwm <- function(db,
     db$PLOT <- as(db$PLOT, 'sf')
   }
 
-  data <- db$PLOT %>%
-    inner_join(select(db$COND, -c('INVYR', 'STATECD', 'UNITCD', 'COUNTYCD', 'PLOT')), by = c('PLT_CN')) %>%
+  ## Prep joins and filters
+  ## Which grpByNames are in which table? Helps us subset below
+  grpP <- names(db$PLOT)[grpBy %in% names(db$PLOT)]
+  grpC <- names(db$COND)[grpBy %in% names(db$COND)]
+
+  ## Prep joins and filters
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
+    inner_join(select(db$COND, c('PLT_CN', 'CND_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
     inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_STRATUM, -c('STATECD', 'RSCD')), by = c('STRATUM_CN' = 'CN')) %>%
+    inner_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL, c('EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     left_join(select(db$COND_DWM_CALC, -c( 'STATECD', 'COUNTYCD', 'UNITCD', 'INVYR', 'MEASYEAR', 'PLOT', 'CONDID', 'EVALID', 'STRATUM_CN')), by = c('PLT_CN', 'CND_CN')) %>%
@@ -3164,6 +3225,7 @@ invasive <- function(db,
   reqTables <- c('PLOT', 'INVASIVE_SUBPLOT_SPP', 'COND',
                  'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
+  grpNames <- c(names(db$PLOT), names(db$COND))
   ## Some warnings
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
@@ -3180,6 +3242,11 @@ invasive <- function(db,
   if (any(reqTables %in% names(db) == FALSE)){
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
+  }
+  if (any(grpBy %in% grpNames == FALSE)){
+    missG <- grpNames[grpNames %in% grpBy == FALSE]
+    stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT or COND tables.'))
+
   }
 
 
@@ -3245,16 +3312,21 @@ invasive <- function(db,
   }
 
 
+  ## Prep joins and filters
+  ## Which grpByNames are in which table? Helps us subset below
+  grpP <- names(db$PLOT)[grpBy %in% names(db$PLOT)]
+  grpC <- names(db$COND)[grpBy %in% names(db$COND)]
 
-  data <- db$PLOT %>%
-    inner_join(select(db$COND, -c("INVYR", "STATECD", "UNITCD", "COUNTYCD", "PLOT")), by = c("PLT_CN")) %>%
-    inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c("STRATUM_CN", "PLT_CN")),by = c("PLT_CN")) %>%
-    inner_join(select(db$POP_STRATUM, -c("STATECD", "RSCD")), by = c(STRATUM_CN = "CN")) %>%
-    inner_join(select(db$POP_ESTN_UNIT, c("CN", "EVAL_CN", "AREA_USED",  "P1PNTCNT_EU")), by = c(ESTN_UNIT_CN = "CN")) %>%
-    inner_join(select(db$POP_EVAL, c("EVAL_GRP_CN", "ESTN_METHOD", "CN", "END_INVYR", "REPORT_YEAR_NM")), by = c(EVAL_CN = "CN")) %>%
-    inner_join(select(db$POP_EVAL_TYP, c("EVAL_TYP", "EVAL_CN")), by = c("EVAL_CN")) %>%
-    inner_join(select(db$POP_EVAL_GRP, c("RSCD", "CN", "EVAL_GRP")), by = c(EVAL_GRP_CN = "CN")) %>%
-    full_join(select(db$INV, -c("INVYR", "STATECD", "UNITCD", "COUNTYCD", "PLOT")), by = c("PLT_CN", "CONDID")) %>%
+  ## Prep joins and filters
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVASIVE_SAMPLING_STATUS_CD', grpP)) %>%
+    inner_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+    inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
+    inner_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
+    inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
+    inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
+    full_join(select(db$INVASIVE_SUBPLOT_SPP, c('PLT_CN', 'COVER_PCT', 'VEG_SPCD', 'CONDID')), by = c("PLT_CN", "CONDID")) %>%
     left_join(intData$REF_PLANT_DICTIONARY, by = c('VEG_SPCD' = 'SYMBOL')) %>%
     mutate(SYMBOL = VEG_SPCD) %>%
     mutate(aAdj = ifelse(PROP_BASIS == "SUBP", ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
