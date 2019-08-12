@@ -301,6 +301,7 @@ print.FIA.Database <- function(x, ...){
 #' @import sf
 #' @import stringr
 #' @import gganimate
+#' @importFrom data.table fread
 #' @importFrom ggplot2 ggplot geom_sf labs scale_fill_viridis_c theme_minimal theme aes element_blank element_text unit ggsave
 #' @importFrom parallel makeCluster detectCores mclapply parLapply
 #' @importFrom tidyr gather
@@ -368,7 +369,7 @@ readFIA <- function(dir,
   ## Compute estimates in parallel -- Clusters in windows, forking otherwise
   if (Sys.info()['sysname'] == 'Windows'){
     cl <- makeCluster(nCores) # Set up snow cluster
-    inTables <- parLapply(cl, files, FUN = readFIAHelper1, dir)
+    inTables <- parLapply(cl, FUN = readFIAHelper1, X = files, dir)
   } else { # Unix systems
     inTables <- mclapply(files, FUN = readFIAHelper1, dir, mc.cores = nCores)
   }
