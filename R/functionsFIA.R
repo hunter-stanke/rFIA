@@ -307,7 +307,6 @@ print.FIA.Database <- function(x, ...){
 #' @importFrom tidyr gather
 #' @importFrom pbapply pblapply
 #' @importFrom sp over proj4string<- coordinates<- spTransform proj4string
-#' @importFrom forcats fct_explicit_na
 #' @importFrom stats cov var
 #' @importFrom utils object.size read.csv tail globalVariables type.convert
 NULL
@@ -408,6 +407,7 @@ readFIA <- function(dir,
   }
 
   # NEW CLASS NAME FOR FIA DATABASE OBJECTS
+  outTables <- lapply(outTables, as.data.frame)
   class(outTables) <- 'FIA.Database'
 
   return(outTables)
@@ -515,6 +515,7 @@ clipFIA <- function(db,
 
 
   if('GRM_COND' %in% names(db) == FALSE & mostRecent & nrow(db$SUBP_COND_CHNG_MTRX) > 1){
+    suppressWarnings({
     ## Modify the Subplot Condition Change matrix to include current and previous condition status
     db$SUBP_COND_CHNG_MTRX <- db$SUBP_COND_CHNG_MTRX %>%
       filter(SUBPTYP == 1) %>%
@@ -529,7 +530,9 @@ clipFIA <- function(db,
       inner_join(select(db$SUBP_COND_CHNG_MTRX, c('PLT_CN', 'CONDID', 'COND_CHANGE_CD')), by = c('PLT_CN', 'CONDID')) %>%
       distinct(PLT_CN, CONDID, .keep_all = TRUE)%>%
       mutate(CONDPROP_UNADJ = ifelse(COND_CHANGE_CD == 1, CONDPROP_UNADJ, 0)) # Has to be forested currently and at last measurment
-  }
+    })
+    }
+
 
 
 
@@ -550,20 +553,24 @@ clipFIA <- function(db,
 
   ## Locate the most recent EVALID and subset plots
   if (mostRecent){
+    suppressWarnings({
     tempData <- db$PLOT %>%
       mutate(PLT_CN = CN) %>%
-      inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-      inner_join(select(db$POP_STRATUM, -c('STATECD', 'RSCD')), by = c('STRATUM_CN' = 'CN')) %>%
-      inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-      inner_join(select(db$POP_EVAL, c('EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM', 'LOCATION_NM')), by = c('EVAL_CN' = 'CN')) %>%
-      inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
-      inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) #%>%
-
+      left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
+      left_join(select(db$POP_STRATUM, -c('STATECD', 'RSCD')), by = c('STRATUM_CN' = 'CN')) %>%
+      left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
+      left_join(select(db$POP_EVAL, c('EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM', 'LOCATION_NM')), by = c('EVAL_CN' = 'CN')) %>%
+      left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
+      left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
+      mutate_if(is.factor,
+                as.character) %>%
+      filter(!is.na(END_INVYR))
+    })
      if(any(unique(db$PLOT$STATECD) %in% c(69, 72, 78, 41, 53))){
       tempMR <- tempData %>%
         filter(STATECD %in% c(69, 72, 78, 41, 53) == FALSE) %>%
         group_by(LOCATION_NM, EVAL_TYP) %>%
-        filter(END_INVYR == max(END_INVYR, na.rm = TRUE))
+        filter(END_INVYR == max(as.numeric(END_INVYR), na.rm = TRUE))
       tempFULL <- tempData %>%
         filter(STATECD %in% c(69, 72, 78, 41, 53))
       tempData <- bind_rows(tempMR, tempFULL)
@@ -571,7 +578,7 @@ clipFIA <- function(db,
      } else {
       tempData <- tempData %>%
         group_by(LOCATION_NM, EVAL_TYP) %>%
-        filter(END_INVYR == max(END_INVYR, na.rm = TRUE))
+        filter(END_INVYR == max(as.numeric(END_INVYR), na.rm = TRUE))
      }
 
     # Both most recent and EVALID is specified, pulls most recent subset of the evalids given
@@ -634,10 +641,7 @@ clipFIA <- function(db,
    if (!is.null(mask)){
      # Convert polygons to an sf object
      mask <- mask %>%
-       as('sf') %>%
-       mutate_if(is.factor,
-                 fct_explicit_na,
-                 na_level = "NA")
+       as('sf')
 
      ## Make plot data spatial, projected same as polygon layer
      pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
@@ -648,11 +652,11 @@ clipFIA <- function(db,
 
      # Intersect plot with polygons
      mask$polyID <- 1:nrow(mask)
-     suppressMessages({
+     suppressMessages({suppressWarnings({
        pltSF <- st_intersection(pltSF, mask) %>%
          as.data.frame() %>%
          select(-c('geometry')) # removes artifact of SF object
-     })
+     })})
 
      # Identify the estimation units to which plots within the mask belong to
      estUnits <- pltSF %>%
@@ -950,10 +954,9 @@ standStruct <- function(db,
   if(!is.null(polys)) {
     # Convert polygons to an sf object
     polys <- polys %>%
-      as('sf') %>%
+      as('sf')%>%
       mutate_if(is.factor,
-                fct_explicit_na,
-                na_level = "NA")
+                as.character)
     # Add shapefile names to grpBy
     grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
@@ -964,11 +967,11 @@ standStruct <- function(db,
       st_transform(crs = st_crs(polys)$proj4string)
     # Intersect plot with polygons
     polys$polyID <- 1:nrow(polys)
-    suppressMessages({
+    suppressMessages({suppressWarnings({
       pltSF <- st_intersection(pltSF, polys) %>%
         as.data.frame() %>%
         select(-c('geometry')) # removes artifact of SF object
-    })
+    })})
 
     # # Convert back to dataframe
     # db$PLOT <- as.data.frame(db$PLOT) %>%
@@ -982,23 +985,25 @@ standStruct <- function(db,
   }
 
   ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[grpBy %in% names(db$PLOT)]
-  grpC <- names(db$COND)[grpBy %in% names(db$COND)]
+  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
+  grpC <- names(db$COND)[names(db$COND) %in% grpBy]
 
   ## Prep joins and filters
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
-    inner_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
-    inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
-    inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
+    left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'CCLCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE')), by = c('PLT_CN', 'CONDID')) %>%
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     rename(YEAR = END_INVYR,
-           YEAR_RANGE = REPORT_YEAR_NM)
+           YEAR_RANGE = REPORT_YEAR_NM) %>%
+    mutate_if(is.factor,
+              as.character)
 
   ## Recode a few of the estimation methods to make things easier below
   data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
@@ -1013,8 +1018,8 @@ standStruct <- function(db,
     # Test if any polygons cross state boundaries w/ different recent inventory years
     if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
       mergeYears <- pltSF %>%
-        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
-        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        left_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
 
@@ -1075,9 +1080,6 @@ standStruct <- function(db,
       ## estimation unit, and cause estimates to be inflated substantially
       combos <- data %>%
         as.data.frame() %>%
-        mutate_if(is.factor,
-                  fct_explicit_na,
-                  na_level = "NA") %>%
         group_by(.dots = grpBy) %>%
         summarize()
       if(!is.null(polys)){
@@ -1088,6 +1090,7 @@ standStruct <- function(db,
 
       message('Computing Summary Statistics.....')
 
+      suppressWarnings({
       ## Compute estimates in parallel -- Clusters in windows, forking otherwise
       if (Sys.info()['sysname'] == 'Windows'){
         cl <- makeCluster(nCores)
@@ -1104,6 +1107,7 @@ standStruct <- function(db,
           sOut <- mclapply(names(combos), FUN = standStructHelper, combos, data, grpBy, totals, tidy, SE, mc.cores = nCores)
         }
       }
+      })
 
       if (SE){
         # Convert from list to dataframe
@@ -1172,9 +1176,6 @@ standStruct <- function(db,
       } else { ## Function found no plots within the polygon, so it panics
         combos <- data %>%
           as.data.frame() %>%
-          mutate_if(is.factor,
-                    fct_explicit_na,
-                    na_level = "NA") %>%
           group_by(.dots = grpBy) %>%
           summarize()
         sOut <- data.frame("YEAR" = combos$YEAR,
@@ -1198,6 +1199,7 @@ standStruct <- function(db,
   } # End byPlot = FALSE
   remove(data)
   remove(db)
+  sOut <- filter(sOut, !is.na(YEAR))
   gc()
 
   return(sOut)
@@ -1280,10 +1282,9 @@ diversity <- function(db,
   if(!is.null(polys)) {
     # Convert polygons to an sf object
     polys <- polys %>%
-      as('sf') %>%
+      as('sf')%>%
       mutate_if(is.factor,
-                fct_explicit_na,
-                na_level = "NA")
+                as.character)
     # Add shapefile names to grpBy
     grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
@@ -1294,11 +1295,11 @@ diversity <- function(db,
       st_transform(crs = st_crs(polys)$proj4string)
     # Intersect plot with polygons
     polys$polyID <- 1:nrow(polys)
-    suppressMessages({
+    suppressMessages({suppressWarnings({
       pltSF <- st_intersection(pltSF, polys) %>%
         as.data.frame() %>%
         select(-c('geometry')) # removes artifact of SF object
-    })
+    })})
 
     # # Convert back to dataframe
     # db$PLOT <- as.data.frame(db$PLOT) %>%
@@ -1313,24 +1314,26 @@ diversity <- function(db,
 
 
   ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[grpBy %in% names(db$PLOT)]
-  grpC <- names(db$COND)[grpBy %in% names(db$COND)]
-  grpT <- names(db$TREE)[grpBy %in% names(db$TREE)]
+  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
+  grpC <- names(db$COND)[names(db$COND) %in% grpBy]
+  grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
   ## Prep joins and filters
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
-    inner_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
-    inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
-    inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
+    left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT)), by = c('PLT_CN', 'CONDID')) %>%
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     rename(YEAR = END_INVYR,
-           YEAR_RANGE = REPORT_YEAR_NM)
+           YEAR_RANGE = REPORT_YEAR_NM)%>%
+    mutate_if(is.factor,
+              as.character)
 
   ## Recode a few of the estimation methods to make things easier below
   data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
@@ -1345,8 +1348,8 @@ diversity <- function(db,
     # Test if any polygons cross state boundaries w/ different recent inventory years
     if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
       mergeYears <- pltSF %>%
-        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
-        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        left_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
 
@@ -1399,8 +1402,7 @@ diversity <- function(db,
   if (bySizeClass){
     grpBy <- c(grpBy, 'sizeClass')
     grpByOrig <- c(grpByOrig, 'sizeClass')
-    data$sizeClass <- makeClasses(data$DIA, interval = 2) %>%
-      fct_explicit_na()
+    data$sizeClass <- makeClasses(data$DIA, interval = 2)
   }
 
 
@@ -1426,9 +1428,6 @@ diversity <- function(db,
   } else {
     combos <- data %>%
       as.data.frame() %>%
-      mutate_if(is.factor,
-                fct_explicit_na,
-                na_level = "NA") %>%
       group_by(.dots = grpBy) %>%
       summarize()
     if(!is.null(polys)){
@@ -1439,6 +1438,7 @@ diversity <- function(db,
 
     message('Computing Summary Statistics.....')
 
+    suppressWarnings({
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
@@ -1455,6 +1455,7 @@ diversity <- function(db,
         dOut <- mclapply(names(combos), FUN = diversityHelper, combos, data, grpBy, SE, mc.cores = nCores)
       }
     }
+    })
 
     if (SE){
       # Convert from list to dataframe
@@ -1484,9 +1485,6 @@ diversity <- function(db,
     } else { ## Function found no plots within the polygon, so it panics
       combos <- data %>%
         as.data.frame() %>%
-        mutate_if(is.factor,
-                  fct_explicit_na,
-                  na_level = "NA") %>%
         group_by(.dots = grpBy) %>%
         summarize()
       dOut <- data.frame("YEAR" = combos$YEAR, "H_a" = rep(NA, nrow(combos)),
@@ -1509,7 +1507,7 @@ diversity <- function(db,
 
 
   } # End byPlot == FALSE
-
+  dOut <- filter(dOut, !is.na(YEAR))
   return(dOut)
 }
 
@@ -1569,7 +1567,8 @@ tpa <- function(db,
 
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
-  ids <- select(db$POP_EVAL, c('CN', 'END_INVYR', 'EVALID')) %>%
+  ids <- db$POP_EVAL %>%
+    select('CN', 'END_INVYR', 'EVALID') %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
     filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
     distinct(EVALID)
@@ -1581,10 +1580,9 @@ tpa <- function(db,
   if(!is.null(polys)) {
     # Convert polygons to an sf object
     polys <- polys %>%
-      as('sf') %>%
+      as('sf')%>%
       mutate_if(is.factor,
-                fct_explicit_na,
-                na_level = "NA")
+                as.character)
     # Add shapefile names to grpBy
     grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
@@ -1595,11 +1593,11 @@ tpa <- function(db,
       st_transform(crs = st_crs(polys)$proj4string)
     # Intersect plot with polygons
     polys$polyID <- 1:nrow(polys)
-    suppressMessages({
+    suppressMessages({suppressWarnings({
       pltSF <- st_intersection(pltSF, polys) %>%
         as.data.frame() %>%
         select(-c('geometry')) # removes artifact of SF object
-    })
+    })})
 
   } else if (byPlot & returnSpatial){
     ## Make plot data spatial, projected same as polygon layer
@@ -1609,24 +1607,26 @@ tpa <- function(db,
   } # END AREAL
 
   ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[grpBy %in% names(db$PLOT)]
-  grpC <- names(db$COND)[grpBy %in% names(db$COND)]
-  grpT <- names(db$TREE)[grpBy %in% names(db$TREE)]
+  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
+  grpC <- names(db$COND)[names(db$COND) %in% grpBy]
+  grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
   ## Prep joins and filters
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
-    inner_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
-    inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
-    inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
+    left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT)), by = c('PLT_CN', 'CONDID')) %>%
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     rename(YEAR = END_INVYR,
-           YEAR_RANGE = REPORT_YEAR_NM)
+           YEAR_RANGE = REPORT_YEAR_NM) %>%
+    mutate_if(is.factor,
+              as.character)
   ## Recode a few of the estimation methods to make things easier below
   data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
                             `Post-Stratification` = 'strat',
@@ -1634,9 +1634,9 @@ tpa <- function(db,
                             `Double sampling for stratification` = 'double',
                             `Simple random sampling` = 'simple',
                             `Subsampling units of unequal size` = 'simple')
+
   if(!is.null(polys)){
     data <- left_join(data, pltSF, by = 'PLT_CN')
-
     # Test if any polygons cross state boundaries w/ different recent inventory years
     if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
       mergeYears <- pltSF %>%
@@ -1644,15 +1644,12 @@ tpa <- function(db,
         inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
-
       # Replace YEAR from above w/ max year so that data is pooled across states
       data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
         mutate(YEAR = maxYear)
     }
-
   }
-
 
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
   # Land type domain indicator
@@ -1705,8 +1702,7 @@ tpa <- function(db,
   if (bySizeClass){
     grpBy <- c(grpBy, 'sizeClass')
     grpByOrig <- c(grpByOrig, 'sizeClass')
-    data$sizeClass <- makeClasses(data$DIA, interval = 2) %>%
-      fct_explicit_na()
+    data$sizeClass <- makeClasses(data$DIA, interval = 2)
   }
 
 
@@ -1730,9 +1726,6 @@ tpa <- function(db,
     ## estimation unit, and cause estimates to be inflated substantially)
     combos <- data %>%
       as.data.frame() %>%
-      mutate_if(is.factor,
-                fct_explicit_na,
-                na_level = "NA") %>%
       group_by(.dots = grpBy) %>%
       summarize()
     # if(!is.null(polys)){
@@ -1754,6 +1747,7 @@ tpa <- function(db,
     #for (i in 1:nrow(combos)){ #, .combine = 'rbind', .packages = 'dplyr', .export = c('data')
     #tOut <- foreach(i = 1:nrow(combos), .combine = 'rbind', .packages = 'dplyr', .export = c('data'))
 
+    suppressWarnings({
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
@@ -1769,6 +1763,7 @@ tpa <- function(db,
         tOut <- mclapply(names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
       }
     }
+    })
 
     if (SE){
       # Convert from list to dataframe
@@ -1795,9 +1790,6 @@ tpa <- function(db,
     } else { ## Function found no plots within the polygon, so it panics
       combos <- data %>%
         as.data.frame() %>%
-        mutate_if(is.factor,
-                  fct_explicit_na,
-                  na_level = "NA") %>%
         group_by(.dots = grpBy) %>%
         summarize()
       tOut <- data.frame("YEAR" = combos$YEAR, "TPA" = rep(NA, nrow(combos)),
@@ -1818,7 +1810,7 @@ tpa <- function(db,
   } # End byPlot == FALSE
   remove(data)
   remove(db)
-  #tOut <- filter(tOut, !is.na(YEAR))
+  tOut <- filter(tOut, !is.na(YEAR))
   return(tOut)
 }
 
@@ -1904,7 +1896,7 @@ growMort <- function(db,
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
   ids <- db$POP_EVAL %>%
     select('CN', 'END_INVYR', 'EVALID') %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+    left_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
     filter(EVAL_TYP == 'EXPGROW' | EVAL_TYP == 'EXPMORT' | EVAL_TYP == 'EXPREMV') %>%
     distinct(EVALID)
   db$POP_EVAL <- db$POP_EVAL %>%
@@ -1915,10 +1907,9 @@ growMort <- function(db,
   if(!is.null(polys)) {
     # Convert polygons to an sf object
     polys <- polys %>%
-      as('sf') %>%
+      as('sf')%>%
       mutate_if(is.factor,
-                fct_explicit_na,
-                na_level = "NA")
+                as.character)
     # Add shapefile names to grpBy
     grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
@@ -1929,11 +1920,11 @@ growMort <- function(db,
       st_transform(crs = st_crs(polys)$proj4string)
     # Intersect plot with polygons
     polys$polyID <- 1:nrow(polys)
-    suppressMessages({
+    suppressMessages({suppressWarnings({
       pltSF <- st_intersection(pltSF, polys) %>%
         as.data.frame() %>%
         select(-c('geometry')) # removes artifact of SF object
-    })
+    })})
 
     # # Convert back to dataframe
     # db$PLOT <- as.data.frame(db$PLOT) %>%
@@ -1946,19 +1937,19 @@ growMort <- function(db,
     db$PLOT <- as(db$PLOT, 'sf')
   }
   ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[grpBy %in% names(db$PLOT)]
-  grpC <- names(db$COND)[grpBy %in% names(db$COND)]
-  grpT <- names(db$TREE)[grpBy %in% names(db$TREE)]
+  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
+  grpC <- names(db$COND)[names(db$COND) %in% grpBy]
+  grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
   ## Prep joins and filters
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
-    inner_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
-    inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
-    inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
+    left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     left_join(select(db$TREE, c('TRE_CN', 'PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT)), by = c('PLT_CN', 'CONDID')) %>%
     left_join(select(db$TREE_GRM_COMPONENT, c('PLT_CN', 'TRE_CN')), by = c('PLT_CN', 'TRE_CN')) %>%
     left_join(select(db$TREE_GRM_ESTN, c('PLT_CN', 'TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT')), by = c('PLT_CN', 'TRE_CN')) %>%
@@ -1967,7 +1958,9 @@ growMort <- function(db,
     rename(YEAR = END_INVYR,
            YEAR_RANGE = REPORT_YEAR_NM) %>%
     mutate(TPAMORT_UNADJ = ifelse(str_detect(COMPONENT, 'MORT'), TPAMORT_UNADJ, 0)) %>%
-    mutate(TPAREMV_UNADJ = ifelse(str_detect(COMPONENT, 'CUT') | str_detect(COMPONENT, 'DIV'), TPAREMV_UNADJ, 0)) #%>%
+    mutate(TPAREMV_UNADJ = ifelse(str_detect(COMPONENT, 'CUT') | str_detect(COMPONENT, 'DIV'), TPAREMV_UNADJ, 0)) %>%
+    mutate_if(is.factor,
+              as.character)
     #mutate(CONDPROP_UNADJ = ifelse(is.na(TPAMORT_UNADJ), NA, CONDPROP_UNADJ))
   ## Recode a few of the estimation methods to make things easier below
   data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
@@ -1982,8 +1975,8 @@ growMort <- function(db,
     # Test if any polygons cross state boundaries w/ different recent inventory years
     if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
       mergeYears <- pltSF %>%
-        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
-        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        left_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
 
@@ -2045,8 +2038,7 @@ growMort <- function(db,
   if (bySizeClass){
     grpBy <- c(grpBy, 'sizeClass')
     grpByOrig <- c(grpByOrig, 'sizeClass')
-    data$sizeClass <- makeClasses(data$DIA, interval = 2) %>%
-      fct_explicit_na()
+    data$sizeClass <- makeClasses(data$DIA, interval = 2)
   }
 
 
@@ -2071,9 +2063,6 @@ growMort <- function(db,
     ## estimation unit, and cause estimates to be inflated substantially)
     combos <- data %>%
       as.data.frame() %>%
-      mutate_if(is.factor,
-                fct_explicit_na,
-                na_level = "NA") %>%
       group_by(.dots = grpBy) %>%
       summarize()
     if(!is.null(polys)){
@@ -2091,6 +2080,7 @@ growMort <- function(db,
 
     message('Computing Summary Statistics.....')
 
+    suppressWarnings({
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
@@ -2106,6 +2096,7 @@ growMort <- function(db,
         tOut <- mclapply(names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
       }
     }
+    })
 
     if (SE){
       # Convert from list to dataframe
@@ -2133,9 +2124,6 @@ growMort <- function(db,
     } else { ## Function found no plots within the polygon, so it panics
       combos <- data %>%
         as.data.frame() %>%
-        mutate_if(is.factor,
-                  fct_explicit_na,
-                  na_level = "NA") %>%
         group_by(.dots = grpBy) %>%
         summarize()
       tOut <- data.frame("YEAR" = combos$YEAR, "RECR_TPA" = rep(NA, nrow(combos)),
@@ -2159,7 +2147,7 @@ growMort <- function(db,
   } # End byPlot == FALSE
   remove(data)
   remove(db)
-  #tOut <- filter(tOut, !is.na(YEAR))
+  tOut <- filter(tOut, !is.na(YEAR))
   return(tOut)
 }
 
@@ -2256,10 +2244,9 @@ vitalRates <- function(db,
   if(!is.null(polys)) {
     # Convert polygons to an sf object
     polys <- polys %>%
-      as('sf') %>%
+      as('sf')%>%
       mutate_if(is.factor,
-                fct_explicit_na,
-                na_level = "NA")
+                as.character)
     # Add shapefile names to grpBy
     grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
@@ -2270,11 +2257,11 @@ vitalRates <- function(db,
       st_transform(crs = st_crs(polys)$proj4string)
     # Intersect plot with polygons
     polys$polyID <- 1:nrow(polys)
-    suppressMessages({
+    suppressMessages({suppressWarnings({
       pltSF <- st_intersection(pltSF, polys) %>%
         as.data.frame() %>%
         select(-c('geometry')) # removes artifact of SF object
-    })
+    })})
 
     # # Convert back to dataframe
     # db$PLOT <- as.data.frame(db$PLOT) %>%
@@ -2288,19 +2275,19 @@ vitalRates <- function(db,
   }
 
   ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[grpBy %in% names(db$PLOT)]
-  grpC <- names(db$COND)[grpBy %in% names(db$COND)]
-  grpT <- names(db$TREE)[grpBy %in% names(db$TREE)]
+  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
+  grpC <- names(db$COND)[names(db$COND) %in% grpBy]
+  grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
   ## Prep joins and filters
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'REMPER', grpP)) %>%
-    inner_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
-    inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
-    inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
+    left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     left_join(select(db$TREE, c('TRE_CN', 'PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT)), by = c('PLT_CN', 'CONDID')) %>%
     left_join(select(db$TREE_GRM_COMPONENT, c('PLT_CN', 'TRE_CN', 'ANN_DIA_GROWTH', 'ANN_HT_GROWTH', 'DIA_BEGIN', 'DIA_MIDPT', 'DIA_END',
                             'HT_BEGIN', 'HT_MIDPT', 'HT_END')), by = c('PLT_CN', 'TRE_CN')) %>%
@@ -2314,7 +2301,9 @@ vitalRates <- function(db,
                                      TRUE ~ (HT_END - HT_BEGIN) / REMPER)) %>%
     mutate(ANN_BA_GROWTH = case_when(is.null(DIA_END) ~ (basalArea(DIA_MIDPT) - basalArea(DIA_BEGIN)) / REMPER / 2,
                                      is.null(DIA_BEGIN) ~ (basalArea(DIA_END) - basalArea(DIA_MIDPT)) / REMPER / 2,
-                                     TRUE ~ (basalArea(DIA_END) - basalArea(DIA_BEGIN)) / REMPER))
+                                     TRUE ~ (basalArea(DIA_END) - basalArea(DIA_BEGIN)) / REMPER)) %>%
+    mutate_if(is.factor,
+              as.character)
   ## Recode a few of the estimation methods to make things easier below
   data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
                             `Post-Stratification` = 'strat',
@@ -2328,8 +2317,8 @@ vitalRates <- function(db,
     # Test if any polygons cross state boundaries w/ different recent inventory years
     if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
       mergeYears <- pltSF %>%
-        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
-        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        left_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
 
@@ -2386,8 +2375,7 @@ vitalRates <- function(db,
   if (bySizeClass){
     grpBy <- c(grpBy, 'sizeClass')
     grpByOrig <- c(grpByOrig, 'sizeClass')
-    data$sizeClass <- makeClasses(data$DIA, interval = 2) %>%
-      fct_explicit_na()
+    data$sizeClass <- makeClasses(data$DIA, interval = 2)
   }
 
 
@@ -2418,9 +2406,6 @@ vitalRates <- function(db,
     ## estimation unit, and cause estimates to be inflated substantially)
     combos <- data %>%
       as.data.frame() %>%
-      mutate_if(is.factor,
-                fct_explicit_na,
-                na_level = "NA") %>%
       group_by(.dots = grpBy) %>%
       summarize()
     if(!is.null(polys)){
@@ -2438,6 +2423,7 @@ vitalRates <- function(db,
 
     message('Computing Summary Statistics.....')
 
+    suppressWarnings({
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
@@ -2453,6 +2439,7 @@ vitalRates <- function(db,
         tOut <- mclapply(names(combos), FUN = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
       }
     }
+    })
 
     if (SE){
       # Convert from list to dataframe
@@ -2480,9 +2467,6 @@ vitalRates <- function(db,
     } else { ## Function found no plots within the polygon, so it panics
       combos <- data %>%
         as.data.frame() %>%
-        mutate_if(is.factor,
-                  fct_explicit_na,
-                  na_level = "NA") %>%
         group_by(.dots = grpBy) %>%
         summarize()
       tOut <- data.frame("YEAR" = combos$YEAR, "DIA_GROW" = rep(NA, nrow(combos)),
@@ -2506,7 +2490,7 @@ vitalRates <- function(db,
   } # End byPlot == FALSE
   remove(data)
   remove(db)
-  #tOut <- filter(tOut, !is.na(YEAR))
+  tOut <- filter(tOut, !is.na(YEAR))
   return(tOut)
 }
 
@@ -2588,8 +2572,7 @@ biomass <- function(db,
     polys <- polys %>%
       as('sf') %>%
       mutate_if(is.factor,
-                fct_explicit_na,
-                na_level = "NA")
+                as.character)
     # Add shapefile names to grpBy
     grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
@@ -2600,11 +2583,11 @@ biomass <- function(db,
       st_transform(crs = st_crs(polys)$proj4string)
     # Intersect plot with polygons
     polys$polyID <- 1:nrow(polys)
-    suppressMessages({
+    suppressMessages({suppressWarnings({
       pltSF <- st_intersection(pltSF, polys) %>%
         as.data.frame() %>%
         select(-c('geometry')) # removes artifact of SF object
-    })
+    })})
 
     # # Convert back to dataframe
     # db$PLOT <- as.data.frame(db$PLOT) %>%
@@ -2620,25 +2603,27 @@ biomass <- function(db,
 
   ## Prep joins and filters
   ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[grpBy %in% names(db$PLOT)]
-  grpC <- names(db$COND)[grpBy %in% names(db$COND)]
-  grpT <- names(db$TREE)[grpBy %in% names(db$TREE)]
+  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
+  grpC <- names(db$COND)[names(db$COND) %in% grpBy]
+  grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
   ## Prep joins and filters
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
-    inner_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
-    inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
-    inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
+    left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE',
                                 'VOLCFNET', 'VOLCSNET', 'DRYBIO_AG', 'DRYBIO_BG', 'CARBON_AG', 'CARBON_BG', grpT)), by = c('PLT_CN', 'CONDID')) %>%
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     rename(YEAR = END_INVYR,
-           YEAR_RANGE = REPORT_YEAR_NM)
+           YEAR_RANGE = REPORT_YEAR_NM) %>%
+    mutate_if(is.factor,
+              as.character)
   ## Recode a few of the estimation methods to make things easier below
   data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
                             `Post-Stratification` = 'strat',
@@ -2652,8 +2637,8 @@ biomass <- function(db,
     # Test if any polygons cross state boundaries w/ different recent inventory years
     if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
       mergeYears <- pltSF %>%
-        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
-        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        left_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
       # Replace YEAR from above w/ max year so that data is pooled across states
@@ -2714,8 +2699,7 @@ biomass <- function(db,
   if (bySizeClass){
     grpBy <- c(grpBy, 'sizeClass')
     grpByOrig <- c(grpByOrig, 'sizeClass')
-    data$sizeClass <- makeClasses(data$DIA, interval = 2) %>%
-      fct_explicit_na()
+    data$sizeClass <- makeClasses(data$DIA, interval = 2)
   }
 
 
@@ -2741,9 +2725,6 @@ biomass <- function(db,
   } else {
     combos <- data %>%
       as.data.frame() %>%
-      mutate_if(is.factor,
-                fct_explicit_na,
-                na_level = "NA") %>%
       group_by(.dots = grpBy) %>%
       summarize()
     if(!is.null(polys)){
@@ -2761,6 +2742,7 @@ biomass <- function(db,
 
     message('Computing Summary Statistics.....')
 
+    suppressWarnings({
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
@@ -2776,6 +2758,7 @@ biomass <- function(db,
         bOut <- mclapply(names(combos), FUN = biomassHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
       }
     }
+    })
 
     if (SE){
       # Convert from list to dataframe
@@ -2802,9 +2785,6 @@ biomass <- function(db,
     } else { ## Function found no plots within the polygon, so it panics
       combos <- data %>%
         as.data.frame() %>%
-        mutate_if(is.factor,
-                  fct_explicit_na,
-                  na_level = "NA") %>%
         group_by(.dots = grpBy) %>%
         summarize()
       bOut <- data.frame("YEAR" = combos$YEAR, "NETVOL_ACRE" = rep(NA, nrow(combos)),
@@ -2830,7 +2810,7 @@ biomass <- function(db,
   } # End byPlot == FALSE
   remove(data)
   remove(db)
-  #tOut <- filter(tOut, !is.na(YEAR))
+  bOut <- filter(bOut, !is.na(YEAR))
   return(bOut)
 }
 
@@ -2910,8 +2890,7 @@ dwm <- function(db,
     polys <- polys %>%
       as('sf') %>%
       mutate_if(is.factor,
-                fct_explicit_na,
-                na_level = "NA")
+                as.character)
     # Add shapefile names to grpBy
     grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
@@ -2922,11 +2901,11 @@ dwm <- function(db,
       st_transform(crs = st_crs(polys)$proj4string)
     # Intersect plot with polygons
     polys$polyID <- 1:nrow(polys)
-    suppressMessages({
+    suppressMessages({suppressWarnings({
       pltSF <- st_intersection(pltSF, polys) %>%
         as.data.frame() %>%
         select(-c('geometry')) # removes artifact of SF object
-    })
+    })})
 
     # # Convert back to dataframe
     # db$PLOT <- as.data.frame(db$PLOT) %>%
@@ -2941,23 +2920,26 @@ dwm <- function(db,
 
   ## Prep joins and filters
   ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[grpBy %in% names(db$PLOT)]
-  grpC <- names(db$COND)[grpBy %in% names(db$COND)]
+  ## Which grpByNames are in which table? Helps us subset below
+  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
+  grpC <- names(db$COND)[names(db$COND) %in% grpBy]
 
   ## Prep joins and filters
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
-    inner_join(select(db$COND, c('PLT_CN', 'CND_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
-    inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
-    inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CND_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
+    left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     left_join(select(db$COND_DWM_CALC, -c( 'STATECD', 'COUNTYCD', 'UNITCD', 'INVYR', 'MEASYEAR', 'PLOT', 'CONDID', 'EVALID', 'STRATUM_CN')), by = c('PLT_CN', 'CND_CN')) %>%
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     #mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     rename(YEAR = END_INVYR,
-           YEAR_RANGE = REPORT_YEAR_NM)
+           YEAR_RANGE = REPORT_YEAR_NM) %>%
+    mutate_if(is.factor,
+              as.character)
   ## Recode a few of the estimation methods to make things easier below
   data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
                             `Post-Stratification` = 'strat',
@@ -2971,8 +2953,8 @@ dwm <- function(db,
     # Test if any polygons cross state boundaries w/ different recent inventory years
     if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
       mergeYears <- pltSF %>%
-        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
-        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        left_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
 
@@ -3047,9 +3029,6 @@ dwm <- function(db,
     ## estimation unit, and cause estimates to be inflated substantially
     combos <- data %>%
       as.data.frame() %>%
-      mutate_if(is.factor,
-                fct_explicit_na,
-                na_level = "NA") %>%
       group_by(.dots = grpBy) %>%
       summarize()
     if(!is.null(polys)){
@@ -3060,6 +3039,7 @@ dwm <- function(db,
 
     message('Computing Summary Statistics.....')
 
+    suppressWarnings({
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
@@ -3076,6 +3056,7 @@ dwm <- function(db,
         cOut <- mclapply(names(combos), FUN = dwmHelper, combos, data, grpBy, totals, SE, mc.cores = nCores)
       }
     }
+    })
 
     if (SE){
       # Convert from list to dataframe
@@ -3164,9 +3145,6 @@ dwm <- function(db,
     } else { ## Function found no plots within the polygon, so it panics
       combos <- data %>%
         as.data.frame() %>%
-        mutate_if(is.factor,
-                  fct_explicit_na,
-                  na_level = "NA") %>%
         group_by(.dots = grpBy) %>%
         summarize()
 
@@ -3204,6 +3182,7 @@ dwm <- function(db,
   } # End byPlot = FALSE
   remove(data)
   remove(db)
+  cOut <- filter(cOut, !is.na(YEAR))
   gc()
 
   return(cOut)
@@ -3281,10 +3260,9 @@ invasive <- function(db,
   if(!is.null(polys)) {
     # Convert polygons to an sf object
     polys <- polys %>%
-      as('sf') %>%
+      as('sf')%>%
       mutate_if(is.factor,
-                fct_explicit_na,
-                na_level = "NA")
+                as.character)
     # Add shapefile names to grpBy
     grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
@@ -3295,11 +3273,11 @@ invasive <- function(db,
       st_transform(crs = st_crs(polys)$proj4string)
     # Intersect plot with polygons
     polys$polyID <- 1:nrow(polys)
-    suppressMessages({
+    suppressMessages({suppressWarnings({
       pltSF <- st_intersection(pltSF, polys) %>%
         as.data.frame() %>%
         select(-c('geometry')) # removes artifact of SF object
-    })
+    })})
 
     # # Convert back to dataframe
     # db$PLOT <- as.data.frame(db$PLOT) %>%
@@ -3315,24 +3293,30 @@ invasive <- function(db,
 
   ## Prep joins and filters
   ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[grpBy %in% names(db$PLOT)]
-  grpC <- names(db$COND)[grpBy %in% names(db$COND)]
+  ## Which grpByNames are in which table? Helps us subset below
+  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
+  grpC <- names(db$COND)[names(db$COND) %in% grpBy]
 
   ## Prep joins and filters
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVASIVE_SAMPLING_STATUS_CD', grpP)) %>%
-    inner_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    inner_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
-    inner_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
-    inner_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-    full_join(select(db$INVASIVE_SUBPLOT_SPP, c('PLT_CN', 'COVER_PCT', 'VEG_SPCD', 'CONDID')), by = c("PLT_CN", "CONDID")) %>%
-    left_join(intData$REF_PLANT_DICTIONARY, by = c('VEG_SPCD' = 'SYMBOL')) %>%
-    mutate(SYMBOL = VEG_SPCD) %>%
-    mutate(aAdj = ifelse(PROP_BASIS == "SUBP", ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
+    left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
+    full_join(select(db$INVASIVE_SUBPLOT_SPP, c('PLT_CN', 'COVER_PCT', 'VEG_SPCD', 'CONDID')), by = c("PLT_CN", "CONDID"))
+  suppressWarnings({
+  data <- data %>%
+      left_join(intData$REF_PLANT_DICTIONARY, by = c('VEG_SPCD' = 'SYMBOL')) %>%
+      mutate(SYMBOL = VEG_SPCD) %>%
+      mutate(aAdj = ifelse(PROP_BASIS == "SUBP", ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     #mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
-    rename(YEAR = END_INVYR, YEAR_RANGE = REPORT_YEAR_NM)
+      rename(YEAR = END_INVYR, YEAR_RANGE = REPORT_YEAR_NM) %>%
+      mutate_if(is.factor,
+                as.character)
+  })
   data$ESTN_METHOD = recode(.x = data$ESTN_METHOD, `Post-Stratification` = "strat",
                             `Stratified random sampling` = "strat", `Double sampling for stratification` = "double",
                             `Simple random sampling` = "simple", `Subsampling units of unequal size` = "simple")
@@ -3343,8 +3327,8 @@ invasive <- function(db,
     # Test if any polygons cross state boundaries w/ different recent inventory years
     if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
       mergeYears <- pltSF %>%
-        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
-        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        left_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
 
@@ -3392,9 +3376,6 @@ invasive <- function(db,
     ## estimation unit, and cause estimates to be inflated substantially)
     combos <- data %>%
       as.data.frame() %>%
-      mutate_if(is.factor,
-                fct_explicit_na,
-                na_level = "NA") %>%
       group_by(.dots = grpBy) %>%
       summarize()
     # if(!is.null(polys)){
@@ -3412,6 +3393,7 @@ invasive <- function(db,
     #for (i in 1:nrow(combos)){ #, .combine = 'rbind', .packages = 'dplyr', .export = c('data')
     #tOut <- foreach(i = 1:nrow(combos), .combine = 'rbind', .packages = 'dplyr', .export = c('data'))
 
+    suppressWarnings({
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
@@ -3435,6 +3417,7 @@ invasive <- function(db,
       # Pull out dataframe
       invOut <- invOut[[1]]
     }
+    })
 
 
     # Snag the names
@@ -3455,9 +3438,6 @@ invasive <- function(db,
     } else { ## Function found no plots within the polygon, so it panics
       combos <- data %>%
         as.data.frame() %>%
-        mutate_if(is.factor,
-                  fct_explicit_na,
-                  na_level = "NA") %>%
         group_by(.dots = grpBy) %>%
         summarize()
       invOut <- data.frame("YEAR" = combos$YEAR, "COVER_PCT" = rep(NA, nrow(combos)),
@@ -3478,7 +3458,7 @@ invasive <- function(db,
   } # End byPlot == FALSE
   remove(data)
   remove(db)
-  #tOut <- filter(tOut, !is.na(YEAR))
+  invOut <- filter(invOut, !is.na(YEAR))
   return(invOut)
 
 }

@@ -111,9 +111,9 @@ diversityHelper <- function(x, combos, data, grpBy, SE){
                 hVar = (1/AREA_TOTAL^2) * (hVar + (H_a^2 * areaVar) - 2 * H_a * cvH),
                 ehVar = (1/AREA_TOTAL^2) * (ehVar + (Eh_a^2 * areaVar) - 2 * Eh_a * cveH),
                 sVar = (1/AREA_TOTAL^2) * (sVar + (S_a^2 * areaVar) - 2 * S_a * cvS),
-                H_a_SE = ifelse(nStands > 1, sqrt(hVar) / H_a * 100,0),
-                Eh_a_SE = ifelse(nStands > 1, sqrt(ehVar) / Eh_a * 100, 0),
-                S_a_SE = ifelse(nStands > 1, sqrt(sVar) / S_a * 100, 0)) %>%
+                H_a_SE = sqrt(hVar) / H_a * 100,
+                Eh_a_SE = sqrt(ehVar) / Eh_a * 100,
+                S_a_SE = sqrt(sVar) / S_a * 100) %>%
       select(H_a, Eh_a, S_a, H_a_SE, Eh_a_SE, S_a_SE, nStands)
 
     # Beta & gamma diversity indices
