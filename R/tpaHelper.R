@@ -7,17 +7,19 @@ tpaHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
   for (n in 1:ncol(combos[[x]])){
     # Tree domain indicator for each column in
     tObs <- as.character(combos[[x]][[grpBy[n]]]) == as.character(data[[grpBy[n]]])
+    if (length(which(is.na(tObs))) == length(tObs)) tObs <- 1
     td <- data$tDI * tObs * td
-    #pd <- data$pDI * pd
     # Area domain indicator for each column in
     if(grpBy[n] %in% aGrpBy){
       aObs <- as.character(combos[[x]][[aGrpBy[n]]]) == as.character(data[[aGrpBy[n]]])
+      if (length(which(is.na(aObs))) == length(aObs)) aObs <- 1
       aObs[is.na(aObs)] <- 0
       ad <- data$aDI * aObs * ad
       pd <- data$pDI * pd * aObs
 
     }
   }
+
 
   if(SE){
     data$tDI <- td

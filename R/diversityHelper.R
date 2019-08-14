@@ -5,7 +5,8 @@ diversityHelper <- function(x, combos, data, grpBy, SE){
   for (n in 1:ncol(combos[[x]])){
     # Tree domain indicator for each column in
     tObs <- as.character(combos[[x]][[grpBy[n]]]) == as.character(data[[grpBy[n]]])
-    td <- data$tDI * tObs * td * !is.na(data$DIA)
+    if (length(which(is.na(tObs))) == length(tObs)) tObs <- 1
+    td <- data$tDI * tObs * td
   }
 
 

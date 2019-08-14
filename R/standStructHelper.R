@@ -5,6 +5,7 @@ standStructHelper <- function(x, combos, data, grpBy, totals, tidy, SE){
   for (n in 1:ncol(combos[[x]])){
     # Area domain indicator for each column in
     aObs <- as.character(combos[[x]][[grpBy[n]]]) == as.character(data[[grpBy[n]]])
+    if (length(which(is.na(aObs))) == length(aObs)) aObs <- 1
     ad <- data$aDI * aObs * ad
   }
 

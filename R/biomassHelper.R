@@ -2,29 +2,16 @@ biomassHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
   # Update domain indicator for each each column speficed in grpBy
   td = 1 # Start both at 1, update as we iterate through
   ad = 1
-  # for (n in 1:ncol(combos[[x]])){
-  #   # Tree domain indicator for each column in
-  #   da <- as.factor(data[[grpBy[n]]])
-  #   co <- factor(combos[[x]][[grpBy[n]]], levels = levels(da))
-  #   tObs <- da == co
-  #   td <- data$tDI * tObs * td
-  #   # Area domain indicator for each column in
-  #   if(grpBy[n] %in% aGrpBy){
-  #     daA <- as.factor(data[[aGrpBy[n]]])
-  #     coA <- factor(combos[[x]][[aGrpBy[n]]], levels = levels(daA))
-  #     aObs <- coA == daA
-  #     aObs[is.na(aObs)] <- 0
-  #     ad <- data$aDI * aObs * ad
-  #   }
-  # }
 
   for (n in 1:ncol(combos[[x]])){
     # Tree domain indicator for each column in
     tObs <- as.character(combos[[x]][[grpBy[n]]]) == as.character(data[[grpBy[n]]])
+    if (length(which(is.na(tObs))) == length(tObs)) tObs <- 1
     td <- data$tDI * tObs * td
     # Area domain indicator for each column in
     if(grpBy[n] %in% aGrpBy){
       aObs <- as.character(combos[[x]][[aGrpBy[n]]]) == as.character(data[[aGrpBy[n]]])
+      if (length(which(is.na(aObs))) == length(aObs)) aObs <- 1
       aObs[is.na(aObs)] <- 0
       ad <- data$aDI * aObs * ad
     }

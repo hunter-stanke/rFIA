@@ -898,7 +898,7 @@ standStruct <- function(db,
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
-  if (!is.null(polys) & class(polys) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
+  if (!is.null(polys) & first(first(class(polys))) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
   }
   if (!is.null(grpBy) & class(grpBy) != 'character'){
@@ -972,6 +972,10 @@ standStruct <- function(db,
         as.data.frame() %>%
         select(-c('geometry')) # removes artifact of SF object
     })})
+    # A warning
+    if (length(unique(pltSF$PLT_CN)) < 1){
+      stop('No plots in db overlap with polys.')
+    }
 
     # # Convert back to dataframe
     # db$PLOT <- as.data.frame(db$PLOT) %>%
@@ -984,13 +988,45 @@ standStruct <- function(db,
     db$PLOT <- as(db$PLOT, 'sf')
   }
 
+  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
+  # Land type domain indicator
+  if (tolower(landType) == 'forest'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1, 1, 0)
+  } else if (tolower(landType) == 'timber'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
+  } else if (tolower(landType) == 'all') {
+    db$COND$landD <- 1
+  }
+
+  # update spatial domain indicator
+  if(!is.null(polys)){
+    db$PLOT$sp <- ifelse(db$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+  } else {
+    db$PLOT$sp <- 1
+  }
+
+  # User defined domain indicator for area (ex. specific forest type)
+  pcEval <- left_join(db$PLOT, select(db$COND, -c('STATECD', 'UNITCD', 'COUNTYCD', 'INVYR', 'PLOT')), by = 'PLT_CN')
+  areaDomain <- substitute(areaDomain)
+  pcEval$aD <- eval(areaDomain, pcEval) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  if(!is.null(pcEval$aD)) pcEval$aD[is.na(pcEval$aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+  if(is.null(pcEval$aD)) pcEval$aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+  pcEval$aD <- as.numeric(pcEval$aD)
+  db$COND <- left_join(db$COND, select(pcEval, c('PLT_CN', 'CONDID', 'aD')), by = c('PLT_CN', 'CONDID')) %>%
+    mutate(aD_c = aD)
+  aD_p <- pcEval %>%
+    group_by(PLT_CN) %>%
+    summarize(aD_p = as.numeric(any(aD > 0)))
+  db$PLOT <- left_join(db$PLOT, aD_p, by = 'PLT_CN')
+  rm(pcEval)
+
   ## Which grpByNames are in which table? Helps us subset below
   grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
   grpC <- names(db$COND)[names(db$COND) %in% grpBy]
 
   ## Prep joins and filters
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'aD_p', 'sp')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', 'landD', 'aD_c', grpC)), by = c('PLT_CN')) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
@@ -1030,29 +1066,10 @@ standStruct <- function(db,
     }
 
   }
-  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
-  # Land type domain indicator
-  if (tolower(landType) == 'forest'){
-    landD <- ifelse(data$COND_STATUS_CD == 1, 1, 0)
-  } else if (tolower(landType) == 'timber'){
-    landD <- ifelse(data$COND_STATUS_CD == 1 & data$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & data$RESERVCD == 0, 1, 0)
-  } else if (tolower(landType) == 'all') {
-    landD <- 1
-  }
-  # update spatial domain indicator
-  if(!is.null(polys)){
-    sp <- ifelse(data$PLT_CN %in% pltSF$PLT_CN, 1, 0)
-  } else {
-    sp <- 1
-  }
-  # User defined domain indicator for area (ex. specific forest type)
-  areaDomain <- substitute(areaDomain)
-  aD <- eval(areaDomain, data) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
-  if(!is.null(aD)) aD[is.na(aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
-  if(is.null(aD)) aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+
   ## Comprehensive indicator function
-  data$aDI <- landD * aD * sp
-  data$tDI <- landD * aD * sp
+  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
+  data$tDI <- data$landD * data$aD_p * data$aD_c * data$sp
 
 
 
@@ -1078,13 +1095,14 @@ standStruct <- function(db,
       # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
       ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
       ## estimation unit, and cause estimates to be inflated substantially
-      combos <- data %>%
-        as.data.frame() %>%
-        group_by(.dots = grpBy) %>%
-        summarize()
-      if(!is.null(polys)){
-        combos <- filter(combos, !is.na(polyID))
-      }
+    combos <- select(data, c(grpBy)) %>%
+      as.data.frame() %>%
+      group_by(.dots = grpBy) %>%
+      summarize() %>%
+      filter(!is.na(YEAR))
+    if(!is.null(polys)){
+      combos <- filter(combos, !is.na(polyID))
+    }
       # List of rows for lapply
       combos <- split(combos, seq(nrow(combos)))
 
@@ -1229,7 +1247,7 @@ diversity <- function(db,
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
-  if (!is.null(polys) & class(polys) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
+  if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
   }
   if (!is.null(grpBy) & class(grpBy) != 'character'){
@@ -1253,18 +1271,8 @@ diversity <- function(db,
   grpBy <- c('YEAR', grpBy)
   grpByOrig <- grpBy
 
-  ## Pull out individual tables from database object
-  # if (!is.null(db)){
-  #   TREE <- db[['TREE']]
-  #   COND <- db[['COND']]
   db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
-  #   POP_PLOT_STRATUM_ASSGN <- db[['POP_PLOT_STRATUM_ASSGN]]
-  #   PEU <- db$POP_ESTN_UNIT
-  #   POP_EVAL <- db$POP_EVAL
-  #   POP_STRATUM <- db$POP_STRATUM
-  #   PET <- db$POP_EVAL_TYP
-  #   PEG <- db$POP_EVAL_GRP
-  # }
+
 
   message('Joining FIA Tables.....')
 
@@ -1304,6 +1312,10 @@ diversity <- function(db,
     # # Convert back to dataframe
     # db$PLOT <- as.data.frame(db$PLOT) %>%
     #   select(-c('geometry')) # removes artifact of SF object
+    # A warning
+    if (length(unique(pltSF$PLT_CN)) < 1){
+      stop('No plots in db overlap with polys.')
+    }
 
   } else if (byPlot & returnSpatial){
     ## Make plot data spatial, projected same as polygon layer
@@ -1312,6 +1324,51 @@ diversity <- function(db,
     db$PLOT <- as(db$PLOT, 'sf')
   }
 
+  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
+  # Land type domain indicator
+  if (tolower(landType) == 'forest'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1, 1, 0)
+  } else if (tolower(landType) == 'timber'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
+  }
+  # Tree Type domain indicator
+  if (tolower(treeType) == 'live'){
+    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1, 1, 0)
+  } else if (tolower(treeType) == 'dead'){
+    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 2 & db$TREE$STANDING_DEAD_CD == 1, 1, 0)
+  } else if (tolower(treeType) == 'gs'){
+    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1 & db$TREE$DIA >= 5 & db$TREE$TREECLCD == 2, 1, 0)
+  } else if (tolower(treeType) == 'all'){
+    db$TREE$typeD <- 1
+  }
+  # update spatial domain indicator
+  if(!is.null(polys)){
+    db$PLOT$sp <- ifelse(db$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+  } else {
+    db$PLOT$sp <- 1
+  }
+
+  # User defined domain indicator for area (ex. specific forest type)
+  pcEval <- left_join(db$PLOT, select(db$COND, -c('STATECD', 'UNITCD', 'COUNTYCD', 'INVYR', 'PLOT')), by = 'PLT_CN')
+  areaDomain <- substitute(areaDomain)
+  pcEval$aD <- eval(areaDomain, pcEval) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  if(!is.null(pcEval$aD)) pcEval$aD[is.na(pcEval$aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+  if(is.null(pcEval$aD)) pcEval$aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+  pcEval$aD <- as.numeric(pcEval$aD)
+  db$COND <- left_join(db$COND, select(pcEval, c('PLT_CN', 'CONDID', 'aD')), by = c('PLT_CN', 'CONDID')) %>%
+    mutate(aD_c = aD)
+  aD_p <- pcEval %>%
+    group_by(PLT_CN) %>%
+    summarize(aD_p = as.numeric(any(aD > 0)))
+  db$PLOT <- left_join(db$PLOT, aD_p, by = 'PLT_CN')
+  rm(pcEval)
+
+  # Same as above for tree (ex. trees > 20 ft tall)
+  treeDomain <- substitute(treeDomain)
+  tD <- eval(treeDomain, db$TREE) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  if(!is.null(tD)) tD[is.na(tD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+  if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+  db$TREE$tD <- as.numeric(tD)
 
   ## Which grpByNames are in which table? Helps us subset below
   grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
@@ -1319,15 +1376,15 @@ diversity <- function(db,
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
   ## Prep joins and filters
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'aD_p', 'sp')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT)), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA','SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT, 'typeD', 'tD')), by = c('PLT_CN', 'CONDID')) %>%
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     rename(YEAR = END_INVYR,
@@ -1358,45 +1415,12 @@ diversity <- function(db,
         select(-c(YEAR)) %>%
         mutate(YEAR = maxYear)
     }
-
   }
 
-
-  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
-  # Land type domain indicator
-  if (tolower(landType) == 'forest'){
-    landD <- ifelse(data$COND_STATUS_CD == 1, 1, 0)
-  } else if (tolower(landType) == 'timber'){
-    landD <- ifelse(data$COND_STATUS_CD == 1 & data$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & data$RESERVCD == 0, 1, 0)
-  }
-  # Tree Type domain indicator
-  if (tolower(treeType) == 'live'){
-    typeD <- ifelse(data$STATUSCD == 1, 1, 0)
-  } else if (tolower(treeType) == 'dead'){
-    typeD <- ifelse(data$STATUSCD == 2 & data$STANDING_DEAD_CD == 1, 1, 0)
-  } else if (tolower(treeType) == 'gs'){
-    typeD <- ifelse(data$STATUSCD == 1 & data$DIA >= 5 & data$TREECLCD == 2, 1, 0)
-  } else if (tolower(treeType) == 'all'){
-    typeD <- 1
-  }
-  # update spatial domain indicator
-  if(!is.null(polys)){
-    sp <- ifelse(data$PLT_CN %in% pltSF$PLT_CN, 1, 0)
-  } else {
-    sp <- 1
-  }
-  # User defined domain indicator for area (ex. specific forest type)
-  areaDomain <- substitute(areaDomain)
-  aD <- eval(areaDomain, data) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
-  if(!is.null(aD)) aD[is.na(aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
-  if(is.null(aD)) aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
-  # Same as above for tree (ex. trees > 20 ft tall)
-  treeDomain <- substitute(treeDomain)
-  tD <- eval(treeDomain, data) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
-  if(!is.null(tD)) tD[is.na(tD)] <- 0 # Make NAs 0s. Causes bugs otherwise
-  if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
   ## Comprehensive indicator function
-  data$tDI <- landD * aD * tD * typeD * sp
+  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
+  data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
+  data$pDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$sp
 
   ## Break into size classes
   if (bySizeClass){
@@ -1426,10 +1450,11 @@ diversity <- function(db,
 
     ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
   } else {
-    combos <- data %>%
+    combos <- select(data, c(grpBy)) %>%
       as.data.frame() %>%
       group_by(.dots = grpBy) %>%
-      summarize()
+      summarize() %>%
+      filter(!is.na(YEAR))
     if(!is.null(polys)){
       combos <- filter(combos, !is.na(polyID))
     }
@@ -1536,7 +1561,7 @@ tpa <- function(db,
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
-  if (!is.null(polys) & class(polys) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
+  if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
   }
   if (!is.null(grpBy) & class(grpBy) != 'character'){
@@ -1598,6 +1623,10 @@ tpa <- function(db,
         as.data.frame() %>%
         select(-c('geometry')) # removes artifact of SF object
     })})
+    # A warning
+    if (length(unique(pltSF$PLT_CN)) < 1){
+      stop('No plots in db overlap with polys.')
+    }
 
   } else if (byPlot & returnSpatial){
     ## Make plot data spatial, projected same as polygon layer
@@ -1606,21 +1635,68 @@ tpa <- function(db,
     db$PLOT <- as(db$PLOT, 'sf')
   } # END AREAL
 
+  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
+  # Land type domain indicator
+  if (tolower(landType) == 'forest'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1, 1, 0)
+  } else if (tolower(landType) == 'timber'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
+  }
+  # Tree Type domain indicator
+  if (tolower(treeType) == 'live'){
+    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1, 1, 0)
+  } else if (tolower(treeType) == 'dead'){
+    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 2 & db$TREE$STANDING_DEAD_CD == 1, 1, 0)
+  } else if (tolower(treeType) == 'gs'){
+    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1 & db$TREE$DIA >= 5 & db$TREE$TREECLCD == 2, 1, 0)
+  } else if (tolower(treeType) == 'all'){
+    db$TREE$typeD <- 1
+  }
+  # update spatial domain indicator
+  if(!is.null(polys)){
+    db$PLOT$sp <- ifelse(db$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+  } else {
+    db$PLOT$sp <- 1
+  }
+
+  # User defined domain indicator for area (ex. specific forest type)
+  pcEval <- left_join(db$PLOT, select(db$COND, -c('STATECD', 'UNITCD', 'COUNTYCD', 'INVYR', 'PLOT')), by = 'PLT_CN')
+  areaDomain <- substitute(areaDomain)
+  pcEval$aD <- eval(areaDomain, pcEval) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  if(!is.null(pcEval$aD)) pcEval$aD[is.na(pcEval$aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+  if(is.null(pcEval$aD)) pcEval$aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+  pcEval$aD <- as.numeric(pcEval$aD)
+  db$COND <- left_join(db$COND, select(pcEval, c('PLT_CN', 'CONDID', 'aD')), by = c('PLT_CN', 'CONDID')) %>%
+    mutate(aD_c = aD)
+  aD_p <- pcEval %>%
+    group_by(PLT_CN) %>%
+    summarize(aD_p = as.numeric(any(aD > 0)))
+  db$PLOT <- left_join(db$PLOT, aD_p, by = 'PLT_CN')
+  rm(pcEval)
+
+  # Same as above for tree (ex. trees > 20 ft tall)
+  treeDomain <- substitute(treeDomain)
+  tD <- eval(treeDomain, db$TREE) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  if(!is.null(tD)) tD[is.na(tD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+  if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+  db$TREE$tD <- as.numeric(tD)
+
+
   ## Which grpByNames are in which table? Helps us subset below
   grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
   grpC <- names(db$COND)[names(db$COND) %in% grpBy]
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
   ## Prep joins and filters
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'aD_p', 'sp')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT)), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT, 'tD', 'typeD')), by = c('PLT_CN', 'CONDID')) %>%
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     rename(YEAR = END_INVYR,
@@ -1651,43 +1727,10 @@ tpa <- function(db,
     }
   }
 
-  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
-  # Land type domain indicator
-  if (tolower(landType) == 'forest'){
-    landD <- data$COND_STATUS_CD == 1
-  } else if (tolower(landType) == 'timber'){
-    landD <- data$COND_STATUS_CD == 1 & data$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & data$RESERVCD == 0
-  }
-  # Tree Type domain indicator
-  if (tolower(treeType) == 'live'){
-    typeD <- data$STATUSCD == 1
-  } else if (tolower(treeType) == 'dead'){
-    typeD <- data$STATUSCD == 2 & data$STANDING_DEAD_CD == 1
-  } else if (tolower(treeType) == 'gs'){
-    typeD <- data$STATUSCD == 1 & data$DIA >= 5 & data$TREECLCD == 2
-  } else if (tolower(treeType) == 'all'){
-    typeD <- 1
-  }
-  # update spatial domain indicator
-  if(!is.null(polys)){
-    sp <- data$PLT_CN %in% pltSF$PLT_CN
-  } else {
-    sp <- 1
-  }
-  # User defined domain indicator for area (ex. specific forest type)
-  areaDomain <- substitute(areaDomain)
-  aD <- eval(areaDomain, data) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
-  if(!is.null(aD)) aD[is.na(aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
-  if(is.null(aD)) aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
-  # Same as above for tree (ex. trees > 20 ft tall)
-  treeDomain <- substitute(treeDomain)
-  tD <- eval(treeDomain, data) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
-  if(!is.null(tD)) tD[is.na(tD)] <- 0 # Make NAs 0s. Causes bugs otherwise
-  if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
   ## Comprehensive indicator function
-  data$aDI <- landD * aD * sp
-  data$tDI <- landD * aD * tD * typeD * sp
-  data$pDI <- landD * aD * tD * sp
+  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
+  data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
+  data$pDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$sp
 
   ## Add species to groups
   if (bySpecies) {
@@ -1724,13 +1767,14 @@ tpa <- function(db,
     # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
     ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
     ## estimation unit, and cause estimates to be inflated substantially)
-    combos <- data %>%
+    combos <- select(data, c(grpBy)) %>%
       as.data.frame() %>%
       group_by(.dots = grpBy) %>%
-      summarize()
-    # if(!is.null(polys)){
-    #   combos <- filter(combos, !is.na(polyID))
-    # }
+      summarize() %>%
+      filter(!is.na(YEAR))
+    if(!is.null(polys)){
+      combos <- filter(combos, !is.na(polyID))
+    }
     # List of rows for lapply
     combos <- split(combos, seq(nrow(combos)))
 
@@ -1839,7 +1883,7 @@ growMort <- function(db,
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
-  if (!is.null(polys) & class(polys) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
+  if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
   }
   if (!is.null(grpBy) & class(grpBy) != 'character'){
@@ -1925,6 +1969,10 @@ growMort <- function(db,
         as.data.frame() %>%
         select(-c('geometry')) # removes artifact of SF object
     })})
+    # A warning
+    if (length(unique(pltSF$PLT_CN)) < 1){
+      stop('No plots in db overlap with polys.')
+    }
 
     # # Convert back to dataframe
     # db$PLOT <- as.data.frame(db$PLOT) %>%
@@ -1936,21 +1984,65 @@ growMort <- function(db,
     proj4string(db$PLOT) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
     db$PLOT <- as(db$PLOT, 'sf')
   }
+
+  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
+  # Land type domain indicator
+  if (tolower(landType) == 'forest'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1, 1, 0)
+  } else if (tolower(landType) == 'timber'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
+  }
+  # Tree Type domain indicator
+  if (tolower(treeType) == 'all'){
+    db$TREE$typeD <- 1
+  } else if (tolower(treeType) == 'gs'){
+    db$TREE$typeD <- ifelse(db$TREE$DIA >= 5, 1, 0)
+  }
+  # update spatial domain indicator
+  if(!is.null(polys)){
+    db$PLOT$sp <- ifelse(db$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+  } else {
+    db$PLOT$sp <- 1
+  }
+
+  # User defined domain indicator for area (ex. specific forest type)
+  pcEval <- left_join(db$PLOT, select(db$COND, -c('STATECD', 'UNITCD', 'COUNTYCD', 'INVYR', 'PLOT')), by = 'PLT_CN')
+  areaDomain <- substitute(areaDomain)
+  pcEval$aD <- eval(areaDomain, pcEval) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  if(!is.null(pcEval$aD)) pcEval$aD[is.na(pcEval$aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+  if(is.null(pcEval$aD)) pcEval$aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+  pcEval$aD <- as.numeric(pcEval$aD)
+  db$COND <- left_join(db$COND, select(pcEval, c('PLT_CN', 'CONDID', 'aD')), by = c('PLT_CN', 'CONDID')) %>%
+    mutate(aD_c = aD)
+  aD_p <- pcEval %>%
+    group_by(PLT_CN) %>%
+    summarize(aD_p = as.numeric(any(aD > 0)))
+  db$PLOT <- left_join(db$PLOT, aD_p, by = 'PLT_CN')
+  rm(pcEval)
+
+  # Same as above for tree (ex. trees > 20 ft tall)
+  treeDomain <- substitute(treeDomain)
+  tD <- eval(treeDomain, db$TREE) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  if(!is.null(tD)) tD[is.na(tD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+  if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+  db$TREE$tD <- as.numeric(tD)
+
+
   ## Which grpByNames are in which table? Helps us subset below
   grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
   grpC <- names(db$COND)[names(db$COND) %in% grpBy]
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
   ## Prep joins and filters
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'sp', 'aD_p')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'landD', 'aD_c', 'CONDID', grpC)), by = c('PLT_CN')) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-    left_join(select(db$TREE, c('TRE_CN', 'PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT)), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE, c('TRE_CN', 'PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT, 'typeD', 'tD')), by = c('PLT_CN', 'CONDID')) %>%
     left_join(select(db$TREE_GRM_COMPONENT, c('PLT_CN', 'TRE_CN')), by = c('PLT_CN', 'TRE_CN')) %>%
     left_join(select(db$TREE_GRM_ESTN, c('PLT_CN', 'TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT')), by = c('PLT_CN', 'TRE_CN')) %>%
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
@@ -1985,45 +2077,11 @@ growMort <- function(db,
         select(-c(YEAR)) %>%
         mutate(YEAR = maxYear)
     }
-
   }
 
-  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
-  # Land type domain indicator
-  if (tolower(landType) == 'forest'){
-    landD <- ifelse(data$COND_STATUS_CD == 1, 1, 0)
-  } else if (tolower(landType) == 'timber'){
-    landD <- ifelse(data$COND_STATUS_CD == 1 & data$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & data$RESERVCD == 0, 1, 0)
-  }
-  # Tree Type domain indicator
-  # if (tolower(treeType) == 'live'){
-  #   typeD <- ifelse(data$STATUSCD == 1, 1, 0)
-  # } else if (tolower(treeType) == 'dead'){
-  #   typeD <- ifelse(data$STATUSCD == 2 & data$STANDING_DEAD_CD == 1, 1, 0)
-  if (tolower(treeType) == 'gs'){
-    typeD <- ifelse(data$STATUSCD == 1 & data$DIA >= 5 & data$TREECLCD == 2, 1, 0)
-  } else if (tolower(treeType) == 'all'){
-    typeD <- 1
-  }
-  # update spatial domain indicator
-  if(!is.null(polys)){
-    sp <- ifelse(data$PLT_CN %in% pltSF$PLT_CN, 1, 0)
-  } else {
-    sp <- 1
-  }
-  # User defined domain indicator for area (ex. specific forest type)
-  areaDomain <- substitute(areaDomain)
-  aD <- eval(areaDomain, data) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
-  if(!is.null(aD)) aD[is.na(aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
-  if(is.null(aD)) aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
-  # Same as above for tree (ex. trees > 20 ft tall)
-  treeDomain <- substitute(treeDomain)
-  tD <- eval(treeDomain, data) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
-  if(!is.null(tD)) tD[is.na(tD)] <- 0 # Make NAs 0s. Causes bugs otherwise
-  if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
   ## Comprehensive indicator function
-  data$aDI <- landD * aD * sp
-  data$tDI <- landD * aD * tD * typeD * sp
+  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
+  data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
 
   ## Add species to groups
   if (bySpecies) {
@@ -2061,10 +2119,11 @@ growMort <- function(db,
     # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
     ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
     ## estimation unit, and cause estimates to be inflated substantially)
-    combos <- data %>%
+    combos <- select(data, c(grpBy)) %>%
       as.data.frame() %>%
       group_by(.dots = grpBy) %>%
-      summarize()
+      summarize() %>%
+      filter(!is.na(YEAR))
     if(!is.null(polys)){
       combos <- filter(combos, !is.na(polyID))
     }
@@ -2176,7 +2235,7 @@ vitalRates <- function(db,
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
-  if (!is.null(polys) & class(polys) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
+  if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
   }
   if (!is.null(grpBy) & class(grpBy) != 'character'){
@@ -2262,6 +2321,10 @@ vitalRates <- function(db,
         as.data.frame() %>%
         select(-c('geometry')) # removes artifact of SF object
     })})
+    # A warning
+    if (length(unique(pltSF$PLT_CN)) < 1){
+      stop('No plots in db overlap with polys.')
+    }
 
     # # Convert back to dataframe
     # db$PLOT <- as.data.frame(db$PLOT) %>%
@@ -2274,21 +2337,64 @@ vitalRates <- function(db,
     db$PLOT <- as(db$PLOT, 'sf')
   }
 
+  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
+  # Land type domain indicator
+  if (tolower(landType) == 'forest'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1, 1, 0)
+  } else if (tolower(landType) == 'timber'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
+  }
+  # Tree Type domain indicator
+  if (tolower(treeType) == 'live'){
+    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1, 1, 0)
+  } else if (tolower(treeType) == 'gs'){
+    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1 & db$TREE$DIA >= 5 & db$TREE$TREECLCD == 2, 1, 0)
+  }
+
+  # update spatial domain indicator
+  if(!is.null(polys)){
+    db$PLOT$sp <- ifelse(db$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+  } else {
+    db$PLOT$sp <- 1
+  }
+
+  # User defined domain indicator for area (ex. specific forest type)
+  pcEval <- left_join(db$PLOT, select(db$COND, -c('STATECD', 'UNITCD', 'COUNTYCD', 'INVYR', 'PLOT')), by = 'PLT_CN')
+  areaDomain <- substitute(areaDomain)
+  pcEval$aD <- eval(areaDomain, pcEval) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  if(!is.null(pcEval$aD)) pcEval$aD[is.na(pcEval$aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+  if(is.null(pcEval$aD)) pcEval$aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+  pcEval$aD <- as.numeric(pcEval$aD)
+  db$COND <- left_join(db$COND, select(pcEval, c('PLT_CN', 'CONDID', 'aD')), by = c('PLT_CN', 'CONDID')) %>%
+    mutate(aD_c = aD)
+  aD_p <- pcEval %>%
+    group_by(PLT_CN) %>%
+    summarize(aD_p = as.numeric(any(aD > 0)))
+  db$PLOT <- left_join(db$PLOT, aD_p, by = 'PLT_CN')
+  rm(pcEval)
+
+  # Same as above for tree (ex. trees > 20 ft tall)
+  treeDomain <- substitute(treeDomain)
+  tD <- eval(treeDomain, db$TREE) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  if(!is.null(tD)) tD[is.na(tD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+  if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+  db$TREE$tD <- as.numeric(tD)
+
   ## Which grpByNames are in which table? Helps us subset below
   grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
   grpC <- names(db$COND)[names(db$COND) %in% grpBy]
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
   ## Prep joins and filters
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'REMPER', grpP)) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'REMPER', grpP, 'sp', 'aD_p')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'aD_c', 'landD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-    left_join(select(db$TREE, c('TRE_CN', 'PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT)), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE, c('TRE_CN', 'PLT_CN', 'CONDID', 'DIA', 'typeD', 'tD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT)), by = c('PLT_CN', 'CONDID')) %>%
     left_join(select(db$TREE_GRM_COMPONENT, c('PLT_CN', 'TRE_CN', 'ANN_DIA_GROWTH', 'ANN_HT_GROWTH', 'DIA_BEGIN', 'DIA_MIDPT', 'DIA_END',
                             'HT_BEGIN', 'HT_MIDPT', 'HT_END')), by = c('PLT_CN', 'TRE_CN')) %>%
     left_join(select(db$TREE_GRM_ESTN, c('PLT_CN', 'TRE_CN', 'TPAGROW_UNADJ', 'SUBPTYP_GRM', 'ANN_NET_GROWTH')), by = c('PLT_CN', 'TRE_CN')) %>%
@@ -2329,38 +2435,9 @@ vitalRates <- function(db,
     }
 
   }
-  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
-  # Land type domain indicator
-  if (tolower(landType) == 'forest'){
-    landD <- ifelse(data$COND_STATUS_CD == 1, 1, 0)
-  } else if (tolower(landType) == 'timber'){
-    landD <- ifelse(data$COND_STATUS_CD == 1 & data$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & data$RESERVCD == 0, 1, 0)
-  }
-  # Tree Type domain indicator
-  if (tolower(treeType) == 'live'){
-    typeD <- ifelse(data$STATUSCD == 1, 1, 0)
-  } else if (tolower(treeType) == 'gs'){
-    typeD <- ifelse(data$STATUSCD == 1 & data$DIA >= 5 & data$TREECLCD == 2, 1, 0)
-  }
-  # update spatial domain indicator
-  if(!is.null(polys)){
-    sp <- ifelse(data$PLT_CN %in% pltSF$PLT_CN, 1, 0)
-  } else {
-    sp <- 1
-  }
-  # User defined domain indicator for area (ex. specific forest type)
-  areaDomain <- substitute(areaDomain)
-  aD <- eval(areaDomain, data) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
-  if(!is.null(aD)) aD[is.na(aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
-  if(is.null(aD)) aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
-  # Same as above for tree (ex. trees > 20 ft tall)
-  treeDomain <- substitute(treeDomain)
-  tD <- eval(treeDomain, data) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
-  if(!is.null(tD)) tD[is.na(tD)] <- 0 # Make NAs 0s. Causes bugs otherwise
-  if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
   ## Comprehensive indicator function
-  data$aDI <- landD * aD * sp
-  data$tDI <- landD * aD * tD * typeD * sp
+  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
+  data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
 
   ## Add species to groups
   if (bySpecies) {
@@ -2404,10 +2481,11 @@ vitalRates <- function(db,
     # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
     ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
     ## estimation unit, and cause estimates to be inflated substantially)
-    combos <- data %>%
+    combos <- select(data, c(grpBy)) %>%
       as.data.frame() %>%
       group_by(.dots = grpBy) %>%
-      summarize()
+      summarize() %>%
+      filter(!is.na(YEAR))
     if(!is.null(polys)){
       combos <- filter(combos, !is.na(polyID))
     }
@@ -2518,7 +2596,7 @@ biomass <- function(db,
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
-  if (!is.null(polys) & class(polys) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
+  if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
   }
   if (!is.null(grpBy) & class(grpBy) != 'character'){
@@ -2588,6 +2666,10 @@ biomass <- function(db,
         as.data.frame() %>%
         select(-c('geometry')) # removes artifact of SF object
     })})
+    # A warning
+    if (length(unique(pltSF$PLT_CN)) < 1){
+      stop('No plots in db overlap with polys.')
+    }
 
     # # Convert back to dataframe
     # db$PLOT <- as.data.frame(db$PLOT) %>%
@@ -2601,6 +2683,52 @@ biomass <- function(db,
   }
 
 
+  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
+  # Land type domain indicator
+  if (tolower(landType) == 'forest'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1, 1, 0)
+  } else if (tolower(landType) == 'timber'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
+  }
+  # Tree Type domain indicator
+  if (tolower(treeType) == 'live'){
+    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1, 1, 0)
+  } else if (tolower(treeType) == 'dead'){
+    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 2 & db$TREE$STANDING_DEAD_CD == 1, 1, 0)
+  } else if (tolower(treeType) == 'gs'){
+    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1 & db$TREE$DIA >= 5 & db$TREE$TREECLCD == 2, 1, 0)
+  } else if (tolower(treeType) == 'all'){
+    db$TREE$typeD <- 1
+  }
+  # update spatial domain indicator
+  if(!is.null(polys)){
+    db$PLOT$sp <- ifelse(db$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+  } else {
+    db$PLOT$sp <- 1
+  }
+
+  # User defined domain indicator for area (ex. specific forest type)
+  pcEval <- left_join(db$PLOT, select(db$COND, -c('STATECD', 'UNITCD', 'COUNTYCD', 'INVYR', 'PLOT')), by = 'PLT_CN')
+  areaDomain <- substitute(areaDomain)
+  pcEval$aD <- eval(areaDomain, pcEval) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  if(!is.null(pcEval$aD)) pcEval$aD[is.na(pcEval$aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+  if(is.null(pcEval$aD)) pcEval$aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+  pcEval$aD <- as.numeric(pcEval$aD)
+  db$COND <- left_join(db$COND, select(pcEval, c('PLT_CN', 'CONDID', 'aD')), by = c('PLT_CN', 'CONDID')) %>%
+    mutate(aD_c = aD)
+  aD_p <- pcEval %>%
+    group_by(PLT_CN) %>%
+    summarize(aD_p = as.numeric(any(aD > 0)))
+  db$PLOT <- left_join(db$PLOT, aD_p, by = 'PLT_CN')
+  rm(pcEval)
+
+  # Same as above for tree (ex. trees > 20 ft tall)
+  treeDomain <- substitute(treeDomain)
+  tD <- eval(treeDomain, db$TREE) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  if(!is.null(tD)) tD[is.na(tD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+  if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+  db$TREE$tD <- as.numeric(tD)
+
   ## Prep joins and filters
   ## Which grpByNames are in which table? Helps us subset below
   grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
@@ -2608,15 +2736,15 @@ biomass <- function(db,
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
   ## Prep joins and filters
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'sp', 'aD_p')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'landD', 'aD_c')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE',
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', 'typeD', 'tD',
                                 'VOLCFNET', 'VOLCSNET', 'DRYBIO_AG', 'DRYBIO_BG', 'CARBON_AG', 'CARBON_BG', grpT)), by = c('PLT_CN', 'CONDID')) %>%
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
@@ -2648,43 +2776,9 @@ biomass <- function(db,
       }
   }
 
-
-  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
-  # Land type domain indicator
-  if (tolower(landType) == 'forest'){
-    landD <- ifelse(data$COND_STATUS_CD == 1, 1, 0)
-  } else if (tolower(landType) == 'timber'){
-    landD <- ifelse(data$COND_STATUS_CD == 1 & data$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & data$RESERVCD == 0, 1, 0)
-  }
-  # Tree Type domain indicator
-  if (tolower(treeType) == 'live'){
-    typeD <- ifelse(data$STATUSCD == 1, 1, 0)
-  } else if (tolower(treeType) == 'dead'){
-    typeD <- ifelse(data$STATUSCD == 2 & data$STANDING_DEAD_CD == 1, 1, 0)
-  } else if (tolower(treeType) == 'gs'){
-    typeD <- ifelse(data$STATUSCD == 1 & data$DIA >= 5 & data$TREECLCD == 2, 1, 0)
-  } else if (tolower(treeType) == 'all'){
-    typeD <- 1
-  }
-  # update spatial domain indicator
-  if(!is.null(polys)){
-    sp <- ifelse(data$PLT_CN %in% pltSF$PLT_CN, 1, 0)
-  } else {
-    sp <- 1
-  }
-  # User defined domain indicator for area (ex. specific forest type)
-  areaDomain <- substitute(areaDomain)
-  aD <- eval(areaDomain, data) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
-  if(!is.null(aD)) aD[is.na(aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
-  if(is.null(aD)) aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
-  # Same as above for tree (ex. trees > 20 ft tall)
-  treeDomain <- substitute(treeDomain)
-  tD <- eval(treeDomain, data) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
-  if(!is.null(tD)) tD[is.na(tD)] <- 0 # Make NAs 0s. Causes bugs otherwise
-  if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
   ## Comprehensive indicator function
-  data$aDI <- landD * aD * sp
-  data$tDI <- landD * aD * tD * typeD * sp
+  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
+  data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
 
   ## Add species to groups
   if (bySpecies) {
@@ -2723,10 +2817,11 @@ biomass <- function(db,
 
     ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
   } else {
-    combos <- data %>%
+    combos <- select(data, c(grpBy)) %>%
       as.data.frame() %>%
       group_by(.dots = grpBy) %>%
-      summarize()
+      summarize() %>%
+      filter(!is.na(YEAR))
     if(!is.null(polys)){
       combos <- filter(combos, !is.na(polyID))
     }
@@ -2835,7 +2930,7 @@ dwm <- function(db,
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
-  if (!is.null(polys) & class(polys) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
+  if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
   }
   if (!is.null(grpBy) & class(grpBy) != 'character'){
@@ -2860,18 +2955,10 @@ dwm <- function(db,
 
   message('Joining FIA Tables.....')
 
-  # ## Pull out individual tables from database object
-  # if (!is.null(db)){
   db$COND_DWM_CALC <- db[['COND_DWM_CALC']] %>% mutate(DWM_CN = CN)
   db$COND <- db[['COND']] %>% mutate(CND_CN = CN)
   db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
-  #   POP_PLOT_STRATUM_ASSGN <- db[['POP_PLOT_STRATUM_ASSGN_STRATUM_ASSGN']]
-  #   PEU <- db$POP_ESTN_UNIT
-  #   POP_EVAL <- db$POP_EVAL
-  #   POP_STRATUM <- db$POP_STRATUM
-  #   PET <- db$POP_EVAL_TYP
-  #   PEG <- db$POP_EVAL_GRP
-  # }
+
 
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
@@ -2906,6 +2993,10 @@ dwm <- function(db,
         as.data.frame() %>%
         select(-c('geometry')) # removes artifact of SF object
     })})
+    # A warning
+    if (length(unique(pltSF$PLT_CN)) < 1){
+      stop('No plots in db overlap with polys.')
+    }
 
     # # Convert back to dataframe
     # db$PLOT <- as.data.frame(db$PLOT) %>%
@@ -2918,15 +3009,43 @@ dwm <- function(db,
     db$PLOT <- as(db$PLOT, 'sf')
   }
 
+  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
+  # Land type domain indicator
+  if (tolower(landType) == 'forest'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1, 1, 0)
+  } else if (tolower(landType) == 'timber'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
+  }
+  # update spatial domain indicator
+  if(!is.null(polys)){
+    db$PLOT$sp <- ifelse(db$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+  } else {
+    db$PLOT$sp <- 1
+  }
+
+  # User defined domain indicator for area (ex. specific forest type)
+  pcEval <- left_join(db$PLOT, select(db$COND, -c('STATECD', 'UNITCD', 'COUNTYCD', 'INVYR', 'PLOT')), by = 'PLT_CN')
+  areaDomain <- substitute(areaDomain)
+  pcEval$aD <- eval(areaDomain, pcEval) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  if(!is.null(pcEval$aD)) pcEval$aD[is.na(pcEval$aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+  if(is.null(pcEval$aD)) pcEval$aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+  pcEval$aD <- as.numeric(pcEval$aD)
+  db$COND <- left_join(db$COND, select(pcEval, c('PLT_CN', 'CONDID', 'aD')), by = c('PLT_CN', 'CONDID')) %>%
+    mutate(aD_c = aD)
+  aD_p <- pcEval %>%
+    group_by(PLT_CN) %>%
+    summarize(aD_p = as.numeric(any(aD > 0)))
+  db$PLOT <- left_join(db$PLOT, aD_p, by = 'PLT_CN')
+  rm(pcEval)
+
   ## Prep joins and filters
-  ## Which grpByNames are in which table? Helps us subset below
   ## Which grpByNames are in which table? Helps us subset below
   grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
   grpC <- names(db$COND)[names(db$COND) %in% grpBy]
 
   ## Prep joins and filters
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP)) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CND_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'sp', 'aD_p')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CND_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'aD_c', 'landD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
@@ -2966,28 +3085,8 @@ dwm <- function(db,
 
   }
 
-  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
-  # Land type domain indicator
-  if (tolower(landType) == 'forest'){
-    landD <- ifelse(data$COND_STATUS_CD == 1, 1, 0)
-  } else if (tolower(landType) == 'timber'){
-    landD <- ifelse(data$COND_STATUS_CD == 1 & data$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & data$RESERVCD == 0, 1, 0)
-  }
-
-  # update spatial domain indicator
-  if(!is.null(polys)){
-    sp <- ifelse(data$PLT_CN %in% pltSF$PLT_CN, 1, 0)
-  } else {
-    sp <- 1
-  }
-  # User defined domain indicator for area (ex. specific forest type)
-  areaDomain <- substitute(areaDomain)
-  aD <- eval(areaDomain, data) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
-  if(!is.null(aD)) aD[is.na(aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
-  if(is.null(aD)) aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
   ## Comprehensive indicator function
-  data$aDI <- landD * aD * sp
-
+  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
 
 
   ####################  COMPUTE ESTIMATES  ###########################
@@ -3027,10 +3126,11 @@ dwm <- function(db,
     # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
     ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
     ## estimation unit, and cause estimates to be inflated substantially
-    combos <- data %>%
+    combos <- select(data, c(grpBy)) %>%
       as.data.frame() %>%
       group_by(.dots = grpBy) %>%
-      summarize()
+      summarize() %>%
+      filter(!is.na(YEAR))
     if(!is.null(polys)){
       combos <- filter(combos, !is.na(polyID))
     }
@@ -3210,7 +3310,7 @@ invasive <- function(db,
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
-  if (!is.null(polys) & class(polys) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
+  if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
   }
   if (!is.null(grpBy) & class(grpBy) != 'character'){
@@ -3278,6 +3378,10 @@ invasive <- function(db,
         as.data.frame() %>%
         select(-c('geometry')) # removes artifact of SF object
     })})
+    # A warning
+    if (length(unique(pltSF$PLT_CN)) < 1){
+      stop('No plots in db overlap with polys.')
+    }
 
     # # Convert back to dataframe
     # db$PLOT <- as.data.frame(db$PLOT) %>%
@@ -3290,6 +3394,34 @@ invasive <- function(db,
     db$PLOT <- as(db$PLOT, 'sf')
   }
 
+  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
+  # Land type domain indicator
+  if (tolower(landType) == 'forest'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1, 1, 0)
+  } else if (tolower(landType) == 'timber'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
+  }
+  # update spatial domain indicator
+  if(!is.null(polys)){
+    db$PLOT$sp <- ifelse(db$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+  } else {
+    db$PLOT$sp <- 1
+  }
+
+  # User defined domain indicator for area (ex. specific forest type)
+  pcEval <- left_join(db$PLOT, select(db$COND, -c('STATECD', 'UNITCD', 'COUNTYCD', 'INVYR', 'PLOT')), by = 'PLT_CN')
+  areaDomain <- substitute(areaDomain)
+  pcEval$aD <- eval(areaDomain, pcEval) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  if(!is.null(pcEval$aD)) pcEval$aD[is.na(pcEval$aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+  if(is.null(pcEval$aD)) pcEval$aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+  pcEval$aD <- as.numeric(pcEval$aD)
+  db$COND <- left_join(db$COND, select(pcEval, c('PLT_CN', 'CONDID', 'aD')), by = c('PLT_CN', 'CONDID')) %>%
+    mutate(aD_c = aD)
+  aD_p <- pcEval %>%
+    group_by(PLT_CN) %>%
+    summarize(aD_p = as.numeric(any(aD > 0)))
+  db$PLOT <- left_join(db$PLOT, aD_p, by = 'PLT_CN')
+  rm(pcEval)
 
   ## Prep joins and filters
   ## Which grpByNames are in which table? Helps us subset below
@@ -3298,8 +3430,8 @@ invasive <- function(db,
   grpC <- names(db$COND)[names(db$COND) %in% grpBy]
 
   ## Prep joins and filters
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVASIVE_SAMPLING_STATUS_CD', grpP)) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'SITECLCD', 'RESERVCD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVASIVE_SAMPLING_STATUS_CD', grpP, 'sp', 'aD_p')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'aD_c', 'landD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
@@ -3337,30 +3469,10 @@ invasive <- function(db,
         select(-c(YEAR)) %>%
         mutate(YEAR = maxYear)
     }
-
   }
 
-  if (tolower(landType) == "forest") {
-    landD <- ifelse(data$COND_STATUS_CD == 1, 1, 0)
-  } else if (tolower(landType) == "timber") {
-    landD <- ifelse(data$COND_STATUS_CD == 1 & data$SITECLCD %in%
-                      c(1, 2, 3, 4, 5, 6) & data$RESERVCD == 0, 1, 0)
-  }
-  # update spatial domain indicator
-  if(!is.null(polys)){
-    sp <- ifelse(data$PLT_CN %in% pltSF$PLT_CN, 1, 0)
-  } else {
-    sp <- 1
-  }
   ## Comprehensive indicator function
-  areaDomain <- substitute(areaDomain)
-  aD <- eval(areaDomain, data)
-  if (!is.null(aD))
-    aD[is.na(aD)] <- 0
-  if (is.null(aD))
-    aD <- 1
-  data$aDI <- landD * aD * sp
-
+  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
 
 
   if (byPlot) {
@@ -3374,13 +3486,14 @@ invasive <- function(db,
     # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
     ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
     ## estimation unit, and cause estimates to be inflated substantially)
-    combos <- data %>%
+    combos <- select(data, c(grpBy)) %>%
       as.data.frame() %>%
       group_by(.dots = grpBy) %>%
-      summarize()
-    # if(!is.null(polys)){
-    #   combos <- filter(combos, !is.na(polyID))
-    # }
+      summarize() %>%
+      filter(!is.na(YEAR))
+    if(!is.null(polys)){
+      combos <- filter(combos, !is.na(polyID))
+    }
     # List of rows for lapply
     combos <- split(combos, seq(nrow(combos)))
 

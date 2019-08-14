@@ -168,11 +168,11 @@ head(tpaRI_own)
 #>   YEAR OWNGRPCD      TPA      BAA TPA_PERC BAA_PERC   TPA_SE   BAA_SE
 #> 1 2017       30 1.238332 4.783645      100      100 49.84574 49.34242
 #> 2 2017       40 1.435430 3.737055      100      100 24.80016 26.94152
-#> 3 2017       NA      NaN      NaN      NaN      NaN      NaN      NaN
+#> 3 2017       NA 1.372623 4.070559      100      100 22.68298 24.92343
 #>   TPA_PERC_SE BAA_PERC_SE nPlots_TREE nPlots_AREA
 #> 1    51.46922    50.95504           4          38
 #> 2    26.04668    27.89684          12          80
-#> 3         NaN         NaN           0           0
+#> 3    23.14604    25.23145          16         116
 ```
 
 **What if I want to produce estimates within my own population boundaries (within user-defined spatial zones/polygons)?** This is where things get really exciting.
