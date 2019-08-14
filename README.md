@@ -3,8 +3,8 @@
 
 # rFIA: Unlocking the FIA Database in R
 
-![US Biomass](/home/hunter/NPS/package/rFIA/static/usBiomass.png)
-<!-- badges: start --> <!-- badges: end -->
+![US Biomass](static/usBiomass.png) <!-- badges: start -->
+<!-- badges: end -->
 
 The goal of `rFIA` is to increase the accessibility and use of the USFS
 Forest Inventory and Analysis (FIA) Database by providing a
