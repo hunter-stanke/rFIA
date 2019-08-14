@@ -82,4 +82,4 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'vmdCV', 'vmdEst', 'vmdPlot', 'vmdStrat', 'vmdV', 'vmdVar', 'vpCV', 'vpEst', 'vpPlot', 'vpStrat',
                          'vpV', 'vpVar', 'vsmCV', 'vsmEst', 'vsmPlot', 'vsmStrat', 'vsmV', 'vsmVar', 'w',
                          'AREA', 'AREA_SE', 'CARB', 'CARBON_AG', 'CARBON_BG', 'CARB_1000HR', 'CND_CN', 'COMPONENT',
-                         'DIA', 'DIA_GROW', 'GENUS', 'HT_GROW', 'PLOT', 'PLT_CN'))
+                         'DIA', 'DIA_GROW', 'GENUS', 'HT_GROW', 'PLOT', 'PLT_CN', 'maxYear', 'aD', 'LOCATION_NM'))

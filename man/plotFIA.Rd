@@ -46,6 +46,8 @@ plotFIA(data, fillVar, animate = FALSE, title = NULL, colOption = 'viridis',
 
   \item{legend.width}{numeric; scalar for legend width.}
 
+  \item{device}{character; device to use for image save. Can either be a device function (e.g. png()), or one of "eps", "ps", "tex" (pictex), "pdf", "jpeg", "tiff", "png", "bmp", "svg" or "wmf" (windows only)..}
+
   \item{savePath}{character; path to save plot to (combined with fileName).}
 
   \item{fileName}{character; file name to create on disk.}

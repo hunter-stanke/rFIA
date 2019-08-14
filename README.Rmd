@@ -14,6 +14,7 @@ knitr::opts_chunk$set(
 ```
 # rFIA: Unlocking the FIA Database in R
 
+![US Biomass](/home/hunter/NPS/package/usBiomass.png)
 <!-- badges: start -->
 <!-- badges: end -->
 
@@ -23,6 +24,7 @@ Specifically, `rFIA` improves accessibility to the spatio-temporal estimation ca
 
 You can download subsets of the FIA Database at the FIA Datamart: https://apps.fs.usda.gov/fia/datamart/CSV/datamart_csv.html
 
+<br>
 
 ## Installation
 
@@ -36,6 +38,8 @@ Alternatively, you can install the development version from GitHub:
 ```r
 devtools::install_github('hunter-stanke/rFIA')
 ```
+
+<br>
 
 ## Functionality
 
@@ -53,6 +57,7 @@ devtools::install_github('hunter-stanke/rFIA')
 |`tpa`            | Estimate abundance of standing trees (TPA & BAA)                     |
 |`vitalRates`     | Estimate live tree growth rates                                      |
 
+<br>
 
 ## Example Usage
 

@@ -3,13 +3,15 @@
 rFIA: Unlocking the FIA Database in R
 =====================================
 
-<!-- badges: start -->
-<!-- badges: end -->
+![US Biomass](/home/hunter/NPS/package/usBiomass.png) <!-- badges: start --> <!-- badges: end -->
+
 The goal of `rFIA` is to increase the accessibility and use of the USFS Forest Inventory and Analysis (FIA) Database by providing a user-friendly, open source platform to easily query and analyze FIA Data. Designed to accommodate a wide range of potential user objectives, `rFIA` simplifies the estimation of forest variables from the FIA Database and allows all R users (experts and newcomers alike) to unlock the flexibility and potential inherent to the Enhanced FIA design.
 
 Specifically, `rFIA` improves accessibility to the spatio-temporal estimation capacity of the FIA Database by producing space-time indexed summaries of forest variables within user-defined population boundaries. Direct integration with other popular R packages (e.g., dplyr, sp, and sf) facilitates efficient space-time query and data summary, and supports common data representations and API design. The package implements design-based estimation procedures outlined by Bechtold & Patterson (2005), and has been validated against estimates and sampling errors produced by EVALIDator. Current development is focused on the implementation of spatially-enabled model-assisted estimators to improve population, change, and ratio estimates.
 
 You can download subsets of the FIA Database at the FIA Datamart: <https://apps.fs.usda.gov/fia/datamart/CSV/datamart_csv.html>
+
+<br>
 
 Installation
 ------------
@@ -25,6 +27,8 @@ Alternatively, you can install the development version from GitHub:
 ``` r
 devtools::install_github('hunter-stanke/rFIA')
 ```
+
+<br>
 
 Functionality
 -------------
@@ -42,6 +46,8 @@ Functionality
 | `standStruct`   | Estimate forest structural stage distributions                     |
 | `tpa`           | Estimate abundance of standing trees (TPA & BAA)                   |
 | `vitalRates`    | Estimate live tree growth rates                                    |
+
+<br>
 
 Example Usage
 -------------
