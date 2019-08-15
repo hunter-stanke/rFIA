@@ -507,7 +507,7 @@ clipFIA <- function(db,
   if(any(unique(db$PLOT$STATECD) %in% c(69, 72, 78, 41, 53)) & mostRecent){
     vState <- unique(db$PLOT$STATECD[db$PLOT$STATECD %in% c(69, 72, 78, 41, 53)])
     fancyName <- unique(intData$EVAL_GRP$STATE[intData$EVAL_GRP$STATECD %in% vState])
-    warning(paste('Most recent subset unavailable for: ', as.character(fancyName) , '. All data required to compute estimates. Returning full database.', sep = ''))
+    warning(paste('Most recent subset unavailable for: ', toString(fancyName) , '. All data required to compute estimates. Returning full database.', sep = ''))
   }
   if (!is.null(mask) & first(class(mask)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('mask must be spatial polygons object of class sp or sf. ')
@@ -1030,7 +1030,7 @@ standStruct <- function(db,
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'CCLCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE')), by = c('PLT_CN', 'CONDID')) %>%
@@ -1039,7 +1039,8 @@ standStruct <- function(db,
     rename(YEAR = END_INVYR,
            YEAR_RANGE = REPORT_YEAR_NM) %>%
     mutate_if(is.factor,
-              as.character)
+              as.character)%>%
+    filter(!is.na(YEAR))
 
   ## Recode a few of the estimation methods to make things easier below
   data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
@@ -1095,13 +1096,42 @@ standStruct <- function(db,
       # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
       ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
       ## estimation unit, and cause estimates to be inflated substantially
-    combos <- select(data, c(grpBy)) %>%
-      as.data.frame() %>%
-      group_by(.dots = grpBy) %>%
-      summarize() %>%
-      filter(!is.na(YEAR))
-    if(!is.null(polys)){
-      combos <- filter(combos, !is.na(polyID))
+    # combos <- select(data, c(grpBy)) %>%
+    #   as.data.frame() %>%
+    #   group_by(.dots = grpBy) %>%
+    #   summarize() %>%
+    #   filter(!is.na(YEAR))
+    # if(!is.null(polys)){
+    #   combos <- filter(combos, !is.na(polyID))
+    # }
+    ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
+    if(is.null(polys)){
+      combos <- select(data, c(grpBy)) %>%
+        as.data.frame() %>%
+        group_by(.dots = grpBy) %>%
+        summarize() %>%
+        filter(!is.na(YEAR))
+    } else {
+      ## Non spatial combos
+      combosNS <- select(data, c(grpBy[grpBy %in% names(polys) == FALSE])) %>%
+        as.data.frame() %>%
+        group_by(.dots = grpBy[grpBy %in% names(polys) == FALSE]) %>%
+        summarize() %>%
+        filter(!is.na(YEAR))
+      combosNSpoly <- combosNS %>%
+        mutate(polyID = 1)
+      if(nrow(polys) > 1){
+        # Duplicate set of non spatial groups
+        for (p in 2:nrow(polys)) {
+          combosNS$polyID <- p
+          combosNSpoly <- rbind(combosNSpoly, combosNS)
+        }
+      }
+      # New combos for spatial objects
+      combos <- pltSF %>%
+        select(-c(PLT_CN)) %>%
+        distinct(polyID, .keep_all = TRUE) %>%
+        left_join(combosNSpoly, by = 'polyID')
     }
       # List of rows for lapply
       combos <- split(combos, seq(nrow(combos)))
@@ -1381,7 +1411,7 @@ diversity <- function(db,
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA','SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT, 'typeD', 'tD')), by = c('PLT_CN', 'CONDID')) %>%
@@ -1390,7 +1420,8 @@ diversity <- function(db,
     rename(YEAR = END_INVYR,
            YEAR_RANGE = REPORT_YEAR_NM)%>%
     mutate_if(is.factor,
-              as.character)
+              as.character)%>%
+    filter(!is.na(YEAR))
 
   ## Recode a few of the estimation methods to make things easier below
   data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
@@ -1427,6 +1458,7 @@ diversity <- function(db,
     grpBy <- c(grpBy, 'sizeClass')
     grpByOrig <- c(grpByOrig, 'sizeClass')
     data$sizeClass <- makeClasses(data$DIA, interval = 2)
+    data <- data[!is.na(data$sizeClass),]
   }
 
 
@@ -1450,13 +1482,42 @@ diversity <- function(db,
 
     ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
   } else {
-    combos <- select(data, c(grpBy)) %>%
-      as.data.frame() %>%
-      group_by(.dots = grpBy) %>%
-      summarize() %>%
-      filter(!is.na(YEAR))
-    if(!is.null(polys)){
-      combos <- filter(combos, !is.na(polyID))
+    # combos <- select(data, c(grpBy)) %>%
+    #   as.data.frame() %>%
+    #   group_by(.dots = grpBy) %>%
+    #   summarize() %>%
+    #   filter(!is.na(YEAR))
+    # if(!is.null(polys)){
+    #   combos <- filter(combos, !is.na(polyID))
+    # }
+    ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
+    if(is.null(polys)){
+      combos <- select(data, c(grpBy)) %>%
+        as.data.frame() %>%
+        group_by(.dots = grpBy) %>%
+        summarize() %>%
+        filter(!is.na(YEAR))
+    } else {
+      ## Non spatial combos
+      combosNS <- select(data, c(grpBy[grpBy %in% names(polys) == FALSE])) %>%
+        as.data.frame() %>%
+        group_by(.dots = grpBy[grpBy %in% names(polys) == FALSE]) %>%
+        summarize() %>%
+        filter(!is.na(YEAR))
+      combosNSpoly <- combosNS %>%
+        mutate(polyID = 1)
+      if(nrow(polys) > 1){
+        # Duplicate set of non spatial groups
+        for (p in 2:nrow(polys)) {
+          combosNS$polyID <- p
+          combosNSpoly <- rbind(combosNSpoly, combosNS)
+        }
+      }
+      # New combos for spatial objects
+      combos <- pltSF %>%
+        select(-c(PLT_CN)) %>%
+        distinct(polyID, .keep_all = TRUE) %>%
+        left_join(combosNSpoly, by = 'polyID')
     }
     # List of rows for lapply
     combos <- split(combos, seq(nrow(combos)))
@@ -1693,7 +1754,7 @@ tpa <- function(db,
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT, 'tD', 'typeD')), by = c('PLT_CN', 'CONDID')) %>%
@@ -1702,7 +1763,9 @@ tpa <- function(db,
     rename(YEAR = END_INVYR,
            YEAR_RANGE = REPORT_YEAR_NM) %>%
     mutate_if(is.factor,
-              as.character)
+              as.character) %>%
+    filter(!is.na(YEAR))
+
   ## Recode a few of the estimation methods to make things easier below
   data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
                             `Post-Stratification` = 'strat',
@@ -1736,7 +1799,9 @@ tpa <- function(db,
   if (bySpecies) {
     data <- data %>%
       left_join(select(intData$REF_SPECIES_2018, c('SPCD','COMMON_NAME', 'GENUS', 'SPECIES')), by = 'SPCD') %>%
-      mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' '))
+      mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' ')) %>%
+      mutate_if(is.factor,
+                as.character)
     grpBy <- c(grpBy, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
     grpByOrig <- c(grpByOrig, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
   }
@@ -1746,6 +1811,7 @@ tpa <- function(db,
     grpBy <- c(grpBy, 'sizeClass')
     grpByOrig <- c(grpByOrig, 'sizeClass')
     data$sizeClass <- makeClasses(data$DIA, interval = 2)
+    data <- data[!is.na(data$sizeClass),]
   }
 
 
@@ -1767,13 +1833,42 @@ tpa <- function(db,
     # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
     ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
     ## estimation unit, and cause estimates to be inflated substantially)
-    combos <- select(data, c(grpBy)) %>%
-      as.data.frame() %>%
-      group_by(.dots = grpBy) %>%
-      summarize() %>%
-      filter(!is.na(YEAR))
-    if(!is.null(polys)){
-      combos <- filter(combos, !is.na(polyID))
+    # combos <- select(data, c(grpBy)) %>%
+    #   as.data.frame() %>%
+    #   group_by(.dots = grpBy) %>%
+    #   summarize() %>%
+    #   filter(!is.na(YEAR))
+    # if(!is.null(polys)){
+    #   combos <- filter(combos, !is.na(polyID))
+    # }
+    ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
+    if(is.null(polys)){
+      combos <- select(data, c(grpBy)) %>%
+        as.data.frame() %>%
+        group_by(.dots = grpBy) %>%
+        summarize() %>%
+        filter(!is.na(YEAR))
+    } else {
+      ## Non spatial combos
+      combosNS <- select(data, c(grpBy[grpBy %in% names(polys) == FALSE])) %>%
+        as.data.frame() %>%
+        group_by(.dots = grpBy[grpBy %in% names(polys) == FALSE]) %>%
+        summarize() %>%
+        filter(!is.na(YEAR))
+      combosNSpoly <- combosNS %>%
+        mutate(polyID = 1)
+      if(nrow(polys) > 1){
+        # Duplicate set of non spatial groups
+        for (p in 2:nrow(polys)) {
+          combosNS$polyID <- p
+          combosNSpoly <- rbind(combosNSpoly, combosNS)
+        }
+      }
+      # New combos for spatial objects
+      combos <- pltSF %>%
+        select(-c(PLT_CN)) %>%
+        distinct(polyID, .keep_all = TRUE) %>%
+        left_join(combosNSpoly, by = 'polyID')
     }
     # List of rows for lapply
     combos <- split(combos, seq(nrow(combos)))
@@ -1899,9 +1994,15 @@ growMort <- function(db,
   if (any(grpBy %in% grpNames == FALSE)){
     missG <- grpNames[grpNames %in% grpBy == FALSE]
     stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT, COND, or TREE tables.'))
-
   }
-
+  ## No EXP_GROW available for Western States, make sure we warn that values will be returned as 0
+  # These states do not allow temporal queries. Things are extremely weird with their eval groups
+  noGrow <- c(02,03,04,07,08,11,14,15,16, 23, 30, 32, 35,43,49, 78)
+  if(any(unique(db$PLOT$STATECD) %in% noGrow)){
+    vState <- unique(db$PLOT$STATECD[db$PLOT$STATECD %in% noGrow])
+    fancyName <- unique(intData$EVAL_GRP$STATE[intData$EVAL_GRP$STATECD %in% vState])
+    warning(paste('Recruitment data unavailable for: ', toString(fancyName) , '. Returning 0 for all recruitment estimates which include these states.', sep = ''))
+  }
   # These states do not allow change estimates.
   if(any(unique(db$PLOT$STATECD) %in% c(69, 72, 78, 15, 02))){
     vState <- unique(db$PLOT$STATECD[db$PLOT$STATECD %in% c(69, 72, 78, 15, 02)])
@@ -2039,7 +2140,7 @@ growMort <- function(db,
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     left_join(select(db$TREE, c('TRE_CN', 'PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT, 'typeD', 'tD')), by = c('PLT_CN', 'CONDID')) %>%
@@ -2087,7 +2188,9 @@ growMort <- function(db,
   if (bySpecies) {
     data <- data %>%
       left_join(select(intData$REF_SPECIES_2018, c('SPCD','COMMON_NAME', 'GENUS', 'SPECIES')), by = 'SPCD') %>%
-      mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' '))
+      mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' ')) %>%
+      mutate_if(is.factor,
+                as.character)
     grpBy <- c(grpBy, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
     grpByOrig <- c(grpByOrig, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
   }
@@ -2097,6 +2200,7 @@ growMort <- function(db,
     grpBy <- c(grpBy, 'sizeClass')
     grpByOrig <- c(grpByOrig, 'sizeClass')
     data$sizeClass <- makeClasses(data$DIA, interval = 2)
+    data <- data[!is.na(data$sizeClass),]
   }
 
 
@@ -2119,14 +2223,45 @@ growMort <- function(db,
     # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
     ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
     ## estimation unit, and cause estimates to be inflated substantially)
-    combos <- select(data, c(grpBy)) %>%
-      as.data.frame() %>%
-      group_by(.dots = grpBy) %>%
-      summarize() %>%
-      filter(!is.na(YEAR))
-    if(!is.null(polys)){
-      combos <- filter(combos, !is.na(polyID))
+    # combos <- select(data, c(grpBy)) %>%
+    #   as.data.frame() %>%
+    #   group_by(.dots = grpBy) %>%
+    #   summarize() %>%
+    #   filter(!is.na(YEAR))
+    # if(!is.null(polys)){
+    #   test <- filter(combos, !is.na(polyID))
+    #   if (nrow(test) > 0) combos <- test # If no points available, it produces zero rows & bugs
+    # }
+    ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
+    if(is.null(polys)){
+      combos <- select(data, c(grpBy)) %>%
+        as.data.frame() %>%
+        group_by(.dots = grpBy) %>%
+        summarize() %>%
+        filter(!is.na(YEAR))
+    } else {
+      ## Non spatial combos
+      combosNS <- select(data, c(grpBy[grpBy %in% names(polys) == FALSE])) %>%
+        as.data.frame() %>%
+        group_by(.dots = grpBy[grpBy %in% names(polys) == FALSE]) %>%
+        summarize() %>%
+        filter(!is.na(YEAR))
+      combosNSpoly <- combosNS %>%
+        mutate(polyID = 1)
+      if(nrow(polys) > 1){
+        # Duplicate set of non spatial groups
+        for (p in 2:nrow(polys)) {
+          combosNS$polyID <- p
+          combosNSpoly <- rbind(combosNSpoly, combosNS)
+        }
+      }
+      # New combos for spatial objects
+      combos <- pltSF %>%
+        select(-c(PLT_CN)) %>%
+        distinct(polyID, .keep_all = TRUE) %>%
+        left_join(combosNSpoly, by = 'polyID')
     }
+
     # List of rows for lapply
     combos <- split(combos, seq(nrow(combos)))
 
@@ -2251,7 +2386,14 @@ vitalRates <- function(db,
   if (any(grpBy %in% grpNames == FALSE)){
     missG <- grpNames[grpNames %in% grpBy == FALSE]
     stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT, COND, or TREE tables.'))
-
+  }
+  ## No EXP_GROW available for most Western States, make sure we warn that values will be returned as 0
+  # These states do not allow temporal queries. Things are extremely weird with their eval groups
+  noGrow <- c(02,03,04,07,08,11,14,15,16, 23, 30, 32, 35,43,49, 78)
+  if(any(unique(db$PLOT$STATECD) %in% noGrow)){
+    vState <- unique(db$PLOT$STATECD[db$PLOT$STATECD %in% noGrow])
+    fancyName <- unique(intData$EVAL_GRP$STATE[intData$EVAL_GRP$STATECD %in% vState])
+    warning(paste('Growth data unavailable for: ', toString(fancyName) , '. Returning 0 for all recruitment estimates which include these states.', sep = ''))
   }
 
   # These states do not allow change estimates.
@@ -2293,7 +2435,7 @@ vitalRates <- function(db,
   ids <- db$POP_EVAL %>%
     select('CN', 'END_INVYR', 'EVALID') %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP == 'EXPGROW' | EVAL_TYP == 'EXPCURR') %>%
+    filter(EVAL_TYP == 'EXPGROW') %>%
     distinct(EVALID)
   db$POP_EVAL <- db$POP_EVAL %>%
     filter(EVALID %in% ids$EVALID)
@@ -2391,7 +2533,7 @@ vitalRates <- function(db,
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     left_join(select(db$TREE, c('TRE_CN', 'PLT_CN', 'CONDID', 'DIA', 'typeD', 'tD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT)), by = c('PLT_CN', 'CONDID')) %>%
@@ -2443,7 +2585,9 @@ vitalRates <- function(db,
   if (bySpecies) {
     data <- data %>%
       left_join(select(intData$REF_SPECIES_2018, c('SPCD','COMMON_NAME', 'GENUS', 'SPECIES')), by = 'SPCD') %>%
-      mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' '))
+      mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' '))%>%
+      mutate_if(is.factor,
+                as.character)
     grpBy <- c(grpBy, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
     grpByOrig <- c(grpByOrig, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
   }
@@ -2453,6 +2597,7 @@ vitalRates <- function(db,
     grpBy <- c(grpBy, 'sizeClass')
     grpByOrig <- c(grpByOrig, 'sizeClass')
     data$sizeClass <- makeClasses(data$DIA, interval = 2)
+    data <- data[!is.na(data$sizeClass),]
   }
 
 
@@ -2481,14 +2626,46 @@ vitalRates <- function(db,
     # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
     ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
     ## estimation unit, and cause estimates to be inflated substantially)
-    combos <- select(data, c(grpBy)) %>%
-      as.data.frame() %>%
-      group_by(.dots = grpBy) %>%
-      summarize() %>%
-      filter(!is.na(YEAR))
-    if(!is.null(polys)){
-      combos <- filter(combos, !is.na(polyID))
+
+    ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
+    if(is.null(polys)){
+      combos <- select(data, c(grpBy)) %>%
+        as.data.frame() %>%
+        group_by(.dots = grpBy) %>%
+        summarize() %>%
+        filter(!is.na(YEAR))
+    } else {
+      ## Non spatial combos
+      combosNS <- select(data, c(grpBy[grpBy %in% names(polys) == FALSE])) %>%
+        as.data.frame() %>%
+        group_by(.dots = grpBy[grpBy %in% names(polys) == FALSE]) %>%
+        summarize() %>%
+        filter(!is.na(YEAR))
+      combosNSpoly <- combosNS %>%
+        mutate(polyID = 1)
+      if(nrow(polys) > 1){
+        # Duplicate set of non spatial groups
+        for (p in 2:nrow(polys)) {
+          combosNS$polyID <- p
+          combosNSpoly <- rbind(combosNSpoly, combosNS)
+        }
+      }
+      # New combos for spatial objects
+      combos <- pltSF %>%
+        select(-c(PLT_CN)) %>%
+        distinct(polyID, .keep_all = TRUE) %>%
+        left_join(combosNSpoly, by = 'polyID')
     }
+
+
+
+    #test <- filter(combos, !is.na(polyID))
+
+      # if (nrow(test) < 1) {
+      #    else {
+      #     combos <- test
+      #   }
+    #}
     # List of rows for lapply
     combos <- split(combos, seq(nrow(combos)))
 
@@ -2741,7 +2918,7 @@ biomass <- function(db,
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', 'typeD', 'tD',
@@ -2784,7 +2961,9 @@ biomass <- function(db,
   if (bySpecies) {
     data <- data %>%
       left_join(select(intData$REF_SPECIES_2018, c('SPCD','COMMON_NAME', 'GENUS', 'SPECIES')), by = 'SPCD') %>%
-      mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' '))
+      mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' '))%>%
+      mutate_if(is.factor,
+                as.character)
     grpBy <- c(grpBy, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
     grpByOrig <- c(grpByOrig, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
   }
@@ -2794,8 +2973,8 @@ biomass <- function(db,
     grpBy <- c(grpBy, 'sizeClass')
     grpByOrig <- c(grpByOrig, 'sizeClass')
     data$sizeClass <- makeClasses(data$DIA, interval = 2)
+    data <- data[!is.na(data$sizeClass),]
   }
-
 
 
   ####################  COMPUTE ESTIMATES  ###########################
@@ -2817,13 +2996,42 @@ biomass <- function(db,
 
     ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
   } else {
-    combos <- select(data, c(grpBy)) %>%
-      as.data.frame() %>%
-      group_by(.dots = grpBy) %>%
-      summarize() %>%
-      filter(!is.na(YEAR))
-    if(!is.null(polys)){
-      combos <- filter(combos, !is.na(polyID))
+    # combos <- select(data, c(grpBy)) %>%
+    #   as.data.frame() %>%
+    #   group_by(.dots = grpBy) %>%
+    #   summarize() %>%
+    #   filter(!is.na(YEAR))
+    # if(!is.null(polys)){
+    #   combos <- filter(combos, !is.na(polyID))
+    # }
+    ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
+    if(is.null(polys)){
+      combos <- select(data, c(grpBy)) %>%
+        as.data.frame() %>%
+        group_by(.dots = grpBy) %>%
+        summarize() %>%
+        filter(!is.na(YEAR))
+    } else {
+      ## Non spatial combos
+      combosNS <- select(data, c(grpBy[grpBy %in% names(polys) == FALSE])) %>%
+        as.data.frame() %>%
+        group_by(.dots = grpBy[grpBy %in% names(polys) == FALSE]) %>%
+        summarize() %>%
+        filter(!is.na(YEAR))
+      combosNSpoly <- combosNS %>%
+        mutate(polyID = 1)
+      if(nrow(polys) > 1){
+        # Duplicate set of non spatial groups
+        for (p in 2:nrow(polys)) {
+          combosNS$polyID <- p
+          combosNSpoly <- rbind(combosNSpoly, combosNS)
+        }
+      }
+      # New combos for spatial objects
+      combos <- pltSF %>%
+        select(-c(PLT_CN)) %>%
+        distinct(polyID, .keep_all = TRUE) %>%
+        left_join(combosNSpoly, by = 'polyID')
     }
     # List of rows for lapply
     combos <- split(combos, seq(nrow(combos)))
@@ -3049,7 +3257,7 @@ dwm <- function(db,
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     left_join(select(db$COND_DWM_CALC, -c( 'STATECD', 'COUNTYCD', 'UNITCD', 'INVYR', 'MEASYEAR', 'PLOT', 'CONDID', 'EVALID', 'STRATUM_CN')), by = c('PLT_CN', 'CND_CN')) %>%
@@ -3126,13 +3334,42 @@ dwm <- function(db,
     # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
     ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
     ## estimation unit, and cause estimates to be inflated substantially
-    combos <- select(data, c(grpBy)) %>%
-      as.data.frame() %>%
-      group_by(.dots = grpBy) %>%
-      summarize() %>%
-      filter(!is.na(YEAR))
-    if(!is.null(polys)){
-      combos <- filter(combos, !is.na(polyID))
+    # combos <- select(data, c(grpBy)) %>%
+    #   as.data.frame() %>%
+    #   group_by(.dots = grpBy) %>%
+    #   summarize() %>%
+    #   filter(!is.na(YEAR))
+    # if(!is.null(polys)){
+    #   combos <- filter(combos, !is.na(polyID))
+    # }
+    ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
+    if(is.null(polys)){
+      combos <- select(data, c(grpBy)) %>%
+        as.data.frame() %>%
+        group_by(.dots = grpBy) %>%
+        summarize() %>%
+        filter(!is.na(YEAR))
+    } else {
+      ## Non spatial combos
+      combosNS <- select(data, c(grpBy[grpBy %in% names(polys) == FALSE])) %>%
+        as.data.frame() %>%
+        group_by(.dots = grpBy[grpBy %in% names(polys) == FALSE]) %>%
+        summarize() %>%
+        filter(!is.na(YEAR))
+      combosNSpoly <- combosNS %>%
+        mutate(polyID = 1)
+      if(nrow(polys) > 1){
+        # Duplicate set of non spatial groups
+        for (p in 2:nrow(polys)) {
+          combosNS$polyID <- p
+          combosNSpoly <- rbind(combosNSpoly, combosNS)
+        }
+      }
+      # New combos for spatial objects
+      combos <- pltSF %>%
+        select(-c(PLT_CN)) %>%
+        distinct(polyID, .keep_all = TRUE) %>%
+        left_join(combosNSpoly, by = 'polyID')
     }
     # List of rows for lapply
     combos <- split(combos, seq(nrow(combos)))
@@ -3435,7 +3672,7 @@ invasive <- function(db,
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    left_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     full_join(select(db$INVASIVE_SUBPLOT_SPP, c('PLT_CN', 'COVER_PCT', 'VEG_SPCD', 'CONDID')), by = c("PLT_CN", "CONDID"))
@@ -3486,13 +3723,42 @@ invasive <- function(db,
     # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
     ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
     ## estimation unit, and cause estimates to be inflated substantially)
-    combos <- select(data, c(grpBy)) %>%
-      as.data.frame() %>%
-      group_by(.dots = grpBy) %>%
-      summarize() %>%
-      filter(!is.na(YEAR))
-    if(!is.null(polys)){
-      combos <- filter(combos, !is.na(polyID))
+    # combos <- select(data, c(grpBy)) %>%
+    #   as.data.frame() %>%
+    #   group_by(.dots = grpBy) %>%
+    #   summarize() %>%
+    #   filter(!is.na(YEAR))
+    # if(!is.null(polys)){
+    #   combos <- filter(combos, !is.na(polyID))
+    # }
+    ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
+    if(is.null(polys)){
+      combos <- select(data, c(grpBy)) %>%
+        as.data.frame() %>%
+        group_by(.dots = grpBy) %>%
+        summarize() %>%
+        filter(!is.na(YEAR))
+    } else {
+      ## Non spatial combos
+      combosNS <- select(data, c(grpBy[grpBy %in% names(polys) == FALSE])) %>%
+        as.data.frame() %>%
+        group_by(.dots = grpBy[grpBy %in% names(polys) == FALSE]) %>%
+        summarize() %>%
+        filter(!is.na(YEAR))
+      combosNSpoly <- combosNS %>%
+        mutate(polyID = 1)
+      if(nrow(polys) > 1){
+        # Duplicate set of non spatial groups
+        for (p in 2:nrow(polys)) {
+          combosNS$polyID <- p
+          combosNSpoly <- rbind(combosNSpoly, combosNS)
+        }
+      }
+      # New combos for spatial objects
+      combos <- pltSF %>%
+        select(-c(PLT_CN)) %>%
+        distinct(polyID, .keep_all = TRUE) %>%
+        left_join(combosNSpoly, by = 'polyID')
     }
     # List of rows for lapply
     combos <- split(combos, seq(nrow(combos)))

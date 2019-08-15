@@ -47,7 +47,7 @@ vitalRatesHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
                 p2 = first(P2POINTCNT))
     ### Compute total AREA in the domain of interest
     aInt <- data %>%
-      filter(EVAL_TYP == 'EXPCURR') %>%
+      #filter(EVAL_TYP == 'EXPCURR') %>%
       distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, .keep_all = TRUE) %>%
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
       summarize(fa = sum(CONDPROP_UNADJ * aDI * aAdj, na.rm = TRUE),
