@@ -343,9 +343,9 @@ readFIA <- function(dir,
   # Only read in the specified tables
   if (!is.null(tables)){
     if (any(str_sub(files, 3, 3) == '_')){
-      files <- files[str_sub(files,1,-5) %in% tables]
-    } else {
       files <- files[str_sub(files,4,-5) %in% tables]
+    } else {
+      files <- files[str_sub(files,1,-5) %in% tables]
     }
   }
 
@@ -372,15 +372,17 @@ readFIA <- function(dir,
   } else { # Unix systems
     inTables <- mclapply(files, FUN = readFIAHelper1, dir, mc.cores = nCores)
   }
+
   # Give them some names
   names(inTables) <- files
+  #inTables <- lapply(inTables, as.data.frame)
 
   # Check for corresponding tables (multiple states)
   # If they exist, loop through and merge corresponding tables
   tableNames <- names(inTables)
   outTables <- list()
   ## Check if the directory has the entire US naming convention or state naming convention
-  if (any(str_sub(files, 3, 3) == '_')){ ## ENTIRE NAMING CONVENTION
+  if (any(str_sub(files, 3, 3) == '_')){ ## STATE NAMING CONVENTION
     if (anyDuplicated(str_sub(tableNames, 4)) != 0){
       for (i in 1:length(unique(str_sub(tableNames, 4)))){
         subList <- inTables[str_sub(tableNames, 4) == unique(str_sub(tableNames,4))[i]]
@@ -392,7 +394,7 @@ readFIA <- function(dir,
       outTables <- inTables
       names(outTables) <- unique(str_sub(tableNames, 4, -5))
     }
-  } else{ ## STATE NAMING CONVENTION
+  } else{ ## ENTIRE NAMING CONVENTION
     if (anyDuplicated(tableNames) != 0){
       for (i in 1:length(unique(tableNames))){
         subList <- inTables[tableNames == unique(tableNames)[i]]
@@ -407,7 +409,7 @@ readFIA <- function(dir,
   }
 
   # NEW CLASS NAME FOR FIA DATABASE OBJECTS
-  outTables <- lapply(outTables, as.data.frame)
+  #outTables <- lapply(outTables, as.data.frame)
   class(outTables) <- 'FIA.Database'
 
   return(outTables)

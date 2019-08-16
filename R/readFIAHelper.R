@@ -1,11 +1,11 @@
 readFIAHelper1 <- function(x, dir, ...){
   # Read in and append each file to a list
-  file <- data.table::fread(paste(dir, x, sep = ""), showProgress = FALSE, logical01 = FALSE, ...)
+  file <- data.table::fread(paste(dir, x, sep = ""), showProgress = FALSE, logical01 = FALSE, integer64 = 'numeric', ...)
   # suppressMessages({suppressWarnings({
   # f <- read_csv(paste(dir, x, sep = ""), progress = FALSE, col_type = cols(.default = col_character()), ...)
   # f <- type_convert(f)
   # })})
-  gc()
+  file <- as.data.frame(file)
 
   file
 

@@ -2,7 +2,6 @@
 
 S3method(print,FIA.Database)
 S3method(summary,FIA.Database)
-export(animateFIA)
 export(biomass)
 export(clipFIA)
 export(diversity)
