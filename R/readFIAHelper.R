@@ -8,7 +8,20 @@ readFIAHelper1 <- function(x, dir, ...){
   file <- as.data.frame(file)
 
   file
+}
 
+getFIAHelper <- function(x, dir, ...){
+  # Download and append each file to a list
+  file <- data.table::fread(x, showProgress = FALSE, logical01 = FALSE, integer64 = 'numeric', ...)
+
+  # Write the data out the directory they've chosen
+  if(!is.null(dir)){
+    data.table::fwrite(x = file, file = paste0(dir, str_sub(x, 43, -1)), showProgress = FALSE)
+  }
+
+  file <- as.data.frame(file)
+
+  file
 }
 
 

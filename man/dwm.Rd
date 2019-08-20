@@ -5,7 +5,7 @@
 }
 
 \description{
-Produces estimates of down woody material stocks on a per acre basis from the Forest Inventory and Analysis Database (FIADB), along with population totals for each variable. Estimates are returned by fuel class (1HR, 10HR, 100HR, 1000HR, Piles) for application in fuels management. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = 'STATECD'}). Easy options to implement parallel processing.
+Produces estimates of down woody material stocks on a per acre basis from the Forest Inventory and Analysis Database (FIADB), along with population totals for each variable. Estimates are returned by fuel class (1HR, 10HR, 100HR, 1000HR, Piles) for application in fuels management. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}). Easy options to implement parallel processing.
 }
 
 \usage{
@@ -17,7 +17,7 @@ dwm(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = 'forest',
 \arguments{
   \item{db}{\code{FIA.Database} object produced from \code{\link{readFIA}}. Function requires that PLOT, COND_DWM_CALC, COND, POP_PLOT_STRATUM_ASSGN, POP_ESTN_UNIT, POP_EVAL, POP_STRATUM, POP_EVAL_TYP, POP_EVAL_GRP tables exist in FIA.Database object.}
 
-  \item{grpBy}{character; variables from PLOT, COND, or TREE tables to group estimates by. Multiple grouping variables should be combined with \code{c()}, and grouping will occur heirarchically. For example, to produce seperate estimates for each ownership group within ecoregion subsections, specify \code{c('ECOSUBCD', 'OWNGRPCD')}.}
+  \item{grpBy}{variables from PLOT, COND, or TREE tables to group estimates by (NOT quoted). Multiple grouping variables should be combined with \code{c()}, and grouping will occur heirarchically. For example, to produce seperate estimates for each ownership group within ecoregion subsections, specify \code{c(ECOSUBCD, OWNGRPCD)}.}
 
   \item{polys}{\code{sp} or \code{sf} Polygon/MultiPolgyon object; Areal units to bin data for estimation. Seperate estimates will be produces for region encompassed by each areal unit.}
 
@@ -106,7 +106,7 @@ dwm(fiaRI,
 
 ## Estimates of all forestland by owner group (most recent subset)
 dwm(clipFIA(fiaRI, mostRecent = TRUE),
-    grpBy = c('OWNGRPCD'))
+    grpBy = OWNGRPCD)
 
 ## Estimates of all forestland on mesic sites (most recent)
 dwm(clipFIA(fiaRI, mostRecent = TRUE),
@@ -119,7 +119,7 @@ dwmSF <- dwm(clipFIA(fiaRI, mostRecent = TRUE),
             returnSpatial = TRUE,
             tidy = FALSE)
 plot(dwmSF)
-plotFIA(dwmSF, 'BIO_ACRE') # TOTAL BIOMASS / ACRE (tons)
+plotFIA(dwmSF, BIO_ACRE) # TOTAL BIOMASS / ACRE (tons)
 }
 }
 

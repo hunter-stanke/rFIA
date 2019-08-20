@@ -3,7 +3,7 @@
 \title{Estimate species diversity from FIADB}
 
 \description{
-Produces estimates of species diversity from FIA data. Returns shannon's index, shannon's equitability, and species richness for alpha (mean/SE of stands), beta, and gamma diversity. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by size class and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = 'STATECD'}). Easy options to implement parallel processing.
+Produces estimates of species diversity from FIA data. Returns shannon's index, shannon's equitability, and species richness for alpha (mean/SE of stands), beta, and gamma diversity. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by size class and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}). Easy options to implement parallel processing.
 }
 
 \usage{
@@ -15,7 +15,7 @@ diversity(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySizeClass = F
 \arguments{
   \item{db}{\code{FIA.Database} object produced from \code{\link{readFIA}}. Function requires that PLOT, TREE, COND, POP_PLOT_STRATUM_ASSGN, POP_ESTN_UNIT, POP_EVAL, POP_STRATUM, POP_EVAL_TYP, POP_EVAL_GRP tables exist in FIA.Database object.}
 
-  \item{grpBy}{character; variables from PLOT, COND, or TREE tables to group estimates by. Multiple grouping variables should be combined with \code{c()}, and grouping will occur heirarchically. For example, to produce seperate estimates for each ownership group within ecoregion subsections, specify \code{c('ECOSUBCD', 'OWNGRPCD')}.}
+  \item{grpBy}{variables from PLOT, COND, or TREE tables to group estimates by (NOT quoted). Multiple grouping variables should be combined with \code{c()}, and grouping will occur heirarchically. For example, to produce seperate estimates for each ownership group within ecoregion subsections, specify \code{c(ECOSUBCD, OWNGRPCD)}.}
 
   \item{polys}{\code{sp} or \code{sf} Polygon/MultiPolgyon object; Areal units to bin data for estimation. Seperate estimates will be produces for region encompassed by each areal unit.}
 
@@ -124,7 +124,7 @@ diversity(db = clipFIA(fiaRI, mostRecent = TRUE),
 # Make a categorical variable which represents stand age (grouped by 10 yr intervals)
 fiaRI$COND$STAND_AGE <- makeClasses(fiaRI$COND$STDAGE, interval = 10)
 diversity(db = clipFIA(fiaRI, mostRecent = TRUE),
-          grpBy = 'STAND_AGE')
+          grpBy = STAND_AGE)
 
 ## Estimates for live white pine ( > 12" DBH) on forested mesic sites (all available inventories)
 diversity(fiaRI,
@@ -137,6 +137,6 @@ ctSF <- diversity(clipFIA(fiaRI, mostRecent = TRUE),
                   polys = countiesRI,
                   returnSpatial = TRUE)
 plot(ctSF) # Plot multiple variables simultaneously
-plotFIA(ctSF, 'H_a') # Plot of mean Shannons Index of stands
+plotFIA(ctSF, H_a) # Plot of mean Shannons Index of stands
 }
 }

@@ -2,10 +2,10 @@
 \alias{readFIA}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
-Load FIA database into R environment
+Load FIA database into R environment from local directory
 }
 \description{
-Loads FIA Datatables into R from .csv files stored in a local directory. Capable of merging multiple state downloads of the FIA database for regional analysis. Simply store each set of state data, as download from the FIA Datamart, in the same directory and hand to \code{readFIA}. Easy options to implement parallel processing.}
+Loads FIA Datatables into R from .csv files stored in a local directory. If you have not previously downloaded FIA Data from the FIA Datamart, use \code{\link{getFIA}} to download data for your region of interest and load it into R. Capable of merging multiple state downloads of the FIA database for regional analysis. Simply store each set of state data, as download from the FIA Datamart, in the same directory and hand to \code{readFIA}.}
 
 \usage{
 readFIA(dir, common = TRUE, tables = NULL, nCores = 1, ...)}
@@ -19,19 +19,19 @@ readFIA(dir, common = TRUE, tables = NULL, nCores = 1, ...)}
 }
 
 \details{
-Download subsets of the FIA Database from the FIA Datamart: \url{https://apps.fs.usda.gov/fia/datamart/datamart.html}. Once downloaded, unzip the directory, and read into R using \code{readFIA}.
+Download subsets of the FIA Database using \code{\link{getFIA}} (recommended), or manually from the FIA Datamart: \url{https://apps.fs.usda.gov/fia/datamart/datamart.html}. Once downloaded, unzip the directory (if downloaded manually), and read into R using \code{readFIA}.
 
 If \code{common = TRUE}, the following tables will be imported: COND, COND_DWM_CALC, INVASIVE_SUBPLOT_SPP, PLOT, POP_ESTN_UNIT, POP_EVAL, POP_EVAL_GRP, POP_EVAL_TYP, POP_PLOT_STRATUM_ASSGN, POP_STRATUM, SUBPLOT, TREE, TREE_GRM_COMPONENT. These tables currently support all functionality with \code{rFIA}, and it is recommended that only these tables be imported to conserve RAM and reduce processing time.
 
-If you wish to merge multiple state downloads of FIA data (e.g. Michigan and Indiana state downloads), simply place both sets of datatables in the same directory and import with \code{readFIA}. Upon import, corresponding tables (e.g. MI_PLOT and IN_PLOT) will be merged, and analysis can be completed for the entire region or within spatial units which transcend state boundaries (e.g. Ecoregion subsections).
+If you wish to merge multiple state downloads of FIA data (e.g. Michigan and Indiana state downloads), simply place both sets of datatables in the same directory (done for you when using \code{\link{getFIA}}) and import with \code{readFIA}. Upon import, corresponding tables (e.g. MI_PLOT and IN_PLOT) will be merged, and analysis can be completed for the entire region or within spatial units which transcend state boundaries (e.g. Ecoregion subsections).
+
+Easy, efficient parallelization is implemented with the \code{\link{parallel}} package. Users must only specify the \code{nCores} argument with a value greater than 1 in order to implement parallel processing on their machines. Parallel implementation is achieved using a snow type cluster on any Windows OS, and with multicore forking on any Unix OS (Linux, Mac). Implementing parallel processing may substantially decrease decrease free memory during processing, particularly on Windows OS. Thus, users should be cautious when running in parallel, and consider implementing serial processing for this task if computational resources are limited (\code{nCores = 1}).
 }
 
 \value{
 List object containing FIA Datatables. List elements represent individual FIA Datatables stored as \code{data.frame} objects. Names of list elements reflect names of files from which they were read into R environment (File names should not be changed after download from FIA Datamart).
 
 If multiple subsets of the FIA database are held in the same directory (e.g. Michigan and Indiana state downloads), corresponding tables will be merged (e.g. PLOT table returned contains plots in both Michigan and Indiana).
-
-Easy, efficient parallelization is implemented with the \code{\link{parallel}} package. Users must only specify the \code{nCores} argument with a value greater than 1 in order to implement parallel processing on their machines. Parallel implementation is achieved using a snow type cluster on any Windows OS, and with multicore forking on any Unix OS (Linux, Mac). Implementing parallel processing may substantially decrease decrease free memory during processing, particularly on Windows OS. Thus, users should be cautious when running in parallel, and consider implementing serial processing for this task if computational resources are limited (\code{nCores = 1}).
 }
 
 \references{
@@ -45,7 +45,9 @@ Hunter Stanke and Andrew Finley
 }
 
 \note{
-To download subsets of the FIA Database, go online to the FIA Datamart (\url{https://apps.fs.usda.gov/fia/datamart/datamart.html}) and choose to download .csv files. Here you can choose to download subsets of the full database for individual states, or select to download individual tables. For use with the \code{rFIA} package, we recommend download of subsets of the full database representing individual states of interest. Files must be unzipped in order to be imported.
+To download subsets of the FIA Database manually, go online to the FIA Datamart (\url{https://apps.fs.usda.gov/fia/datamart/datamart.html}) and choose to download .csv files. Here you can choose to download subsets of the full database for individual states, or select to download individual tables. For use with the \code{rFIA} package, we recommend download of subsets of the full database representing individual states of interest. Files must be unzipped in order to be imported.
+
+Alternatively, use \code{\link{getFIA}} to automate the download and saving process for you (recommended).
 }
 
 \seealso{

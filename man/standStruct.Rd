@@ -5,7 +5,7 @@
 }
 
 \description{
-Estimates the stand structural stage distribution of an area of forest/ timberland from FIA data. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. Easy options to implement parallel processing. Stand structural stage is classified for each stand (condition) using a method similar to that of Frelich and Lorimer (1991) but substitute basal area for exposed crown area (see Details, References). If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = 'STATECD'}).
+Estimates the stand structural stage distribution of an area of forest/ timberland from FIA data. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. Easy options to implement parallel processing. Stand structural stage is classified for each stand (condition) using a method similar to that of Frelich and Lorimer (1991) but substitute basal area for exposed crown area (see Details, References). If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}).
 }
 
 \usage{
@@ -19,7 +19,7 @@ standStruct(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
 \arguments{
    \item{db}{\code{FIA.Database} object produced from \code{\link{readFIA}}. Function requires that PLOT, TREE, COND, POP_PLOT_STRATUM_ASSGN, POP_ESTN_UNIT, POP_EVAL, POP_STRATUM, POP_EVAL_TYP, POP_EVAL_GRP tables exist in FIA.Database object.}
 
-   \item{grpBy}{character; variables from PLOT, COND, or TREE tables to group estimates by. Multiple grouping variables should be combined with \code{c()}, and grouping will occur heirarchically. For example, to produce seperate estimates for each ownership group within ecoregion subsections, specify \code{c('ECOSUBCD', 'OWNGRPCD')}.}
+   \item{grpBy}{variables from PLOT, COND, or TREE tables to group estimates by (NOT quoted). Multiple grouping variables should be combined with \code{c()}, and grouping will occur heirarchically. For example, to produce seperate estimates for each ownership group within ecoregion subsections, specify \code{c(ECOSUBCD, OWNGRPCD)}.}
 
   \item{polys}{\code{sp} or \code{sf} Polygon/MultiPolgyon object; Areal units to bin data for estimation. Seperate estimates will be produces for region encompassed by each areal unit.}
 
@@ -121,7 +121,7 @@ standStruct(fiaRI, tidy = FALSE)
 
 ## Calculate structural stage distribution of all forestland by owner group, over time
 standStruct(clipFIA(fiaRI, mostRecent = TRUE),
-            grpBy = c('OWNGRPCD'))
+            grpBy = c(OWNGRPCD))
 
 ## Calculate structural stage distribution of all forestland on xeric sites, over time
 standStruct(clipFIA(fiaRI, mostRecent = TRUE),
@@ -134,6 +134,6 @@ sdSF <- standStruct(clipFIA(fiaRI, mostRecent = TRUE),
             returnSpatial = TRUE,
             tidy = FALSE)
 plot(sdSF)
-plotFIA(sdSF, 'POLE_PERC')
+plotFIA(sdSF, POLE_PERC)
 }
 }

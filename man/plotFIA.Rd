@@ -1,40 +1,55 @@
 \name{plotFIA}
 \alias{plotFIA}
-\title{Static and animated plots of spatial FIA summaries}
+\title{Static and animated plots of FIA summaries}
 \description{
-Produce static and temporally animated plots of spatial FIA summaries. Requires that summaries be returned as spatial objects (e.g. specify \code{returnSpatial = TRUE} when computing summaries using \code{\link{tpa}}). For animated plots, also requires that multiple reporting years be present in the summary data (animations iterate through time). Specify \code{savePath} and \code{fileName} to save plots (animations saved as .gif files).
+Default behavior for non-spatial summaries produces time-series plots, and for spatial summaries (class \code{sf}) produces choropleth maps. For non-spatial summaries, the user may specify the \code{grp} parameter to produce plots with multiple lines, colored by a grouping variable. Additionally, users may specify an x-axis to produce plots other than time series (e.g. BAA (\code{y}) by size class (\code{x}) colored by species (\code{grp})).
 }
 
 \usage{
-plotFIA(data, fillVar, animate = FALSE, title = NULL, colOption = 'viridis',
-        lineCol = "gray30", lineWidth =1, minYear = 2005, direction = 1,
-        alpha = .9, transform = "identity", text.size = 1, text.font = '',
+plotFIA(data, y, grp = NULL, x = NULL, animate = FALSE, n.max = NULL, plot.title = NULL,
+        y.lab = NULL, x.lab = NULL, legend.title = NULL, legend.labs = NULL,
+        color.option = 'viridis', line.color = "gray30", line.width =1, min.year = 2005,
+        direction = 1, alpha = .9, transform = "identity", text.size = 1, text.font = '',
         lab.width = 1, legend.height = 1, legend.width = 1, device = NULL,
-        savePath = NULL, fileName = NULL, ...)
+        savePath = NULL, fileName = NULL)
            }
 
 \arguments{
-  \item{data}{sf object; spatial FIA summary produced from other \code{rFIA} functions (e.g. \code{\link{tpa}}, \code{\link{biomass}}, etc.).}
+  \item{data}{dataframe or \code{sf} object; FIA summary produced from other \code{rFIA} functions (e.g. \code{\link{tpa}}, \code{\link{biomass}}, etc.).}
 
-  \item{fillVar}{character; variable contained in \code{data} which will be used to fill polygons. Variable name must be quoted.}
+  \item{y}{variable contained in \code{data} which will be used as y-axis or to fill polygons (spatial). NOT quoted.}
 
-  \item{animate}{logical; if TRUE, produces temporally animated plots (iterates over years).}
+  \item{grp}{variable contained in \code{data} which will be used as a grouping variable. Not meaningful for spatial summaries. NOT quoted.}
 
-  \item{title}{character; plot title.}
+  \item{x}{variable contained in \code{data} which will be used as a x-axis in place of time. If NULL, time-series plot will be produced. Not meaningful for spatial summaries. NOT quoted.}
 
-  \item{colOption}{character; one of: "viridis" (default), "magma", "inferno", "plasma", or "cividis".}
+  \item{animate}{logical; if TRUE, produces temporally animated plots.}
 
-  \item{lineCol}{character; polygon outline color.}
+  \item{n.max}{numeric; maximum number of groups to plot. If positive, will plot the top \code{n} groups with respect to \code{y}, and if negative, will plot the bottom \code{n}. Not meaningful for spatial summaries.}
 
-  \item{lineWidth}{numeric; scalar for polygon outline width. Specify \code{lineWidth = 0} for no outline.}
+  \item{plot.title}{character; plot title.}
 
-  \item{minYear}{numeric; earliest year to be included in animation. FIA data is sparse in years prior to 2005 and estimates are unlikely to be available.}
+  \item{y.lab}{character; y-axis label. Not meaningful for spatial summaries.}
+
+  \item{x.lab}{character; x-axis label. Not meaningful for spatial summaries.}
+
+  \item{legend.title}{character; title for legend.}
+
+  \item{legend.labs}{character; labels for legend values.}
+
+  \item{color.option}{character; one of: "viridis" (default), "magma", "inferno", "plasma", or "cividis".}
+
+  \item{line.color}{character; color of plotted line (non-spatial) or polygon outline color (spatial).}
+
+  \item{line.width}{numeric; scalar for plotted line width (non-spatial) polygon outline width (spatial). Specify \code{lineWidth = 0} for no outline.}
+
+  \item{min.year}{numeric; earliest year to be included in animation. FIA data is sparse in years prior to 2005 and estimates are unlikely to be available.}
 
   \item{direction}{numeric; sets the order of colors in the scale. If 1, the default, colors are ordered from darkest to lightest. If -1, the order of colors is reversed.}
 
   \item{alpha}{numeric; alpha transparency, a number in [0,1], see argument alpha in \code{hsv}.}
 
-  \item{transform}{character; transformations to apply to plotted variable \code{fillVar}. Options include: "asn", "atanh", "boxcox", "exp", "identity", "log", "log10", "log1p", "log2", "logit", "reciprocal", "reverse", "sqrt".}
+  \item{transform}{character; transformations to apply to plotted variable \code{y}. Options include: "asn", "atanh", "boxcox", "exp", "identity", "log", "log10", "log1p", "log2", "logit", "reciprocal", "reverse", "sqrt".}
 
   \item{text.size}{numeric; scalar for text size (e.g. text.size = 2 would be twice the default size).}
 
@@ -46,14 +61,22 @@ plotFIA(data, fillVar, animate = FALSE, title = NULL, colOption = 'viridis',
 
   \item{legend.width}{numeric; scalar for legend width.}
 
-  \item{device}{character; device to use for image save. Can either be a device function (e.g. png()), or one of "eps", "ps", "tex" (pictex), "pdf", "jpeg", "tiff", "png", "bmp", "svg" or "wmf" (windows only)..}
+  \item{device}{character; device to use for image save. Can either be a device function (e.g. png()), or one of "eps", "ps", "tex" (pictex), "pdf", "jpeg", "tiff", "png", "bmp", "svg" or "wmf" (windows only).}
 
   \item{savePath}{character; path to save plot to (combined with fileName).}
 
   \item{fileName}{character; file name to create on disk.}
-
-  \item{...}{other arguments passed on to \code{\link{scale_fill_viridis_c}}.}
 }
+
+
+\details{
+If \code{animate = FALSE} and multiple reporting years are present in the summary, produces plots of the most recent subset.
+
+To produce spatial plots, summaries must be returned as spatial objects (e.g. specify \code{returnSpatial = TRUE} when computing summaries using \code{\link{tpa}}). For animated plots, also requires that multiple reporting years be present in the summary data (animations iterate through time).
+
+Specify \code{savePath} and \code{fileName} to save plots (animations saved as .gif files).
+}
+
 
 
 \author{
@@ -62,25 +85,38 @@ Hunter Stanke and Andrew Finley
 
 \examples{
 \dontrun{
+################### SPATIAL PLOTTING #############################
 ## Compute abundance estimates for live stems in Rhode Island
-## for all available inventory years, summarized by counties
+## for all available inventory years, summarized by counties and
+## return a spatial object
 tpaRI <- tpa(fiaRI, polys = countiesRI, returnSpatial = TRUE)
 
 ## Produce animated plot
-plotFIA(tpaRI, fillVar = 'TPA', animate = TRUE, title = 'Abundance (TPA)')
-
+plotFIA(tpaRI, y = TPA, animate = TRUE, legend.title = 'Abundance (TPA)')
 ## With a square root transform
-plotFIA(tpaRI, fillVar = 'TPA', animate = TRUE, title = 'Abundance (TPA)', transform = 'sqrt')
-
+plotFIA(tpaRI, y = TPA, animate = TRUE, legend.title = 'Abundance (TPA)', transform = 'sqrt')
 
 ## Same as above, but for static plots (most recent subset from RI)
 tpaMR <- tpa(clipFIA(fiaRI), polys = countiesRI, returnSpatial = TRUE)
-
 ## Produce animated plot
-plotFIA(tpaMR, fillVar = 'TPA', animate = FALSE, title = 'Abundance (TPA)')
+plotFIA(tpaMR, y = TPA, animate = FALSE, plot.title = 'Abundance (TPA)')
 
-## With a square root transform
-plotFIA(tpaMR, fillVar = 'TPA', animate = FALSE, title = 'Abundance (TPA)', transform = 'sqrt')
+
+################# NON-SPATIAL PLOTTING #########################
+## Same as above, but return a non-spatial object (no spatial grouping)
+tpaRI <- tpa(fiaRI)
+
+## Plot TPA over time
+plotFIA(tpaRI, TPA)
+
+## BAA over time, grouped by ownership group
+tpaRI_own <- tpa(fiaRI, grpBy = OWNGRPCD)
+plotFIA(tpaRI_own, y = BAA, grp = OWNGRPCD)
+
+## BAA by size class (not a time series) grouped by species
+tpaRI_sc <- tpa(clipFIA(fiaRI), bySpecies = TRUE, bySizeClass = TRUE)
+plotFIA(tpaRI_sc, y = BAA, grp = COMMON_NAME, x = sizeClass, n.max = 4)# Only the top 4
+
 }
 }
 

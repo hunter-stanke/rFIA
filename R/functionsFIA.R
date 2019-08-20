@@ -5,14 +5,6 @@
 }
 
 
-# ### Check if columns could be converted to numeric
-# numericcharacters <- function(x) {
-#   x <- !any(is.na(suppressWarnings(as.numeric(x)))) & is.character(x)
-#
-#   return(x)
-# }
-
-
 ################ PREVIOUS FUNCTIONS ######################
 #### SHANNON'S EVENESS INDEX (H)
 #
@@ -292,8 +284,11 @@ print.FIA.Database <- function(x, ...){
   ## Tables included
   cat('Tables:          ', names(x), '\n', '\n')
 
-  print(sapply(x, as_tibble))
-
+  if (length(x) > 1){
+    print(sapply(x, as_tibble))
+  } else {
+    print(as_tibble(x[1]))
+  }
 }
 
 #' @import dplyr
@@ -301,8 +296,8 @@ print.FIA.Database <- function(x, ...){
 #' @import sf
 #' @import stringr
 #' @import gganimate
+#' @import ggplot2
 #' @importFrom data.table fread
-#' @importFrom ggplot2 ggplot geom_sf labs scale_fill_viridis_c theme_minimal theme aes element_blank element_text unit ggsave
 #' @importFrom parallel makeCluster detectCores mclapply parLapply
 #' @importFrom tidyr gather
 #' @importFrom pbapply pblapply
@@ -337,7 +332,6 @@ readFIA <- function(dir,
   if(length(files[str_sub(files,-4, -1) == '.csv']) < 1){
     stop(paste('Directory', dir, 'contains no .csv files.'))
   }
-
 
 
   # Only read in the specified tables
@@ -405,6 +399,140 @@ readFIA <- function(dir,
     } else {
       outTables <- inTables
       names(outTables) <- unique(str_sub(tableNames, 1, -5))
+    }
+  }
+
+  # NEW CLASS NAME FOR FIA DATABASE OBJECTS
+  #outTables <- lapply(outTables, as.data.frame)
+  class(outTables) <- 'FIA.Database'
+
+  return(outTables)
+}
+
+## Access FIA Database files from the FIA Datamart
+#' @export
+getFIA <- function(states,
+                   dir = NULL,
+                   common = TRUE,
+                   tables = NULL,
+                   nCores = 1){
+
+  cat(sys.call()$dir)
+  if (!is.null(dir)){
+    # Add a slash to end of directory name if missing
+    if (str_sub(dir,-1) != '/'){
+      dir <- paste(dir, '/', sep = "")
+    }
+    # Check to see directory exists
+    if(!dir.exists(dir)) {
+      stop(paste('Directory', dir, 'does not exist. Cannot create new directory.'))
+    }
+  }
+
+  ## Some warnings up front
+  ## Do not try to merge ENTIRE with other states
+  if (length(states) > 1 & any(str_detect(str_to_upper(states), 'ENTIRE'))){
+    stop('Cannot merge ENITRE with other state tables. ENTIRE includes all state tables combined. Do you only need data for a particular region?')
+  }
+  ## Check to make sure states exist
+  allStates <- c('AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID',
+                 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS',
+                 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK',
+                 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV',
+                 'WI', 'WY', 'AS', 'FM', 'GU', 'MP', 'PW', 'PR', 'VI', 'ENTIRE')
+  if (any(str_to_upper(states) %in% allStates == FALSE)){
+    missStates <- states[str_to_upper(states) %in% allStates == FALSE]
+    stop(paste('Data unavailable for: ', paste(as.character(missStates),collapse = ', '), '. Did you use state/terrority abbreviations? e.g. use states = "AL" (correct) instead of states = "ALABAMA".'))
+  }
+
+  ## Check to make sure tables exist
+  allTables <- c("BOUNDARY", "COND_DWM_CALC", "COND","COUNTY","DWM_COARSE_WOODY_DEBRIS",
+                 "DWM_DUFF_LITTER_FUEL","DWM_FINE_WOODY_DEBRIS","DWM_MICROPLOT_FUEL",
+                 "DWM_RESIDUAL_PILE", "DWM_TRANSECT_SEGMENT", "DWM_VISIT","GRND_CVR",
+                 "INVASIVE_SUBPLOT_SPP","LICHEN_LAB","LICHEN_PLOT_SUMMARY","LICHEN_VISIT",
+                 "OZONE_BIOSITE_SUMMARY","OZONE_PLOT_SUMMARY","OZONE_PLOT","OZONE_SPECIES_SUMMARY",
+                 "OZONE_VALIDATION","OZONE_VISIT", "P2VEG_SUBP_STRUCTURE","P2VEG_SUBPLOT_SPP",
+                 "PLOT_REGEN","PLOT", "PLOTGEOM", "PLOTSNAP","POP_ESTN_UNIT","POP_EVAL_ATTRIBUTE",
+                 "POP_EVAL_GRP","POP_EVAL_TYP","POP_EVAL","POP_PLOT_STRATUM_ASSGN","POP_STRATUM",
+                 "SEEDLING_REGEN","SEEDLING","SITETREE","SOILS_EROSION","SOILS_LAB","SOILS_SAMPLE_LOC" ,
+                 "SOILS_VISIT", "SUBP_COND_CHNG_MTRX","SUBP_COND","SUBPLOT_REGEN","SUBPLOT",
+                 "SURVEY","TREE_GRM_BEGIN","TREE_GRM_COMPONENT","TREE_GRM_ESTN", "TREE_GRM_MIDPT",
+                 "TREE_REGIONAL_BIOMASS", "TREE_WOODLAND_STEMS","TREE","VEG_PLOT_SPECIES",
+                 "VEG_QUADRAT","VEG_SUBPLOT_SPP","VEG_SUBPLOT", "VEG_VISIT")
+  if (any(str_to_upper(tables) %in% allTables == FALSE)){
+    missTables <- tables[str_to_upper(tables) %in% allTables == FALSE]
+    stop(paste('Tables: ', paste(as.character(missTables),collapse = ', '), ' unavailble. Check the FIA Datamart at https://apps.fs.usda.gov/fia/datamart/CSV/datamart_csv.html for a list of available tables for each state. Alternatively, specify common = TRUE to download the most commonly used tables.
+
+Did you accidentally include the state abbreviation in front of the table name? e.g. tables = "AL_PLOT" (wrong) instead of tables = "PLOT" (correct).'))
+  }
+
+  ## Make a list of tables names to read in
+  ## Append table names with state abbs and then add url link
+  if (common & is.null(tables)){
+    tables <- c('COND', 'COND_DWM_CALC', 'INVASIVE_SUBPLOT_SPP', 'PLOT', 'POP_ESTN_UNIT',
+                'POP_EVAL', 'POP_EVAL_GRP', 'POP_EVAL_TYP', 'POP_PLOT_STRATUM_ASSGN', 'POP_STRATUM',
+                'SUBPLOT', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_ESTN', 'SUBP_COND_CHNG_MTRX')
+  } else {
+    tables <- str_to_upper(tables)
+  }
+
+  # Make sure state Abbs are in right format
+  states <- str_to_upper(states)
+  if (states != 'ENTIRE') {
+    states <- paste0(states, '_')
+  } else {
+    states <- ''
+  }
+
+  # Convert all to url paths
+  urls <- c()
+  for (i in 1:length(states)){
+    if (i == 1){
+      urls <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', states[i], tables, '.csv')
+    } else {
+      urls <- c(urls, paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', states[i], tables, '.csv'))
+    }
+  }
+
+  ## Read/write tables in parallel -- Clusters in windows, forking otherwise
+  if (Sys.info()['sysname'] == 'Windows'){
+    cl <- makeCluster(nCores) # Set up snow cluster
+    inTables <- parLapply(cl, FUN = getFIAHelper, X = urls, dir)
+  } else { # Unix systems
+    inTables <- mclapply(urls, FUN = getFIAHelper, dir, mc.cores = nCores)
+  }
+
+  # Give them some names
+  names(inTables) <- str_sub(urls, 43, -5)
+
+  # Check for corresponding tables (multiple states)
+  # If they exist, loop through and merge corresponding tables
+  ## Check if the directory has the entire US naming convention or state naming convention
+  tableNames <- names(inTables)
+  outTables <- list()
+  if (any(str_sub(tableNames, 3, 3) == '_')){ ## STATE NAMING CONVENTION
+    if (anyDuplicated(str_sub(tableNames, 4)) != 0){
+      for (i in 1:length(unique(str_sub(tableNames, 4)))){
+        subList <- inTables[str_sub(tableNames, 4) == unique(str_sub(tableNames,4))[i]]
+        name <- unique(str_sub(tableNames, 4))[i]
+        # Give a ton of warnings about factors and characters, don't do that
+        outTables[[name]] <- suppressWarnings(do.call(rbind, subList))
+      }
+    } else {
+      outTables <- inTables
+      names(outTables) <- unique(str_sub(tableNames, 4))
+    }
+  } else{ ## ENTIRE NAMING CONVENTION
+    if (anyDuplicated(tableNames) != 0){
+      for (i in 1:length(unique(tableNames))){
+        subList <- inTables[tableNames == unique(tableNames)[i]]
+        name <- unique(str_sub(tableNames, 1))[i]
+        # Give a ton of warnings about factors and characters, don't do that
+        outTables[[name]] <- suppressWarnings(do.call(rbind, subList))
+      }
+    } else {
+      outTables <- inTables
+      names(outTables) <- unique(str_sub(tableNames, 1))
     }
   }
 
@@ -892,19 +1020,45 @@ standStruct <- function(db,
                         SE = TRUE,
                         progress = TRUE,
                         nCores = 1) {
+
+  ## Need a plotCN
+  db$PLOT <- db$PLOT %>% mutate(PLT_CN = CN)
+
+  ## Converting names given in grpBy to character vector (NSE to standard)
+  ##  don't have to change original code
+  grpBy_quo <- enquo(grpBy)
+
+  # Probably cheating, but it works
+  if (quo_name(grpBy_quo) != 'NULL'){
+    ## Have to join tables to run select with this object type
+    plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
+    ## We want a unique error message here to tell us when columns are not present in data
+    d_quo <- tryCatch(
+      error = function(cnd) {
+        0
+      },
+      plt_quo[1,] %>% # Just the first row
+        inner_join(db$COND, by = 'PLT_CN') %>%
+        select(!!grpBy_quo)
+    )
+    # If column doesnt exist, just returns 0, not a dataframe
+    if (is.null(nrow(d_quo))){
+      grpName <- quo_name(grpBy_quo)
+      stop(paste('Columns', grpName, 'not found in PLOT, TREE, or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
+    } else {
+      # Convert to character
+      grpBy <- names(d_quo)
+    }
+  }
+
   reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
-  grpNames <- c(names(db$PLOT), names(db$COND))
-
   ## Some warnings
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
   if (!is.null(polys) & first(first(class(polys))) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
-  }
-  if (!is.null(grpBy) & class(grpBy) != 'character'){
-    stop('grpBy must be of class character. Please specify variable names to group by as quoted list. Example: grpBy = c("OWNGRPCD", "SITECLCD")')
   }
   if (tidy & returnSpatial){
     warning('Returning multiple observations for each areal unit. If returnSpatial = TRUE, tidy = FALSE is recommended.')
@@ -916,28 +1070,10 @@ standStruct <- function(db,
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
   }
-  if (any(grpBy %in% grpNames == FALSE)){
-    missG <- grpNames[grpNames %in% grpBy == FALSE]
-    stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT or COND tables.'))
-
-  }
 
   # Save original grpByfor pretty return with spatial objects
   grpBy <- c('YEAR', grpBy)
   grpByOrig <- grpBy
-
-  # ## Pull out individual tables from database object
-  # if (!is.null(db)){
-  #   TREE <- db[['TREE']]
-  #   COND <- db[['COND']]
-  db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
-  #   POP_PLOT_STRATUM_ASSGN <- db[['POP_PLOT_STRATUM_ASSGN_STRATUM_ASSGN']]
-  #   PEU <- db$POP_ESTN_UNIT
-  #   POP_EVAL <- db$POP_EVAL
-  #   POP_STRATUM <- db$POP_STRATUM
-  #   PET <- db$POP_EVAL_TYP
-  #   PEG <- db$POP_EVAL_GRP
-  # }
 
   message('Joining FIA Tables.....')
 
@@ -1030,7 +1166,7 @@ standStruct <- function(db,
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'aD_p', 'sp')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', 'landD', 'aD_c', grpC)), by = c('PLT_CN')) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
     right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
@@ -1270,20 +1406,45 @@ diversity <- function(db,
                       SE = TRUE,
                       progress = TRUE,
                       nCores = 1) {
+  ## Need a plotCN
+  db$PLOT <- db$PLOT %>% mutate(PLT_CN = CN)
+
+  ## Converting names given in grpBy to character vector (NSE to standard)
+  ##  don't have to change original code
+  grpBy_quo <- enquo(grpBy)
+
+  # Probably cheating, but it works
+  if (quo_name(grpBy_quo) != 'NULL'){
+    ## Have to join tables to run select with this object type
+    plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
+    ## We want a unique error message here to tell us when columns are not present in data
+    d_quo <- tryCatch(
+      error = function(cnd) {
+        0
+      },
+      plt_quo[1,] %>% # Just the first row
+        inner_join(db$COND, by = 'PLT_CN') %>%
+        inner_join(db$TREE, by = 'PLT_CN') %>%
+        select(!!grpBy_quo)
+    )
+    # If column doesnt exist, just returns 0, not a dataframe
+    if (is.null(nrow(d_quo))){
+      grpName <- quo_name(grpBy_quo)
+      stop(paste('Columns', grpName, 'not found in PLOT, TREE, or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
+    } else {
+      # Convert to character
+      grpBy <- names(d_quo)
+    }
+  }
 
   reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
-  grpNames <- c(names(db$PLOT), names(db$TREE), names(db$COND))
-
   ## Some warnings
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
   if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
-  }
-  if (!is.null(grpBy) & class(grpBy) != 'character'){
-    stop('grpBy must be of class character. Please specify variable names to group by as quoted list. Example: grpBy = c("OWNGRPCD", "SITECLCD")')
   }
   if (landType %in% c('timber', 'forest') == FALSE){
     stop('landType must be one of: "forest" or "timber".')
@@ -1292,19 +1453,10 @@ diversity <- function(db,
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
   }
-  if (any(grpBy %in% grpNames == FALSE)){
-    missG <- grpNames[grpNames %in% grpBy == FALSE]
-    stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT, COND, or TREE tables.'))
-
-  }
-
 
   # Save original grpByfor pretty return with spatial objects
   grpBy <- c('YEAR', grpBy)
   grpByOrig <- grpBy
-
-  db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
-
 
   message('Joining FIA Tables.....')
 
@@ -1411,7 +1563,7 @@ diversity <- function(db,
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'aD_p', 'sp')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
     right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
@@ -1617,18 +1769,47 @@ tpa <- function(db,
                 progress = TRUE,
                 nCores = 1) {
 
+  ## Need a plotCN
+  db$PLOT <- db$PLOT %>% mutate(PLT_CN = CN)
+
+  ## Converting names given in grpBy to character vector (NSE to standard)
+  ##  don't have to change original code
+  grpBy_quo <- enquo(grpBy)
+
+  # Probably cheating, but it works
+  if (quo_name(grpBy_quo) != 'NULL'){
+    ## Have to join tables to run select with this object type
+    plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
+    ## We want a unique error message here to tell us when columns are not present in data
+    d_quo <- tryCatch(
+      error = function(cnd) {
+        return(0)
+        },
+      plt_quo[1,] %>% # Just the first row
+        inner_join(db$COND, by = 'PLT_CN') %>%
+        inner_join(db$TREE, by = 'PLT_CN') %>%
+        select(!!grpBy_quo)
+      )
+
+    # If column doesnt exist, just returns 0, not a dataframe
+    if (is.null(nrow(d_quo))){
+      grpName <- quo_name(grpBy_quo)
+      stop(paste('Columns', grpName, 'not found in PLOT, TREE, or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
+    } else {
+      # Convert to character
+      grpBy <- names(d_quo)
+    }
+  }
+
+
   reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
-  grpNames <- c(names(db$PLOT), names(db$TREE), names(db$COND))
   ## Some warnings
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
   if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
-  }
-  if (!is.null(grpBy) & class(grpBy) != 'character'){
-    stop('grpBy must be of class character. Please specify variable names to group by as quoted list. Example: grpBy = c("OWNGRPCD", "SITECLCD")')
   }
   if (landType %in% c('timber', 'forest') == FALSE){
     stop('landType must be one of: "forest" or "timber".')
@@ -1637,19 +1818,10 @@ tpa <- function(db,
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
   }
-  if (any(grpBy %in% grpNames == FALSE)){
-    missG <- grpNames[grpNames %in% grpBy == FALSE]
-    stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT, COND, or TREE tables.'))
 
-  }
-
-  # Save original grpByfor pretty return with spatial objects
+  # Save original grpBy for pretty return with spatial objects
   grpBy <- c('YEAR', grpBy)
   grpByOrig <- grpBy
-
-  ## Need a plotCN
-  db$PLOT <- db$PLOT %>% mutate(PLT_CN = CN)
-
 
   message('Joining FIA Tables.....')
 
@@ -1754,7 +1926,7 @@ tpa <- function(db,
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'aD_p', 'sp')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
     right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
@@ -1972,19 +2144,48 @@ growMort <- function(db,
                      SE = TRUE,
                      progress = TRUE,
                      nCores = 1) {
+
+  ## Need a plotCN
+  db$TREE <- db[['TREE']] %>% mutate(TRE_CN = CN)
+  db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
+
+  ## Converting names given in grpBy to character vector (NSE to standard)
+  ##  don't have to change original code
+  grpBy_quo <- enquo(grpBy)
+
+  # Probably cheating, but it works
+  if (quo_name(grpBy_quo) != 'NULL'){
+    ## Have to join tables to run select with this object type
+    plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
+    ## We want a unique error message here to tell us when columns are not present in data
+    d_quo <- tryCatch(
+      error = function(cnd) {
+        0
+      },
+      plt_quo[1,] %>% # Just the first row
+        inner_join(db$COND, by = 'PLT_CN') %>%
+        inner_join(db$TREE, by = 'PLT_CN') %>%
+        select(!!grpBy_quo)
+    )
+    # If column doesnt exist, just returns 0, not a dataframe
+    if (is.null(nrow(d_quo))){
+      grpName <- quo_name(grpBy_quo)
+      stop(paste('Columns', grpName, 'not found in PLOT, TREE, or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
+    } else {
+      # Convert to character
+      grpBy <- names(d_quo)
+    }
+  }
+
   reqTables <- c('PLOT', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_ESTN', 'COND',
                  'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
-  grpNames <- c(names(db$PLOT), names(db$TREE), names(db$COND))
   ## Some warnings
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
   if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
-  }
-  if (!is.null(grpBy) & class(grpBy) != 'character'){
-    stop('grpBy must be of class character. Please specify variable names to group by as quoted list. Example: grpBy = c("OWNGRPCD", "SITECLCD")')
   }
   if (landType %in% c('timber', 'forest') == FALSE){
     stop('landType must be one of: "forest" or "timber".')
@@ -1993,10 +2194,7 @@ growMort <- function(db,
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
   }
-  if (any(grpBy %in% grpNames == FALSE)){
-    missG <- grpNames[grpNames %in% grpBy == FALSE]
-    stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT, COND, or TREE tables.'))
-  }
+
   ## No EXP_GROW available for Western States, make sure we warn that values will be returned as 0
   # These states do not allow temporal queries. Things are extremely weird with their eval groups
   noGrow <- c(02,03,04,07,08,11,14,15,16, 23, 30, 32, 35,43,49, 78)
@@ -2018,9 +2216,6 @@ growMort <- function(db,
 
   message('Joining FIA Tables.....')
 
-
-  db$TREE <- db[['TREE']] %>% mutate(TRE_CN = CN)
-  db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
 
   if ('GRM_COND' %in% names(db) == FALSE & nrow(db$SUBP_COND_CHNG_MTRX) > 1){
     ## Modify the Subplot Condition Change matrix to include current and previous condition status
@@ -2140,7 +2335,7 @@ growMort <- function(db,
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'sp', 'aD_p')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'landD', 'aD_c', 'CONDID', grpC)), by = c('PLT_CN')) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
     right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
@@ -2364,19 +2559,47 @@ vitalRates <- function(db,
                        SE = TRUE,
                        progress = TRUE,
                        nCores = 1){
+  ## Need a plotCN
+  db$TREE <- db[['TREE']] %>% mutate(TRE_CN = CN)
+  db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
+
+  ## Converting names given in grpBy to character vector (NSE to standard)
+  ##  don't have to change original code
+  grpBy_quo <- enquo(grpBy)
+
+  # Probably cheating, but it works
+  if (quo_name(grpBy_quo) != 'NULL'){
+    ## Have to join tables to run select with this object type
+    plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
+    ## We want a unique error message here to tell us when columns are not present in data
+    d_quo <- tryCatch(
+      error = function(cnd) {
+        0
+      },
+      plt_quo[1,] %>% # Just the first row
+        inner_join(db$COND, by = 'PLT_CN') %>%
+        inner_join(db$TREE, by = 'PLT_CN') %>%
+        select(!!grpBy_quo)
+    )
+    # If column doesnt exist, just returns 0, not a dataframe
+    if (is.null(nrow(d_quo))){
+      grpName <- quo_name(grpBy_quo)
+      stop(paste('Columns', grpName, 'not found in PLOT, TREE, or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
+    } else {
+      # Convert to character
+      grpBy <- names(d_quo)
+    }
+  }
+
   reqTables <- c('PLOT', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_ESTN', 'COND',
                  'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
-  grpNames <- c(names(db$PLOT), names(db$TREE), names(db$COND))
   ## Some warnings
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
   if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
-  }
-  if (!is.null(grpBy) & class(grpBy) != 'character'){
-    stop('grpBy must be of class character. Please specify variable names to group by as quoted list. Example: grpBy = c("OWNGRPCD", "SITECLCD")')
   }
   if (landType %in% c('timber', 'forest') == FALSE){
     stop('landType must be one of: "forest" or "timber".')
@@ -2385,10 +2608,7 @@ vitalRates <- function(db,
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
   }
-  if (any(grpBy %in% grpNames == FALSE)){
-    missG <- grpNames[grpNames %in% grpBy == FALSE]
-    stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT, COND, or TREE tables.'))
-  }
+
   ## No EXP_GROW available for most Western States, make sure we warn that values will be returned as 0
   # These states do not allow temporal queries. Things are extremely weird with their eval groups
   noGrow <- c(02,03,04,07,08,11,14,15,16, 23, 30, 32, 35,43,49, 78)
@@ -2411,9 +2631,6 @@ vitalRates <- function(db,
 
   message('Joining FIA Tables.....')
 
-
-  db$TREE <- db[['TREE']] %>% mutate(TRE_CN = CN)
-  db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
 
   if ('GRM_COND' %in% names(db) == FALSE & nrow(db$SUBP_COND_CHNG_MTRX) > 1){
     ## Modify the Subplot Condition Change matrix to include current and previous condition status
@@ -2533,7 +2750,7 @@ vitalRates <- function(db,
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'REMPER', grpP, 'sp', 'aD_p')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'aD_c', 'landD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
     right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
@@ -2768,18 +2985,45 @@ biomass <- function(db,
                     SE = TRUE,
                     progress = TRUE,
                     nCores = 1) {
+  ## Need a plotCN
+  db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
+
+  ## Converting names given in grpBy to character vector (NSE to standard)
+  ##  don't have to change original code
+  grpBy_quo <- enquo(grpBy)
+
+  # Probably cheating, but it works
+  if (quo_name(grpBy_quo) != 'NULL'){
+    ## Have to join tables to run select with this object type
+    plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
+    ## We want a unique error message here to tell us when columns are not present in data
+    d_quo <- tryCatch(
+      error = function(cnd) {
+        0
+      },
+      plt_quo[1,] %>% # Just the first row
+        inner_join(db$COND, by = 'PLT_CN') %>%
+        inner_join(db$TREE, by = 'PLT_CN') %>%
+        select(!!grpBy_quo)
+    )
+    # If column doesnt exist, just returns 0, not a dataframe
+    if (is.null(nrow(d_quo))){
+      grpName <- quo_name(grpBy_quo)
+      stop(paste('Columns', grpName, 'not found in PLOT, TREE, or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
+    } else {
+      # Convert to character
+      grpBy <- names(d_quo)
+    }
+  }
+
   reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
-  grpNames <- c(names(db$PLOT), names(db$TREE), names(db$COND))
   ## Some warnings
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
   if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
-  }
-  if (!is.null(grpBy) & class(grpBy) != 'character'){
-    stop('grpBy must be of class character. Please specify variable names to group by as quoted list. Example: grpBy = c("OWNGRPCD", "SITECLCD")')
   }
   if (landType %in% c('timber', 'forest') == FALSE){
     stop('landType must be one of: "forest" or "timber".')
@@ -2788,29 +3032,12 @@ biomass <- function(db,
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
   }
-  if (any(grpBy %in% grpNames == FALSE)){
-    missG <- grpNames[grpNames %in% grpBy == FALSE]
-    stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT, COND, or TREE tables.'))
 
-  }
   # Save original grpByfor pretty return with spatial objects
   grpBy <- c('YEAR', grpBy)
   grpByOrig <- grpBy
 
   message('Joining FIA Tables.....')
-
-  # ## Pull out individual tables from database object
-  # if (!is.null(db)){
-  #   TREE <- db[['TREE']]
-  #   COND <- db[['COND']]
-  db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
-  #   POP_PLOT_STRATUM_ASSGN <- db[['POP_PLOT_STRATUM_ASSGN_STRATUM_ASSGN']]
-  #   PEU <- db$POP_ESTN_UNIT
-  #   POP_EVAL <- db$POP_EVAL
-  #   POP_STRATUM <- db$POP_STRATUM
-  #   PET <- db$POP_EVAL_TYP
-  #   PEG <- db$POP_EVAL_GRP
-  # }
 
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
@@ -2918,7 +3145,7 @@ biomass <- function(db,
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'sp', 'aD_p')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'landD', 'aD_c')), by = c('PLT_CN')) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
     right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
@@ -3133,18 +3360,46 @@ dwm <- function(db,
                 SE = TRUE,
                 progress = TRUE,
                 nCores = 1) {
+  ## Need a plotCN
+  db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
+  db$COND_DWM_CALC <- db[['COND_DWM_CALC']] %>% mutate(DWM_CN = CN)
+  db$COND <- db[['COND']] %>% mutate(CND_CN = CN)
+
+  ## Converting names given in grpBy to character vector (NSE to standard)
+  ##  don't have to change original code
+  grpBy_quo <- enquo(grpBy)
+
+  # Probably cheating, but it works
+  if (quo_name(grpBy_quo) != 'NULL'){
+    ## Have to join tables to run select with this object type
+    plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
+    ## We want a unique error message here to tell us when columns are not present in data
+    d_quo <- tryCatch(
+      error = function(cnd) {
+        0
+      },
+      plt_quo[1,] %>% # Just the first row
+        inner_join(db$COND, by = 'PLT_CN') %>%
+        select(!!grpBy_quo)
+    )
+    # If column doesnt exist, just returns 0, not a dataframe
+    if (is.null(nrow(d_quo))){
+      grpName <- quo_name(grpBy_quo)
+      stop(paste('Columns', grpName, 'not found in PLOT or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
+    } else {
+      # Convert to character
+      grpBy <- names(d_quo)
+    }
+  }
+
   reqTables <- c('PLOT', 'COND_DWM_CALC', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
-  grpNames <- c(names(db$PLOT), names(db$COND))
   ## Some warnings
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
   if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
-  }
-  if (!is.null(grpBy) & class(grpBy) != 'character'){
-    stop('grpBy must be of class character. Please specify variable names to group by as quoted list. Example: grpBy = c("OWNGRPCD", "SITECLCD")')
   }
   if (landType %in% c('timber', 'forest') == FALSE){
     stop('landType must be one of: "forest" or "timber".')
@@ -3153,22 +3408,12 @@ dwm <- function(db,
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
   }
-  if (any(grpBy %in% grpNames == FALSE)){
-    missG <- grpNames[grpNames %in% grpBy == FALSE]
-    stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT or COND tables.'))
-
-  }
 
   # Save original grpByfor pretty return with spatial objects
   grpBy <- c('YEAR', grpBy)
   grpByOrig <- grpBy
 
   message('Joining FIA Tables.....')
-
-  db$COND_DWM_CALC <- db[['COND_DWM_CALC']] %>% mutate(DWM_CN = CN)
-  db$COND <- db[['COND']] %>% mutate(CND_CN = CN)
-  db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
-
 
 
   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
@@ -3257,7 +3502,7 @@ dwm <- function(db,
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'sp', 'aD_p')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CND_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'aD_c', 'landD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
     right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
@@ -3540,20 +3785,45 @@ invasive <- function(db,
                      SE = TRUE,
                      progress = TRUE,
                      nCores = 1){
+  # Need a PLT_CN
+  db$PLOT <- db[["PLOT"]] %>% mutate(PLT_CN = CN)
+
+  ## Converting names given in grpBy to character vector (NSE to standard)
+  ##  don't have to change original code
+  grpBy_quo <- enquo(grpBy)
+
+  # Probably cheating, but it works
+  if (quo_name(grpBy_quo) != 'NULL'){
+    ## Have to join tables to run select with this object type
+    plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
+    ## We want a unique error message here to tell us when columns are not present in data
+    d_quo <- tryCatch(
+      error = function(cnd) {
+        0
+      },
+      plt_quo[1,] %>% # Just the first row
+        inner_join(db$COND, by = 'PLT_CN') %>%
+        select(!!grpBy_quo)
+    )
+    # If column doesnt exist, just returns 0, not a dataframe
+    if (is.null(nrow(d_quo))){
+      grpName <- quo_name(grpBy_quo)
+      stop(paste('Columns', grpName, 'not found in PLOT or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
+    } else {
+      # Convert to character
+      grpBy <- names(d_quo)
+    }
+  }
 
   reqTables <- c('PLOT', 'INVASIVE_SUBPLOT_SPP', 'COND',
                  'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
-  grpNames <- c(names(db$PLOT), names(db$COND))
   ## Some warnings
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
   if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
-  }
-  if (!is.null(grpBy) & class(grpBy) != 'character'){
-    stop('grpBy must be of class character. Please specify variable names to group by as quoted list. Example: grpBy = c("OWNGRPCD", "SITECLCD")')
   }
   if (landType %in% c('timber', 'forest') == FALSE){
     stop('landType must be one of: "forest" or "timber".')
@@ -3562,32 +3832,12 @@ invasive <- function(db,
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
   }
-  if (any(grpBy %in% grpNames == FALSE)){
-    missG <- grpNames[grpNames %in% grpBy == FALSE]
-    stop(paste('Columns', paste (as.character(missG), collapse = ', '), 'not found in PLOT or COND tables.'))
-
-  }
-
 
   ## Link up by species is required, cannot accurately estimate coverage of all species
   grpBy <- c("YEAR", grpBy, 'SYMBOL', 'SCIENTIFIC_NAME', 'COMMON_NAME')
   grpByOrig <- grpBy
 
   message('Joining FIA Tables.....')
-
-  # if (!is.null(db)) {
-  #   INV <- db[["INVASIVE_SUBPLOT_SPP"]]
-  #   COND <- db[["COND"]]
-  #   #SUBP <- db[['SUBPPLOT']]
-  db$PLOT <- db[["PLOT"]] %>% mutate(PLT_CN = CN)
-  #   POP_PLOT_STRATUM_ASSGN <- db[["POP_PLOT_STRATUM_ASSGN_STRATUM_ASSGN"]]
-  #   PEU <- db$POP_ESTN_UNIT
-  #   POP_EVAL <- db$POP_EVAL
-  #   POP_STRATUM <- db$POP_STRATUM
-  #   PET <- db$POP_EVAL_TYP
-  #   PEG <- db$POP_EVAL_GRP
-  # }
-
 
   ids <- db$POP_EVAL %>% select("CN", "END_INVYR", "EVALID") %>%
     inner_join(select(db$POP_EVAL_TYP, c("EVAL_CN", "EVAL_TYP")), by = c(CN = "EVAL_CN")) %>%
@@ -3672,7 +3922,7 @@ invasive <- function(db,
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVASIVE_SAMPLING_STATUS_CD', grpP, 'sp', 'aD_p')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'aD_c', 'landD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
     right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%

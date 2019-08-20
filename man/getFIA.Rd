@@ -1,0 +1,79 @@
+\name{getFIA}
+\alias{getFIA}
+\title{Download FIA Data and Load into R}
+\description{Easiest way to access FIA Data. Downloads FIA Data from the FIA Datamart, loads the data into R environment, and optionally saves all downloaded tables as .csv files to local directory. Capable of merging multiple state downloads of the FIA database for regional analysis. Requires an internet connection to access and download tables from the FIA Datamart.}
+
+\usage{
+getFIA(states, dir = NULL, common = TRUE, tables = NULL, nCores = 1)
+}
+%- maybe also 'usage' for other objects documented here.
+\arguments{
+  \item{states}{character; state/ US territory abbreviations (e.g. 'AL', 'MI', etc.) indicating which state subsets to download. Choose to download multiple states by passing character vector of state abbreviations (e.g. \code{states = c('RI', 'CT', 'MA')}). If multiple states specified, tables will be saved as individual state subsets (for future use with \code{\link{readFIA}}, although loaded in R as a merged, regional database.}
+  \item{dir}{character (optional); directory where FIA tables will be saved after download. If NULL, tables will not be saved on disk and only loaded into R environment.}
+  \item{common}{logical; if TRUE, only import most commonly used tables, including all required for \code{rFIA} functions (see Details for list of tables).}
+  \item{tables}{character vector (optional); names of specific tables to be downloaded for each state specified (e.g. 'PLOT', 'TREE', 'COND', 'TREE_GRM_COMPONENT').}
+  \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
+}
+
+\details{
+If \code{common = TRUE}, the following tables will be downloaded: COND, COND_DWM_CALC, INVASIVE_SUBPLOT_SPP, PLOT, POP_ESTN_UNIT, POP_EVAL, POP_EVAL_GRP, POP_EVAL_TYP, POP_PLOT_STRATUM_ASSGN, POP_STRATUM, SUBPLOT, TREE, TREE_GRM_COMPONENT. These tables currently support all functionality with \code{rFIA}, and it is recommended that only these tables be imported to conserve RAM and reduce processing time.
+
+If you wish to merge multiple state downloads of FIA data (e.g. Michigan and Indiana state downloads), simply specify multiple state abbreviations to the \code{states} argument. Upon import, corresponding tables (e.g. MI_PLOT and IN_PLOT) will be merged, and analysis can be completed for the entire region or within spatial units which transcend state boundaries (e.g. Ecoregion subsections).
+
+If you choose to save downloaded tables to a local directory after download (simply specify \code{dir}), these tables can be easily reloaded into R using \code{\link{readFIA}} (do not need to redownload files).
+
+Easy, efficient parallelization is implemented with the \code{\link{parallel}} package. Users must only specify the \code{nCores} argument with a value greater than 1 in order to implement parallel processing on their machines. Parallel implementation is achieved using a snow type cluster on any Windows OS, and with multicore forking on any Unix OS (Linux, Mac). Implementing parallel processing may substantially decrease decrease free memory during processing, particularly on Windows OS. Thus, users should be cautious when running in parallel, and consider implementing serial processing for this task if computational resources are limited (\code{nCores = 1}).}
+
+\value{
+List object containing FIA Datatables. List elements represent individual FIA Datatables stored as \code{data.frame} objects.
+
+If multiple subsets of the FIA database are downloaded (e.g. \code{states = c('MI', 'IN')}), corresponding tables will be merged (e.g. PLOT table returned contains plots in both Michigan and Indiana).
+}
+
+\references{
+FIA DataMart: \url{https://apps.fs.usda.gov/fia/datamart/datamart.html}
+
+FIA Database User Guide: \url{https://www.fia.fs.fed.us/library/database-documentation/}
+}
+
+\author{
+Hunter Stanke and Andrew Finley
+}
+
+
+%% ~Make other sections like Warning with \section{Warning }{....} ~
+
+\seealso{
+\code{\link{readFIA}}
+}
+
+\examples{
+
+\dontrun{
+library(rFIA)
+
+## Download the common tables for Michigan, load into R, and save to local directory
+db <- getFIA(states = 'MI', dir = 'path/to/your/directory/)
+
+## Download tables, but do not save to disk
+db <- getFIA(states = 'MI')
+
+## Only download the PLOT & TREE Tables
+db <- getFIA(states = 'MI', tables = c(PLOT, TREE))
+
+## Run in parallel
+db <- getFIA(states = 'MI', nCores = 3) # Check available cores with detectCores()
+
+## Access individual tables from the FIA Database
+# Plot table
+db$PLOT
+
+# Tree table
+db$TREE
+
+# Condition table
+db$COND
+
+}
+}
+
