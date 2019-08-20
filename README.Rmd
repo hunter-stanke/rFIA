@@ -14,7 +14,7 @@ knitr::opts_chunk$set(
 ```
 # rFIA: Unlocking the FIA Database in R
 
-![US Biomass](static/usBiomass.png)
+![US Biomass](/home/hunter/NPS/package/usBiomass.png)
 <!-- badges: start -->
 <!-- badges: end -->
 
@@ -49,6 +49,7 @@ devtools::install_github('hunter-stanke/rFIA')
 |`clipFIA`        | Spatial & temporal queries                                           |
 |`diversity`      | Estimate species diversity                                           |
 |`dwm`            | Estimate volume, biomass, and carbon stocks of down woody material   |
+|`getFIA`         | Download FIA data, load into R, and optionally save to disk      |
 |`growMort`       | Estimate recruitment, mortality, and harvest rates                   |
 |`invasive`       | Estimate areal coverage of invasive species                          |
 |`plotFIA`        | Produce static & animated plots of spatial FIA summaries             |
@@ -61,20 +62,28 @@ devtools::install_github('hunter-stanke/rFIA')
 
 ## Example Usage
 
-### _Load FIA Data into R_
-The first step to using `rFIA` is to download subsets of the FIA Database from the FIA Datamart. Download a state subset by clicking the state of interest here: https://apps.fs.usda.gov/fia/datamart/CSV/datamart_csv.html. 
+### _Download FIA Data and Load into R_
+The first step to using `rFIA` is to download subsets of the FIA Database. The easiest way to accomplish this is using `getFIA`. Using one line of code, you can download state subsets of the FIA Database, load data into your R environment, and optionally save those data to a local directory for future use!
+
+```{r eval = FALSE}
+## Download the state subset or Connecticut (requires an internet connection)
+# All data acquired from FIA Datamart: https://apps.fs.usda.gov/fia/datamart/datamart.html
+ct <- getFIA(states = 'CT', dir = '/path/to/save/data')
+```
+
+By default, `getFIA` only downloads the portions of the database required to produce summaries with other `rFIA` functions (`common = TRUE`). This conserves memory on your machine and speeds download time. If you would like to download all available tables for a state, simple specify `common = FALSE` in the call to `getFIA`.
+
+**But what if I want to load multiple states worth of FIA data into R?** No problem! Simply specify mutiple state abbreviations in the `states` argument of `getFIA` (e.g. `states = c('MI', 'IN', 'WI', 'IL'`)), and all state subsets will be downloaded and merged into a single `FIA.Database` object. This will allow you to use other `rFIA` functions to produce estimates within polygons which straddle state boundaries!
 
 Note: given the massive size of the full FIA Database, users are cautioned to only download the subsets containing their region of interest.
 
-Once downloaded, simply unzip the files in thier own directory (all files in the same directory, with no non-FIA files present), and load the database into r using `readFIA`:
+**If you have previously downloaded FIA data would simply like to load into R from a local directory, use `readFIA`:**
 ```{r eval = FALSE}
 ## Load FIA Data from a local directory
 db <- readFIA('/path/to/your/directory/')
 ```
-By default, readFIA only loads the portions of the database required to 
-produce summaries with `rFIA` functions (common = TRUE)
 
-**But what if I want to load multiple states worth of FIA data into R?** No problem! Simply unzip the files from each state download and place them in the same directory. Point `readFIA` to this directory, and it will load and merge the states into a single `FIA.Database` object. This will allow you to use other `rFIA` functions to produce estimates within polygons which straddle state boundaries!
+
 
 ----
 
@@ -85,30 +94,41 @@ Now that you have loaded your FIA data into R, it's time to put it to work. Let'
 ```{r warning= FALSE, message=FALSE}
 library(rFIA)
 ## Load the Rhode Island subset of the FIADB (included w/ rFIA)
-## NOTE: This object was produced using readFIA
+## NOTE: This object can be produced using getFIA and/or readFIA
 data("fiaRI")
-
-## All Inventory Years Available (i.e., returns a time series)
-tpaRI <- tpa(fiaRI)
-## 2005 marks the first reporting year of the annual inventory, prior data is sparse
-head(tpaRI[tpaRI$YEAR >= 2005,]) 
 
 ## Only estimates for the most recent inventory year
 fiaRI_MR <- clipFIA(fiaRI, mostRecent = TRUE) ## subset the most recent data
 tpaRI_MR <- tpa(fiaRI_MR)
 head(tpaRI_MR)
+
+## All Inventory Years Available (i.e., returns a time series)
+tpaRI <- tpa(fiaRI)
+## 2005 marks the first reporting year of the annual inventory, prior data is sparse
+tail(tpaRI[tpaRI$YEAR >= 2005,], n = 4) 
+
+## Time Series plot
+plotFIA(tpaRI, BAA, plot.title = 'Basal area per acre in Rhode Island over time')
+
 ```
 
 **What if I want to group estimates by species? How about by size class?**
 ```{r warning= FALSE, message=FALSE}
 ## Group estimates by species
 tpaRI_species <- tpa(fiaRI_MR, bySpecies = TRUE)
-head(tpaRI_species)
+head(tpaRI_species, n = 3)
 
 ## Group estimates by size class
 ## NOTE: Default 2-inch size classes, but you can make your own using makeClasses()
 tpaRI_sizeClass <- tpa(fiaRI_MR, bySizeClass = TRUE)
-head(tpaRI_sizeClass)
+head(tpaRI_sizeClass, n = 3)
+
+## Group by species and size class, and plot the distribution 
+##  for the most recent inventory year
+tpaRI_spsc <- tpa(fiaRI_MR, bySpecies = TRUE, bySizeClass = TRUE)
+plotFIA(tpaRI_spsc, BAA, grp = COMMON_NAME, x = sizeClass,
+        plot.title = 'Size-class distributions of BAA by species', 
+        x.lab = '', text.size = .64, n.max = 5) # Only want the top 5 species, try n.max = -5 for bottom 5
 
 ```
 
@@ -119,7 +139,7 @@ head(tpaRI_sizeClass)
 ## treeDomain describes the trees of interest, in terms of FIA variables 
 ## areaDomain, just like above,describes the land area of interest
 tpaRI_own <- tpa(fiaRI_MR, 
-                     grpBy = 'OWNGRPCD', 
+                     grpBy = OWNGRPCD, 
                      treeDomain = DIA > 12 & CCLCD %in% c(1,2),
                      areaDomain = PHYSCLCD %in% c(20:29))
 head(tpaRI_own)
@@ -137,7 +157,7 @@ data('countiesRI') ## Load your own spatial data from shapefiles using readOGR()
 tpaRI_counties <- tpa(fiaRI_MR, polys = countiesRI, returnSpatial = TRUE)
 
 ## NOTE: Any grey polygons below simply means no FIA data was available for that region
-plotFIA(tpaRI_counties, 'BAA') # Plotting method for spatial FIA summaries, also try 'TPA' or 'TPA_PERC'
+plotFIA(tpaRI_counties, BAA) # Plotting method for spatial FIA summaries, also try 'TPA' or 'TPA_PERC'
 ```
 
 **We produced a really cool time series earlier, how would I marry the spatial and temporal capacity of `rFIA` to produce estimates across user-defined polygons and through time?** Easy! Just hand `tpa` the full FIA.Database object you produced with `readFIA` (not the most recent subset produced with `clipFIA`). For stunning space-time visualizations, hand the output of `tpa` to `plotFIA`. To save the animation as a .gif file, simpy specify `fileName` (name of output file) and `savePath` (directory to save file, combined with `fileName`). 
@@ -146,7 +166,7 @@ plotFIA(tpaRI_counties, 'BAA') # Plotting method for spatial FIA summaries, also
 tpaRI_st <- tpa(fiaRI, polys = countiesRI, returnSpatial = TRUE)
 
 ## Animate the output
-plotFIA(tpaRI_st, 'TPA', animate = TRUE, title = 'Abundance (TPA)', legend.height = .8)
+plotFIA(tpaRI_st, TPA, animate = TRUE, legend.title = 'Abundance (TPA)', legend.height = .8)
 
 
 ```
