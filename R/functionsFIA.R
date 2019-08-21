@@ -362,7 +362,7 @@ readFIA <- function(dir,
   ## Compute estimates in parallel -- Clusters in windows, forking otherwise
   if (Sys.info()['sysname'] == 'Windows'){
     cl <- makeCluster(nCores) # Set up snow cluster
-    inTables <- parLapply(cl, FUN = readFIAHelper1, X = files, dir)
+    inTables <- parLapply(cl, X = files, fun = readFIAHelper1, dir)
   } else { # Unix systems
     inTables <- mclapply(files, FUN = readFIAHelper1, dir, mc.cores = nCores)
   }
