@@ -417,7 +417,7 @@ getFIA <- function(states,
                    tables = NULL,
                    nCores = 1){
 
-  cat(sys.call()$dir)
+  #cat(sys.call()$dir)
   if (!is.null(dir)){
     # Add a slash to end of directory name if missing
     if (str_sub(dir,-1) != '/'){
@@ -497,9 +497,9 @@ Did you accidentally include the state abbreviation in front of the table name? 
   ## Read/write tables in parallel -- Clusters in windows, forking otherwise
   if (Sys.info()['sysname'] == 'Windows'){
     cl <- makeCluster(nCores) # Set up snow cluster
-    inTables <- parLapply(cl, FUN = getFIAHelper, X = urls, dir)
+    inTables <- parLapply(cl, X = urls, fun = getFIAHelper, dir)
   } else { # Unix systems
-    inTables <- mclapply(urls, FUN = getFIAHelper, dir, mc.cores = nCores)
+    inTables <- mclapply(urls, fun = getFIAHelper, dir, mc.cores = nCores)
   }
 
   # Give them some names
