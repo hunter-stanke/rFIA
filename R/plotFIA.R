@@ -59,8 +59,8 @@ plotFIA <- function(data, y, grp = NULL, x = NULL, animate = FALSE, n.max = NULL
       scale_fill_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform) +
       theme_minimal() +
       theme(axis.text = element_blank(),
-            legend.title = element_text(size = 15 * text.size, face = 'bold.italic', family = text.font),
-            legend.text = element_text(size = 15 * text.size, face = 'italic', family = text.font),
+            legend.title = element_text(size = 14 * text.size, face = 'bold.italic', family = text.font),
+            legend.text = element_text(size = 11 * text.size, face = 'italic', family = text.font),
             plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),
             legend.key.height = unit(2.2 * legend.height, "cm"),
             legend.key.width  = unit(1 * legend.width, "cm"))
