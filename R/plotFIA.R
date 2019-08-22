@@ -1,6 +1,6 @@
 #' @export
 plotFIA <- function(data, y, grp = NULL, x = NULL, animate = FALSE, n.max = NULL, plot.title = NULL,
-                    y.lab = NULL, x.lab = NULL, legend.title = NULL, legend.labs = NULL,
+                    y.lab = NULL, x.lab = NULL, legend.title = NULL, legend.labs = waiver(),
                     color.option = 'viridis', line.color = "gray30", line.width =1,
                     min.year = 2005, direction = 1, alpha = .9, transform = "identity",
                     text.size = 1, text.font = '', lab.width = 1, legend.height = 1,
@@ -38,7 +38,7 @@ plotFIA <- function(data, y, grp = NULL, x = NULL, animate = FALSE, n.max = NULL
 
 
   ## If they want a subset of the groups
-  if (!is.null(n.max)){
+  if (!is.null(n.max) & quo_name(grp_quo) != 'NULL'){
     d <- data %>%
       group_by(grpVar) %>%
       summarize(m = mean(yVar, na.rm = TRUE)) %>%
@@ -81,18 +81,27 @@ plotFIA <- function(data, y, grp = NULL, x = NULL, animate = FALSE, n.max = NULL
       data$xVar <- data$YEAR
       # Convert year to date format
       data$xVar <-as.Date(paste(data$YEAR, 1, 1, sep = "-"))
+      # Make a new label for x-axis if not specified
+      if (is.null(x.lab)) x.lab <- 'YEAR'
     } else {
-      data <- data %>%
-        group_by(xVar, grpVar) %>%
-        filter(YEAR == max(YEAR, na.rm = TRUE)) %>%
-        ungroup()
+      if (quo_name(grp_quo) != 'NULL'){
+        data <- data %>%
+          group_by(xVar, grpVar) %>%
+          filter(YEAR == max(YEAR, na.rm = TRUE)) %>%
+          ungroup()
+      } else {
+        data <- data %>%
+          group_by(xVar) %>%
+          filter(YEAR == max(YEAR, na.rm = TRUE)) %>%
+          ungroup()
+      }
     }
 
       # Simple time series
       if (quo_name(grp_quo) == 'NULL'){
         map <- data %>%
           ggplot(aes(x = xVar, y = yVar)) +
-          geom_line(color = line.color, lwd = line.width) +
+          geom_line(aes(group = 1), color = line.color, lwd = line.width) +
           theme_bw() +
           ggtitle(plot.title) +
           xlab(ifelse(is.null(x.lab), 'YEAR', x.lab)) +
@@ -104,7 +113,7 @@ plotFIA <- function(data, y, grp = NULL, x = NULL, animate = FALSE, n.max = NULL
         # grouped time series
       } else {
         # Handle legend labels
-        if (is.null(legend.labs)) legend.labs = waiver()
+        #if (is.null(legend.labs)) legend.labs = waiver()
 
         # Omit any NAs in grp
         data <- filter(data, !is.na(grpVar))
@@ -112,11 +121,11 @@ plotFIA <- function(data, y, grp = NULL, x = NULL, animate = FALSE, n.max = NULL
           ggplot(aes(x = xVar, y = yVar, colour = as.factor(grpVar), group = as.factor(grpVar))) +
           geom_line(lwd = line.width) +
           #labs(colour = ifelse(is.null(legend.title), str_wrap(y, width = 10 * lab.width), str_wrap(legend.title, width = 10 * lab.width))) +
-          labs(colour = ifelse(is.null(legend.title), '', str_wrap(legend.title, width = 10 * lab.width))) +
           scale_colour_viridis_d(alpha = alpha, option = color.option, direction = direction, labels = legend.labs) +
+          labs(colour = ifelse(is.null(legend.title), '', str_wrap(legend.title, width = 10 * lab.width))) +
           theme_bw() +
           ggtitle(plot.title) +
-          xlab(ifelse(is.null(x.lab), quo_name(x_quo), x.lab)) +
+          xlab(ifelse(is.null(x.lab), quo_name(y_quo), x.lab)) +
           ylab(ifelse(is.null(y.lab), quo_name(y_quo), y.lab)) +
           theme(axis.text = element_text(size = 11 * text.size, family = text.font),
                 axis.title = element_text(size = 15 * text.size, family = text.font),

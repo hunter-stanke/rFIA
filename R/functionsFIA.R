@@ -1060,7 +1060,7 @@ standStruct <- function(db,
   if (!is.null(polys) & first(first(class(polys))) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
   }
-  if (tidy & returnSpatial){
+  if (tidy & returnSpatial & !is.null(polys)){
     warning('Returning multiple observations for each areal unit. If returnSpatial = TRUE, tidy = FALSE is recommended.')
   }
   if (landType %in% c('timber', 'forest', 'all') == FALSE){
@@ -1121,9 +1121,7 @@ standStruct <- function(db,
 
   } else if (byPlot & returnSpatial){
     ## Make plot data spatial, projected same as polygon layer
-    coordinates(db$PLOT) <- ~LON+LAT
-    proj4string(db$PLOT) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-    db$PLOT <- as(db$PLOT, 'sf')
+    grpBy <- c(grpBy, 'LON', 'LAT')
   }
 
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
@@ -1216,18 +1214,16 @@ standStruct <- function(db,
   ### -- BYPLOT -- TPA Estimates at each plot location
   if (byPlot) {
     sOut <- data %>%
-      group_by(.dots = grpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, CONDID) %>%
-      summarize(CONDPROP_UNADJ = first(CONDPROP_UNADJ),
-                stage = structHelper(DIA, CCLCD),
-                aAdj = first(aAdj),
-                aDI = first(aDI)) #%>%
-      # group_by(.dots = grpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-      # summarize(pole = sum(CONDPROP_UNADJ[stage == 'pole'] * aDI[stage == 'pole'] * aAdj[stage == 'pole'], na.rm = TRUE),
-      #           mature = sum(CONDPROP_UNADJ[stage == 'mature'] * aDI[stage == 'mature'] * aAdj[stage == 'mature'], na.rm = TRUE),
-      #           late = sum(CONDPROP_UNADJ[stage == 'late'] * aDI[stage == 'late'] * aAdj[stage == 'late'], na.rm = TRUE),
-      #           mosaic = sum(CONDPROP_UNADJ[stage == 'mosaic'] * aDI[stage == 'mosaic'] * aAdj[stage == 'mosaic'], na.rm = TRUE),
-      #           faFull = sum(CONDPROP_UNADJ * aDI * aAdj * EXPNS, na.rm = TRUE),
-      #           plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
+      group_by(.dots = grpBy, PLT_CN) %>%
+      summarize(stage = structHelper(DIA, CCLCD),
+                nStems = length(which(tDI == 1)))
+
+    if (returnSpatial){
+      sOut <- sOut %>%
+        filter(!is.na(LAT) & !is.na(LON)) %>%
+        st_as_sf(coords = c('LON', 'LAT'),
+                 crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+    }
 
     ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
   } else {
@@ -1503,9 +1499,7 @@ diversity <- function(db,
 
   } else if (byPlot & returnSpatial){
     ## Make plot data spatial, projected same as polygon layer
-    coordinates(db$PLOT) <- ~LON+LAT
-    proj4string(db$PLOT) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-    db$PLOT <- as(db$PLOT, 'sf')
+    grpBy <- c(grpBy, 'LON', 'LAT')
   }
 
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
@@ -1622,17 +1616,18 @@ diversity <- function(db,
   if (byPlot) {
     dOut <- data %>%
       distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
-      group_by(.dots = grpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, CONDID) %>%
+      group_by(.dots = grpBy, PLT_CN) %>%
       summarize(H = divIndex(SPCD, TPA_UNADJ  * tDI, index = 'H'),
                 S = divIndex(SPCD, TPA_UNADJ * tDI, index = 'S'),
                 Eh = divIndex(SPCD, TPA_UNADJ * tDI, index = 'Eh'),
-                plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0))
-      # group_by(.dots = grpBy, ESTN_UNIT_CN, STRATUM_CN, PLT_CN) %>%
-      # summarize(H = sum(hCond, na.rm = TRUE),
-      #           Eh = sum(EhCond, na.rm = TRUE),
-      #           S = sum(sCond* plotIn, na.rm = TRUE),
-      #           plotIn = sum(plotIn, na.rm = TRUE)) #%>%
-    #filter(S > 0)
+                nStems = length(which(tDI == 1)))
+
+    if (returnSpatial){
+      dOut <- dOut %>%
+        filter(!is.na(LAT) & !is.na(LON)) %>%
+        st_as_sf(coords = c('LON', 'LAT'),
+                 crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+    }
 
     ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
   } else {
@@ -1864,10 +1859,7 @@ tpa <- function(db,
     }
 
   } else if (byPlot & returnSpatial){
-    ## Make plot data spatial, projected same as polygon layer
-    coordinates(db$PLOT) <- ~LON+LAT
-    proj4string(db$PLOT) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-    db$PLOT <- as(db$PLOT, 'sf')
+    grpBy <- c(grpBy, 'LON', 'LAT')
   } # END AREAL
 
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
@@ -1998,8 +1990,14 @@ tpa <- function(db,
       group_by(.dots = grpBy, PLT_CN) %>%
       summarize(TPA = sum(TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
                 BAA = sum(basalArea(DIA) * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                nStems = length(which(tDI == 1))) %>%
-      filter(TPA > 0)
+                nStems = length(which(tDI == 1)))
+
+    if (returnSpatial){
+      tOut <- tOut %>%
+        filter(!is.na(LAT) & !is.na(LON)) %>%
+        st_as_sf(coords = c('LON', 'LAT'),
+                 crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+    }
 
     ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
   } else {
@@ -2089,6 +2087,7 @@ tpa <- function(db,
     # Snag the names
     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
 
+
     # Return a spatial object
     if ('YEAR' %in% names(tOut)){
       # Return a spatial object
@@ -2099,6 +2098,7 @@ tpa <- function(db,
       } else if (!is.null(polys) & returnSpatial == FALSE){
         tOut <- select(tOut, c(grpByOrig, tNames, everything())) %>%
           filter(!is.na(polyID))
+      # Return spatial plots
       }
     } else { ## Function found no plots within the polygon, so it panics
       combos <- data %>%
@@ -2278,9 +2278,7 @@ growMort <- function(db,
 
   } else if (byPlot & returnSpatial){
     ## Make plot data spatial, projected same as polygon layer
-    coordinates(db$PLOT) <- ~LON+LAT
-    proj4string(db$PLOT) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-    db$PLOT <- as(db$PLOT, 'sf')
+    grpBy <- c(grpBy, 'LON', 'LAT')
   }
 
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
@@ -2409,12 +2407,19 @@ growMort <- function(db,
       distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
       #filter(EVALID %in% tID) %>%
       # Compute estimates at plot level
-      group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
+      group_by(.dots = grpBy, PLT_CN) %>%
       summarize(TOTAL_TPA = sum(TPAGROW_UNADJ * tAdj * tDI, na.rm = TRUE),
                 RECR_TPA = sum(TPAGROW_UNADJ[COMPONENT == 'INGROWTH'] * tAdj[COMPONENT == 'INGROWTH'] * tDI[COMPONENT == 'INGROWTH'], na.rm = TRUE),
                 MORT_TPA = sum(TPAMORT_UNADJ * tAdj * tDI, na.rm = TRUE),
                 REMV_TPA = sum(TPAREMV_UNADJ * tAdj * tDI, na.rm = TRUE),
-                LAMBDA = ((TOTAL_TPA / (TOTAL_TPA +MORT_TPA + REMV_TPA - RECR_TPA)) ^ (1/first(REMPER))) - 1)
+                nStems = length(which(tDI == 1)))
+
+    if (returnSpatial){
+      tOut <- tOut %>%
+        filter(!is.na(LAT) & !is.na(LON)) %>%
+        st_as_sf(coords = c('LON', 'LAT'),
+                 crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+    }
 
   } else {
     # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
@@ -2693,9 +2698,7 @@ vitalRates <- function(db,
 
   } else if (byPlot & returnSpatial){
     ## Make plot data spatial, projected same as polygon layer
-    coordinates(db$PLOT) <- ~LON+LAT
-    proj4string(db$PLOT) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-    db$PLOT <- as(db$PLOT, 'sf')
+    grpBy <- c(grpBy, 'LON', 'LAT')
   }
 
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
@@ -2827,17 +2830,24 @@ vitalRates <- function(db,
     ### Compute total TREES in domain of interest
     tOut <- data %>%
       distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
-      #filter(EVALID %in% tID) %>%
-      #filter(EVAL_TYP == 'EXPGROW') %>%
+
       # Compute estimates at plot level
-      group_by(.dots = grpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
+      group_by(.dots = grpBy, PLT_CN) %>%
       summarize(TPA = sum(TPAGROW_UNADJ * tAdj * tDI, na.rm = TRUE),
                 DIA_GROW = mean(ANN_DIA_GROWTH * tAdj * tDI, na.rm = TRUE),
                 BA_GROW = mean(ANN_BA_GROWTH * tAdj * tDI, na.rm = TRUE),
                 BAA_GROW = sum(TPAGROW_UNADJ * ANN_BA_GROWTH * tAdj * tDI, na.rm = TRUE),
                 HT_GROW = mean(ANN_HT_GROWTH * tAdj * tDI, na.rm = TRUE),
                 NETVOL_GROW = mean(ANN_NET_GROWTH * tAdj * tDI, na.rm = TRUE),
-                NETVOL_GROW_ACRE = sum(ANN_NET_GROWTH * TPAGROW_UNADJ *tAdj * tDI, na.rm = TRUE))
+                NETVOL_GROW_ACRE = sum(ANN_NET_GROWTH * TPAGROW_UNADJ *tAdj * tDI, na.rm = TRUE),
+                nStems = length(which(tDI == 1)))
+
+    if (returnSpatial){
+      tOut <- tOut %>%
+        filter(!is.na(LAT) & !is.na(LON)) %>%
+        st_as_sf(coords = c('LON', 'LAT'),
+                 crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+    }
 
     ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
   } else {
@@ -3083,9 +3093,7 @@ biomass <- function(db,
 
   } else if (byPlot & returnSpatial){
     ## Make plot data spatial, projected same as polygon layer
-    coordinates(db$PLOT) <- ~LON+LAT
-    proj4string(db$PLOT) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-    db$PLOT <- as(db$PLOT, 'sf')
+    grpBy <- c(grpBy, 'LON', 'LAT')
   }
 
 
@@ -3209,19 +3217,26 @@ biomass <- function(db,
   ####################  COMPUTE ESTIMATES  ###########################
   ### -- BYPLOT -- TPA Estimates at each plot location
   if (byPlot) {
-    b <- data %>%
+    bOut <- data %>%
       distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
       # Compute estimates at plot level
-      group_by(.dots = grpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-      summarize(NETVOL = sum(VOLCFNET * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                SAWVOL = sum(VOLCSNET * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                BIO_AG = sum(DRYBIO_AG * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                BIO_BG = sum(DRYBIO_BG * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                BIO = sum(sum(DRYBIO_AG,DRYBIO_BG,na.rm = TRUE) * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                CARB_AG = sum(CARBON_AG * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                CARB_BG = sum(CARBON_BG * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                CARB = sum(sum(CARBON_AG,CARBON_BG,na.rm=TRUE) * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0))
+      group_by(.dots = grpBy, PLT_CN) %>%
+      summarize(NETVOL_ACRE = sum(VOLCFNET * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
+                SAWVOL_ACRE = sum(VOLCSNET * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
+                BIO_AG_ACRE = sum(DRYBIO_AG * TPA_UNADJ * tAdj * tDI, na.rm = TRUE) / 2000,
+                BIO_BG_ACRE = sum(DRYBIO_BG * TPA_UNADJ * tAdj * tDI, na.rm = TRUE) / 2000,
+                BIO_ACRE = sum(BIO_AG_ACRE, BIO_BG_ACRE, na.rm = TRUE),
+                CARB_AG_ACRE = sum(CARBON_AG * TPA_UNADJ * tAdj * tDI, na.rm = TRUE) / 2000,
+                CARB_BG_ACRE = sum(CARBON_BG * TPA_UNADJ * tAdj * tDI, na.rm = TRUE) / 2000,
+                CARB_ACRE = sum(CARB_AG_ACRE, CARB_BG_ACRE, na.rm = TRUE),
+                nStems = length(which(tDI == 1)))
+
+    if (returnSpatial){
+      bOut <- bOut %>%
+        filter(!is.na(LAT) & !is.na(LON)) %>%
+        st_as_sf(coords = c('LON', 'LAT'),
+                 crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+    }
 
     ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
   } else {
@@ -3459,9 +3474,7 @@ dwm <- function(db,
 
   } else if (byPlot & returnSpatial){
     ## Make plot data spatial, projected same as polygon layer
-    coordinates(db$PLOT) <- ~LON+LAT
-    proj4string(db$PLOT) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-    db$PLOT <- as(db$PLOT, 'sf')
+    grpBy <- c(grpBy, 'LON', 'LAT')
   }
 
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
@@ -3575,6 +3588,13 @@ dwm <- function(db,
                 CARB_1000HR = sum(CWD_CARBON_ADJ * aDI / 2000, na.rm = TRUE),
                 CARB_PILE = sum(PILE_CARBON_ADJ * aDI / 2000, na.rm = TRUE),
                 CARB = sum(CARB_1HR, CARB_10HR, CARB_100HR, CARB_1000HR, CARB_PILE, na.rm = TRUE))
+
+    if (returnSpatial){
+      cOut <- cOut %>%
+        filter(!is.na(LAT) & !is.na(LON)) %>%
+        st_as_sf(coords = c('LON', 'LAT'),
+                 crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+    }
 
     ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
   } else {
@@ -3878,9 +3898,7 @@ invasive <- function(db,
 
   } else if (byPlot & returnSpatial){
     ## Make plot data spatial, projected same as polygon layer
-    coordinates(db$PLOT) <- ~LON+LAT
-    proj4string(db$PLOT) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-    db$PLOT <- as(db$PLOT, 'sf')
+    grpBy <- c(grpBy, 'LON', 'LAT')
   }
 
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
@@ -3927,7 +3945,7 @@ invasive <- function(db,
     right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
     left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-    full_join(select(db$INVASIVE_SUBPLOT_SPP, c('PLT_CN', 'COVER_PCT', 'VEG_SPCD', 'CONDID')), by = c("PLT_CN", "CONDID"))
+    full_join(select(db$INVASIVE_SUBPLOT_SPP, c('PLT_CN', 'COVER_PCT', 'VEG_SPCD', 'SUBP', 'CONDID')), by = c("PLT_CN", "CONDID"))
   suppressWarnings({
   data <- data %>%
       left_join(intData$REF_PLANT_DICTIONARY, by = c('VEG_SPCD' = 'SYMBOL')) %>%
@@ -3971,6 +3989,13 @@ invasive <- function(db,
       group_by(.dots = grpBy, PLT_CN) %>%
       summarize(cover = sum(COVER_PCT/100 * CONDPROP_UNADJ * aAdj * aDI * 24^2*pi, na.rm = TRUE)) %>%
       filter(!is.na(SYMBOL))
+
+    if (returnSpatial){
+      invOut <- invOut %>%
+        filter(!is.na(LAT) & !is.na(LON)) %>%
+        st_as_sf(coords = c('LON', 'LAT'),
+                 crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+    }
   } else {
     # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
     ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
