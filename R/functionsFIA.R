@@ -499,7 +499,7 @@ Did you accidentally include the state abbreviation in front of the table name? 
     cl <- makeCluster(nCores) # Set up snow cluster
     inTables <- parLapply(cl, X = urls, fun = getFIAHelper, dir)
   } else { # Unix systems
-    inTables <- mclapply(urls, fun = getFIAHelper, dir, mc.cores = nCores)
+    inTables <- mclapply(X = urls, FUN = getFIAHelper, dir, mc.cores = nCores)
   }
 
   # Give them some names
@@ -1277,16 +1277,16 @@ standStruct <- function(db,
       if (Sys.info()['sysname'] == 'Windows'){
         cl <- makeCluster(nCores)
         if(progress){ # Include progress Bar
-          sOut <- pblapply(names(combos), FUN = standStructHelper, combos, data, grpBy, totals, tidy, SE, cl = cl)
+          sOut <- pblapply(X = names(combos), FUN = standStructHelper, combos, data, grpBy, totals, tidy, SE, cl = cl)
         } else { # No progress Bar
-          sOut <- parLapply(cl, names(combos), FUN = standStructHelper, combos, data, grpBy, tidy, totals, SE)
+          sOut <- parLapply(cl, X = names(combos), fun = standStructHelper, combos, data, grpBy, tidy, totals, SE)
         }
       } else { # Unix systems
         if(progress){
-          sOut <- pblapply(names(combos), FUN = standStructHelper, combos, data, grpBy, totals, tidy, SE, cl = nCores)
+          sOut <- pblapply(X = names(combos), FUN = standStructHelper, combos, data, grpBy, totals, tidy, SE, cl = nCores)
           #sOut <- lapply(names(combos), FUN = standStructHelper, combos, data, grpBy, totals, tidy, SE)
         } else { # No progress Bar, much quicker
-          sOut <- mclapply(names(combos), FUN = standStructHelper, combos, data, grpBy, totals, tidy, SE, mc.cores = nCores)
+          sOut <- mclapply(X = names(combos), FUN = standStructHelper, combos, data, grpBy, totals, tidy, SE, mc.cores = nCores)
         }
       }
       })
@@ -1678,16 +1678,16 @@ diversity <- function(db,
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
       if(progress){ # Include progress Bar
-        dOut <- pblapply(names(combos), FUN = diversityHelper, combos, data, grpBy, SE, cl = cl)
+        dOut <- pblapply(X = names(combos), FUN = diversityHelper, combos, data, grpBy, SE, cl = cl)
       } else { # No progress Bar
-        dOut <- parLapply(cl, names(combos), FUN = diversityHelper, combos, data, grpBy, SE)
+        dOut <- parLapply(cl, X = names(combos), fun = diversityHelper, combos, data, grpBy, SE)
       }
     } else { # Unix systems
       if(progress){
         dOut <- pblapply(names(combos), FUN = diversityHelper, combos, data, grpBy, SE, cl = nCores)
         #dOut <- pbapply(names(combos), FUN = diversityHelper, combos, data, grpBy, totals, SE)
       } else { # No progress Bar, much quicker
-        dOut <- mclapply(names(combos), FUN = diversityHelper, combos, data, grpBy, SE, mc.cores = nCores)
+        dOut <- mclapply(X = names(combos), FUN = diversityHelper, combos, data, grpBy, SE, mc.cores = nCores)
       }
     }
     })
@@ -2063,15 +2063,15 @@ tpa <- function(db,
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
       if(progress){ # Include progress Bar
-        tOut <- pblapply(names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
+        tOut <- pblapply(X = names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
       } else { # No progress Bar
-        tOut <- parLapply(cl, names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE)
+        tOut <- parLapply(cl, X = names(combos), fun = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE)
       }
     } else { # Unix systems
       if(progress){
-        tOut <- pblapply(names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
+        tOut <- pblapply(X = names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
       } else { # No progress Bar, much quicker
-        tOut <- mclapply(names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
+        tOut <- mclapply(X = names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
       }
     }
     })
@@ -2481,15 +2481,15 @@ growMort <- function(db,
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
       if(progress){ # Include progress Bar
-        tOut <- pblapply(names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
+        tOut <- pblapply(X = names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
       } else { # No progress Bar
-        tOut <- parLapply(cl, names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE)
+        tOut <- parLapply(cl, X = names(combos), fun = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE)
       }
     } else { # Unix systems
       if(progress){
-        tOut <- pblapply(names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
+        tOut <- pblapply(X = names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
       } else { # No progress Bar, much quicker
-        tOut <- mclapply(names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
+        tOut <- mclapply(X = names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
       }
     }
     })
@@ -2912,15 +2912,15 @@ vitalRates <- function(db,
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
       if(progress){ # Include progress Bar
-        tOut <- pblapply(names(combos), FUN = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
+        tOut <- pblapply(X = names(combos), FUN = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
       } else { # No progress Bar
-        tOut <- parLapply(cl, names(combos), FUN = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE)
+        tOut <- parLapply(cl, X = names(combos), fun = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE)
       }
     } else { # Unix systems
       if(progress){
-        tOut <- pblapply(names(combos), FUN = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
+        tOut <- pblapply(X = names(combos), FUN = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
       } else { # No progress Bar, much quicker
-        tOut <- mclapply(names(combos), FUN = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
+        tOut <- mclapply(X = names(combos), FUN = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
       }
     }
     })
@@ -3294,15 +3294,15 @@ biomass <- function(db,
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
       if(progress){ # Include progress Bar
-        bOut <- pblapply(names(combos), FUN = biomassHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
+        bOut <- pblapply(X = names(combos), FUN = biomassHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
       } else { # No progress Bar
-        bOut <- parLapply(cl, names(combos), FUN = biomassHelper, combos, data, grpBy, aGrpBy, totals, SE)
+        bOut <- parLapply(cl, X = names(combos), fun = biomassHelper, combos, data, grpBy, aGrpBy, totals, SE)
       }
     } else { # Unix systems
       if(progress){
-        bOut <- pblapply(names(combos), FUN = biomassHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
+        bOut <- pblapply(X = names(combos), FUN = biomassHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
       } else { # No progress Bar, much quicker
-        bOut <- mclapply(names(combos), FUN = biomassHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
+        bOut <- mclapply(X = names(combos), FUN = biomassHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
       }
     }
     })
@@ -3648,9 +3648,9 @@ dwm <- function(db,
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
       if(progress){ # Include progress Bar
-        cOut <- pblapply(names(combos), FUN = dwmHelper, combos, data, grpBy, totals, SE, cl = cl)
+        cOut <- pblapply(X = names(combos), FUN = dwmHelper, combos, data, grpBy, totals, SE, cl = cl)
       } else { # No progress Bar
-        cOut <- parLapply(cl, names(combos), FUN = dwmHelper, combos, data, grpBy, totals, SE)
+        cOut <- parLapply(cl, X = names(combos), fun = dwmHelper, combos, data, grpBy, totals, SE)
       }
     } else { # Unix systems
       if(progress){
@@ -4054,15 +4054,15 @@ invasive <- function(db,
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
       if(progress){ # Include progress Bar
-        invOut <- pblapply(names(combos), FUN = invasiveHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
+        invOut <- pblapply(X = names(combos), FUN = invasiveHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
       } else { # No progress Bar
-        invOut <- parLapply(cl, names(combos), FUN = invasiveHelper, combos, data, grpBy, aGrpBy, totals, SE)
+        invOut <- parLapply(cl, X = names(combos), fun = invasiveHelper, combos, data, grpBy, aGrpBy, totals, SE)
       }
     } else { # Unix systems
       if(progress){
-        invOut <- pblapply(names(combos), FUN = invasiveHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
+        invOut <- pblapply(X = names(combos), FUN = invasiveHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
       } else { # No progress Bar, much quicker
-        invOut <- mclapply(names(combos), FUN = invasiveHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
+        invOut <- mclapply(X = names(combos), FUN = invasiveHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
       }
     }
 
