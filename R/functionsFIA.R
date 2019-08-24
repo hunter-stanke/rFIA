@@ -298,7 +298,7 @@ print.FIA.Database <- function(x, ...){
 #' @import gganimate
 #' @import ggplot2
 #' @importFrom data.table fread
-#' @importFrom parallel makeCluster detectCores mclapply parLapply
+#' @importFrom parallel makeCluster detectCores mclapply parLapply stopCluster
 #' @importFrom tidyr gather
 #' @importFrom pbapply pblapply
 #' @importFrom sp over proj4string<- coordinates<- spTransform proj4string
@@ -1281,6 +1281,7 @@ standStruct <- function(db,
         } else { # No progress Bar
           sOut <- parLapply(cl, X = names(combos), fun = standStructHelper, combos, data, grpBy, tidy, totals, SE)
         }
+        stopCluster(cl)
       } else { # Unix systems
         if(progress){
           sOut <- pblapply(X = names(combos), FUN = standStructHelper, combos, data, grpBy, totals, tidy, SE, cl = nCores)
@@ -1682,6 +1683,7 @@ diversity <- function(db,
       } else { # No progress Bar
         dOut <- parLapply(cl, X = names(combos), fun = diversityHelper, combos, data, grpBy, SE)
       }
+      stopCluster(cl)
     } else { # Unix systems
       if(progress){
         dOut <- pblapply(names(combos), FUN = diversityHelper, combos, data, grpBy, SE, cl = nCores)
@@ -2067,6 +2069,7 @@ tpa <- function(db,
       } else { # No progress Bar
         tOut <- parLapply(cl, X = names(combos), fun = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE)
       }
+      stopCluster(cl)
     } else { # Unix systems
       if(progress){
         tOut <- pblapply(X = names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
@@ -2485,6 +2488,7 @@ growMort <- function(db,
       } else { # No progress Bar
         tOut <- parLapply(cl, X = names(combos), fun = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE)
       }
+      stopCluster(cl)
     } else { # Unix systems
       if(progress){
         tOut <- pblapply(X = names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
@@ -2916,6 +2920,7 @@ vitalRates <- function(db,
       } else { # No progress Bar
         tOut <- parLapply(cl, X = names(combos), fun = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE)
       }
+      stopCluster(cl)
     } else { # Unix systems
       if(progress){
         tOut <- pblapply(X = names(combos), FUN = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
@@ -3298,6 +3303,7 @@ biomass <- function(db,
       } else { # No progress Bar
         bOut <- parLapply(cl, X = names(combos), fun = biomassHelper, combos, data, grpBy, aGrpBy, totals, SE)
       }
+      stopCluster(cl)
     } else { # Unix systems
       if(progress){
         bOut <- pblapply(X = names(combos), FUN = biomassHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
@@ -4058,6 +4064,7 @@ invasive <- function(db,
       } else { # No progress Bar
         invOut <- parLapply(cl, X = names(combos), fun = invasiveHelper, combos, data, grpBy, aGrpBy, totals, SE)
       }
+      stopCluster(cl)
     } else { # Unix systems
       if(progress){
         invOut <- pblapply(X = names(combos), FUN = invasiveHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
