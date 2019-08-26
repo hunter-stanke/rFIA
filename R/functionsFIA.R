@@ -4355,17 +4355,15 @@ area <- function(db,
   }
 
   # If we need to, join the tree table
-  if (length(grpT) > 0){
+  if (length(grpT) > 0 | !is.null(treeDomain)){
     data <- data %>%
       left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'SUBP', 'TREE', grpT, 'tD')), by = c('PLT_CN', 'CONDID'))
-    # Tree domain indicator
-    data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$sp
   } else {
-    data$tDI <- 1
+    data$tD <- 1
   }
 
   ## Comprehensive indicator function
-  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp * data$tDI
+  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp * data$tD
 
 
 
@@ -4481,8 +4479,5 @@ area <- function(db,
   aOut <- filter(aOut, !is.na(YEAR))
   return(aOut)
 }
-
-
-
 
 
