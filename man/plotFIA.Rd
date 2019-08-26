@@ -7,7 +7,7 @@ Default behavior for non-spatial summaries produces time-series plots, and for s
 
 \usage{
 plotFIA(data, y, grp = NULL, x = NULL, animate = FALSE, n.max = NULL, plot.title = NULL,
-        y.lab = NULL, x.lab = NULL, legend.title = NULL, legend.labs = NULL,
+        y.lab = NULL, x.lab = NULL, legend.title = NULL, legend.labs = waiver(),
         color.option = 'viridis', line.color = "gray30", line.width =1, min.year = 2005,
         direction = 1, alpha = .9, transform = "identity", text.size = 1, text.font = '',
         lab.width = 1, legend.height = 1, legend.width = 1, device = NULL,

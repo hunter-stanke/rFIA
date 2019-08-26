@@ -297,7 +297,7 @@ print.FIA.Database <- function(x, ...){
 #' @import stringr
 #' @import gganimate
 #' @import ggplot2
-#' @importFrom data.table fread
+#' @importFrom data.table fread fwrite
 #' @importFrom parallel makeCluster detectCores mclapply parLapply stopCluster
 #' @importFrom tidyr gather
 #' @importFrom pbapply pblapply

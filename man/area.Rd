@@ -79,6 +79,7 @@ Hunter Stanke and Andrew Finley
 
 
 \examples{
+\dontrun{
 ## Most recent estimates of forested area in RI
 area(db = clipFIA(fiaRI))
 
@@ -97,5 +98,6 @@ area(db = fiaRI,
      landType = 'forest',
      treeDomain = DIA > 20,
     nCores = 3)
+}
 }
 
