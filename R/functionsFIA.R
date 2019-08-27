@@ -1240,13 +1240,13 @@ standStruct <- function(db,
     # }
     ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
     if(is.null(polys)){
+      ## Non spatial combos
       combos <- select(data, c(grpBy)) %>%
         as.data.frame() %>%
         group_by(.dots = grpBy) %>%
         summarize() %>%
         filter(!is.na(YEAR))
     } else {
-      ## Non spatial combos
       combosNS <- select(data, c(grpBy[grpBy %in% names(polys) == FALSE])) %>%
         as.data.frame() %>%
         group_by(.dots = grpBy[grpBy %in% names(polys) == FALSE]) %>%
@@ -4479,5 +4479,7 @@ area <- function(db,
   aOut <- filter(aOut, !is.na(YEAR))
   return(aOut)
 }
+
+
 
 

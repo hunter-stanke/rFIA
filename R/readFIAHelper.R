@@ -1,6 +1,6 @@
 readFIAHelper1 <- function(x, dir, ...){
   # Read in and append each file to a list
-  file <- fread(paste(dir, x, sep = ""), showProgress = FALSE, logical01 = FALSE, integer64 = 'numeric', ...)
+  file <- fread(paste(dir, x, sep = ""), showProgress = FALSE, logical01 = FALSE, integer64 = 'double', ...)
   # suppressMessages({suppressWarnings({
   # f <- read_csv(paste(dir, x, sep = ""), progress = FALSE, col_type = cols(.default = col_character()), ...)
   # f <- type_convert(f)
@@ -12,7 +12,7 @@ readFIAHelper1 <- function(x, dir, ...){
 
 getFIAHelper <- function(x, dir, ...){
   # Download and append each file to a list
-  file <- fread(x, showProgress = FALSE, logical01 = FALSE, integer64 = 'numeric', ...)
+  file <- fread(x, showProgress = FALSE, logical01 = FALSE, integer64 = 'double', ...)
 
   # Write the data out the directory they've chosen
   if(!is.null(dir)){
