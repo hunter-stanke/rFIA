@@ -45,11 +45,12 @@ devtools::install_github('hunter-stanke/rFIA')
 
 |`rFIA` Function  | Description                                                          |
 |---------------- |----------------------------------------------------------------------|
+|`area`           | Estimate land area                                                   |
 |`biomass`        | Estimate volume, biomass, & carbon stocks of standing trees          |
 |`clipFIA`        | Spatial & temporal queries                                           |
 |`diversity`      | Estimate species diversity                                           |
 |`dwm`            | Estimate volume, biomass, and carbon stocks of down woody material   |
-|`getFIA`         | Download FIA data, load into R, and optionally save to disk      |
+|`getFIA`         | Download FIA data, load into R, and optionally save to disk          |
 |`growMort`       | Estimate recruitment, mortality, and harvest rates                   |
 |`invasive`       | Estimate areal coverage of invasive species                          |
 |`plotFIA`        | Produce static & animated plots of spatial FIA summaries             |
