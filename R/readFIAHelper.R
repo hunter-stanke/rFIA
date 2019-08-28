@@ -41,6 +41,13 @@ getFIAHelper <- function(x, dir, ...){
 }
 
 
+# writeFIAHelper <- function(x, db, dir, ...){
+#   # Write the data out the directory they've chosen
+#   fwrite(x = db[[x]], file = paste0(x, '.csv'), showProgress = FALSE)
+# }
+
+
+
 readFIAHelper2 <- function(x, tables){
   subList <- tables[str_sub(x, 4) == unique(str_sub(x,4))]
   mergedTable <- bind_rows(subList, .id = NULL)

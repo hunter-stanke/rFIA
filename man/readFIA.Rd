@@ -15,7 +15,7 @@ readFIA(dir, common = TRUE, tables = NULL, nCores = 1, ...)}
   \item{common}{logical; if TRUE, only import most commonly used tables, including all required for \code{rFIA} functions (see Details for list of tables).}
   \item{tables}{character vector; names of specific tables to be imported (e.g. 'PLOT', 'TREE', 'COND', 'TREE_GRM_COMPONENT').}
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
-  \item{\dots}{other arguments to pass to \code{\link{read.csv}}.}
+  \item{\dots}{other arguments to pass to \code{\link{fread}}.}
 }
 
 \details{
@@ -51,7 +51,7 @@ Alternatively, use \code{\link{getFIA}} to automate the download and saving proc
 }
 
 \seealso{
-\code{\link{clipFIA}}
+\code{\link{clipFIA}, \code{\link{getFIA}}}
 }
 
 

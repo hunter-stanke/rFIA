@@ -359,16 +359,33 @@ readFIA <- function(dir,
   }
 
 
-  ## Compute estimates in parallel -- Clusters in windows, forking otherwise
-  if (Sys.info()['sysname'] == 'Windows'){
-    cl <- makeCluster(nCores) # Set up snow cluster
-    inTables <- parLapply(cl, X = files, fun = readFIAHelper1, dir)
-  } else { # Unix systems
-    inTables <- mclapply(files, FUN = readFIAHelper1, dir, mc.cores = nCores)
+  # ## Compute estimates in parallel -- Clusters in windows, forking otherwise
+  # if (Sys.info()['sysname'] == 'Windows'){
+  #   cl <- makeCluster(nCores) # Set up snow cluster
+  #   inTables <- parLapply(cl, X = files, fun = readFIAHelper1, dir)
+  # } else { # Unix systems
+  #   inTables <- mclapply(files, FUN = readFIAHelper1, dir, mc.cores = nCores)
+  # }
+  inTables <- list()
+  for (n in 1:length(files)){
+    # Read in and append each file to a list
+    file <- fread(paste(dir, files[n], sep = ""), showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores, ...)
+    # We don't want data.table formats
+    file <- as.data.frame(file)
+
+    ## Use a loop to avoid using bit64 package (integer64 columns still appear for some reason)
+    classes <- sapply(file, class)
+    for (i in 1:ncol(file)){
+      if (classes[i] == 'integer64'){
+        file[,i] <- as.double(file[,i])
+      }
+    }
+    inTables[[files[n]]] <- file
   }
 
+
   # Give them some names
-  names(inTables) <- files
+  #names(inTables) <- files
   #inTables <- lapply(inTables, as.data.frame)
 
   # Check for corresponding tables (multiple states)
@@ -478,7 +495,7 @@ Did you accidentally include the state abbreviation in front of the table name? 
 
   # Make sure state Abbs are in right format
   states <- str_to_upper(states)
-  if (states != 'ENTIRE') {
+  if ('ENTIRE' %in% states) {
     states <- paste0(states, '_')
   } else {
     states <- ''
@@ -494,16 +511,40 @@ Did you accidentally include the state abbreviation in front of the table name? 
     }
   }
 
-  ## Read/write tables in parallel -- Clusters in windows, forking otherwise
-  if (Sys.info()['sysname'] == 'Windows'){
-    cl <- makeCluster(nCores) # Set up snow cluster
-    inTables <- parLapply(cl, X = urls, fun = getFIAHelper, dir)
-  } else { # Unix systems
-    inTables <- mclapply(X = urls, FUN = getFIAHelper, dir, mc.cores = nCores)
+  # ## Read/write tables in parallel -- Clusters in windows, forking otherwise
+  # if (Sys.info()['sysname'] == 'Windows'){
+  #   cl <- makeCluster(nCores) # Set up snow cluster
+  #   inTables <- parLapply(cl, X = urls, fun = getFIAHelper, dir)
+  # } else { # Unix systems
+  #   inTables <- mclapply(X = urls, FUN = getFIAHelper, dir, mc.cores = nCores)
+  # }
+  inTables = list()
+  for (n in 1:length(urls)){
+    # Download and append each file to a list
+    file <- fread(urls[n], showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores)
+
+    # Write the data out the directory they've chosen
+    if(!is.null(dir)){
+      fwrite(x = file, file = paste0(dir, str_sub(x, 43, -1)), showProgress = FALSE, nThread = nCores)
+    }
+
+    # We don't want data.table formats
+    file <- as.data.frame(file)
+
+    ## Use a loop to avoid using bit64 package (integer64 columns still appear for some reason)
+    classes <- sapply(file, class)
+    for (i in 1:ncol(file)){
+      if (classes[i] == 'integer64'){
+        file[,i] <- as.double(file[,i])
+      }
+    }
+    inTables[[str_sub(urls[n], 43, -5)]] <- file
   }
 
+
+
   # Give them some names
-  names(inTables) <- str_sub(urls, 43, -5)
+  #names(inTables) <- str_sub(urls, 43, -5)
 
   # Check for corresponding tables (multiple states)
   # If they exist, loop through and merge corresponding tables
@@ -541,6 +582,41 @@ Did you accidentally include the state abbreviation in front of the table name? 
   class(outTables) <- 'FIA.Database'
 
   return(outTables)
+}
+
+## Write out the raw FIA files
+#' @export
+writeFIA <- function(db,
+                     dir,
+                     nCores = 1,
+                     ...){
+  #cat(sys.call()$dir)
+  if (!is.null(dir)){
+    # Add a slash to end of directory name if missing
+    if (str_sub(dir,-1) != '/'){
+      dir <- paste(dir, '/', sep = "")
+    }
+    # Check to see directory exists
+    if(!dir.exists(dir)) {
+      stop(paste('Directory', dir, 'does not exist. Cannot create new directory.'))
+    }
+  }
+
+  tableNames <- names(db)
+  ## Write out tables
+  ## Read/write tables in parallel -- Clusters in windows, forking otherwise
+  # if (Sys.info()['sysname'] == 'Windows'){
+  #   cl <- makeCluster(nCores) # Set up snow cluster
+  #   parLapply(cl, X = tableNames, fun = writeFIAHelper, db, dir)
+  # } else { # Unix systems
+  #   mclapply(X = tableNames, FUN = writeFIAHelper, db, dir, mc.cores = nCores)
+  # }
+  for (i in 1:length(tableNames)){
+    if (is.data.frame(db[[i]])){
+      fwrite(x = db[[i]], file = paste0(dir, tableNames[i], '.csv'), showProgress = FALSE, nThread = nCores)
+    }
+  }
+
 }
 
 
