@@ -1322,6 +1322,11 @@ standStruct <- function(db,
       ## Compute estimates in parallel -- Clusters in windows, forking otherwise
       if (Sys.info()['sysname'] == 'Windows'){
         cl <- makeCluster(nCores)
+        clusterEvalQ(cl, {
+          library(dplyr)
+          library(stringr)
+          library(tidyr)
+        })
         if(progress){ # Include progress Bar
           sOut <- pblapply(X = names(combos), FUN = standStructHelper, combos, data, grpBy, totals, tidy, SE, cl = cl)
         } else { # No progress Bar
@@ -1724,6 +1729,10 @@ diversity <- function(db,
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
+      clusterEvalQ(cl, {
+        library(dplyr)
+        library(stringr)
+      })
       if(progress){ # Include progress Bar
         dOut <- pblapply(X = names(combos), FUN = diversityHelper, combos, data, grpBy, SE, cl = cl)
       } else { # No progress Bar
@@ -2110,6 +2119,10 @@ tpa <- function(db,
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
+      clusterEvalQ(cl, {
+        library(dplyr)
+        library(stringr)
+        })
       if(progress){ # Include progress Bar
         tOut <- pblapply(X = names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
       } else { # No progress Bar
@@ -2529,6 +2542,10 @@ growMort <- function(db,
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
+      clusterEvalQ(cl, {
+        library(dplyr)
+        library(stringr)
+      })
       if(progress){ # Include progress Bar
         tOut <- pblapply(X = names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
       } else { # No progress Bar
@@ -2961,6 +2978,11 @@ vitalRates <- function(db,
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
+      clusterEvalQ(cl, {
+        library(dplyr)
+        library(stringr)
+        library(tidyr)
+      })
       if(progress){ # Include progress Bar
         tOut <- pblapply(X = names(combos), FUN = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
       } else { # No progress Bar
@@ -3344,6 +3366,11 @@ biomass <- function(db,
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
+      clusterEvalQ(cl, {
+        library(dplyr)
+        library(stringr)
+        library(tidyr)
+      })
       if(progress){ # Include progress Bar
         bOut <- pblapply(X = names(combos), FUN = biomassHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
       } else { # No progress Bar
@@ -3699,6 +3726,11 @@ dwm <- function(db,
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
+      clusterEvalQ(cl, {
+        library(dplyr)
+        library(stringr)
+        library(tidyr)
+      })
       if(progress){ # Include progress Bar
         cOut <- pblapply(X = names(combos), FUN = dwmHelper, combos, data, grpBy, totals, SE, cl = cl)
       } else { # No progress Bar
@@ -4105,6 +4137,11 @@ invasive <- function(db,
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
       cl <- makeCluster(nCores)
+      clusterEvalQ(cl, {
+        library(dplyr)
+        library(stringr)
+        library(tidyr)
+      })
       if(progress){ # Include progress Bar
         invOut <- pblapply(X = names(combos), FUN = invasiveHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
       } else { # No progress Bar
@@ -4465,6 +4502,11 @@ area <- function(db,
       ## Compute estimates in parallel -- Clusters in windows, forking otherwise
       if (Sys.info()['sysname'] == 'Windows'){
         cl <- makeCluster(nCores)
+        clusterEvalQ(cl, {
+          library(dplyr)
+          library(stringr)
+          library(tidyr)
+        })
         if(progress){ # Include progress Bar
           aOut <- pblapply(X = names(combos), FUN = areaHelper, combos, data, grpBy, totals, SE, cl = cl)
         } else { # No progress Bar
