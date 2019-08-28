@@ -7,7 +7,7 @@ Lookup Evaluation IDs (EVALIDs) associated with reporting years and evaluation t
 }
 
 \usage{
-findEVALID(db, mostRecent = TRUE, state = NULL, year = NULL, type = NULL)
+findEVALID(db, mostRecent = FALSE, state = NULL, year = NULL, type = NULL)
 }
 
 \arguments{

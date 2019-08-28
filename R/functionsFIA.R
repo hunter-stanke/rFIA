@@ -624,7 +624,7 @@ writeFIA <- function(db,
 # Look up EVALID codes
 #' @export
 findEVALID <- function(db = NULL,
-                       mostRecent = TRUE,
+                       mostRecent = FALSE,
                        state = NULL,
                        year = NULL,
                        type = NULL){
