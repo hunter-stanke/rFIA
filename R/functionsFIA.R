@@ -423,6 +423,9 @@ readFIA <- function(dir,
   #outTables <- lapply(outTables, as.data.frame)
   class(outTables) <- 'FIA.Database'
 
+  ## If you are on windows, close explicitly
+  closeAllConnections()
+
   return(outTables)
 }
 
@@ -581,6 +584,9 @@ Did you accidentally include the state abbreviation in front of the table name? 
   #outTables <- lapply(outTables, as.data.frame)
   class(outTables) <- 'FIA.Database'
 
+  ## If you are on windows, close explicitly
+  closeAllConnections()
+
   return(outTables)
 }
 
@@ -616,6 +622,9 @@ writeFIA <- function(db,
       fwrite(x = db[[i]], file = paste0(dir, tableNames[i], '.csv'), showProgress = FALSE, nThread = nCores)
     }
   }
+
+  ## If you are on windows, close explicitly
+  closeAllConnections()
 
 }
 
