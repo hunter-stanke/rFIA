@@ -89,7 +89,7 @@ db <- readFIA('/path/to/your/directory/')
 ----
 
 ### _Compute Estimates of Forest Variables_
-Now that you have loaded your FIA data into R, it's time to put it to work. Let's explore the basic functionality of `rFIA` with `tpa`, a function to compute tree abundance estimates (TPA, BAA, & relative abundance) from FIA data, and `fiaRI`, a subset of the FIA Database for Rhode Island including all inventories up to 2017.  
+Now that you have loaded your FIA data into R, it's time to put it to work. Let's explore the basic functionality of `rFIA` with `tpa`, a function to compute tree abundance estimates (TPA, BAA, & relative abundance) from FIA data, and `fiaRI`, a subset of the FIA Database for Rhode Island including inventories from 2013-2018. 
 
 **Estimate the abundance of live trees in Rhode Island:**
 ```{r warning= FALSE, message=FALSE}
@@ -105,8 +105,6 @@ head(tpaRI_MR)
 
 ## All Inventory Years Available (i.e., returns a time series)
 tpaRI <- tpa(fiaRI)
-## 2005 marks the first reporting year of the annual inventory, prior data is sparse
-tail(tpaRI[tpaRI$YEAR >= 2005,], n = 4) 
 
 ## Time Series plot
 plotFIA(tpaRI, BAA, plot.title = 'Basal area per acre in Rhode Island over time')

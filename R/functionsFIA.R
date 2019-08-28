@@ -671,7 +671,7 @@ clipFIA <- function(db,
                     mostRecent = TRUE,
                     mask = NULL,
                     matchEval = FALSE,
-                    evalID = NULL,
+                    evalid = NULL,
                     designCD = NULL) {
 
   ## Some warnings
@@ -714,9 +714,7 @@ clipFIA <- function(db,
 
 
   ######### IF USER SPECIES EVALID (OR MOST RECENT), EXTRACT APPROPRIATE PLOTS ##########
-  if (!is.null(evalID)){
-    # Prevent naming interference
-    evalid <- str_sub(evalID, 2,-1)
+  if (!is.null(evalid)){
     # Join appropriate tables and filter out specified EVALIDs
     tempData <- db$PLOT %>%
       mutate(PLT_CN = CN) %>%
@@ -757,11 +755,11 @@ clipFIA <- function(db,
         filter(END_INVYR == max(as.numeric(END_INVYR), na.rm = TRUE))
      }
 
-    # Both most recent and EVALID is specified, pulls most recent subset of the evalids given
-    if (!is.null(evalID)){
-      tempData <- tempData %>%
-        filter(EVALID %in% evalid)
-    }
+    # # Both most recent and EVALID is specified, pulls most recent subset of the evalids given
+    # if (!is.null(evalID)){
+    #   tempData <- tempData %>%
+    #     filter(EVALID %in% evalid)
+    # }
     # # Locate the most recent EVALIDs present in data
     # yrMax <- max(tempData$END_INVYR, na.rm = TRUE)
     # tempData <- tempData %>%
@@ -974,7 +972,7 @@ clipFIA <- function(db,
         filter(TRE_CN %in% clippedData$TREE$CN)
     }
     # Deal with the POP Tables
-    if(!is.null(evalID) | mostRecent){ # User specified EVALIDs
+    if(!is.null(evalid) | mostRecent){ # User specified EVALIDs
       # Links only to POP_EVAL
       if ('POP_EVAL' %in% tableNames){
         clippedData[['POP_EVAL']] <- db$POP_EVAL %>%
