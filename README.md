@@ -119,7 +119,7 @@ Now that you have loaded your FIA data into R, it’s time to put it to
 work. Let’s explore the basic functionality of `rFIA` with `tpa`, a
 function to compute tree abundance estimates (TPA, BAA, & relative
 abundance) from FIA data, and `fiaRI`, a subset of the FIA Database for
-Rhode Island including all inventories up to 2017.
+Rhode Island including inventories from 2013-2018.
 
 **Estimate the abundance of live trees in Rhode Island:**
 
@@ -134,24 +134,12 @@ fiaRI_MR <- clipFIA(fiaRI, mostRecent = TRUE) ## subset the most recent data
 tpaRI_MR <- tpa(fiaRI_MR)
 head(tpaRI_MR)
 #>   YEAR      TPA      BAA TPA_PERC BAA_PERC   TPA_SE   BAA_SE TPA_PERC_SE
-#> 1 2017 441.1381 123.2122 95.38343  94.6289 6.658465 3.012546     7.65795
+#> 1 2018 426.7119 122.1143 93.22791   93.677 6.631549 3.057083     7.61641
 #>   BAA_PERC_SE nPlots_TREE nPlots_AREA
-#> 1    4.486253         124         125
+#> 1    4.477168         126         127
 
 ## All Inventory Years Available (i.e., returns a time series)
 tpaRI <- tpa(fiaRI)
-## 2005 marks the first reporting year of the annual inventory, prior data is sparse
-tail(tpaRI[tpaRI$YEAR >= 2005,], n = 4) 
-#>    YEAR      TPA      BAA TPA_PERC BAA_PERC   TPA_SE   BAA_SE TPA_PERC_SE
-#> 12 2014 466.0828 119.8941 96.81215 95.01087 6.726866 3.093355    7.624014
-#> 13 2015 444.4095 120.5557 96.56753 94.95990 6.397598 3.056033    7.370677
-#> 14 2016 449.7928 122.8870 95.81793 95.01799 6.458278 2.940997    7.454994
-#> 15 2017 441.1381 123.2122 95.38343 94.62890 6.658465 3.012546    7.657950
-#>    BAA_PERC_SE nPlots_TREE nPlots_AREA
-#> 12    4.597449         121         123
-#> 13    4.479756         122         124
-#> 14    4.486982         124         125
-#> 15    4.486253         124         125
 
 ## Time Series plot
 plotFIA(tpaRI, BAA, plot.title = 'Basal area per acre in Rhode Island over time')
@@ -167,30 +155,30 @@ class?**
 tpaRI_species <- tpa(fiaRI_MR, bySpecies = TRUE)
 head(tpaRI_species, n = 3)
 #>   YEAR SPCD          COMMON_NAME        SCIENTIFIC_NAME        TPA
-#> 1 2017   12           balsam fir         Abies balsamea 0.08543602
-#> 2 2017   43 Atlantic white-cedar Chamaecyparis thyoides 0.25204548
-#> 3 2017   68     eastern redcedar   Juniperus virginiana 1.14522403
+#> 1 2018   12           balsam fir         Abies balsamea 0.08732464
+#> 2 2018   43 Atlantic white-cedar Chamaecyparis thyoides 0.24652918
+#> 3 2018   68     eastern redcedar   Juniperus virginiana 1.13812339
 #>          BAA   TPA_PERC   BAA_PERC    TPA_SE    BAA_SE TPA_PERC_SE
-#> 1 0.02882013 0.01847308 0.02213431 116.12825 116.12825    7.745135
-#> 2 0.18331354 0.05449759 0.14078767  58.76023  55.63951    7.680104
-#> 3 0.13385013 0.24762176 0.10279899  64.41035  65.79782    7.684579
+#> 1 0.02945721 0.01907867 0.02259738 114.02897 114.02897    7.700936
+#> 2 0.17960008 0.05386163 0.13777578  59.08447  55.97810    7.638942
+#> 3 0.13844250 0.24865690 0.10620276  64.77184  67.45948    7.643501
 #>   BAA_PERC_SE nPlots_TREE nPlots_AREA
-#> 1    4.634001           1         125
-#> 2    4.520513           3         125
-#> 3    4.534002           5         125
+#> 1    4.619978           1         127
+#> 2    4.511914           3         127
+#> 3    4.527460           5         127
 
 ## Group estimates by size class
 ## NOTE: Default 2-inch size classes, but you can make your own using makeClasses()
 tpaRI_sizeClass <- tpa(fiaRI_MR, bySizeClass = TRUE)
 head(tpaRI_sizeClass, n = 3)
-#>   YEAR sizeClass       TPA      BAA  TPA_PERC BAA_PERC    TPA_SE    BAA_SE
-#> 1 2017     [1,3) 205.23681 3.669717 44.579534 2.986311  9.374920  8.810176
-#> 2 2017     [3,5)  69.80959 5.821516 15.163356 4.737384 12.440803 13.026966
-#> 3 2017     [5,7)  45.22111 8.753295  9.822488 7.123183  5.241419  5.313978
+#>   YEAR sizeClass       TPA      BAA TPA_PERC BAA_PERC    TPA_SE    BAA_SE
+#> 1 2018     [1,3) 200.04626 3.703843 43.68492 3.004808  9.350683  9.599735
+#> 2 2018     [3,5)  67.04905 5.636636 14.64177 4.572821 12.110857 12.699784
+#> 3 2018     [5,7)  44.10363 8.579190  9.63109 6.960020  5.338930  5.392966
 #>   TPA_PERC_SE BAA_PERC_SE nPlots_TREE nPlots_AREA
-#> 1    4.557014    2.051695          75         124
-#> 2    4.557813    2.053974          44         124
-#> 3    4.556390    2.050508         113         124
+#> 1    4.464367    1.978547          76         126
+#> 2    4.465090    1.980327          46         126
+#> 3    4.463748    1.976972         115         126
 
 ## Group by species and size class, and plot the distribution 
 ##  for the most recent inventory year
@@ -220,14 +208,14 @@ tpaRI_own <- tpa(fiaRI_MR,
                      treeDomain = DIA > 12 & CCLCD %in% c(1,2),
                      areaDomain = PHYSCLCD %in% c(20:29))
 head(tpaRI_own)
-#>   YEAR OWNGRPCD      TPA      BAA TPA_PERC BAA_PERC   TPA_SE   BAA_SE
-#> 1 2017       30 1.238332 4.783645      100      100 49.84574 49.34242
-#> 2 2017       40 1.435430 3.737055      100      100 24.80016 26.94152
-#> 3 2017       NA 1.372623 4.070559      100      100 22.68298 24.92343
+#>   YEAR OWNGRPCD       TPA      BAA TPA_PERC BAA_PERC   TPA_SE   BAA_SE
+#> 1 2018       30 0.8482522 3.567751      100      100 58.95933 59.06494
+#> 2 2018       40 1.4920940 3.992055      100      100 25.69191 27.70682
+#> 3 2018       NA 1.2884293 3.857836      100      100 23.72942 25.98661
 #>   TPA_PERC_SE BAA_PERC_SE nPlots_TREE nPlots_AREA
-#> 1    51.46922    50.95504           4          38
-#> 2    26.04668    27.89684          12          80
-#> 3    23.14604    25.23145          16         116
+#> 1    60.69603    60.74652           3          38
+#> 2    26.85686    28.61007          12          82
+#> 3    24.15310    26.25434          15         118
 ```
 
 **What if I want to produce estimates within my own population
