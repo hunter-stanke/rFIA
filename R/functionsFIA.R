@@ -289,7 +289,7 @@ print.FIA.Database <- function(x, ...){
 #' @import gganimate
 #' @import ggplot2
 #' @importFrom data.table fread fwrite
-#' @importFrom parallel makeCluster detectCores mclapply parLapply stopCluster
+#' @importFrom parallel makeCluster detectCores mclapply parLapply stopCluster clusterEvalQ
 #' @importFrom tidyr gather
 #' @importFrom pbapply pblapply
 #' @importFrom sp over proj4string<- coordinates<- spTransform proj4string
