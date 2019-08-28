@@ -1,4 +1,4 @@
-utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ANN_BA_GROWTH',
+utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ANN_BA_GROWTH', 'x',
                          'ANN_DIA_GROWTH', 'ANN_HT_GROWTH', 'ANN_NET_GROWTH', 'AREA AREA_SE', 'AREA_TOTAL',
                          'AREA_TOTAL_SE', 'AREA_USED', 'BAA', 'BAA_GROW', 'BAA_GROW_SE', 'BAA_PERC', 'BAA_PERC_SE',
                          'BAA_SE', 'BAA_TOTAL', 'BA_GROW', 'BA_GROW_SE', 'BA_SE', 'BA_TOTAL', 'BA_TOTAL_full', 'BIO',

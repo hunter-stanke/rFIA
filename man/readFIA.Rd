@@ -51,7 +51,7 @@ Alternatively, use \code{\link{getFIA}} to automate the download and saving proc
 }
 
 \seealso{
-\code{\link{clipFIA}, \code{\link{getFIA}}}
+\code{\link{clipFIA}}, \code{\link{getFIA}}
 }
 
 
