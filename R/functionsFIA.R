@@ -489,7 +489,7 @@ Did you accidentally include the state abbreviation in front of the table name? 
 
   # Make sure state Abbs are in right format
   states <- str_to_upper(states)
-  if ('ENTIRE' %in% states) {
+  if ('ENTIRE' %in% states == FALSE) {
     states <- paste0(states, '_')
   } else {
     states <- ''
@@ -729,8 +729,9 @@ clipFIA <- function(db,
       inner_join(select(db$COND, c('PLT_CN', 'CONDID', 'COND_STATUS_CD')),
                  by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'),
                  suffix = c('.CURR', '.PREV')) %>%
-      group_by(PLT_CN, CONDID) %>%
-      summarize(COND_CHANGE_CD = ifelse(any(COND_STATUS_CD.CURR == 1 & COND_STATUS_CD.PREV == 1), 1, 0))
+      group_by(PLT_CN, SUBPTYP, PREV_PLT_CN, PREVCOND, CONDID) %>%
+      summarize(COND_CHANGE_CD = ifelse(any(COND_STATUS_CD.CURR == 1 & COND_STATUS_CD.PREV == 1), 1, 0)) %>%
+      ungroup()
 
     db$GRM_COND <- db$COND %>%
       inner_join(select(db$SUBP_COND_CHNG_MTRX, c('PLT_CN', 'CONDID', 'COND_CHANGE_CD')), by = c('PLT_CN', 'CONDID')) %>%
