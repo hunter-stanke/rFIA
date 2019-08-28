@@ -18,15 +18,6 @@ divIndex <- function(SPCD, TPA, index) {
     species <- unique(SPCD[TPA > 0 & !is.na(TPA)])
     total <- sum(TPA, na.rm = TRUE)
 
-    ### REALLY SLOW
-    # props <- data.frame(SPCD, TPA) %>%
-    #   filter(TPA > 0) %>%
-    #   group_by(SPCD) %>%
-    #   summarize(tpa = sum(TPA, na.rm = TRUE)) %>%
-    #   mutate(prop = tpa / total) %>%
-    #   summarize(H = -sum(prop * log(prop), na.rm = TRUE))
-    # value <- props$H
-
     p <- c() # Empty vector to hold proportions
     for (i in 1:length(species)){
       p[i] <- sum(TPA[SPCD == species[i]], na.rm = TRUE) / total
