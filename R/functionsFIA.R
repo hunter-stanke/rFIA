@@ -628,70 +628,39 @@ findEVALID <- function(db = NULL,
                        state = NULL,
                        year = NULL,
                        type = NULL){
-  # Naming deals
-  # if (!is.null(db)){
-  #   POP_EVAL = db[['POP_EVAL']]
-  # }
 
-  # # R does dumb things when reading strings w/ leading zeros
-  # tempID <- c()
-  # for (i in 1:length(POP_EVAL$EVALID)){
-  #   tempID[i] <- ifelse(str_length(POP_EVAL$EVALID[i]) < 6, paste('0', db$POP_EVAL$EVALID[i], sep = ''), db$POP_EVAL$EVALID[i])
-  # }
-  #
-  # POP_EVAL$EVALID <- tempID
+  #### REWRITING FOR SIMPLICITY #####
+  # Joing w/ evaltype code
+  ids <- db$POP_EVAL %>%
+    left_join(select(db$POP_EVAL_TYP, c('EVAL_GRP_CN', 'EVAL_TYP')), by = 'EVAL_GRP_CN')
 
-
-  # Convert types into codes
-  if (!is.null(type)){
-    if (type == 'ALL'){
-      type = '00'
-    } else if (type == 'CURR'){
-      type = '01'
-    } else if(type == 'VOL'){
-      type = '02'
-    } else if(type == 'GROW'){
-      type = '03'
-    } else if(type == 'MORT'){
-      type == '04'
-    } else if(type == 'REMV'){
-      type = '05'
-    } else if(type == 'CHNG'){
-      type = '06'
-    } else if(type == 'DWM'){
-      type = '07'
-    } else if(type == 'REGEN'){
-      type = '08'
+  if (!is.null(state)){
+    state <- str_to_upper(state)
+    ## Join state abbs with state codes in popeval
+    ids <- left_join(ids, select(intData$EVAL_GRP, c('STATECD', 'STATE')), by = 'STATECD')
+    # Check if any specified are missing from db
+    if (any(unique(state) %in% unique(db$POP_EVAL_STATE) == FALSE)){
+      missStates <- state[state %in% unique(db$POP_EVAL_STATE) == FALSE]
+      fancyName <- unique(intData$EVAL_GRP$STATE[intData$EVAL_GRP$STATECD %in% missStates])
+      stop(paste('States: ', toString(fancyName) , 'not found in db.', sep = ''))
     }
+    ids <- filter(ids, STATE %in% state)
   }
-
-  # If year is given as whole number, cut it down
   if (!is.null(year)){
-    year <- ifelse(str_length(year) == 2, year, str_sub(year, -2,-1))
+    #year <- ifelse(str_length(year) == 2, year, str_sub(year, -2,-1))
+    ids <- filter(ids, END_INVYR %in% year)
+  }
+  if (!is.null(type)){
+    ids <- filter(ids, EVAL_TYP %in% paste0('EXP', type))
+  }
+  if (mostRecent) {
+    ids <- ids %>%
+      group_by(LOCATION_NM, EVAL_TYP) %>%
+      filter(END_INVYR == max(END_INVYR, na.rm = TRUE))
   }
 
-  # User specifies state & year --> return all evalIDs within state and year
-  if(!is.null(state) & !is.null(year) & !is.null(db)){
-    base <- paste(first(intData$EVAL_GRP$STATECD[intData$EVAL_GRP$STATE == str_to_upper(state)]), year, type, sep = "")
-    ID <- str_subset(db$POP_EVAL$EVALID, base)
-  # User doesn't specifiy a year or state, and doesn't want most recent --> all codes present
-  } else if (is.null(state) & is.null(year) & mostRecent == FALSE & !is.null(db)){
-    if (is.null(type)) {
-      ID <- unique(db$POP_EVAL$EVALID)
-    } else {
-      index <- str_which(str_sub(POP_EVAL$EVALID, -2,-1), type)
-      ID <- db$POP_EVAL$EVALID[index]
-    }
-  # Most recent subset from given database or POP EVAL table
-  } else if(is.null(state) & is.null(year) & mostRecent){
-    if (is.null(type)) {
-      yrMax <- max(db$POP_EVAL$END_INVYR)
-      ID <- db$POP_EVAL$EVALID[db$POP_EVAL$END_INVYR == yrMax]
-    } else {
-      yrMax <- max(db$POP_EVAL$END_INVYR)
-      ID <- db$POP_EVAL$EVALID[db$POP_EVAL$END_INVYR == yrMax & str_sub(db$POP_EVAL$EVALID,-2,-1) == type]
-    }
-  }
+  # Output as vector
+  ID <- unique(ids$EVALID)
 
   return(ID)
 }
