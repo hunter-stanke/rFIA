@@ -14,7 +14,7 @@ knitr::opts_chunk$set(
 ```
 # rFIA: Unlocking the FIA Database in R
 
-![US Biomass](static/usBiomass.png)
+![US Biomass](man/figures/usBiomass.png)
 <!-- badges: start -->
 <!-- badges: end -->
 
