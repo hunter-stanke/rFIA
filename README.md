@@ -1,47 +1,28 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
+rFIA: Unlocking the FIA Database in R
+=====================================
 
-# rFIA: Unlocking the FIA Database in R
+![US Biomass](man/figures/usBiomass.png) <!-- badges: start --> <!-- badges: end -->
 
-![US Biomass](static/usBiomass.png) <!-- badges: start -->
-<!-- badges: end -->
+The goal of `rFIA` is to increase the accessibility and use of the USFS Forest Inventory and Analysis (FIA) Database by providing a user-friendly, open source platform to easily query and analyze FIA Data. Designed to accommodate a wide range of potential user objectives, `rFIA` simplifies the estimation of forest variables from the FIA Database and allows all R users (experts and newcomers alike) to unlock the flexibility and potential inherent to the Enhanced FIA design.
 
-The goal of `rFIA` is to increase the accessibility and use of the USFS
-Forest Inventory and Analysis (FIA) Database by providing a
-user-friendly, open source platform to easily query and analyze FIA
-Data. Designed to accommodate a wide range of potential user objectives,
-`rFIA` simplifies the estimation of forest variables from the FIA
-Database and allows all R users (experts and newcomers alike) to unlock
-the flexibility and potential inherent to the Enhanced FIA design.
+Specifically, `rFIA` improves accessibility to the spatio-temporal estimation capacity of the FIA Database by producing space-time indexed summaries of forest variables within user-defined population boundaries. Direct integration with other popular R packages (e.g., dplyr, sp, and sf) facilitates efficient space-time query and data summary, and supports common data representations and API design. The package implements design-based estimation procedures outlined by Bechtold & Patterson (2005), and has been validated against estimates and sampling errors produced by EVALIDator. Current development is focused on the implementation of spatially-enabled model-assisted estimators to improve population, change, and ratio estimates.
 
-Specifically, `rFIA` improves accessibility to the spatio-temporal
-estimation capacity of the FIA Database by producing space-time indexed
-summaries of forest variables within user-defined population boundaries.
-Direct integration with other popular R packages (e.g., dplyr, sp, and
-sf) facilitates efficient space-time query and data summary, and
-supports common data representations and API design. The package
-implements design-based estimation procedures outlined by Bechtold &
-Patterson (2005), and has been validated against estimates and sampling
-errors produced by EVALIDator. Current development is focused on the
-implementation of spatially-enabled model-assisted estimators to improve
-population, change, and ratio estimates.
-
-You can download subsets of the FIA Database at the FIA Datamart:
-<https://apps.fs.usda.gov/fia/datamart/CSV/datamart_csv.html>
+You can download subsets of the FIA Database at the FIA Datamart: <https://apps.fs.usda.gov/fia/datamart/CSV/datamart_csv.html>
 
 <br>
 
-## Installation
+Installation
+------------
 
-You can install the released version of `rFIA` from
-[CRAN](https://CRAN.R-project.org) with:
+You can install the released version of `rFIA` from [CRAN](https://CRAN.R-project.org) with:
 
 ``` r
 install.packages("rFIA")
 ```
 
-Alternatively, you can install the development version from
-GitHub:
+Alternatively, you can install the development version from GitHub:
 
 ``` r
 devtools::install_github('hunter-stanke/rFIA')
@@ -49,10 +30,11 @@ devtools::install_github('hunter-stanke/rFIA')
 
 <br>
 
-## Functionality
+Functionality
+-------------
 
 | `rFIA` Function | Description                                                        |
-| --------------- | ------------------------------------------------------------------ |
+|-----------------|--------------------------------------------------------------------|
 | `area`          | Estimate land area                                                 |
 | `biomass`       | Estimate volume, biomass, & carbon stocks of standing trees        |
 | `clipFIA`       | Spatial & temporal queries                                         |
@@ -69,16 +51,12 @@ devtools::install_github('hunter-stanke/rFIA')
 
 <br>
 
-## Example Usage
+Example Usage
+-------------
 
 ### *Download FIA Data and Load into R*
 
-The first step to using `rFIA` is to download subsets of the FIA
-Database. The easiest way to accomplish this is using `getFIA`. Using
-one line of code, you can download state subsets of the FIA Database,
-load data into your R environment, and optionally save those data to a
-local directory for future
-use\!
+The first step to using `rFIA` is to download subsets of the FIA Database. The easiest way to accomplish this is using `getFIA`. Using one line of code, you can download state subsets of the FIA Database, load data into your R environment, and optionally save those data to a local directory for future use!
 
 ``` r
 ## Download the state subset or Connecticut (requires an internet connection)
@@ -86,40 +64,24 @@ use\!
 ct <- getFIA(states = 'CT', dir = '/path/to/save/data')
 ```
 
-By default, `getFIA` only downloads the portions of the database
-required to produce summaries with other `rFIA` functions (`common =
-TRUE`). This conserves memory on your machine and speeds download time.
-If you would like to download all available tables for a state, simple
-specify `common = FALSE` in the call to `getFIA`.
+By default, `getFIA` only downloads the portions of the database required to produce summaries with other `rFIA` functions (`common = TRUE`). This conserves memory on your machine and speeds download time. If you would like to download all available tables for a state, simple specify `common = FALSE` in the call to `getFIA`.
 
-**But what if I want to load multiple states worth of FIA data into R?**
-No problem\! Simply specify mutiple state abbreviations in the `states`
-argument of `getFIA` (e.g. `states = c('MI', 'IN', 'WI', 'IL'`)), and
-all state subsets will be downloaded and merged into a single
-`FIA.Database` object. This will allow you to use other `rFIA` functions
-to produce estimates within polygons which straddle state boundaries\!
+**But what if I want to load multiple states worth of FIA data into R?** No problem! Simply specify mutiple state abbreviations in the `states` argument of `getFIA` (e.g. `states = c('MI', 'IN', 'WI', 'IL'`)), and all state subsets will be downloaded and merged into a single `FIA.Database` object. This will allow you to use other `rFIA` functions to produce estimates within polygons which straddle state boundaries!
 
-Note: given the massive size of the full FIA Database, users are
-cautioned to only download the subsets containing their region of
-interest.
+Note: given the massive size of the full FIA Database, users are cautioned to only download the subsets containing their region of interest.
 
-**If you have previously downloaded FIA data would simply like to load
-into R from a local directory, use `readFIA`:**
+**If you have previously downloaded FIA data would simply like to load into R from a local directory, use `readFIA`:**
 
 ``` r
 ## Load FIA Data from a local directory
 db <- readFIA('/path/to/your/directory/')
 ```
 
------
+------------------------------------------------------------------------
 
 ### *Compute Estimates of Forest Variables*
 
-Now that you have loaded your FIA data into R, it’s time to put it to
-work. Let’s explore the basic functionality of `rFIA` with `tpa`, a
-function to compute tree abundance estimates (TPA, BAA, & relative
-abundance) from FIA data, and `fiaRI`, a subset of the FIA Database for
-Rhode Island including inventories from 2013-2018.
+Now that you have loaded your FIA data into R, it's time to put it to work. Let's explore the basic functionality of `rFIA` with `tpa`, a function to compute tree abundance estimates (TPA, BAA, & relative abundance) from FIA data, and `fiaRI`, a subset of the FIA Database for Rhode Island including inventories from 2013-2018.
 
 **Estimate the abundance of live trees in Rhode Island:**
 
@@ -147,8 +109,7 @@ plotFIA(tpaRI, BAA, plot.title = 'Basal area per acre in Rhode Island over time'
 
 <img src="man/figures/README-unnamed-chunk-4-1.png" width="100%" />
 
-**What if I want to group estimates by species? How about by size
-class?**
+**What if I want to group estimates by species? How about by size class?**
 
 ``` r
 ## Group estimates by species
@@ -190,14 +151,7 @@ plotFIA(tpaRI_spsc, BAA, grp = COMMON_NAME, x = sizeClass,
 
 <img src="man/figures/README-unnamed-chunk-5-1.png" width="100%" />
 
-**What if I want estimates for a specific type of tree (ex. greater than
-12-inches DBH and in a canopy dominant or subdominant position) in
-specific area (ex. growing on mesic sites), and I want to group by
-estimates by some variable other than species or size class (ex.
-ownsership group)?** Easy\! Each of these specifications are described
-in the FIA Database, and all `rFIA` functions can leverage these data to
-easily implement complex
-queries\!
+**What if I want estimates for a specific type of tree (ex. greater than 12-inches DBH and in a canopy dominant or subdominant position) in specific area (ex. growing on mesic sites), and I want to group by estimates by some variable other than species or size class (ex. ownsership group)?** Easy! Each of these specifications are described in the FIA Database, and all `rFIA` functions can leverage these data to easily implement complex queries!
 
 ``` r
 ## grpBy specifies what to group estimates by (just like species and size class above)
@@ -218,9 +172,7 @@ head(tpaRI_own)
 #> 3    24.15310    26.25434          15         118
 ```
 
-**What if I want to produce estimates within my own population
-boundaries (within user-defined spatial zones/polygons)?** This is where
-things get really exciting.
+**What if I want to produce estimates within my own population boundaries (within user-defined spatial zones/polygons)?** This is where things get really exciting.
 
 ``` r
 ## Load the county boundaries for Rhode Island
@@ -237,14 +189,7 @@ plotFIA(tpaRI_counties, BAA) # Plotting method for spatial FIA summaries, also t
 
 <img src="man/figures/README-unnamed-chunk-7-1.png" width="100%" />
 
-**We produced a really cool time series earlier, how would I marry the
-spatial and temporal capacity of `rFIA` to produce estimates across
-user-defined polygons and through time?** Easy\! Just hand `tpa` the
-full FIA.Database object you produced with `readFIA` (not the most
-recent subset produced with `clipFIA`). For stunning space-time
-visualizations, hand the output of `tpa` to `plotFIA`. To save the
-animation as a .gif file, simpy specify `fileName` (name of output file)
-and `savePath` (directory to save file, combined with `fileName`).
+**We produced a really cool time series earlier, how would I marry the spatial and temporal capacity of `rFIA` to produce estimates across user-defined polygons and through time?** Easy! Just hand `tpa` the full FIA.Database object you produced with `readFIA` (not the most recent subset produced with `clipFIA`). For stunning space-time visualizations, hand the output of `tpa` to `plotFIA`. To save the animation as a .gif file, simpy specify `fileName` (name of output file) and `savePath` (directory to save file, combined with `fileName`).
 
 ``` r
 ## Using the full FIA dataset, all available inventories
