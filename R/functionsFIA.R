@@ -365,13 +365,6 @@ readFIA <- function(dir,
     # We don't want data.table formats
     file <- as.data.frame(file)
 
-    # ## Use a loop to avoid using bit64 package (integer64 columns still appear for some reason)
-    # classes <- sapply(file, class)
-    # for (i in 1:ncol(file)){
-    #   if (classes[i] == 'integer64'){
-    #     file[,i] <- as.double(file[,i])
-    #   }
-    # }
     inTables[[files[n]]] <- file
   }
 
@@ -526,13 +519,6 @@ Did you accidentally include the state abbreviation in front of the table name? 
     # We don't want data.table formats
     file <- as.data.frame(file)
 
-    ## Use a loop to avoid using bit64 package (integer64 columns still appear for some reason)
-    classes <- sapply(file, class)
-    for (i in 1:ncol(file)){
-      if (classes[i] == 'integer64'){
-        file[,i] <- as.double(file[,i])
-      }
-    }
     inTables[[str_sub(urls[n], 43, -5)]] <- file
   }
 
