@@ -14,5 +14,4 @@ Imports: dplyr, sp, sf, stringr, tidyr, parallel, pbapply, ggplot2, gganimate, m
 Suggests: 
     knitr,
     rmarkdown
-VignetteBuilder: knitr
 RoxygenNote: 6.1.1
