@@ -665,12 +665,6 @@ clipFIA <- function(db,
   if (class(db) != "FIA.Database"){
     stop('db must be of class "FIA.Databse". Use readFIA() to load your FIA data.')
   }
-  # These states do not allow temporal queries. Things are extremely weird with their eval groups
-  if(any(unique(db$PLOT$STATECD) %in% c(69, 72, 78, 41, 53)) & mostRecent){
-    vState <- unique(db$PLOT$STATECD[db$PLOT$STATECD %in% c(69, 72, 78, 41, 53)])
-    fancyName <- unique(intData$EVAL_GRP$STATE[intData$EVAL_GRP$STATECD %in% vState])
-    warning(paste('Most recent subset unavailable for: ', toString(fancyName) , '. All data required to compute estimates. Returning full database.', sep = ''))
-  }
   if (!is.null(mask) & first(class(mask)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('mask must be spatial polygons object of class sp or sf. ')
   }
@@ -697,9 +691,6 @@ clipFIA <- function(db,
     }
 
 
-
-
-
   ######### IF USER SPECIES EVALID (OR MOST RECENT), EXTRACT APPROPRIATE PLOTS ##########
   if (!is.null(evalid)){
     # Join appropriate tables and filter out specified EVALIDs
@@ -717,40 +708,16 @@ clipFIA <- function(db,
     suppressWarnings({
     tempData <- db$PLOT %>%
       mutate(PLT_CN = CN) %>%
-      left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-      left_join(select(db$POP_STRATUM, -c('STATECD', 'RSCD')), by = c('STRATUM_CN' = 'CN')) %>%
-      left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-      left_join(select(db$POP_EVAL, c('EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM', 'LOCATION_NM')), by = c('EVAL_CN' = 'CN')) %>%
-      left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
-      left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-      mutate_if(is.factor,
-                as.character) %>%
-      filter(!is.na(END_INVYR))
+      left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN', 'EVALID')), by = c('PLT_CN'))
+
+
+    ## Most recent evals by
+    mrids <- findEVALID(db, mostRecent = TRUE)
+
+    tempData <- tempData %>%
+      filter(EVALID %in% mrids)
     })
-     if(any(unique(db$PLOT$STATECD) %in% c(69, 72, 78, 41, 53))){
-      tempMR <- tempData %>%
-        filter(STATECD %in% c(69, 72, 78, 41, 53) == FALSE) %>%
-        group_by(LOCATION_NM, EVAL_TYP) %>%
-        filter(END_INVYR == max(as.numeric(END_INVYR), na.rm = TRUE))
-      tempFULL <- tempData %>%
-        filter(STATECD %in% c(69, 72, 78, 41, 53))
-      tempData <- bind_rows(tempMR, tempFULL)
 
-     } else {
-      tempData <- tempData %>%
-        group_by(LOCATION_NM, EVAL_TYP) %>%
-        filter(END_INVYR == max(as.numeric(END_INVYR), na.rm = TRUE))
-     }
-
-    # # Both most recent and EVALID is specified, pulls most recent subset of the evalids given
-    # if (!is.null(evalID)){
-    #   tempData <- tempData %>%
-    #     filter(EVALID %in% evalid)
-    # }
-    # # Locate the most recent EVALIDs present in data
-    # yrMax <- max(tempData$END_INVYR, na.rm = TRUE)
-    # tempData <- tempData %>%
-    #   filter(END_INVYR == yrMax)
     # Extract appropriate PLOTS
     db$PLOT <- db$PLOT[db$PLOT$CN %in% tempData$PLT_CN,]
     #test = db$PLOT <- db$PLOT[db$PLOT$CN %in% tempData$PLT_CN,]
@@ -859,53 +826,10 @@ clipFIA <- function(db,
     }
    }
 
-  # Starting w/ the most recent subset by state, just want to merge END_INVYR where we have overlapping polygons
-
-  # #### TO deal with polygons which cross state boundaries with different most recent inventory years
-  # if(matchEval & mostRecent & !is.null(mask)){
-  #   # do a spatial intersection with plot to id poly, then merge the years in pop_eval
-  #   evals <- pltSF %>%
-  #     inner_join(db$POP_EVAL)
-  #   # use pltSF from above
-  # }
-
-
 
   #################  APPLY  QUERY TO REMAINING TABLES  ###########################
   ## User gives object names and not list object
   otherTables <- db
-
-  # if (!is.list(otherTables) & !is.null(otherTables)){
-  #   clippedData <- list()
-  #   clippedData[['PLOT']] <- db$PLOT
-  #   if (!is.null(db$OZONE_PLOT)){clippedData[['OZONE_PLOT']] <- db$OZONE_PLOT}
-  #   # Spatial query for all tables directly related to PLOT
-  #   for (i in 1:length(otherTables)){
-  #     # Pull the object with the name listed from the global environment
-  #     table <- get(otherTables[i], envir = .GlobalEnv)
-  #     if ('PLT_CN' %in% colnames(table) & str_detect(otherTables[i], 'OZONE') == FALSE){
-  #       clipTable <- table[table$PLT_CN %in% db$PLOT$CN,]
-  #       clippedData[[otherTables[i]]] <- clipTable
-  #
-  #     } else if (str_detect(otherTables[i], 'OZONE') &'PLT_CN' %in% colnames(table)){
-  #       clipTable <- table[table$PLT_CN %in% db$OZONE_PLOT$CN,]
-  #       clippedData[[otherTables[i]]] <- clipTable
-  #
-  #     } else if ('CTY_CN' %in% colnames(table)){
-  #       clipTable <- table[table$CTY_CN %in% db$PLOT$CTY_CN,]
-  #       clippedData[[otherTables[i]]] <- clipTable
-  #
-  #     } else if('SRV_CN' %in% colnames(table)){
-  #       clipTable <- table[table$SRV_CN %in% db$PLOT$SRV_CN,]
-  #       clippedData[[otherTables[i]]] <- clipTable
-  #
-  #     } else{ # IF it doesn't connect in a way described above, return the whole thing
-  #       clippedData[[otherTables[i]]] <- table
-  #     }
-  #   }
-  #
-  #   ### IF LIST OBJECT IS INGESTED FROM OTHER TABLES
-  # } else
 
   if (is.list(otherTables)){
     tableNames <- names(otherTables)
@@ -3637,21 +3561,22 @@ dwm <- function(db,
                 VOL_1000HR = sum(CWD_VOLCF_ADJ * aDI, na.rm = TRUE),
                 VOL_PILE = sum(PILE_VOLCF_ADJ * aDI, na.rm = TRUE),
                 VOL = sum(VOL_1HR, VOL_10HR, VOL_100HR, VOL_1000HR, VOL_PILE, na.rm = TRUE),
-                # BIO_FUEL = sum(FUEL_BIOMASS * aDI / 2000, na.rm = TRUE),
-                # BIO_LITTER = sum(LITTER_BIOMASS * aDI / 2000, na.rm = TRUE),
-                # BIO_DUFF = sum(DUFF_BIOMASS* aDI / 2000, na.rm = TRUE),
+                BIO_DUFF = sum(DUFF_BIOMASS* aDI / 2000, na.rm = TRUE),
+                BIO_LITTER = sum(LITTER_BIOMASS * aDI / 2000, na.rm = TRUE),
                 BIO_1HR = sum(FWD_SM_DRYBIO_ADJ * aDI / 2000, na.rm = TRUE),
                 BIO_10HR = sum(FWD_MD_DRYBIO_ADJ * aDI / 2000, na.rm = TRUE),
                 BIO_100HR = sum(FWD_LG_DRYBIO_ADJ * aDI / 2000, na.rm = TRUE),
                 BIO_1000HR = sum(CWD_DRYBIO_ADJ * aDI / 2000, na.rm = TRUE),
                 BIO_PILE = sum(PILE_DRYBIO_ADJ * aDI / 2000, na.rm = TRUE),
-                BIO = sum(BIO_1HR, BIO_10HR, BIO_100HR, BIO_1000HR, BIO_PILE, na.rm = TRUE),
+                BIO = sum(BIO_LITTER, BIO_DUFF, BIO_1HR, BIO_10HR, BIO_100HR, BIO_1000HR, BIO_PILE, na.rm = TRUE),
+                CARB_DUFF = sum(DUFF_CARBON* aDI / 2000, na.rm = TRUE),
+                CARB_LITTER = sum(LITTER_CARBON * aDI / 2000, na.rm = TRUE),
                 CARB_1HR = sum(FWD_SM_CARBON_ADJ * aDI / 2000, na.rm = TRUE),
                 CARB_10HR = sum(FWD_MD_CARBON_ADJ * aDI / 2000, na.rm = TRUE),
                 CARB_100HR = sum(FWD_LG_CARBON_ADJ * aDI / 2000, na.rm = TRUE),
                 CARB_1000HR = sum(CWD_CARBON_ADJ * aDI / 2000, na.rm = TRUE),
                 CARB_PILE = sum(PILE_CARBON_ADJ * aDI / 2000, na.rm = TRUE),
-                CARB = sum(CARB_1HR, CARB_10HR, CARB_100HR, CARB_1000HR, CARB_PILE, na.rm = TRUE))
+                CARB = sum(CARB_LITTER, CARB_DUFF, CARB_1HR, CARB_10HR, CARB_100HR, CARB_1000HR, CARB_PILE, na.rm = TRUE))
 
     if (returnSpatial){
       cOut <- cOut %>%
@@ -3738,13 +3663,13 @@ dwm <- function(db,
 
       ## IF the user wants a tidy dataframe at the end, handle it for them
       if (tidy){
-        # Gather up all those rando columns
-        vol <- gather(cOut, key = 'FUEL_TYPE', value = 'VOL_ACRE', VOL_1HR_ACRE:VOL_PILE_ACRE)
-        bio <- gather(cOut, key = 'FUEL_TYPE', value = 'BIO_ACRE', BIO_1HR_ACRE:BIO_PILE_ACRE)
-        carb <- gather(cOut, key = 'FUEL_TYPE', value = 'CARB_ACRE', CARB_1HR_ACRE:CARB_PILE_ACRE)
-        volSE <- gather(cOut, key = 'FUEL_TYPE', value = 'VOL_ACRE_SE', VOL_1HR_ACRE_SE:VOL_PILE_ACRE_SE)
-        bioSE <- gather(cOut, key = 'FUEL_TYPE', value = 'BIO_ACRE_SE', BIO_1HR_ACRE_SE:BIO_PILE_ACRE_SE)
-        carbSE <- gather(cOut, key = 'FUEL_TYPE', value = 'CARB_ACRE_SE', CARB_1HR_ACRE_SE:CARB_PILE_ACRE_SE)
+        # Gather up columns
+        vol <- gather(cOut, key = 'FUEL_TYPE', value = 'VOL_ACRE', VOL_DUFF_ACRE:VOL_PILE_ACRE)
+        bio <- gather(cOut, key = 'FUEL_TYPE', value = 'BIO_ACRE', BIO_DUFF_ACRE:BIO_PILE_ACRE)
+        carb <- gather(cOut, key = 'FUEL_TYPE', value = 'CARB_ACRE', CARB_DUFF_ACRE:CARB_PILE_ACRE)
+        volSE <- gather(cOut, key = 'FUEL_TYPE', value = 'VOL_ACRE_SE', VOL_DUFF_ACRE_SE:VOL_PILE_ACRE_SE)
+        bioSE <- gather(cOut, key = 'FUEL_TYPE', value = 'BIO_ACRE_SE', BIO_DUFF_ACRE_SE:BIO_PILE_ACRE_SE)
+        carbSE <- gather(cOut, key = 'FUEL_TYPE', value = 'CARB_ACRE_SE', CARB_DUFF_ACRE_SE:CARB_PILE_ACRE_SE)
         # Join them back up all nice like
         cTidy <- bind_cols(select(vol, c(names(combos[[1]]), 'FUEL_TYPE', 'VOL_ACRE', 'nPlots')),
                            select(bio, BIO_ACRE),
@@ -3753,12 +3678,12 @@ dwm <- function(db,
                            select(bioSE, BIO_ACRE_SE),
                            select(carbSE, CARB_ACRE_SE))
         if(totals){
-          volT <- gather(cOut, key = 'FUEL_TYPE', value = 'VOL_TOTAL', VOL_1HR:VOL_PILE)
-          bioT <- gather(cOut, key = 'FUEL_TYPE', value = 'BIO_TOTAL', BIO_1HR:BIO_PILE)
-          carbT <- gather(cOut, key = 'FUEL_TYPE', value = 'CARB_TOTAL', CARB_1HR:CARB_PILE)
-          volTSE <- gather(cOut, key = 'FUEL_TYPE', value = 'VOL_TOTAL_SE', VOL_1HR_SE:VOL_PILE_SE)
-          bioTSE <- gather(cOut, key = 'FUEL_TYPE', value = 'BIO_TOTAL_SE', BIO_1HR_SE:BIO_PILE_SE)
-          carbTSE <- gather(cOut, key = 'FUEL_TYPE', value = 'CARB_TOTAL_SE', CARB_1HR_SE:CARB_PILE_SE)
+          volT <- gather(cOut, key = 'FUEL_TYPE', value = 'VOL_TOTAL', VOL_DUFF:VOL_PILE)
+          bioT <- gather(cOut, key = 'FUEL_TYPE', value = 'BIO_TOTAL', BIO_DUFF:BIO_PILE)
+          carbT <- gather(cOut, key = 'FUEL_TYPE', value = 'CARB_TOTAL', CARB_DUFF:CARB_PILE)
+          volTSE <- gather(cOut, key = 'FUEL_TYPE', value = 'VOL_TOTAL_SE', VOL_DUFF_SE:VOL_PILE_SE)
+          bioTSE <- gather(cOut, key = 'FUEL_TYPE', value = 'BIO_TOTAL_SE', BIO_DUFF_SE:BIO_PILE_SE)
+          carbTSE <- gather(cOut, key = 'FUEL_TYPE', value = 'CARB_TOTAL_SE', CARB_DUFF_SE:CARB_PILE_SE)
           cTidy <- bind_cols(cTidy, select(volT, VOL_TOTAL),
                              select(bioT, BIO_TOTAL),
                              select(carbT, CARB_TOTAL),
@@ -3776,10 +3701,10 @@ dwm <- function(db,
       cOut <- cOut[[1]]
 
       if (tidy){
-        # Gather up all those rando columns
-        vol <- gather(cOut, key = 'FUEL_TYPE', value = 'VOL_ACRE', VOL_1HR_ACRE:VOL_PILE_ACRE)
-        bio <- gather(cOut, key = 'FUEL_TYPE', value = 'BIO_ACRE', BIO_1HR_ACRE:BIO_PILE_ACRE)
-        carb <- gather(cOut, key = 'FUEL_TYPE', value = 'CARB_ACRE', CARB_1HR_ACRE:CARB_PILE_ACRE)
+        # Gather up columns
+        vol <- gather(cOut, key = 'FUEL_TYPE', value = 'VOL_ACRE', VOL_DUFF_ACRE:VOL_PILE_ACRE)
+        bio <- gather(cOut, key = 'FUEL_TYPE', value = 'BIO_ACRE', BIO_DUFF_ACRE:BIO_PILE_ACRE)
+        carb <- gather(cOut, key = 'FUEL_TYPE', value = 'CARB_ACRE', CARB_DUFF_ACRE:CARB_PILE_ACRE)
         # Join them back up all nice like
         cTidy <- bind_cols(select(vol, c(grpBy, 'FUEL_TYPE', 'VOL_ACRE', 'nPlots')),
                            select(bio, BIO_ACRE),
@@ -3787,9 +3712,9 @@ dwm <- function(db,
 
 
         if(totals){
-          volT <- gather(cOut, key = 'FUEL_TYPE', value = 'VOL_TOTAL', VOL_1HR:VOL_PILE)
-          bioT <- gather(cOut, key = 'BIO_TYPE', value = 'BIO_TOTAL', BIO_1HR:BIO_PILE)
-          carbT <- gather(cOut, key = 'FUEL_TYPE', value = 'CARB_TOTAL', CARB_1HR:CARB_PILE)
+          volT <- gather(cOut, key = 'FUEL_TYPE', value = 'VOL_TOTAL', VOL_DUFF:VOL_PILE)
+          bioT <- gather(cOut, key = 'BIO_TYPE', value = 'BIO_TOTAL', BIO_DUFF:BIO_PILE)
+          carbT <- gather(cOut, key = 'FUEL_TYPE', value = 'CARB_TOTAL', CARB_DUFF:CARB_PILE)
           cTidy <- bind_cols(cTidy, select(volT, VOL_TOTAL),
                              select(bioT, BIO_TOTAL),
                              select(carbT, CARB_TOTAL))
@@ -3829,12 +3754,16 @@ dwm <- function(db,
                          "VOL_1000HR_ACRE" = rep(NA, nrow(combos)), "VOL_1000HR_ACRE_SE" = rep(NA, nrow(combos)),
                          "VOL_PILE_ACRE" = rep(NA, nrow(combos)), "VOL_PILE_ACRE_SE" = rep(NA, nrow(combos)),
                          "VOL_ACRE" = rep(NA, nrow(combos)), "VOL_ACRE_SE" = rep(NA, nrow(combos)),
+                         "BIO_DUFF_ACRE" = rep(NA, nrow(combos)), "BIO_DUFF_ACRE_SE" = rep(NA, nrow(combos)),
+                         "BIO_LITTER_ACRE" = rep(NA, nrow(combos)), "BIO_LITTER_ACRE_SE" = rep(NA, nrow(combos)),
                          "BIO_1HR_ACRE" = rep(NA, nrow(combos)), "BIO_1HR_ACRE_SE" = rep(NA, nrow(combos)),
                          "BIO_10HR_ACRE" = rep(NA, nrow(combos)), "BIO_10HR_ACRE_SE" = rep(NA, nrow(combos)),
                          "BIO_100HR_ACRE" = rep(NA, nrow(combos)), "BIO_100HR_ACRE_SE" = rep(NA, nrow(combos)),
                          "BIO_1000HR_ACRE" = rep(NA, nrow(combos)), "BIO_1000HR_ACRE_SE" = rep(NA, nrow(combos)),
                          "BIO_PILE_ACRE" = rep(NA, nrow(combos)), "BIO_PILE_ACRE_SE" = rep(NA, nrow(combos)),
                          "BIO_ACRE" = rep(NA, nrow(combos)), "BIO_ACRE_SE" = rep(NA, nrow(combos)),
+                         "CARB_DUFF_ACRE" = rep(NA, nrow(combos)), "CARB_DUFF_ACRE_SE" = rep(NA, nrow(combos)),
+                         "CARB_LITTER_ACRE" = rep(NA, nrow(combos)), "CARB_LITTER_ACRE_SE" = rep(NA, nrow(combos)),
                          "CARB_1HR_ACRE" = rep(NA, nrow(combos)), "CARB_1HR_ACRE_SE" = rep(NA, nrow(combos)),
                          "CARB_10HR_ACRE" = rep(NA, nrow(combos)), "CARB_10HR_ACRE_SE" = rep(NA, nrow(combos)),
                          "CARB_100HR_ACRE" = rep(NA, nrow(combos)), "CARB_100HR_ACRE_SE" = rep(NA, nrow(combos)),
@@ -4552,6 +4481,20 @@ area <- function(db,
   aOut <- filter(aOut, !is.na(YEAR))
   return(aOut)
 }
+
+# soils <- function(grpBy = NULL,
+#                   polys = NULL,
+#                   returnSpatial = FALSE,
+#                   byLandType = FALSE,
+#                   landType = 'forest',
+#                   areaDomain = NULL,
+#                   totals = FALSE,
+#                   byPlot = FALSE,
+#                   SE = TRUE,
+#                   progress = TRUE,
+#                   nCores = 1){
+#
+# }
 
 
 
