@@ -4482,19 +4482,259 @@ area <- function(db,
   return(aOut)
 }
 
-# soils <- function(grpBy = NULL,
-#                   polys = NULL,
-#                   returnSpatial = FALSE,
-#                   byLandType = FALSE,
-#                   landType = 'forest',
-#                   areaDomain = NULL,
-#                   totals = FALSE,
-#                   byPlot = FALSE,
-#                   SE = TRUE,
-#                   progress = TRUE,
-#                   nCores = 1){
-#
-# }
+soils <- function(db,
+                  grpBy = NULL,
+                  polys = NULL,
+                  returnSpatial = FALSE,
+                  byLayer = TRUE,
+                  landType = 'forest',
+                  areaDomain = NULL,
+                  totals = FALSE,
+                  byPlot = FALSE,
+                  SE = TRUE,
+                  progress = TRUE,
+                  nCores = 1){
+  ## Need a plotCN
+  db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
+  db$SOILS_LAB <- db[['SOILS_LAB']] %>% mutate(SOIL_CN = CN)
+
+  ## Converting names given in grpBy to character vector (NSE to standard)
+  ##  don't have to change original code
+  grpBy_quo <- enquo(grpBy)
+
+  # Probably cheating, but it works
+  if (quo_name(grpBy_quo) != 'NULL'){
+    ## Have to join tables to run select with this object type
+    plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
+    ## We want a unique error message here to tell us when columns are not present in data
+    d_quo <- tryCatch(
+      error = function(cnd) {
+        0
+      },
+      plt_quo[1,] %>% # Just the first row
+        inner_join(db$COND, by = 'PLT_CN') %>%
+        select(!!grpBy_quo)
+    )
+    # If column doesnt exist, just returns 0, not a dataframe
+    if (is.null(nrow(d_quo))){
+      grpName <- quo_name(grpBy_quo)
+      stop(paste('Columns', grpName, 'not found in PLOT or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
+    } else {
+      # Convert to character
+      grpBy <- names(d_quo)
+    }
+  }
+
+  reqTables <- c('PLOT', 'SOILS_EROSION', 'SOILS_LAB', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
+                 'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
+  ## Some warnings
+  if (class(db) != "FIA.Database"){
+    stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
+  }
+  if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
+    stop('polys must be spatial polygons object of class sp or sf. ')
+  }
+  if (landType %in% c('timber', 'forest') == FALSE){
+    stop('landType must be one of: "forest" or "timber".')
+  }
+  if (any(reqTables %in% names(db) == FALSE)){
+    missT <- reqTables[reqTables %in% names(db) == FALSE]
+    stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
+  }
+
+  # Save original grpByfor pretty return with spatial objects
+  grpBy <- c('YEAR', grpBy)
+  grpByOrig <- grpBy
+
+  message('Joining FIA Tables.....')
+
+
+  ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
+  ids <- db$POP_EVAL %>%
+    select('CN', 'END_INVYR', 'EVALID') %>%
+    inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+    #filter(EVAL_TYP == 'EXPDWM') %>%
+    distinct(EVALID)
+  db$POP_EVAL <- db$POP_EVAL %>%
+    filter(EVALID %in% ids$EVALID)
+
+
+  ### AREAL SUMMARY PREP
+  if(!is.null(polys)) {
+    # Convert polygons to an sf object
+    polys <- polys %>%
+      as('sf') %>%
+      mutate_if(is.factor,
+                as.character)
+    # Add shapefile names to grpBy
+    grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
+    ## Make plot data spatial, projected same as polygon layer
+    pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
+    coordinates(pltSF) <- ~LON+LAT
+    proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+    pltSF <- as(pltSF, 'sf') %>%
+      st_transform(crs = st_crs(polys)$proj4string)
+    # Intersect plot with polygons
+    polys$polyID <- 1:nrow(polys)
+    suppressMessages({suppressWarnings({
+      pltSF <- st_intersection(pltSF, polys) %>%
+        as.data.frame() %>%
+        select(-c('geometry')) # removes artifact of SF object
+    })})
+    # A warning
+    if (length(unique(pltSF$PLT_CN)) < 1){
+      stop('No plots in db overlap with polys.')
+    }
+
+    # # Convert back to dataframe
+    # db$PLOT <- as.data.frame(db$PLOT) %>%
+    #   select(-c('geometry')) # removes artifact of SF object
+
+  } else if (byPlot & returnSpatial){
+    ## Make plot data spatial, projected same as polygon layer
+    grpBy <- c(grpBy, 'LON', 'LAT')
+  }
+
+  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
+  # Land type domain indicator
+  if (tolower(landType) == 'forest'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1, 1, 0)
+  } else if (tolower(landType) == 'timber'){
+    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
+  }
+  # update spatial domain indicator
+  if(!is.null(polys)){
+    db$PLOT$sp <- ifelse(db$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+  } else {
+    db$PLOT$sp <- 1
+  }
+
+  # User defined domain indicator for area (ex. specific forest type)
+  pcEval <- left_join(db$PLOT, select(db$COND, -c('STATECD', 'UNITCD', 'COUNTYCD', 'INVYR', 'PLOT')), by = 'PLT_CN')
+  areaDomain <- substitute(areaDomain)
+  pcEval$aD <- eval(areaDomain, pcEval) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  if(!is.null(pcEval$aD)) pcEval$aD[is.na(pcEval$aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+  if(is.null(pcEval$aD)) pcEval$aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+  pcEval$aD <- as.numeric(pcEval$aD)
+  db$COND <- left_join(db$COND, select(pcEval, c('PLT_CN', 'CONDID', 'aD')), by = c('PLT_CN', 'CONDID')) %>%
+    mutate(aD_c = aD)
+  aD_p <- pcEval %>%
+    group_by(PLT_CN) %>%
+    summarize(aD_p = as.numeric(any(aD > 0)))
+  db$PLOT <- left_join(db$PLOT, aD_p, by = 'PLT_CN')
+  rm(pcEval)
+
+  ## Prep joins and filters
+  ## Which grpByNames are in which table? Helps us subset below
+  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
+  grpC <- names(db$COND)[names(db$COND) %in% grpBy]
+
+  ## Prep joins and filters
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'sp', 'aD_p')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'aD_c', 'landD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
+    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+    left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
+    right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+    left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
+    left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
+    left_join(select(db$SOILS_EROSION, c('PLT_CN', 'SOILSPCT', 'COMPCPCT', 'TYPRTDCD', 'TYPCMPCD', 'TYPAREACD', 'TYPOTHRCD')), by = c('PLT_CN')) %>%
+    left_join(select(db$SOILS_LAB, c(PLT_CN, SOIL_CN, QASTATCD, LAYER_TYPE, BULK_DENSITY:OLSEN_P)), by = 'PLT_CN') %>%
+    mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
+    #mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
+    rename(YEAR = END_INVYR,
+           YEAR_RANGE = REPORT_YEAR_NM) %>%
+    mutate_if(is.factor,
+              as.character)
+  ## Recode a few of the estimation methods to make things easier below
+  data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
+                            `Post-Stratification` = 'strat',
+                            `Stratified random sampling` = 'strat',
+                            `Double sampling for stratification` = 'double',
+                            `Simple random sampling` = 'simple',
+                            `Subsampling units of unequal size` = 'simple')
+
+  ## Some quality assurance
+  data <- filter(data, QASTATCD %in% c(1,7))
+
+  if(!is.null(polys)){
+    data <- left_join(data, pltSF, by = 'PLT_CN')
+
+    # Test if any polygons cross state boundaries w/ different recent inventory years
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+      mergeYears <- pltSF %>%
+        left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+        left_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+        group_by(polyID) %>%
+        summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+
+      # Replace YEAR from above w/ max year so that data is pooled across states
+      data <- left_join(data, mergeYears, by = 'polyID') %>%
+        select(-c(YEAR)) %>%
+        mutate(YEAR = maxYear)
+    }
+
+  }
+
+  ## Comprehensive indicator function
+  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
+
+
+  ## ByLayer
+  if (byLayer){
+    data$LAYER_TYPE = recode(.x = data$LAYER_TYPE,
+                             FF_TOTAL = 'Forest Floor Total',
+                             L_ORG = 'Organic Litter',
+                             MIN_1 = 'Mineral 0-4',
+                             MIN_2 = 'Mineral 4-8',
+                             ORG_1 = 'Organic 0-4',
+                             ORG_2 = 'Organic 4-8')
+    grpBy <- c(grpBy, 'LAYER_TYPE')
+  }
+
+  ####################  COMPUTE ESTIMATES  ###########################
+  ### -- BYPLOT -- TPA Estimates at each plot location
+  if (byPlot) {
+    sOut <- data %>%
+      distinct(PLT_CN, SOIL_CN,  .keep_all = TRUE) %>%
+      group_by(.dots = grpBy, PLT_CN) %>%
+      summarize(BULK_DENSITY = mean(BULK_DENSITY * aDI, na.rm = TRUE),
+                COARSE_PERC = mean(COARSE_FRACTION_PCT * aDI, na.rm = TRUE),
+                C_ORG_PERC = mean(C_ORG_PCT * aDI, na.rm = TRUE),
+                C_INORG_PERC = mean(C_INORG_PCT * aDI, na.rm = TRUE),
+                C_TOTAL_PERC = mean(C_TOTAL_PCT * aDI, na.rm = TRUE),
+                N_TOTAL_PERC = mean(N_TOTAL_PCT * aDI, na.rm = TRUE),
+                PH_H2O = mean(PH_H2O * aDI, na.rm = TRUE),
+                PH_CACL2 = mean(PH_CACL2 * aDI, na.rm = TRUE),
+                ECEC = mean(ECEC * aDI, na.rm = TRUE),
+                EXCHNG_NA = mean(EXCHNG_NA * aDI, na.rm = TRUE),
+                EXCHNG_K = mean(EXCHNG_K * aDI, na.rm = TRUE),
+                EXCHNG_MG = mean(EXCHNG_MG * aDI, na.rm = TRUE),
+                EXCHNG_CA = mean(EXCHNG_CA * aDI, na.rm = TRUE),
+                EXCHNG_AL = mean(EXCHNG_AL * aDI, na.rm = TRUE),
+                EXCHNG_MN = mean(EXCHNG_MN * aDI, na.rm = TRUE),
+                EXCHNG_FE = mean(EXCHNG_FE * aDI, na.rm = TRUE),
+                EXCHNG_CU = mean(EXCHNG_CU * aDI, na.rm = TRUE),
+                EXCHNG_ZN = mean(EXCHNG_ZN * aDI, na.rm = TRUE),
+                EXCHNG_CD = mean(EXCHNG_CD * aDI, na.rm = TRUE),
+                EXCHNG_PB = mean(EXCHNG_PB * aDI, na.rm = TRUE),
+                EXCHNG_S = mean(EXCHNG_S * aDI, na.rm = TRUE),
+                BRAY1_P = mean(BRAY1_P * aDI, na.rm = TRUE),
+                OLSEN_P = mean(OLSEN_P * aDI, na.rm = TRUE))
+
+    if (returnSpatial){
+      sOut <- sOut %>%
+        filter(!is.na(LAT) & !is.na(LON)) %>%
+        st_as_sf(coords = c('LON', 'LAT'),
+                 crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+    }
+
+    ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
+  }
+
+  return(sOut)
+
+}
 
 
 
