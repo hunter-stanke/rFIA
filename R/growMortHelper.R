@@ -35,29 +35,35 @@ growMortHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
 
       ### Compute total TREES in domain of interest
     tInt <- data %>%
-      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
-      #filter(EVALID %in% tID) %>%
+      filter(EVAL_TYP %in% c('EXPGROW','EXPMORT', 'EXPREMV')) %>%
+      #filter(DIA >= 5) %>%
+      #distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
+      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, TRE_CN, COMPONENT, .keep_all = TRUE) %>%
       # Compute estimates at plot level
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
       summarize(tPlot = sum(TPAGROW_UNADJ * tAdj * tDI, na.rm = TRUE),
                 rPlot = sum(TPAGROW_UNADJ[COMPONENT == 'INGROWTH'] * tAdj[COMPONENT == 'INGROWTH'] * tDI[COMPONENT == 'INGROWTH'], na.rm = TRUE),
-                mPlot = sum(TPAMORT_UNADJ * tAdj * tDI, na.rm = TRUE),
+                mPlot = sum(TPAMORT_UNADJ* tAdj * tDI, na.rm = TRUE),
                 hPlot = sum(TPAREMV_UNADJ * tAdj * tDI, na.rm = TRUE),
                 #prevPop = tPlot + mPlot * first(REMPER) + hPlot * first(REMPER) - rPlot * first(REMPER),
                 #lPlot = (tPlot / ifelse(prevPop < 1, NA, prevPop)) ^ (1/first(REMPER)) - 1,
                 #REMPER = first(REMPER),
-                plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0),
+                plotIn_g = ifelse(tPlot >  0, 1,0),
+                plotIn_r = ifelse(rPlot >  0, 1,0),
+                plotIn_m = ifelse(mPlot > 0, 1,0),
+                plotIn_h = ifelse(hPlot >  0, 1,0),
                 a = first(AREA_USED),
                 p1EU = first(P1PNTCNT_EU),
                 p1 = first(P1POINTCNT),
                 p2 = first(P2POINTCNT))
+
     ### Compute total AREA in the domain of interest
     aInt <- data %>%
       #filter(EVAL_TYP == 'EXPCURR') %>%
       distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, .keep_all = TRUE) %>%
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
       summarize(fa = sum(CONDPROP_UNADJ * aDI * aAdj, na.rm = TRUE),
-                plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0),
+                plotIn_a = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0),
                 a = first(AREA_USED),
                 p1EU = first(P1PNTCNT_EU),
                 p1 = first(P1POINTCNT),
@@ -66,7 +72,7 @@ growMortHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
 
     ## Compute COVARIANCE between numerator and denominator (for ratio estimates of variance)
     t <- tInt %>%
-      inner_join(aInt, by = c('PLT_CN', 'ESTN_UNIT_CN', 'ESTN_METHOD', 'STRATUM_CN'), suffix = c('_t', '_a')) %>%
+      left_join(aInt, by = c('ESTN_UNIT_CN', 'ESTN_METHOD', 'STRATUM_CN', 'PLT_CN'), suffix = c('_t', '_a'))  %>%
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN) %>%
       summarize(tStrat = mean(tPlot, na.rm = TRUE),
                 rStrat = mean(rPlot, na.rm = TRUE),
@@ -77,7 +83,10 @@ growMortHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
                 a = first(a_t),
                 w = first(p1_t) / first(p1EU_a), # Stratum weight
                 nh = first(p2_t), # Number plots in stratum
-                nPlots_TREE = sum(plotIn_t, na.rm = TRUE),
+                nPlots_TREE = sum(plotIn_g, na.rm = TRUE),
+                nPlots_RECR = sum(plotIn_r, na.rm = TRUE),
+                nPlots_MORT = sum(plotIn_m, na.rm = TRUE),
+                nPlots_REMV = sum(plotIn_h, na.rm = TRUE),
                 nPlots_AREA = sum(plotIn_a, na.rm = TRUE),
                 # Strata level variances
                 tv = ifelse(first(ESTN_METHOD == 'simple'),
@@ -129,6 +138,9 @@ growMortHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
                 #lEst = unitMean(ESTN_METHOD, a, nh, w, lStrat),
                 aEst = unitMean(ESTN_METHOD, a, nh, w, aStrat),
                 nPlots_TREE = sum(nPlots_TREE, na.rm = TRUE),
+                nPlots_RECR = sum(nPlots_RECR, na.rm = TRUE),
+                nPlots_MORT = sum(nPlots_MORT, na.rm = TRUE),
+                nPlots_REMV = sum(nPlots_REMV, na.rm = TRUE),
                 nPlots_AREA = sum(nPlots_AREA, na.rm = TRUE),
                 #Variance estimates
                 tVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, tv, tStrat, tEst),
@@ -194,23 +206,26 @@ growMortHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
                 REMV_PERC_SE = sqrt(htVar) / REMV_TPA * 100,
                 # Non-zero plots
                 nPlots_TREE = sum(nPlots_TREE, na.rm = TRUE),
+                nPlots_RECR = sum(nPlots_RECR, na.rm = TRUE),
+                nPlots_MORT = sum(nPlots_MORT, na.rm = TRUE),
+                nPlots_REMV = sum(nPlots_REMV, na.rm = TRUE),
                 nPlots_AREA = sum(nPlots_AREA, na.rm = TRUE))
 
     # Make some columns go away
     if (totals) {
       t <- t %>%
-        select(RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC, #LAMBDA,
+        select(RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC,
                TREE_TOTAL, RECR_TOTAL, MORT_TOTAL, REMV_TOTAL, AREA_TOTAL,
                RECR_TPA_SE, MORT_TPA_SE, REMV_TPA_SE,
-               RECR_PERC_SE, MORT_PERC_SE, REMV_PERC_SE, #LAMBDA_SE,
+               RECR_PERC_SE, MORT_PERC_SE, REMV_PERC_SE,
                TREE_TOTAL_SE, RECR_TOTAL_SE, MORT_TOTAL_SE, REMV_TOTAL_SE, AREA_TOTAL_SE,
-               nPlots_TREE, nPlots_AREA)
+               nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV, nPlots_AREA)
     } else {
       t <- t %>%
-        select(RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC, #LAMBDA,
+        select(RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC,
                RECR_TPA_SE, MORT_TPA_SE, REMV_TPA_SE,
-               RECR_PERC_SE, MORT_PERC_SE, REMV_PERC_SE, #LAMBDA_SE,
-               nPlots_TREE, nPlots_AREA)
+               RECR_PERC_SE, MORT_PERC_SE, REMV_PERC_SE,
+               nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV, nPlots_AREA)
     }
     # Rejoin with some grpBy Names
     t <- data.frame(combos[[x]], t)
@@ -220,25 +235,19 @@ growMortHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
     ### BELOW DOES NOT PRODUCE SAMPLING ERRORS, use EXPNS instead (much quicker)
     ### Compute total TREES in domain of interest
     tInt <- data %>%
-      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
-      #filter(EVALID %in% tID) %>%
+      filter(EVAL_TYP %in% c('EXPGROW','EXPMORT', 'EXPREMV')) %>%
+      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, TRE_CN, COMPONENT, .keep_all = TRUE) %>%
       # Compute estimates at plot level
       group_by(.dots = grpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-      summarize(tPlot = sum(TPAGROW_UNADJ * tAdj * tDI, na.rm = TRUE),
-                rPlot = sum(TPAGROW_UNADJ[COMPONENT == 'INGROWTH'] * tAdj[COMPONENT == 'INGROWTH'] * tDI[COMPONENT == 'INGROWTH'], na.rm = TRUE),
-                mPlot = sum(TPAMORT_UNADJ * tAdj * tDI, na.rm = TRUE),
-                hPlot = sum(TPAREMV_UNADJ * tAdj * tDI, na.rm = TRUE),
-                #prevPop = tPlot + mPlot * first(REMPER) + hPlot * first(REMPER) - rPlot * first(REMPER),
-                #lPlot = (tPlot / ifelse(prevPop < 1, NA, prevPop)) ^ (1/first(REMPER)) - 1,
-                EXPNS = first(EXPNS),
-                #lPlot = (((tPlot / (tPlot + mPlot * first(REMPER) + hPlot * first(REMPER) - rPlot * first(REMPER))) ^ (1/first(REMPER))) - 1) * first(EXPNS),
-                # lPlot = ((sum(TPAGROW_UNADJ * tAdj * tDI, na.rm = TRUE) /
-                #             ((sum(TPAGROW_UNADJ * tAdj * tDI, na.rm = TRUE) +
-                #                 sum(TPAMORT_UNADJ * tAdj * tDI, na.rm = TRUE) * first(REMPER) +
-                #                 sum(TPAMORT_UNADJ * tAdj * tDI, na.rm = TRUE) * first(REMPER) -
-                #                 sum(TPAGROW_UNADJ[COMPONENT == 'INGROWTH'] * tAdj[COMPONENT == 'INGROWTH'] * tDI[COMPONENT == 'INGROWTH'], na.rm = TRUE) * first(REMPER))) ^
-                #             (1/first(REMPER))) - 1),
-                plotIn_t = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0))
+      summarize(tPlot = sum(TPAGROW_UNADJ * tAdj * tDI * EXPNS, na.rm = TRUE),
+                rPlot = sum(TPAGROW_UNADJ[COMPONENT == 'INGROWTH'] * tAdj[COMPONENT == 'INGROWTH'] * tDI[COMPONENT == 'INGROWTH'] * EXPNS[COMPONENT == 'INGROWTH'], na.rm = TRUE),
+                mPlot = sum(TPAMORT_UNADJ* tAdj * tDI * EXPNS, na.rm = TRUE),
+                hPlot = sum(TPAREMV_UNADJ * tAdj * tDI * EXPNS, na.rm = TRUE),
+                plotIn_g = ifelse(tPlot >  0, 1,0),
+                plotIn_r = ifelse(rPlot >  0, 1,0),
+                plotIn_m = ifelse(mPlot > 0, 1,0),
+                plotIn_h = ifelse(hPlot >  0, 1,0))
+
     ### Compute total AREA in the domain of interest
     aInt <- data %>%
       #filter(EVAL_TYP == 'EXPCURR') %>%
@@ -250,18 +259,13 @@ growMortHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
     suppressMessages({
       t <- tInt %>%
         inner_join(aInt) %>%
-        # group_by(.dots = grpBy, ESTN_UNIT_CN, STRATUM_CN) %>%
-        # summarize(lStrat = sum(lPlot, na.rm = TRUE) * first(EXPNS))# %>%
-        # group_by(.dots = grpBy, ESTN_UNIT_CN) %>%
-        # summarize(lEst = sum(lStrat, na.rm = TRUE))
         ## Full region
         group_by(.dots = grpBy) %>%
-        summarize(TREE_TOTAL = sum(tPlot * EXPNS, na.rm = TRUE),
-                  RECR_TOTAL = sum(rPlot* EXPNS, na.rm = TRUE),
-                  MORT_TOTAL = sum(mPlot* EXPNS, na.rm = TRUE),
-                  REMV_TOTAL = sum(hPlot* EXPNS, na.rm = TRUE),
+        summarize(TREE_TOTAL = sum(tPlot, na.rm = TRUE),
+                  RECR_TOTAL = sum(rPlot, na.rm = TRUE),
+                  MORT_TOTAL = sum(mPlot, na.rm = TRUE),
+                  REMV_TOTAL = sum(hPlot, na.rm = TRUE),
                   AREA_TOTAL = sum(fa, na.rm = TRUE),
-                  #LAMBDA = sum(lPlot * EXPNS, na.rm = TRUE),
                   RECR_TPA = RECR_TOTAL / AREA_TOTAL,
                   MORT_TPA = MORT_TOTAL / AREA_TOTAL,
                   REMV_TPA = REMV_TOTAL / AREA_TOTAL,
@@ -269,20 +273,23 @@ growMortHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
                   MORT_PERC = MORT_TOTAL / TREE_TOTAL * 100,
                   REMV_PERC = REMV_TOTAL / TREE_TOTAL * 100,
                   # Non-zero plots
-                  nPlots_TREE = sum(plotIn_t, na.rm = TRUE),
+                  nPlots_TREE = sum(plotIn_g, na.rm = TRUE),
+                  nPlots_RECR = sum(plotIn_r, na.rm = TRUE),
+                  nPlots_MORT = sum(plotIn_m, na.rm = TRUE),
+                  nPlots_REMV = sum(plotIn_h, na.rm = TRUE),
                   nPlots_AREA = sum(plotIn_a, na.rm = TRUE))
     })
 
     # Make some columns go away
     if (totals) {
       t <- t %>%
-        select(grpBy, RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC, #LAMBDA,
+        select(grpBy, RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC,
                TREE_TOTAL, RECR_TOTAL, MORT_TOTAL, REMV_TOTAL, AREA_TOTAL,
-               nPlots_TREE, nPlots_AREA)
+               nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV,nPlots_AREA)
     } else {
       t <- t %>%
-        select(grpBy, RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC, #LAMBDA,
-               nPlots_TREE, nPlots_AREA)
+        select(grpBy, RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC,
+               nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV,nPlots_AREA)
     }
   } # End SE Conditional
 

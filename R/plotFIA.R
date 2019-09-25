@@ -4,7 +4,7 @@ plotFIA <- function(data, y, grp = NULL, x = NULL, animate = FALSE, n.max = NULL
                     color.option = 'viridis', line.color = "gray30", line.width =1,
                     min.year = 2005, direction = 1, alpha = .9, transform = "identity",
                     text.size = 1, text.font = '', lab.width = 1, legend.height = 1,
-                    legend.width = 1, device = NULL, savePath = NULL, fileName = NULL) {
+                    legend.width = 1, device = 'png', savePath = NULL, fileName = NULL) {
 
   ## Some dummy checks
   if (!is.null(savePath) & is.null(fileName)){

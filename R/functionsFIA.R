@@ -170,15 +170,18 @@ adjHelper <- function(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUB
 
 # GRM adjustment helper
 grmAdj <- function(subtyp, adjMicr, adjSubp, adjMacr) {
-  subtyp[is.na(subtyp)] <- 0
 
-  adj <- subtyp
-  # Replace with adj values
-  adj[subtyp == 1] <- adjSubp[subtyp == 1]
-  adj[subtyp == 2] <- adjMicr[subtyp == 2]
-  adj[subtyp == 3] <- adjMacr[subtyp == 3]
+  data <- data.frame(typ = as.numeric(subtyp), micr = as.numeric(adjMicr), subp =as.numeric(adjSubp), macr =as.numeric(adjMacr))
 
-  return(adj)
+  data <- data %>%
+    mutate(adj = case_when(
+      typ == 0 ~ 0,
+      typ == 1 ~ subp,
+      typ == 2 ~ micr,
+      typ == 3 ~ macr,
+    ))
+
+  return(data$adj)
 }
 
 # Helper function to compute variance for estimation units (manages different estimation methods)
@@ -605,6 +608,26 @@ writeFIA <- function(db,
   closeAllConnections()
 
 }
+
+### Connect to an SQLite3 backend
+connectFIA <- function(dir){
+  ## Connect to the database
+  db <- dbConnect(RSQLite::SQLite(), dir)
+
+  ## Grab the names and store object in list like those held in memory
+  tableNames <- dbListTables(db)
+  outList <- list()
+  for (i in 1:length(tableNames)){
+    outList[[tableNames[i]]] <- tbl(db, tableNames[i])
+  }
+
+  # NEW CLASS NAME FOR FIA DATABASE OBJECTS
+  #outTables <- lapply(outTables, as.data.frame)
+  class(outList) <- 'FIA.Database'
+
+  return(outList)
+}
+
 
 
 #### THIS MAY NEED WORK. NOT ALL EVALIDs follow the same coding scheme (ex, CT 2005 --> 95322)
@@ -1745,12 +1768,12 @@ tpa <- function(db,
     d_quo <- tryCatch(
       error = function(cnd) {
         return(0)
-        },
+      },
       plt_quo[1,] %>% # Just the first row
         inner_join(db$COND, by = 'PLT_CN') %>%
         inner_join(db$TREE, by = 'PLT_CN') %>%
         select(!!grpBy_quo)
-      )
+    )
 
     # If column doesnt exist, just returns 0, not a dataframe
     if (is.null(nrow(d_quo))){
@@ -1887,8 +1910,8 @@ tpa <- function(db,
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
     right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
-    left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
-    left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
+    # left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
+    # left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
     left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT, 'tD', 'typeD')), by = c('PLT_CN', 'CONDID')) %>%
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
@@ -2025,26 +2048,26 @@ tpa <- function(db,
     #tOut <- foreach(i = 1:nrow(combos), .combine = 'rbind', .packages = 'dplyr', .export = c('data'))
 
     suppressWarnings({
-    ## Compute estimates in parallel -- Clusters in windows, forking otherwise
-    if (Sys.info()['sysname'] == 'Windows'){
-      cl <- makeCluster(nCores)
-      clusterEvalQ(cl, {
-        library(dplyr)
-        library(stringr)
+      ## Compute estimates in parallel -- Clusters in windows, forking otherwise
+      if (Sys.info()['sysname'] == 'Windows'){
+        cl <- makeCluster(nCores)
+        clusterEvalQ(cl, {
+          library(dplyr)
+          library(stringr)
         })
-      if(progress){ # Include progress Bar
-        tOut <- pblapply(X = names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
-      } else { # No progress Bar
-        tOut <- parLapply(cl, X = names(combos), fun = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE)
+        if(progress){ # Include progress Bar
+          tOut <- pblapply(X = names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
+        } else { # No progress Bar
+          tOut <- parLapply(cl, X = names(combos), fun = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE)
+        }
+        stopCluster(cl)
+      } else { # Unix systems
+        if(progress){
+          tOut <- pblapply(X = names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
+        } else { # No progress Bar, much quicker
+          tOut <- mclapply(X = names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
+        }
       }
-      stopCluster(cl)
-    } else { # Unix systems
-      if(progress){
-        tOut <- pblapply(X = names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
-      } else { # No progress Bar, much quicker
-        tOut <- mclapply(X = names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
-      }
-    }
     })
 
     if (SE){
@@ -2069,7 +2092,7 @@ tpa <- function(db,
       } else if (!is.null(polys) & returnSpatial == FALSE){
         tOut <- select(tOut, c(grpByOrig, tNames, everything())) %>%
           filter(!is.na(polyID))
-      # Return spatial plots
+        # Return spatial plots
       }
     } else { ## Function found no plots within the polygon, so it panics
       combos <- data %>%
@@ -2188,21 +2211,30 @@ growMort <- function(db,
   message('Joining FIA Tables.....')
 
 
-  if ('GRM_COND' %in% names(db) == FALSE & nrow(db$SUBP_COND_CHNG_MTRX) > 1){
-    ## Modify the Subplot Condition Change matrix to include current and previous condition status
-    db$SUBP_COND_CHNG_MTRX <- db$SUBP_COND_CHNG_MTRX %>%
-      filter(SUBPTYP == 1) %>%
-      inner_join(select(db$COND, c('PLT_CN', 'CONDID', 'COND_STATUS_CD')), by = c('PLT_CN', 'CONDID')) %>%
-      inner_join(select(db$COND, c('PLT_CN', 'CONDID', 'COND_STATUS_CD')),
-                 by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'),
-                 suffix = c('.CURR', '.PREV')) %>%
-      group_by(PLT_CN, CONDID) %>%
-      summarize(COND_CHANGE_CD = ifelse(any(COND_STATUS_CD.CURR == 1 & COND_STATUS_CD.PREV == 1), 1, 0))
-
-    db$GRM_COND <- db$COND %>%
-      inner_join(select(db$SUBP_COND_CHNG_MTRX, c('PLT_CN', 'CONDID', 'COND_CHANGE_CD')), by = c('PLT_CN', 'CONDID')) %>%
-      distinct(PLT_CN, CONDID, .keep_all = TRUE)%>%
-      mutate(CONDPROP_UNADJ = ifelse(COND_CHANGE_CD == 1, CONDPROP_UNADJ, 0)) # Has to be forested currently and at last measurment
+  if ('mostRecent' %in% names(db) == FALSE){
+    # ## Determine the Previous condition status for each condition, on each plot
+    # db$SUBP_COND_CHNG_MTRX <- distinct(db$SUBP_COND_CHNG_MTRX, PLT_CN, CONDID, .keep_all = TRUE) %>%
+    #   filter(SUBPTYP == 1) %>%
+    #   left_join(select(db$COND, PLT_CN, CONDID, COND_STATUS_CD), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID')) %>%
+    #   mutate(PREVCOND_STATUS = COND_STATUS_CD)
+    #
+    # db$COND <- db$COND %>%
+    #   left_join(select(db$SUBP_COND_CHNG_MTRX, 'PLT_CN', 'CONDID', 'PREVCOND_STATUS', ), by = c("PLT_CN", "CONDID")) %>%
+    #   mutate(COND_STATUS_CD = ifelse(COND_STATUS_CD == 1 & PREVCOND_STATUS == 1, 1, 0))
+    # Modify the Subplot Condition Change matrix to include current and previous condition status
+    # db$SUBP_COND_CHNG_MTRX <- db$SUBP_COND_CHNG_MTRX %>%
+    #   filter(SUBPTYP == 1) %>%
+    #   inner_join(select(db$COND, c('PLT_CN', 'CONDID', 'COND_STATUS_CD')), by = c('PLT_CN', 'CONDID')) %>%
+    #   inner_join(select(db$COND, c('PLT_CN', 'CONDID', 'COND_STATUS_CD')),
+    #              by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'),
+    #              suffix = c('.CURR', '.PREV')) %>%
+    #   group_by(PLT_CN, CONDID) %>%
+    #   summarize(COND_CHANGE_CD = ifelse(any(COND_STATUS_CD.CURR == 1 & COND_STATUS_CD.PREV == 1), 1, 0))
+    #
+    # db$COND <- db$COND %>%
+    #   inner_join(select(db$SUBP_COND_CHNG_MTRX, c('PLT_CN', 'CONDID', 'COND_CHANGE_CD')), by = c('PLT_CN', 'CONDID')) %>%
+    #   distinct(PLT_CN, CONDID, .keep_all = TRUE)%>%
+    #   mutate(CONDPROP_UNADJ = ifelse(COND_CHANGE_CD == 1, CONDPROP_UNADJ, 0)) # Has to be forested currently and at last measurment
   }
 
 
@@ -2210,7 +2242,8 @@ growMort <- function(db,
   ids <- db$POP_EVAL %>%
     select('CN', 'END_INVYR', 'EVALID') %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP == 'EXPGROW' | EVAL_TYP == 'EXPMORT' | EVAL_TYP == 'EXPREMV') %>%
+    filter(EVAL_TYP %in% c('EXPGROW','EXPMORT', 'EXPREMV', 'EXPCURR')) %>%
+    #filter(EVAL_TYP == 'EXPGROW' | EVAL_TYP == 'EXPMORT' | EVAL_TYP == 'EXPREMV'| EVAL_TYP == 'EXPCURR') %>%
     distinct(EVALID)
   db$POP_EVAL <- db$POP_EVAL %>%
     filter(EVALID %in% ids$EVALID)
@@ -2256,15 +2289,51 @@ growMort <- function(db,
   # Land type domain indicator
   if (tolower(landType) == 'forest'){
     db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1, 1, 0)
+    # Tree Type domain indicator
+    if (tolower(treeType) == 'all'){
+      db$TREE$typeD <- 1
+      ## Rename some variables in grm
+      db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
+                                      TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_AL_FOREST,
+                                      TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_AL_FOREST,
+                                      TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_AL_FOREST,
+                                      SUBPTYP_GRM = SUBP_SUBPTYP_GRM_AL_FOREST,
+                                      COMPONENT = SUBP_COMPONENT_AL_FOREST)
+
+    } else if (tolower(treeType) == 'gs'){
+      db$TREE$typeD <- ifelse(db$TREE$DIA >= 5, 1, 0)
+      db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
+                                      TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_GS_FOREST,
+                                      TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_GS_FOREST,
+                                      TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_GS_FOREST,
+                                      SUBPTYP_GRM = SUBP_SUBPTYP_GRM_GS_FOREST,
+                                      COMPONENT = SUBP_COMPONENT_GS_FOREST)
+    }
   } else if (tolower(landType) == 'timber'){
     db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
+    # Tree Type domain indicator
+    if (tolower(treeType) == 'all'){
+      db$TREE$typeD <- 1
+      ## Rename some variables in grm
+      db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
+                                      TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_AL_TIMBER,
+                                      TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_AL_TIMBER,
+                                      TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_AL_TIMBER,
+                                      SUBPTYP_GRM = SUBP_SUBPTYP_GRM_AL_TIMBER,
+                                      COMPONENT = SUBP_COMPONENT_AL_TIMBER)
+
+    } else if (tolower(treeType) == 'gs'){
+      db$TREE$typeD <- ifelse(db$TREE$DIA >= 5, 1, 0)
+      db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
+                                      TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_GS_TIMBER,
+                                      TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_GS_TIMBER,
+                                      TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_GS_TIMBER,
+                                      SUBPTYP_GRM = SUBP_SUBPTYP_GRM_GS_TIMBER,
+                                      COMPONENT = SUBP_COMPONENT_GS_TIMBER)
+    }
   }
-  # Tree Type domain indicator
-  if (tolower(treeType) == 'all'){
-    db$TREE$typeD <- 1
-  } else if (tolower(treeType) == 'gs'){
-    db$TREE$typeD <- ifelse(db$TREE$DIA >= 5, 1, 0)
-  }
+
+
   # update spatial domain indicator
   if(!is.null(polys)){
     db$PLOT$sp <- ifelse(db$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
@@ -2300,34 +2369,39 @@ growMort <- function(db,
   grpC <- names(db$COND)[names(db$COND) %in% grpBy]
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
-  ## Prep joins and filters
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'sp', 'aD_p')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'landD', 'aD_c', 'CONDID', grpC)), by = c('PLT_CN')) %>%
-    left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
+  data <- select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
     right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
     left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
-    left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-    left_join(select(db$TREE, c('TRE_CN', 'PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT, 'typeD', 'tD')), by = c('PLT_CN', 'CONDID')) %>%
-    left_join(select(db$TREE_GRM_COMPONENT, c('PLT_CN', 'TRE_CN')), by = c('PLT_CN', 'TRE_CN')) %>%
-    left_join(select(db$TREE_GRM_ESTN, c('PLT_CN', 'TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT')), by = c('PLT_CN', 'TRE_CN')) %>%
+    left_join(select(db$PLOT, c('PLT_CN', 'PREV_PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'sp', 'aD_p')), by = 'PLT_CN') %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID','landD', 'aD_c', grpC)), by = 'PLT_CN') %>%
+    left_join(select(db$TREE, c('TRE_CN', 'PREV_TRE_CN', 'PLT_CN', 'CONDID', 'PREVCOND', 'SPCD', grpT, 'typeD', 'tD')), by = c('PLT_CN', 'CONDID')) %>% ## ISSUE MAY BE HERE, SEE EVALIDATOR CODE
+    # Previous attributes
+    left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC)), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
+    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
+    # GRM
+    left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT')), by = c('TRE_CN')) %>%
+    ## Try to join up COND again for matching vals
     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     mutate(tAdj = grmAdj(SUBPTYP_GRM, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
     rename(YEAR = END_INVYR,
            YEAR_RANGE = REPORT_YEAR_NM) %>%
-    mutate(TPAMORT_UNADJ = ifelse(str_detect(COMPONENT, 'MORT'), TPAMORT_UNADJ, 0)) %>%
-    mutate(TPAREMV_UNADJ = ifelse(str_detect(COMPONENT, 'CUT') | str_detect(COMPONENT, 'DIV'), TPAREMV_UNADJ, 0)) %>%
+    #mutate(TPAMORT_UNADJ = ifelse(str_detect(COMPONENT, 'MORT'), TPAMORT_UNADJ, 0)) %>%
+    #mutate(TPAREMV_UNADJ = ifelse(str_detect(COMPONENT, 'CUT') | str_detect(COMPONENT, 'DIV'), TPAREMV_UNADJ, 0)) %>%
     mutate_if(is.factor,
               as.character)
-    #mutate(CONDPROP_UNADJ = ifelse(is.na(TPAMORT_UNADJ), NA, CONDPROP_UNADJ))
-  ## Recode a few of the estimation methods to make things easier below
+
+  # Recode a few of the estimation methods to make things easier below
   data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
                             `Post-Stratification` = 'strat',
                             `Stratified random sampling` = 'strat',
                             `Double sampling for stratification` = 'double',
                             `Simple random sampling` = 'simple',
                             `Subsampling units of unequal size` = 'simple')
+
+
   if(!is.null(polys)){
     data <- left_join(data, pltSF, by = 'PLT_CN')
 
@@ -2346,9 +2420,18 @@ growMort <- function(db,
     }
   }
 
+  # If previous attributes are unavailable for trees, default to current (otherwise we get NAs for early inventories)
+  data$tD.prev <- ifelse(is.na(data$tD.prev), data$tD, data$tD.prev)
+  data$typeD.prev <- ifelse(is.na(data$typeD.prev), data$typeD, data$typeD.prev)
+  data$landD.prev <- ifelse(is.na(data$landD.prev), data$landD, data$landD.prev)
+  data$aD_p.prev <- ifelse(is.na(data$aD_p.prev), data$aD_p, data$aD_p.prev)
+  data$aD_c.prev <- ifelse(is.na(data$aD_c.prev), data$aD_c, data$aD_c.prev)
+  data$sp.prev <- ifelse(is.na(data$sp.prev), data$sp, data$sp.prev)
+
   ## Comprehensive indicator function
   data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
-  data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
+  data$tDI <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev
+
 
   ## Add species to groups
   if (bySpecies) {
@@ -2448,26 +2531,26 @@ growMort <- function(db,
     message('Computing Summary Statistics.....')
 
     suppressWarnings({
-    ## Compute estimates in parallel -- Clusters in windows, forking otherwise
-    if (Sys.info()['sysname'] == 'Windows'){
-      cl <- makeCluster(nCores)
-      clusterEvalQ(cl, {
-        library(dplyr)
-        library(stringr)
-      })
-      if(progress){ # Include progress Bar
-        tOut <- pblapply(X = names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
-      } else { # No progress Bar
-        tOut <- parLapply(cl, X = names(combos), fun = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE)
+      ## Compute estimates in parallel -- Clusters in windows, forking otherwise
+      if (Sys.info()['sysname'] == 'Windows'){
+        cl <- makeCluster(nCores)
+        clusterEvalQ(cl, {
+          library(dplyr)
+          library(stringr)
+        })
+        if(progress){ # Include progress Bar
+          tOut <- pblapply(X = names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
+        } else { # No progress Bar
+          tOut <- parLapply(cl, X = names(combos), fun = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE)
+        }
+        stopCluster(cl)
+      } else { # Unix systems
+        if(progress){
+          tOut <- pblapply(X = names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
+        } else { # No progress Bar, much quicker
+          tOut <- mclapply(X = names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
+        }
       }
-      stopCluster(cl)
-    } else { # Unix systems
-      if(progress){
-        tOut <- pblapply(X = names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
-      } else { # No progress Bar, much quicker
-        tOut <- mclapply(X = names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
-      }
-    }
     })
 
     if (SE){
@@ -2505,7 +2588,8 @@ growMort <- function(db,
                          "MORT_TPA_SE" = rep(NA, nrow(combos)), "REMV_TPA_SE" = rep(NA, nrow(combos)),
                          "RECR_PERC_SE" = rep(NA, nrow(combos)), "MORT_PERC_SE" = rep(NA, nrow(combos)),
                          "REMV_PERC_SE" = rep(NA, nrow(combos)), "nPlots_TREE" = rep(NA, nrow(combos)),
-                         "nPlots_AREA" = rep(NA, nrow(combos)))
+                         "nPlots_RECR"= rep(NA, nrow(combos)), "nPlots_MORT"= rep(NA, nrow(combos)),
+                         "nPlots_REMV"= rep(NA, nrow(combos)), "nPlots_AREA" = rep(NA, nrow(combos)))
       if (!is.null(polys) & returnSpatial) {
         suppressMessages({suppressWarnings({
           polys = left_join(polys, combos)
@@ -4482,260 +4566,860 @@ area <- function(db,
   return(aOut)
 }
 
-soils <- function(db,
-                  grpBy = NULL,
-                  polys = NULL,
-                  returnSpatial = FALSE,
-                  byLayer = TRUE,
-                  landType = 'forest',
-                  areaDomain = NULL,
-                  totals = FALSE,
-                  byPlot = FALSE,
-                  SE = TRUE,
-                  progress = TRUE,
-                  nCores = 1){
-  ## Need a plotCN
-  db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
-  db$SOILS_LAB <- db[['SOILS_LAB']] %>% mutate(SOIL_CN = CN)
-
-  ## Converting names given in grpBy to character vector (NSE to standard)
-  ##  don't have to change original code
-  grpBy_quo <- enquo(grpBy)
-
-  # Probably cheating, but it works
-  if (quo_name(grpBy_quo) != 'NULL'){
-    ## Have to join tables to run select with this object type
-    plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
-    ## We want a unique error message here to tell us when columns are not present in data
-    d_quo <- tryCatch(
-      error = function(cnd) {
-        0
-      },
-      plt_quo[1,] %>% # Just the first row
-        inner_join(db$COND, by = 'PLT_CN') %>%
-        select(!!grpBy_quo)
-    )
-    # If column doesnt exist, just returns 0, not a dataframe
-    if (is.null(nrow(d_quo))){
-      grpName <- quo_name(grpBy_quo)
-      stop(paste('Columns', grpName, 'not found in PLOT or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
-    } else {
-      # Convert to character
-      grpBy <- names(d_quo)
-    }
-  }
-
-  reqTables <- c('PLOT', 'SOILS_EROSION', 'SOILS_LAB', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
-                 'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
-  ## Some warnings
-  if (class(db) != "FIA.Database"){
-    stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
-  }
-  if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
-    stop('polys must be spatial polygons object of class sp or sf. ')
-  }
-  if (landType %in% c('timber', 'forest') == FALSE){
-    stop('landType must be one of: "forest" or "timber".')
-  }
-  if (any(reqTables %in% names(db) == FALSE)){
-    missT <- reqTables[reqTables %in% names(db) == FALSE]
-    stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
-  }
-
-  # Save original grpByfor pretty return with spatial objects
-  grpBy <- c('YEAR', grpBy)
-  grpByOrig <- grpBy
-
-  message('Joining FIA Tables.....')
-
-
-  ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
-  ids <- db$POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID') %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    #filter(EVAL_TYP == 'EXPDWM') %>%
-    distinct(EVALID)
-  db$POP_EVAL <- db$POP_EVAL %>%
-    filter(EVALID %in% ids$EVALID)
-
-
-  ### AREAL SUMMARY PREP
-  if(!is.null(polys)) {
-    # Convert polygons to an sf object
-    polys <- polys %>%
-      as('sf') %>%
-      mutate_if(is.factor,
-                as.character)
-    # Add shapefile names to grpBy
-    grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
-    ## Make plot data spatial, projected same as polygon layer
-    pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
-    coordinates(pltSF) <- ~LON+LAT
-    proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-    pltSF <- as(pltSF, 'sf') %>%
-      st_transform(crs = st_crs(polys)$proj4string)
-    # Intersect plot with polygons
-    polys$polyID <- 1:nrow(polys)
-    suppressMessages({suppressWarnings({
-      pltSF <- st_intersection(pltSF, polys) %>%
-        as.data.frame() %>%
-        select(-c('geometry')) # removes artifact of SF object
-    })})
-    # A warning
-    if (length(unique(pltSF$PLT_CN)) < 1){
-      stop('No plots in db overlap with polys.')
-    }
-
-    # # Convert back to dataframe
-    # db$PLOT <- as.data.frame(db$PLOT) %>%
-    #   select(-c('geometry')) # removes artifact of SF object
-
-  } else if (byPlot & returnSpatial){
-    ## Make plot data spatial, projected same as polygon layer
-    grpBy <- c(grpBy, 'LON', 'LAT')
-  }
-
-  ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
-  # Land type domain indicator
-  if (tolower(landType) == 'forest'){
-    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1, 1, 0)
-  } else if (tolower(landType) == 'timber'){
-    db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
-  }
-  # update spatial domain indicator
-  if(!is.null(polys)){
-    db$PLOT$sp <- ifelse(db$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
-  } else {
-    db$PLOT$sp <- 1
-  }
-
-  # User defined domain indicator for area (ex. specific forest type)
-  pcEval <- left_join(db$PLOT, select(db$COND, -c('STATECD', 'UNITCD', 'COUNTYCD', 'INVYR', 'PLOT')), by = 'PLT_CN')
-  areaDomain <- substitute(areaDomain)
-  pcEval$aD <- eval(areaDomain, pcEval) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
-  if(!is.null(pcEval$aD)) pcEval$aD[is.na(pcEval$aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
-  if(is.null(pcEval$aD)) pcEval$aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
-  pcEval$aD <- as.numeric(pcEval$aD)
-  db$COND <- left_join(db$COND, select(pcEval, c('PLT_CN', 'CONDID', 'aD')), by = c('PLT_CN', 'CONDID')) %>%
-    mutate(aD_c = aD)
-  aD_p <- pcEval %>%
-    group_by(PLT_CN) %>%
-    summarize(aD_p = as.numeric(any(aD > 0)))
-  db$PLOT <- left_join(db$PLOT, aD_p, by = 'PLT_CN')
-  rm(pcEval)
-
-  ## Prep joins and filters
-  ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
-  grpC <- names(db$COND)[names(db$COND) %in% grpBy]
-
-  ## Prep joins and filters
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'sp', 'aD_p')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'aD_c', 'landD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
-    left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
-    left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
-    left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-    right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
-    left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
-    left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
-    left_join(select(db$SOILS_EROSION, c('PLT_CN', 'SOILSPCT', 'COMPCPCT', 'TYPRTDCD', 'TYPCMPCD', 'TYPAREACD', 'TYPOTHRCD')), by = c('PLT_CN')) %>%
-    left_join(select(db$SOILS_LAB, c(PLT_CN, SOIL_CN, QASTATCD, LAYER_TYPE, BULK_DENSITY:OLSEN_P)), by = 'PLT_CN') %>%
-    mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
-    #mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
-    rename(YEAR = END_INVYR,
-           YEAR_RANGE = REPORT_YEAR_NM) %>%
-    mutate_if(is.factor,
-              as.character)
-  ## Recode a few of the estimation methods to make things easier below
-  data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
-                            `Post-Stratification` = 'strat',
-                            `Stratified random sampling` = 'strat',
-                            `Double sampling for stratification` = 'double',
-                            `Simple random sampling` = 'simple',
-                            `Subsampling units of unequal size` = 'simple')
-
-  ## Some quality assurance
-  data <- filter(data, QASTATCD %in% c(1,7))
-
-  if(!is.null(polys)){
-    data <- left_join(data, pltSF, by = 'PLT_CN')
-
-    # Test if any polygons cross state boundaries w/ different recent inventory years
-    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
-      mergeYears <- pltSF %>%
-        left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
-        left_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
-        group_by(polyID) %>%
-        summarize(maxYear = max(END_INVYR, na.rm = TRUE))
-
-      # Replace YEAR from above w/ max year so that data is pooled across states
-      data <- left_join(data, mergeYears, by = 'polyID') %>%
-        select(-c(YEAR)) %>%
-        mutate(YEAR = maxYear)
-    }
-
-  }
-
-  ## Comprehensive indicator function
-  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
-
-
-  ## ByLayer
-  if (byLayer){
-    data$LAYER_TYPE = recode(.x = data$LAYER_TYPE,
-                             FF_TOTAL = 'Forest Floor Total',
-                             L_ORG = 'Organic Litter',
-                             MIN_1 = 'Mineral 0-4',
-                             MIN_2 = 'Mineral 4-8',
-                             ORG_1 = 'Organic 0-4',
-                             ORG_2 = 'Organic 4-8')
-    grpBy <- c(grpBy, 'LAYER_TYPE')
-  }
-
-  ####################  COMPUTE ESTIMATES  ###########################
-  ### -- BYPLOT -- TPA Estimates at each plot location
-  if (byPlot) {
-    sOut <- data %>%
-      distinct(PLT_CN, SOIL_CN,  .keep_all = TRUE) %>%
-      group_by(.dots = grpBy, PLT_CN) %>%
-      summarize(BULK_DENSITY = mean(BULK_DENSITY * aDI, na.rm = TRUE),
-                COARSE_PERC = mean(COARSE_FRACTION_PCT * aDI, na.rm = TRUE),
-                C_ORG_PERC = mean(C_ORG_PCT * aDI, na.rm = TRUE),
-                C_INORG_PERC = mean(C_INORG_PCT * aDI, na.rm = TRUE),
-                C_TOTAL_PERC = mean(C_TOTAL_PCT * aDI, na.rm = TRUE),
-                N_TOTAL_PERC = mean(N_TOTAL_PCT * aDI, na.rm = TRUE),
-                PH_H2O = mean(PH_H2O * aDI, na.rm = TRUE),
-                PH_CACL2 = mean(PH_CACL2 * aDI, na.rm = TRUE),
-                ECEC = mean(ECEC * aDI, na.rm = TRUE),
-                EXCHNG_NA = mean(EXCHNG_NA * aDI, na.rm = TRUE),
-                EXCHNG_K = mean(EXCHNG_K * aDI, na.rm = TRUE),
-                EXCHNG_MG = mean(EXCHNG_MG * aDI, na.rm = TRUE),
-                EXCHNG_CA = mean(EXCHNG_CA * aDI, na.rm = TRUE),
-                EXCHNG_AL = mean(EXCHNG_AL * aDI, na.rm = TRUE),
-                EXCHNG_MN = mean(EXCHNG_MN * aDI, na.rm = TRUE),
-                EXCHNG_FE = mean(EXCHNG_FE * aDI, na.rm = TRUE),
-                EXCHNG_CU = mean(EXCHNG_CU * aDI, na.rm = TRUE),
-                EXCHNG_ZN = mean(EXCHNG_ZN * aDI, na.rm = TRUE),
-                EXCHNG_CD = mean(EXCHNG_CD * aDI, na.rm = TRUE),
-                EXCHNG_PB = mean(EXCHNG_PB * aDI, na.rm = TRUE),
-                EXCHNG_S = mean(EXCHNG_S * aDI, na.rm = TRUE),
-                BRAY1_P = mean(BRAY1_P * aDI, na.rm = TRUE),
-                OLSEN_P = mean(OLSEN_P * aDI, na.rm = TRUE))
-
-    if (returnSpatial){
-      sOut <- sOut %>%
-        filter(!is.na(LAT) & !is.na(LON)) %>%
-        st_as_sf(coords = c('LON', 'LAT'),
-                 crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
-    }
-
-    ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
-  }
-
-  return(sOut)
-
-}
 
 
 
 
+# ## TPA & BAA
+# tpaDB <- function(db,
+#                   grpBy = NULL,
+#                   polys = NULL,
+#                   returnSpatial = FALSE,
+#                   bySpecies = FALSE,
+#                   bySizeClass = FALSE,
+#                   landType = 'forest',
+#                   treeType = 'live',
+#                   treeDomain = NULL,
+#                   areaDomain = NULL,
+#                   totals = FALSE,
+#                   byPlot = FALSE,
+#                   SE = TRUE,
+#                   progress = TRUE,
+#                   nCores = 1) {
+#
+#   #### SQLite is full of issues, too long of a chain and grouping is not good
+#   #### Try postgre and see what happens, otherwise drop for now
+#
+#
+#   ## Need a plotCN
+#   db$PLOT <- db$PLOT %>% mutate(PLT_CN = CN)
+#
+#   ## Converting names given in grpBy to character vector (NSE to standard)
+#   ##  don't have to change original code
+#   grpBy_quo <- enquo(grpBy)
+#
+#   # Probably cheating, but it works
+#   if (quo_name(grpBy_quo) != 'NULL'){
+#     ## Have to join tables to run select with this object type
+#     plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
+#     ## We want a unique error message here to tell us when columns are not present in data
+#     d_quo <- tryCatch(
+#       error = function(cnd) {
+#         return(0)
+#       },
+#       plt_quo[1,] %>% # Just the first row
+#         inner_join(db$COND, by = 'PLT_CN') %>%
+#         inner_join(db$TREE, by = 'PLT_CN') %>%
+#         select(!!grpBy_quo)
+#     )
+#
+#     # If column doesnt exist, just returns 0, not a dataframe
+#     if (is.null(nrow(d_quo))){
+#       grpName <- quo_name(grpBy_quo)
+#       stop(paste('Columns', grpName, 'not found in PLOT, TREE, or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
+#     } else {
+#       # Convert to character
+#       grpBy <- names(d_quo)
+#     }
+#   }
+#
+#   reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
+#                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
+#   ## Some warnings
+#   if (class(db) != "FIA.Database"){
+#     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
+#   }
+#   if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
+#     stop('polys must be spatial polygons object of class sp or sf. ')
+#   }
+#   if (landType %in% c('timber', 'forest') == FALSE){
+#     stop('landType must be one of: "forest" or "timber".')
+#   }
+#   if (any(reqTables %in% names(db) == FALSE)){
+#     missT <- reqTables[reqTables %in% names(db) == FALSE]
+#     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
+#   }
+#
+#   # Save original grpBy for pretty return with spatial objects
+#   grpBy <- c('YEAR', grpBy)
+#   grpByOrig <- grpBy
+#
+#   message('Joining FIA Tables.....')
+#
+#
+#   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
+#   ids <- db$POP_EVAL %>%
+#     select('CN', 'END_INVYR', 'EVALID') %>%
+#     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+#     filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+#     distinct(EVALID) %>%
+#     collect()
+#   db$POP_EVAL <- db$POP_EVAL %>%
+#     filter(EVALID %in% local(ids$EVALID))
+#
+#
+#   ### AREAL SUMMARY PREP
+#   if(!is.null(polys)) {
+#     # Convert polygons to an sf object
+#     polys <- polys %>%
+#       as('sf')%>%
+#       mutate_if(is.factor,
+#                 as.character)
+#     # Add shapefile names to grpBy
+#     grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
+#     ## Make plot data spatial, projected same as polygon layer
+#     pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
+#     coordinates(pltSF) <- ~LON+LAT
+#     proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+#     pltSF <- as(pltSF, 'sf') %>%
+#       st_transform(crs = st_crs(polys)$proj4string)
+#     # Intersect plot with polygons
+#     polys$polyID <- 1:nrow(polys)
+#     suppressMessages({suppressWarnings({
+#       pltSF <- st_intersection(pltSF, polys) %>%
+#         as.data.frame() %>%
+#         select(-c('geometry')) # removes artifact of SF object
+#     })})
+#     # A warning
+#     if (length(unique(pltSF$PLT_CN)) < 1){
+#       stop('No plots in db overlap with polys.')
+#     }
+#
+#   } else if (byPlot & returnSpatial){
+#     grpBy <- c(grpBy, 'LON', 'LAT')
+#   } # END AREAL
+#
+#   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
+#   # Land type domain indicator
+#   if (tolower(landType) == 'forest'){
+#     db$COND <- mutate(db$COND, landD = ifelse(COND_STATUS_CD == 1, 1, 0))
+#   } else if (tolower(landType) == 'timber'){
+#     db$COND <- mutate(db$COND, landD = ifelse(COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0))
+#   }
+#   # Tree Type domain indicator
+#   if (tolower(treeType) == 'live'){
+#     db$TREE <- mutate(db$TREE, typeD = ifelse(STATUSCD == 1, 1, 0))
+#   } else if (tolower(treeType) == 'dead'){
+#     db$TREE <- mutate(db$TREE, typeD = ifelse(STATUSCD == 2 & STANDING_DEAD_CD == 1, 1, 0))
+#   } else if (tolower(treeType) == 'gs'){
+#     db$TREE <- mutate(db$TREE, typeD = ifelse(STATUSCD == 1 & DIA >= 5 & TREECLCD == 2, 1, 0))
+#   } else if (tolower(treeType) == 'all'){
+#     db$TREE <- mutate(db$TREE, typeD = 1)
+#   }
+#   # update spatial domain indicator
+#   if(!is.null(polys)){
+#     db$PLOT <- mutate(db$PLOT, sp = ifelse(PLT_CN %in% pltSF$PLT_CN, 1, 0))
+#   } else {
+#     db$PLOT <- mutate(db$PLOT, sp = 1)
+#   }
+#
+#   # User defined domain indicator for area (ex. specific forest type)
+#   if(!is.null(areaDomain)) {
+#     pcEval <- left_join(db$PLOT, db$COND, by = 'PLT_CN')
+#     areaDomain <- enquo(areaDomain)
+#     pcEval <- mutate(pcEval, aD = if_else(!!areaDomain, 1, 0))
+#     suppressMessages({
+#       db$COND <- left_join(db$COND, pcEval) %>%
+#         mutate(aD_c = aD)
+#       aD_p <- pcEval %>%
+#         group_by(PLT_CN) %>%
+#         summarize(aD_p = as.numeric(any(aD > 0)))
+#       db$PLOT <- left_join(db$PLOT, aD_p)
+#     })
+#   } else {
+#     db$COND <- mutate(db$COND, aD_c = 1)
+#     db$PLOT <- mutate(db$PLOT, aD_p = 1)
+#   }
+#
+#
+#
+#   # User defined domain indicator for area (ex. specific forest type)
+#   if(!is.null(treeDomain)) {
+#     treeDomain <- enquo(treeDomain)
+#     db$TREE <- mutate(db$TREE, tD = if_else(!!treeDomain, 1, 0))
+#   } else {
+#     db$TREE <- mutate(db$TREE, tD = 1)
+#   }
+#
+#
+#   ## Which grpByNames are in which table? SUBSET only necessary columns for joins
+#   db$PLOT <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA',  'aD_p', 'sp', colnames(db$PLOT)[colnames(db$PLOT) %in% local(grpBy)]))
+#   db$COND <- select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', 'aD_c', 'landD', colnames(db$COND)[colnames(db$COND) %in% local(grpBy)]))
+#   db$TREE <- select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', 'tD', 'typeD', colnames(db$TREE)[colnames(db$TREE) %in% local(grpBy)]))
+#   db$POP_PLOT_STRATUM_ASSGN <- select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN'))
+#   db$POP_STRATUM <- select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT'))
+#   db$POP_ESTN_UNIT <- select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU'))
+#   db$POP_EVAL <- select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM'))
+#   #db$POP_EVAL_TYP <- select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN'))
+#   #db$POP_EVAL_GRP <- select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP'))
+#
+#
+#   ## Prep joins and filters
+#   data <- db$PLOT %>%
+#     left_join(db$COND, by = c('PLT_CN')) %>%
+#     left_join(db$POP_PLOT_STRATUM_ASSGN, by = c('PLT_CN')) %>%
+#     left_join(db$POP_STRATUM, by = c('STRATUM_CN' = 'CN')) %>%
+#     left_join(db$POP_ESTN_UNIT,by = c('ESTN_UNIT_CN' = 'CN')) %>%
+#     left_join(db$POP_EVAL, by = c('EVAL_CN' = 'CN')) %>%
+#     filter(!is.na(EVALID)) %>%
+#     #left_join(db$POP_EVAL_TYP, by = c('EVAL_CN')) %>%
+#     #left_join(db$POP_EVAL_GRP, by = c('EVAL_GRP_CN' = 'CN')) %>%
+#     left_join(db$TREE, by = c('PLT_CN', 'CONDID')) %>%
+#     mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
+#     rename(YEAR = END_INVYR,
+#            YEAR_RANGE = REPORT_YEAR_NM) %>%
+#     mutate_if(is.factor,
+#               as.character) %>%
+#     filter(!is.na(YEAR)) %>%
+#     # Tree Adjustment factor
+#     mutate(
+#       tAdj = case_when(
+#         is.na(DIA) ~ ADJ_FACTOR_SUBP,
+#         DIA >= MACRO_BREAKPOINT_DIA & !is.na(DIA) ~ ADJ_FACTOR_MACR,
+#         DIA < 5 & !is.na(DIA) ~ ADJ_FACTOR_MICR[DIA < 5 & !is.na(DIA)],
+#         DIA >= 5 & DIA < MACRO_BREAKPOINT_DIA & !is.na(DIA) ~ ADJ_FACTOR_SUBP),
+#       estMethod = case_when(
+#         ESTN_METHOD == "Post-Stratification" ~ 'strat',
+#         ESTN_METHOD == "Stratified random sampling" ~ 'strat',
+#         ESTN_METHOD == "Double sampling for stratification" ~ 'double',
+#         ESTN_METHOD == "Simple random sampling" ~ 'simple',
+#         ESTN_METHOD == "Subsampling units of unequal size" ~ 'simple')
+#     )
+#
+#   # Test to see if a collect on data will help break the chain
+#   #test <- collect(select(data, DIA))
+#
+#   grpBy <- sym(grpBy)
+#
+#   tOut <- data %>%
+#     #filter(!is.na(PLT_CN)) %>%
+#     #distinct(PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
+#     #group_by(.dots= PLT_CN) %>%
+#     group_by_(!!grpBy, 'PLT_CN') %>%
+#     summarize(TPA = sum(TPA_UNADJ, na.rm = TRUE)) %>%
+#     #BAA = sum(basalArea(DIA) * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
+#     #nStems = length(which(tDI == 1))) %>%
+#     show_query %>%
+#     collect()
+#
+#
+#   if(!is.null(polys)){
+#     data <- left_join(data, local(pltSF), by = 'PLT_CN')
+#     # Test if any polygons cross state boundaries w/ different recent inventory years
+#     if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+#       mergeYears <- local(pltSF) %>%
+#         inner_join(db$POP_PLOT_STRATUM_ASSGN, by = 'PLT_CN') %>%
+#         inner_join(db$POP_EVAL, by = 'EVALID') %>%
+#         group_by(polyID) %>%
+#         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+#       # Replace YEAR from above w/ max year so that data is pooled across states
+#       data <- left_join(data, local(mergeYears), by = 'polyID') %>%
+#         select(-c(YEAR)) %>%
+#         mutate(YEAR = maxYear)
+#     }
+#   }
+#
+#   ## Comprehensive indicator function
+#   data <- mutate(data,
+#                  aDI = landD * aD_p * aD_c * sp,
+#                  tDI = landD * aD_p * aD_c * tD * typeD * sp,
+#                  pDI = landD * aD_p * aD_c * tD * sp)
+#
+#   ## Add species to groups
+#   if (bySpecies) {
+#     data <- data %>%
+#       left_join(select(local(intData$REF_SPECIES_2018), c('SPCD','COMMON_NAME', 'GENUS', 'SPECIES')), by = 'SPCD') %>%
+#       mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' ')) %>%
+#       mutate_if(is.factor,
+#                 as.character)
+#     grpBy <- c(grpBy, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
+#     grpByOrig <- c(grpByOrig, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
+#   }
+#
+#   ## Break into size classes
+#   if (bySizeClass){
+#     grpBy <- c(grpBy, 'sizeClass')
+#     grpByOrig <- c(grpByOrig, 'sizeClass')
+#     data$sizeClass <- makeClasses(data$DIA, interval = 2)
+#     data <- data[!is.na(data$sizeClass),]
+#   }
+#
+#
+#   ####################  COMPUTE ESTIMATES  ###########################
+#   ### -- BYPLOT -- TPA Estimates at each plot location
+#   if (byPlot) {
+#
+#
+#     # tOut <- data %>%
+#     #   filter(!is.na(PLT_CN)) %>%
+#     #   #distinct(PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
+#     #   group_by(!!enquo(grpBy), PLT_CN) %>%
+#     #   summarize(TPA = sum(TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
+#     #             #BAA = sum(basalArea(DIA) * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
+#     #             nStems = length(which(tDI == 1))) %>%
+#     #   show_query %>%
+#     #   collect()
+#
+#     if (returnSpatial){
+#       tOut <- tOut %>%
+#         filter(!is.na(LAT) & !is.na(LON)) %>%
+#         st_as_sf(coords = c('LON', 'LAT'),
+#                  crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+#     }
+#
+#     ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
+#   } else {
+#     #if (SE){
+#     # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
+#     ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
+#     ## estimation unit, and cause estimates to be inflated substantially)
+#     # combos <- select(data, c(grpBy)) %>%
+#     #   as.data.frame() %>%
+#     #   group_by(.dots = grpBy) %>%
+#     #   summarize() %>%
+#     #   filter(!is.na(YEAR))
+#     # if(!is.null(polys)){
+#     #   combos <- filter(combos, !is.na(polyID))
+#     # }
+#     ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
+#     if(is.null(polys)){
+#       combos <- select(data, c(grpBy)) %>%
+#         as.data.frame() %>%
+#         group_by(.dots = grpBy) %>%
+#         summarize() %>%
+#         filter(!is.na(YEAR))
+#     } else {
+#       ## Non spatial combos
+#       combosNS <- select(data, c(grpBy[grpBy %in% names(polys) == FALSE])) %>%
+#         as.data.frame() %>%
+#         group_by(.dots = grpBy[grpBy %in% names(polys) == FALSE]) %>%
+#         summarize() %>%
+#         filter(!is.na(YEAR))
+#       combosNSpoly <- combosNS %>%
+#         mutate(polyID = 1)
+#       if(nrow(polys) > 1){
+#         # Duplicate set of non spatial groups
+#         for (p in 2:nrow(polys)) {
+#           combosNS$polyID <- p
+#           combosNSpoly <- rbind(combosNSpoly, combosNS)
+#         }
+#       }
+#       # New combos for spatial objects
+#       combos <- pltSF %>%
+#         select(-c(PLT_CN)) %>%
+#         distinct(polyID, .keep_all = TRUE) %>%
+#         left_join(combosNSpoly, by = 'polyID')
+#     }
+#     # List of rows for lapply
+#     combos <- split(combos, seq(nrow(combos)))
+#
+#     # Seperate area grouping names, (ex. TPA red oak in total land area of ingham county, rather than only area where red oak occurs)
+#     if (!is.null(polys)){
+#       aGrpBy <- c('YEAR', grpBy[grpBy %in% names(db$PLOT) | grpBy %in% names(db$COND) | grpBy %in% names(pltSF)])
+#     } else {
+#       aGrpBy <- c('YEAR', grpBy[grpBy %in% names(db$PLOT) | grpBy %in% names(db$COND)])
+#     }
+#
+#     message('Computing Summary Statistics.....')
+#     #pb <- progress_bar$new(format = "[:bar] :percent eta: :eta", total = nrow(combos), clear = FALSE, width= 100)
+#
+#     #for (i in 1:nrow(combos)){ #, .combine = 'rbind', .packages = 'dplyr', .export = c('data')
+#     #tOut <- foreach(i = 1:nrow(combos), .combine = 'rbind', .packages = 'dplyr', .export = c('data'))
+#
+#     suppressWarnings({
+#       ## Compute estimates in parallel -- Clusters in windows, forking otherwise
+#       if (Sys.info()['sysname'] == 'Windows'){
+#         cl <- makeCluster(nCores)
+#         clusterEvalQ(cl, {
+#           library(dplyr)
+#           library(stringr)
+#         })
+#         if(progress){ # Include progress Bar
+#           tOut <- pblapply(X = names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = cl)
+#         } else { # No progress Bar
+#           tOut <- parLapply(cl, X = names(combos), fun = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE)
+#         }
+#         stopCluster(cl)
+#       } else { # Unix systems
+#         if(progress){
+#           tOut <- pblapply(X = names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, cl = nCores)
+#         } else { # No progress Bar, much quicker
+#           tOut <- mclapply(X = names(combos), FUN = tpaHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
+#         }
+#       }
+#     })
+#
+#     if (SE){
+#       # Convert from list to dataframe
+#       tOut <- do.call(rbind,tOut)
+#     } else {
+#       # Pull out dataframe
+#       tOut <- tOut[[1]]
+#     }
+#
+#     # Snag the names
+#     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
+#
+#
+#     # Return a spatial object
+#     if ('YEAR' %in% names(tOut)){
+#       # Return a spatial object
+#       if (!is.null(polys) & returnSpatial) {
+#         suppressMessages({suppressWarnings({tOut <- left_join(polys, tOut) %>%
+#           select(c(grpByOrig, tNames, names(polys))) %>%
+#           filter(!is.na(polyID))})})
+#       } else if (!is.null(polys) & returnSpatial == FALSE){
+#         tOut <- select(tOut, c(grpByOrig, tNames, everything())) %>%
+#           filter(!is.na(polyID))
+#         # Return spatial plots
+#       }
+#     } else { ## Function found no plots within the polygon, so it panics
+#       combos <- data %>%
+#         as.data.frame() %>%
+#         group_by(.dots = grpBy) %>%
+#         summarize()
+#       tOut <- data.frame("YEAR" = combos$YEAR, "TPA" = rep(NA, nrow(combos)),
+#                          "BAA" = rep(NA, nrow(combos)), "TPA_PERC" = rep(NA, nrow(combos)),
+#                          "BAA_PERC" = rep(NA, nrow(combos)), "TPA_SE" = rep(NA, nrow(combos)),
+#                          "BAA_SE" = rep(NA, nrow(combos)), "TPA_PERC_SE" = rep(NA, nrow(combos)),
+#                          "BAA_PERC_SE" = rep(NA, nrow(combos)),"nPlots_TREE" = rep(NA, nrow(combos)),
+#                          "nPlots_AREA" = rep(NA, nrow(combos)))
+#       if (!is.null(polys) & returnSpatial) {
+#         suppressMessages({suppressWarnings({
+#           polys = left_join(polys, combos)
+#           tOut <- left_join(polys, tOut)})})
+#       } else if (!is.null(polys) & returnSpatial == FALSE){
+#         tOut <- data.frame(select(tOut, -c('YEAR')), combos)
+#       }
+#     }
+#
+#   } # End byPlot == FALSE
+#   #tOut <- filter(tOut, !is.na(YEAR))
+#   return(tOut)
+# }
+
+
+
+
+
+# ## TPA & BAA
+# tpaNew <- function(db,
+#                 grpBy = NULL,
+#                 polys = NULL,
+#                 returnSpatial = FALSE,
+#                 bySpecies = FALSE,
+#                 bySizeClass = FALSE,
+#                 landType = 'forest',
+#                 treeType = 'live',
+#                 treeDomain = NULL,
+#                 areaDomain = NULL,
+#                 totals = FALSE,
+#                 byPlot = FALSE,
+#                 SE = TRUE,
+#                 progress = TRUE,
+#                 nCores = 1) {
+#
+#   ## Need a plotCN
+#   db$PLOT <- db$PLOT %>% mutate(PLT_CN = CN)
+#
+#   ## Converting names given in grpBy to character vector (NSE to standard)
+#   ##  don't have to change original code
+#   grpBy_quo <- enquo(grpBy)
+#
+#   # Probably cheating, but it works
+#   if (quo_name(grpBy_quo) != 'NULL'){
+#     ## Have to join tables to run select with this object type
+#     plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
+#     ## We want a unique error message here to tell us when columns are not present in data
+#     d_quo <- tryCatch(
+#       error = function(cnd) {
+#         return(0)
+#       },
+#       plt_quo[1,] %>% # Just the first row
+#         inner_join(db$COND, by = 'PLT_CN') %>%
+#         inner_join(db$TREE, by = 'PLT_CN') %>%
+#         select(!!grpBy_quo)
+#     )
+#
+#     # If column doesnt exist, just returns 0, not a dataframe
+#     if (is.null(nrow(d_quo))){
+#       grpName <- quo_name(grpBy_quo)
+#       stop(paste('Columns', grpName, 'not found in PLOT, TREE, or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
+#     } else {
+#       # Convert to character
+#       grpBy <- names(d_quo)
+#     }
+#   }
+#
+#   grpByOrig <- grpBy
+#
+#   reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
+#                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
+#   ## Some warnings
+#   if (class(db) != "FIA.Database"){
+#     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
+#   }
+#   if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
+#     stop('polys must be spatial polygons object of class sp or sf. ')
+#   }
+#   if (landType %in% c('timber', 'forest') == FALSE){
+#     stop('landType must be one of: "forest" or "timber".')
+#   }
+#   if (any(reqTables %in% names(db) == FALSE)){
+#     missT <- reqTables[reqTables %in% names(db) == FALSE]
+#     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
+#   }
+#
+#
+#   message('Joining FIA Tables.....')
+#
+#
+#   ### Snag the EVALIDs that are needed & subset POP_EVAL to only include these
+#   ids <- db$POP_EVAL %>%
+#     select('CN', 'END_INVYR', 'EVALID') %>%
+#     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+#     filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+#     distinct(EVALID)
+#   db$POP_EVAL <- db$POP_EVAL %>%
+#     filter(EVALID %in% ids$EVALID)
+#
+#
+#   ### AREAL SUMMARY PREP
+#   if(!is.null(polys)) {
+#     # Convert polygons to an sf object
+#     polys <- polys %>%
+#       as('sf')%>%
+#       mutate_if(is.factor,
+#                 as.character)
+#     # Add shapefile names to grpBy
+#     grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
+#     ## Make plot data spatial, projected same as polygon layer
+#     pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
+#     coordinates(pltSF) <- ~LON+LAT
+#     proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+#     pltSF <- as(pltSF, 'sf') %>%
+#       st_transform(crs = st_crs(polys)$proj4string)
+#     # Intersect plot with polygons
+#     polys$polyID <- 1:nrow(polys)
+#     suppressMessages({suppressWarnings({
+#       pltSF <- st_intersection(pltSF, polys) %>%
+#         as.data.frame() %>%
+#         select(-c('geometry')) # removes artifact of SF object
+#     })})
+#     # A warning
+#     if (length(unique(pltSF$PLT_CN)) < 1){
+#       stop('No plots in db overlap with polys.')
+#     }
+#
+#   } else if (byPlot & returnSpatial){
+#     grpBy <- c(grpBy, 'LON', 'LAT')
+#   } # END AREAL
+#
+#   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
+#   # Land type domain indicator
+#   if (tolower(landType) == 'forest'){
+#     db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1, 1, 0)
+#   } else if (tolower(landType) == 'timber'){
+#     db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
+#   }
+#   # Tree Type domain indicator
+#   if (tolower(treeType) == 'live'){
+#     db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1, 1, 0)
+#   } else if (tolower(treeType) == 'dead'){
+#     db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 2 & db$TREE$STANDING_DEAD_CD == 1, 1, 0)
+#   } else if (tolower(treeType) == 'gs'){
+#     db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1 & db$TREE$DIA >= 5 & db$TREE$TREECLCD == 2, 1, 0)
+#   } else if (tolower(treeType) == 'all'){
+#     db$TREE$typeD <- 1
+#   }
+#   # update spatial domain indicator
+#   if(!is.null(polys)){
+#     db$PLOT$sp <- ifelse(db$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+#   } else {
+#     db$PLOT$sp <- 1
+#   }
+#
+#   # User defined domain indicator for area (ex. specific forest type)
+#   pcEval <- left_join(db$PLOT, select(db$COND, -c('STATECD', 'UNITCD', 'COUNTYCD', 'INVYR', 'PLOT')), by = 'PLT_CN')
+#   areaDomain <- substitute(areaDomain)
+#   pcEval$aD <- eval(areaDomain, pcEval) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+#   if(!is.null(pcEval$aD)) pcEval$aD[is.na(pcEval$aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+#   if(is.null(pcEval$aD)) pcEval$aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+#   pcEval$aD <- as.numeric(pcEval$aD)
+#   db$COND <- left_join(db$COND, select(pcEval, c('PLT_CN', 'CONDID', 'aD')), by = c('PLT_CN', 'CONDID')) %>%
+#     mutate(aD_c = aD)
+#   aD_p <- pcEval %>%
+#     group_by(PLT_CN) %>%
+#     summarize(aD_p = as.numeric(any(aD > 0)))
+#   db$PLOT <- left_join(db$PLOT, aD_p, by = 'PLT_CN')
+#   rm(pcEval)
+#
+#   # Same as above for tree (ex. trees > 20 ft tall)
+#   treeDomain <- substitute(treeDomain)
+#   tD <- eval(treeDomain, db$TREE) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+#   if(!is.null(tD)) tD[is.na(tD)] <- 0 # Make NAs 0s. Causes bugs otherwise
+#   if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
+#   db$TREE$tD <- as.numeric(tD)
+#
+#   ## Add species to groups
+#   if (bySpecies) {
+#     db$TREE <- db$TREE %>%
+#       left_join(select(intData$REF_SPECIES_2018, c('SPCD','COMMON_NAME', 'GENUS', 'SPECIES')), by = 'SPCD') %>%
+#       mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' ')) %>%
+#       mutate_if(is.factor,
+#                 as.character)
+#     grpBy <- c(grpBy, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
+#     grpByOrig <- c(grpByOrig, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
+#   }
+#
+#   ## Break into size classes
+#   if (bySizeClass){
+#     grpBy <- c(grpBy, 'sizeClass')
+#     grpByOrig <- c(grpByOrig, 'sizeClass')
+#     db$TREE$sizeClass <- makeClasses(db$TREE$DIA, interval = 2)
+#     db$TREE <- db$TREE[!is.na(db$TREE$sizeClass),]
+#   }
+#
+#   ## Which grpByNames are in which table? Helps us subset below
+#   grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
+#   grpC <- names(db$COND)[names(db$COND) %in% grpBy]
+#   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
+#
+#
+#
+#   ####################  COMPUTE ESTIMATES  ###########################
+#   ### -- BYPLOT -- TPA Estimates at each plot location
+#   if (byPlot) {
+#     # Update Year to measurement year
+#     grpBy <- c('MEASYEAR', grpBy)
+#
+#     tOut <- select(db$PLOT, c('PLT_CN', 'MEASYEAR', grpP, 'aD_p', 'sp')) %>%
+#       left_join(select(db$COND, c('PLT_CN', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
+#       left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'TPA_UNADJ', grpT, 'tD', 'typeD')), by = c('PLT_CN', 'CONDID')) %>%
+#       ## Make the domain indicators & adjustment factors
+#       mutate(aDI = landD * aD_p * aD_c * sp,
+#              tDI = landD * aD_p * aD_c * tD * typeD * sp,
+#              pDI = landD * aD_p * aD_c * tD * sp) %>%
+#       group_by(.dots = grpBy, PLT_CN) %>%
+#       summarize(TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE),
+#                 BAA = sum(basalArea(DIA) * TPA_UNADJ * tDI, na.rm = TRUE),
+#                 nStems = length(which(tDI == 1)))
+#
+#     if (returnSpatial){
+#       tOut <- tOut %>%
+#         filter(!is.na(LAT) & !is.na(LON)) %>%
+#         st_as_sf(coords = c('LON', 'LAT'),
+#                  crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+#     }
+#
+#     ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
+#   } else {
+#     # Save original grpBy for pretty return with spatial objects
+#     grpBy <- c('YEAR', grpBy)
+#     grpByOrig <- grpBy
+#
+#     # Seperate area grouping names, (ex. TPA red oak in total land area of ingham county, rather than only area where red oak occurs)
+#     aGrpBy <- c('YEAR', grpP, grpC)
+#     if (!is.null(polys)) aGrpBy <- c(aGrpBy, grpBy[grpBy %in% names(pltSF)])
+#
+#     ## Prep joins and filters TO COMPUTE PLOT LEVEL INDICES
+#     data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', grpP, 'aD_p', 'sp')) %>%
+#       left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
+#       left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT, 'tD', 'typeD')), by = c('PLT_CN', 'CONDID')) %>%
+#       left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = c('PLT_CN')) %>%
+#       left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
+#       left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
+#       right_join(select(db$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
+#       #left_join(select(db$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
+#       #left_join(select(db$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
+#       rename(YEAR = END_INVYR,
+#              YEAR_RANGE = REPORT_YEAR_NM) %>%
+#       filter(!is.na(YEAR)) %>%
+#       ungroup() %>%
+#       ## Build adjustment factors and domain indicators
+#       mutate(aDI = landD * aD_p * aD_c * sp,
+#              tDI = landD * aD_p * aD_c * tD * typeD * sp,
+#              pDI = landD * aD_p * aD_c * tD * sp,
+#              tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR),
+#              aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
+#       ## Some housekeeping to prevent warnings
+#       mutate_if(is.factor,
+#                 as.character)
+#     ## Count the total plots (used to adjust when grouping)
+#     totalPlots <- data %>%
+#       distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
+#       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN) %>%
+#       summarize(totalPlots = length(unique(PLT_CN)))
+#
+#     ## Compute indices at the plot level, to be sent off for more joinery later
+#     ## Numerator and denominator are in different domains of interest, and may be grouped by different variables
+#     tInt <- data %>%
+#       distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
+#       group_by(.dots = grpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
+#       summarize(tPlot = sum(TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
+#                 bPlot = sum(basalArea(DIA) * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
+#                 tTPlot = sum(TPA_UNADJ * tAdj * pDI, na.rm = TRUE),
+#                 bTPlot = sum(basalArea(DIA) * TPA_UNADJ * tAdj * pDI, na.rm = TRUE),
+#                 plotIn_t = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0),
+#                 p1 = first(P1POINTCNT),
+#                 p2 = first(P2POINTCNT),
+#                 p1_eu = first(P1PNTCNT_EU),
+#                 a = first(AREA_USED))
+#     aInt <- data %>%
+#       distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, .keep_all = TRUE) %>%
+#       group_by(.dots = aGrpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
+#       summarize(fa = sum(CONDPROP_UNADJ * aDI * aAdj, na.rm = TRUE),
+#                 plotIn_a = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
+#
+#       # group_by(.dots = aGrpBy, ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID) %>%
+#       # summarize(fa = sum(CONDPROP_UNADJ * aDI * aAdj, na.rm = TRUE),
+#       #           plotIn_a = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
+#     ## Join area & tree estimates, and join with remaining POP tables
+#     suppressMessages({
+#     data <- tInt %>%
+#       inner_join(aInt) %>%
+#       inner_join(totalPlots)
+#     })
+#
+#     ## Recode a few of the estimation methods to make things easier below
+#     data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
+#                               `Post-Stratification` = 'strat',
+#                               `Stratified random sampling` = 'strat',
+#                               `Double sampling for stratification` = 'double',
+#                               `Simple random sampling` = 'simple',
+#                               `Subsampling units of unequal size` = 'simple')
+#
+#
+#     ## Join with polygon attributes
+#     if(!is.null(polys)){
+#       data <- left_join(data, pltSF, by = 'PLT_CN')
+#       # Test if any polygons cross state boundaries w/ different recent inventory years
+#       if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+#         mergeYears <- pltSF %>%
+#           inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
+#           inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
+#           group_by(polyID) %>%
+#           summarize(maxYear = max(END_INVYR, na.rm = TRUE))
+#         # Replace YEAR from above w/ max year so that data is pooled across states
+#         data <- left_join(data, mergeYears, by = 'polyID') %>%
+#           select(-c(YEAR)) %>%
+#           mutate(YEAR = maxYear)
+#       }
+#     }
+#
+#     #if (SE){
+#     # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
+#     ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
+#     ## estimation unit, and cause estimates to be inflated substantially)
+#
+#     ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
+#     if (is.null(polys)){
+#       combos <- select(data, c(grpBy)) %>%
+#         ungroup() %>%
+#         as.data.frame() %>%
+#         group_by(.dots = grpBy) %>%
+#         summarize() %>%
+#         filter(!is.na(YEAR))
+#     } else {
+#       ## Non spatial combos
+#       combosNS <- select(data, c(grpBy[grpBy %in% names(polys) == FALSE])) %>%
+#         ungroup() %>%
+#         as.data.frame() %>%
+#         group_by(.dots = grpBy[grpBy %in% names(polys) == FALSE]) %>%
+#         summarize() %>%
+#         filter(!is.na(YEAR))
+#       combosNSpoly <- combosNS %>%
+#         mutate(polyID = 1)
+#       if(nrow(polys) > 1){
+#         # Duplicate set of non spatial groups
+#         for (p in 2:nrow(polys)) {
+#           combosNS$polyID <- p
+#           combosNSpoly <- rbind(combosNSpoly, combosNS)
+#         }
+#       }
+#       # New combos for spatial objects
+#       combos <- pltSF %>%
+#         select(-c(PLT_CN)) %>%
+#         distinct(polyID, .keep_all = TRUE) %>%
+#         left_join(combosNSpoly, by = 'polyID')
+#     }
+#     # List of rows for lapply
+#     combos <- split(combos, seq(nrow(combos)))
+#
+#
+#
+#     message('Computing Summary Statistics.....')
+#
+#     suppressWarnings({
+#       ## Compute estimates in parallel -- Clusters in windows, forking otherwise
+#       if (Sys.info()['sysname'] == 'Windows'){
+#         cl <- makeCluster(nCores)
+#         clusterEvalQ(cl, {
+#           library(dplyr)
+#           library(stringr)
+#         })
+#         if(progress){ # Include progress Bar
+#           tOut <- pblapply(X = names(combos), FUN = tpaNewHelper, combos, data, totals, SE, cl = cl)
+#         } else { # No progress Bar
+#           tOut <- parLapply(cl, X = names(combos), fun = tpaNewHelper, combos, data, totals, SE)
+#         }
+#         stopCluster(cl)
+#       } else { # Unix systems
+#         if(progress){
+#           tOut <- pblapply(X = names(combos), FUN = tpaNewHelper, combos, data, totals, SE, cl = nCores)
+#         } else { # No progress Bar, much quicker
+#           tOut <- mclapply(X = names(combos), FUN = tpaNewHelper, combos, data, totals, SE, mc.cores = nCores)
+#         }
+#       }
+#     })
+#
+#     if (SE){
+#       # Convert from list to dataframe
+#       tOut <- do.call(rbind,tOut)
+#     } else {
+#       # Pull out dataframe
+#       tOut <- tOut[[1]]
+#     }
+#
+#     # Snag the names
+#     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
+#
+#
+#     # Return a spatial object
+#     if ('YEAR' %in% names(tOut)){
+#       # Return a spatial object
+#       if (!is.null(polys) & returnSpatial) {
+#         suppressMessages({suppressWarnings({tOut <- left_join(polys, tOut) %>%
+#           select(c(grpByOrig, tNames, names(polys))) %>%
+#           filter(!is.na(polyID))})})
+#       } else if (!is.null(polys) & returnSpatial == FALSE){
+#         tOut <- select(tOut, c(grpByOrig, tNames, everything())) %>%
+#           filter(!is.na(polyID))
+#         # Return spatial plots
+#       }
+#     } else { ## Function found no plots within the polygon, so it panics
+#       combos <- data %>%
+#         as.data.frame() %>%
+#         group_by(.dots = grpBy) %>%
+#         summarize()
+#       tOut <- data.frame("YEAR" = combos$YEAR, "TPA" = rep(NA, nrow(combos)),
+#                          "BAA" = rep(NA, nrow(combos)), "TPA_PERC" = rep(NA, nrow(combos)),
+#                          "BAA_PERC" = rep(NA, nrow(combos)), "TPA_SE" = rep(NA, nrow(combos)),
+#                          "BAA_SE" = rep(NA, nrow(combos)), "TPA_PERC_SE" = rep(NA, nrow(combos)),
+#                          "BAA_PERC_SE" = rep(NA, nrow(combos)),"nPlots_TREE" = rep(NA, nrow(combos)),
+#                          "nPlots_AREA" = rep(NA, nrow(combos)))
+#       if (!is.null(polys) & returnSpatial) {
+#         suppressMessages({suppressWarnings({
+#           polys = left_join(polys, combos)
+#           tOut <- left_join(polys, tOut)})})
+#       } else if (!is.null(polys) & returnSpatial == FALSE){
+#         tOut <- data.frame(select(tOut, -c('YEAR')), combos)
+#       }
+#     }
+#
+#   } # End byPlot == FALSE
+#   remove(data)
+#   remove(db)
+#   tOut <- filter(tOut, !is.na(YEAR))
+#   return(tOut)
+# }
