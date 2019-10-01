@@ -11,7 +11,7 @@ Produces estimates of down woody material stocks on a per acre basis from the Fo
 \usage{
 dwm(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = 'forest',
     areaDomain = NULL, byPlot = FALSE, totals = FALSE, tidy = TRUE,
-    SE = TRUE, progress = TRUE, nCores = 1)
+    SE = TRUE, nCores = 1)
 }
 
 \arguments{
@@ -34,8 +34,6 @@ dwm(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = 'forest',
   \item{tidy}{logical; if TRUE, returns estimates grouped by fuel type, rather than including individual columns for each fuel type (For use in tidyverse packages, e.g. \code{ggplot2}, \code{\link{dplyr}}). Not recommended when returning spatial objects (\code{returnSpatial = TRUE}), for consistency with shapefile data structures. }
 
   \item{SE}{logical; if TRUE, returns estimates with samping error (approx. 5x faster without returning samping errors)}
-
-  \item{progress}{logical; if TRUE, a dynamic progress bar is displayed (approx. 30\% faster when FALSE.}
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }

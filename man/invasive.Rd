@@ -10,7 +10,7 @@ Produces estimates of areal coverage of invasive species from the Forest Invento
 \usage{
 invasive(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = "forest",
          areaDomain = NULL, byPlot = FALSE, totals = FALSE, SE = TRUE,
-         progress = TRUE, nCores = 1)
+         nCores = 1)
 }
 
 \arguments{
@@ -31,8 +31,6 @@ invasive(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = "fore
   \item{totals}{logical; if TRUE, returns population estimates in addition to \% coverage.}
 
   \item{SE}{logical; if TRUE, returns estimates with samping error (approx. 5x faster without returning samping errors)}
-
-  \item{progress}{logical; if TRUE, a dynamic progress bar is displayed (approx. 30\% faster when FALSE.}
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }

@@ -9,7 +9,7 @@ Produces estimates of total area (acreage) from FIA data. Estimates can be produ
 area(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
      byLandType = FALSE, landType = 'forest', treeDomain = NULL,
      areaDomain = NULL, totals = FALSE, byPlot = FALSE, SE = TRUE,
-     progress = TRUE, nCores = 1)
+     nCores = 1)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -34,8 +34,6 @@ area(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations (population totals not returned).}
 
   \item{SE}{logical; if TRUE, returns estimates with samping error (approx. 5x faster without returning samping errors)}
-
-  \item{progress}{logical; if TRUE, a dynamic progress bar is displayed (approx. 30\% faster when FALSE.}
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }

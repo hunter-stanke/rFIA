@@ -179,7 +179,7 @@ tpaHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
     #tNames <- names(t)
     # Rejoin with grpBY
     t <- data.frame(combos[[x]], t) #%>%
-      #filter(!is.na(YEAR))
+    #filter(!is.na(YEAR))
 
   } else { # IF SE is FALSE
     ### BELOW DOES NOT PRODUCE SAMPLING ERRORS, use EXPNS instead (much quicker)

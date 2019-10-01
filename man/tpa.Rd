@@ -11,7 +11,7 @@ Produces tree per acre (TPA) and basal area per acre (BAA) estimates from FIA da
 tpa(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE,
     bySizeClass = FALSE, landType = 'forest', treeType = 'live',
     treeDomain = NULL, areaDomain = NULL, totals = FALSE,
-    byPlot = FALSE, SE = TRUE, progress = TRUE, nCores = 1)
+    byPlot = FALSE, SE = TRUE, nCores = 1)
 }
 
 \arguments{
@@ -40,8 +40,6 @@ tpa(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE,
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations (population totals not returned).}
 
   \item{SE}{logical; if TRUE, returns estimates with samping error (approx. 5x faster without returning samping errors)}
-
-  \item{progress}{logical; if TRUE, a dynamic progress bar is displayed (approx. 30\% faster when FALSE.}
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }
