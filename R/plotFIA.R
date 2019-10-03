@@ -1,5 +1,5 @@
 #' @export
-plotFIA <- function(data, y, grp = NULL, x = NULL, animate = FALSE, n.max = NULL, plot.title = NULL,
+plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, n.max = NULL, plot.title = NULL,
                     y.lab = NULL, x.lab = NULL, legend.title = NULL, legend.labs = waiver(),
                     color.option = 'viridis', line.color = "gray30", line.width =1,
                     min.year = 2005, direction = 1, alpha = .9, transform = "identity",
@@ -19,17 +19,55 @@ plotFIA <- function(data, y, grp = NULL, x = NULL, animate = FALSE, n.max = NULL
   if (animate & !is.null(savePath) & !is.null(fileName)){
     message(cat('Saving as .gif file. \n'))
   }
+  ## IF data is not an FIA.Database, y is required
+  if (any(class(data) %in% c('FIA.Database') == FALSE) & is.null(enquo(y))){
+    stop(cat('Argument "y" required unless plotting an FIA.Database object.'))
+  }
 
-  ## Need to quote all variables for NSE
+  ## Plot plot locations in a database
+  if (any(class(data) == 'FIA.Database')){
+    pltSF <- data$PLOT
+    coordinates(pltSF) <- ~LON+LAT
+    proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+    pltSF <- as(pltSF, 'sf')
+    # Make the spatial map
+    map <- pltSF %>%
+      ggplot() +
+      #geom_point(colour = line.color, size = line.width) +
+      geom_sf(aes(geometry = geometry), colour = line.color, size = line.width) +
+      #labs(color = ifelse(is.null(legend.title), str_wrap(quo_name(y_quo), width = 10 * lab.width), str_wrap(legend.title, width = 10 * lab.width))) +
+      #scale_colour_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform) +
+      #scale_fill_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform) +
+      theme_minimal() +
+      ggtitle(plot.title)+
+      theme(#axis.text = element_blank(),
+        legend.title = element_text(size = 14 * text.size, face = 'bold.italic', family = text.font),
+        legend.text = element_text(size = 11 * text.size, face = 'italic', family = text.font),
+        plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),
+        legend.key.height = unit(2.2 * legend.height, "cm"),
+        legend.key.width  = unit(1 * legend.width, "cm"))
+    return(map)
+  }
+
+
+  # Need to quote all variables for NSE
   y_quo = enquo(y)
   x_quo = enquo(x)
   grp_quo = enquo(grp)
+
 
   ## If a modifier was given to a variable, handle it (ex. y = TPA_PERC / 100)
   data <- data %>%
     mutate(yVar = !!y_quo,
            xVar = !!x_quo,
            grpVar = !!grp_quo)
+  # data <- data %>%
+  #   mutate(yVar = !!y,
+  #          xVar = !!x,
+  #          grpVar = !!grp)
+
+
+  ## If data is an FIA.Database
 
   # Filter for the year specified
   data <- data %>%
@@ -51,28 +89,47 @@ plotFIA <- function(data, y, grp = NULL, x = NULL, animate = FALSE, n.max = NULL
 
   ###### SPATIAL & SPATIOTEMPORAL PLOTS ######
   if ('sf' %in% class(data)){
-    # Make the spatial mpa
-    map <- data %>%
-      ggplot() +
-      geom_sf(aes(fill = yVar), colour = line.color, lwd = line.width) +
-      labs(fill = ifelse(is.null(legend.title), str_wrap(quo_name(y_quo), width = 10 * lab.width), str_wrap(legend.title, width = 10 * lab.width))) +
-      scale_fill_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform) +
-      theme_minimal() +
-      ggtitle(plot.title)+
-      theme(axis.text = element_blank(),
-            legend.title = element_text(size = 14 * text.size, face = 'bold.italic', family = text.font),
-            legend.text = element_text(size = 11 * text.size, face = 'italic', family = text.font),
-            plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),
-            legend.key.height = unit(2.2 * legend.height, "cm"),
-            legend.key.width  = unit(1 * legend.width, "cm"))
+    ## Plotting spatial points
+    if (any(str_detect(st_geometry_type(data), 'POINT'))){
+      # Make the spatial map
+      map <- data %>%
+        ggplot() +
+        geom_sf(aes(colour = yVar)) +
+        labs(colour = ifelse(is.null(legend.title), str_wrap(quo_name(y_quo), width = 10 * lab.width), str_wrap(legend.title, width = 10 * lab.width))) +
+        scale_colour_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform) +
+        #scale_fill_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform) +
+        theme_minimal() +
+        ggtitle(plot.title)+
+        theme(#axis.text = element_blank(),
+              legend.title = element_text(size = 14 * text.size, face = 'bold.italic', family = text.font),
+              legend.text = element_text(size = 11 * text.size, face = 'italic', family = text.font),
+              plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),
+              legend.key.height = unit(2.2 * legend.height, "cm"),
+              legend.key.width  = unit(1 * legend.width, "cm"))
+    ## Plotting spatial polygons
+    } else{
+      # Make the spatial map
+      map <- data %>%
+        ggplot() +
+        geom_sf(aes(fill = yVar), colour = line.color, lwd = line.width) +
+        labs(fill = ifelse(is.null(legend.title), str_wrap(quo_name(y_quo), width = 10 * lab.width), str_wrap(legend.title, width = 10 * lab.width))) +
+        scale_fill_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform) +
+        theme_minimal() +
+        ggtitle(plot.title)+
+        theme(#axis.text = element_blank(),
+              legend.title = element_text(size = 14 * text.size, face = 'bold.italic', family = text.font),
+              legend.text = element_text(size = 11 * text.size, face = 'italic', family = text.font),
+              plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),
+              legend.key.height = unit(2.2 * legend.height, "cm"),
+              legend.key.width  = unit(1 * legend.width, "cm"))
 
-    ## Animate if they want to
-    if (animate){
-      map <- map +
-        transition_manual(YEAR) +
-        labs(title = 'Year: {current_frame}')
+      ## Animate if they want to
+      if (animate){
+        map <- map +
+          transition_manual(YEAR) +
+          labs(title = 'Year: {current_frame}')
+      }
     }
-
 
   ###### TIME SERIES PLOTS  (or UD x) ######
   } else {

@@ -6,7 +6,7 @@ Default behavior for non-spatial summaries produces time-series plots, and for s
 }
 
 \usage{
-plotFIA(data, y, grp = NULL, x = NULL, animate = FALSE, n.max = NULL, plot.title = NULL,
+plotFIA(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, n.max = NULL, plot.title = NULL,
         y.lab = NULL, x.lab = NULL, legend.title = NULL, legend.labs = waiver(),
         color.option = 'viridis', line.color = "gray30", line.width =1, min.year = 2005,
         direction = 1, alpha = .9, transform = "identity", text.size = 1, text.font = '',
@@ -15,7 +15,7 @@ plotFIA(data, y, grp = NULL, x = NULL, animate = FALSE, n.max = NULL, plot.title
            }
 
 \arguments{
-  \item{data}{dataframe or \code{sf} object; FIA summary produced from other \code{rFIA} functions (e.g. \code{\link{tpa}}, \code{\link{biomass}}, etc.).}
+  \item{data}{dataframe, \code{sf} object, or \code{FIA.Database} object; FIA summary produced from other \code{rFIA} functions (e.g. \code{\link{tpa}}, \code{\link{biomass}}, etc.). Also accepts \code{FIA.Database}, will return map of plot locations.}
 
   \item{y}{variable contained in \code{data} which will be used as y-axis or to fill polygons (spatial). NOT quoted.}
 
@@ -75,6 +75,8 @@ If \code{animate = FALSE} and multiple reporting years are present in the summar
 To produce spatial plots, summaries must be returned as spatial objects (e.g. specify \code{returnSpatial = TRUE} when computing summaries using \code{\link{tpa}}). For animated plots, also requires that multiple reporting years be present in the summary data (animations iterate through time).
 
 Specify \code{savePath} and \code{fileName} to save plots (animations saved as .gif files).
+
+For a map of plot locations contained in your \code{FIA.Database}, specify the object as the \code{data} argument.
 }
 
 
