@@ -101,4 +101,10 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'VOL_DUFF_SE', 'bdCV', 'bdEst', 'bdPlot', 'bdStrat', 'bdV', 'bdVar', 'blCV', 'blEst', 'blPlot',
                          'blStrat', 'blV', 'blVar', 'cdCV', 'cdEst', 'cdPlot', 'cdStrat', 'cdV', 'cdVar', 'clCV', 'clEst',
                          'clPlot', 'clStrat', 'clV', 'clVar', 'dbConnect', 'dbListTables', 'nPlots_MORT',
-                         'nPlots_RECR', 'nPlots_REMV', 'p1_eu', 'plotIn_g', 'plotIn_h', 'plotIn_m', 'plotIn_r', 'progress', 'totalPlots'))
+                         'nPlots_RECR', 'nPlots_REMV', 'p1_eu', 'plotIn_g', 'plotIn_h', 'plotIn_m', 'plotIn_r', 'progress', 'totalPlots',
+                         'COND_STATUS_CD.chng', 'COND_STATUS_CD.prev', 'GROWTH_ACCT', 'geometry', 'lazy_dt',
+                         'BIO_AC_TOT', 'BIO_GROW', 'BIO_GROW_AC', 'BIO_GROW_AC_SE', 'BIO_GROW_SE', 'DIA.mid',
+                         'DIA.prev', 'DRYBIO_AG.mid', 'DRYBIO_AG.prev', 'INVYR', 'VOLCFNET.mid',
+                         'VOLCFNET.prev', 'bioAPlot', 'bioEst', 'bioPlot', 'bioStrat', 'bioVar', 'bioaEst',
+                         'bioaStrat', 'bioaVar', 'bioagVar', 'bioav', 'biogVar', 'biov', 'cvBIO', 'cvBIOA', 'cvEst_bio',
+                         'cvEst_bioa', 'cvStrat_bio', 'cvStrat_bioa'))
