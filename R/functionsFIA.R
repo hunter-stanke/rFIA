@@ -1187,7 +1187,7 @@ standStruct <- function(db,
     select('CN', 'END_INVYR', 'EVALID') %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
     filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID)) %>%
+    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
     distinct(END_INVYR, EVALID) %>%
     group_by(END_INVYR) %>%
     summarise(id = list(EVALID))
@@ -1971,7 +1971,7 @@ diversity <- function(db,
     select('CN', 'END_INVYR', 'EVALID') %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
     filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID)) %>%
+    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
     distinct(END_INVYR, EVALID) %>%
     group_by(END_INVYR) %>%
     summarise(id = list(EVALID))
@@ -3084,7 +3084,7 @@ tpa <- function(db,
     select('CN', 'END_INVYR', 'EVALID') %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
     filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID)) %>%
+    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
     distinct(END_INVYR, EVALID) %>%
     group_by(END_INVYR) %>%
     summarise(id = list(EVALID))
@@ -3157,11 +3157,11 @@ tpa <- function(db,
     ### -- BYPLOT -- TPA Estimates at each plot location
     if (byPlot) {
 
-      grpBy_sym <- syms(grpBy)
-      tOut_ <- data %>%
+      #grpBy_sym <- syms(grpBy)
+      tOut <- data %>%
         #filter(EVAL_TYP == 'EXPVOL') %>%
         distinct(PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
-        group_by(!!grpBy_sym, PLT_CN) %>%
+        group_by(.dots = grpBy, PLT_CN) %>%
         summarize(TPA = sum(TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
                   BAA = sum(basalArea(DIA) * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
                   nStems = length(which(tDI == 1)))
@@ -3939,8 +3939,7 @@ growMort <- function(db,
     select('CN', 'END_INVYR', 'EVALID', 'GROWTH_ACCT') %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
     filter(EVAL_TYP %in% c('EXPGROW','EXPMORT', 'EXPREMV', 'EXPCURR')) %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID)) %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID)) %>%
+    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
     distinct(END_INVYR, EVALID, .keep_all = TRUE) %>%
     group_by(END_INVYR) %>%
     summarise(id = list(EVALID),
@@ -5806,7 +5805,7 @@ biomass <- function(db,
     select('CN', 'END_INVYR', 'EVALID') %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
     filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID)) %>%
+    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
     distinct(END_INVYR, EVALID) %>%
     group_by(END_INVYR) %>%
     summarise(id = list(EVALID))
@@ -6557,7 +6556,7 @@ dwm <- function(db,
     select('CN', 'END_INVYR', 'EVALID') %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
     filter(EVAL_TYP %in% c('EXPDWM')) %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID)) %>%
+    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
     distinct(END_INVYR, EVALID) %>%
     group_by(END_INVYR) %>%
     summarise(id = list(EVALID))
@@ -7434,7 +7433,7 @@ invasive <- function(db,
     select('CN', 'END_INVYR', 'EVALID') %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
     filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID)) %>%
+    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
     distinct(END_INVYR, EVALID) %>%
     group_by(END_INVYR) %>%
     summarise(id = list(EVALID))
@@ -8134,7 +8133,7 @@ area <- function(db,
     select('CN', 'END_INVYR', 'EVALID') %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
     filter(EVAL_TYP == 'EXPCURR') %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID)) %>%
+    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
     distinct(END_INVYR, EVALID) %>%
     group_by(END_INVYR) %>%
     summarise(id = list(EVALID))
