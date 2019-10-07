@@ -1,4 +1,4 @@
-growMortHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
+growMortHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE, chngAdj){
   # Update domain indicator for each each column speficed in grpBy
   td = 1 # Start both at 1, update as we iterate through
   ad = 1
@@ -36,7 +36,6 @@ growMortHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
       ### Compute total TREES in domain of interest
     tInt <- data %>%
       filter(EVAL_TYP %in% c('EXPGROW','EXPMORT', 'EXPREMV')) %>%
-      #filter(DIA >= 5) %>%
       #distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
       distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, TRE_CN, COMPONENT, .keep_all = TRUE) %>%
       # Compute estimates at plot level
@@ -60,9 +59,9 @@ growMortHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
     ### Compute total AREA in the domain of interest
     aInt <- data %>%
       #filter(EVAL_TYP == 'EXPCURR') %>%
-      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, .keep_all = TRUE) %>%
+      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, SUBP, CONDID, .keep_all = TRUE) %>%
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-      summarize(fa = sum(CONDPROP_UNADJ * aDI * aAdj, na.rm = TRUE),
+      summarize(fa = sum(SUBPTYP_PROP_CHNG * chngAdj * aDI * aAdj, na.rm = TRUE),
                 plotIn_a = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0),
                 a = first(AREA_USED),
                 p1EU = first(P1PNTCNT_EU),

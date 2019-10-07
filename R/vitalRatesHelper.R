@@ -1,4 +1,4 @@
-vitalRatesHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
+vitalRatesHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE, chngAdj){
   # Update domain indicator for each each column speficed in grpBy
   td = 1 # Start both at 1, update as we iterate through
   ad = 1
@@ -30,7 +30,8 @@ vitalRatesHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
 
     tInt <- data %>%
       #filter(EVAL_TYP == 'EXPGROW') %>%
-      distinct(EVALID, ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
+      #distinct(EVALID, ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
+      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, TRE_CN, .keep_all = TRUE) %>%
       #filter(EVALID %in% tID) %>%
       # Compute estimates at plot level
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
@@ -43,24 +44,22 @@ vitalRatesHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
                 gaPlot = sum(vrChangeHelper(VOLCFNET, attribute.mid = VOLCFNET.mid, VOLCFNET.prev, REMPER, COMPONENT) * TPAGROW_UNADJ * tAdj * tDI, na.rm = TRUE),
                 #sPlot = sum(vrChangeHelper(VOLCSNET, attribute.mid = VOLCSNET.mid, VOLCSNET.prev, REMPER, COMPONENT) * tAdj * tDI, na.rm = TRUE),
                 #saPlot = sum(vrChangeHelper(VOLCSNET, attribute.mid = VOLCSNET.mid, VOLCSNET.prev, REMPER, COMPONENT) * TPAGROW_UNADJ * tAdj * tDI, na.rm = TRUE),
-                bioPlot = sum(vrChangeHelper(DRYBIO_AG, DRYBIO_AG.mid, DRYBIO_AG.prev, REMPER, COMPONENT) * tAdj * tDI, na.rm = TRUE),
-                bioAPlot = sum(vrChangeHelper(DRYBIO_AG, DRYBIO_AG.mid, DRYBIO_AG.prev, REMPER, COMPONENT) * TPAGROW_UNADJ *tAdj * tDI, na.rm = TRUE),
+                bioPlot = sum(vrChangeHelper(DRYBIO_AG, DRYBIO_AG.mid, DRYBIO_AG.prev, REMPER, COMPONENT) * tAdj * tDI / 2000, na.rm = TRUE),
+                bioAPlot = sum(vrChangeHelper(DRYBIO_AG, DRYBIO_AG.mid, DRYBIO_AG.prev, REMPER, COMPONENT) * TPAGROW_UNADJ * tAdj * tDI / 2000, na.rm = TRUE),
                 #carbPlot = sum(vrChangeHelper(CARBON_AG, attribute.mid = NULL, CARBON_AG.prev, REMPER, COMPONENT) * tAdj * tDI, na.rm = TRUE),
                 #carbAPlot = sum(vrChangeHelper(CARBON_AG, attribute.mid = NULL, CARBON_AG.prev, REMPER, COMPONENT) * TPAGROW_UNADJ *tAdj * tDI, na.rm = TRUE),
-                plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0),
+                plotIn_t = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0),
                 a = first(AREA_USED),
                 p1EU = first(P1PNTCNT_EU),
                 p1 = first(P1POINTCNT),
                 p2 = first(P2POINTCNT))
 
-
     ### Compute total AREA in the domain of interest
     aInt <- data %>%
-      #filter(EVAL_TYP == 'EXPCURR') %>%
-      distinct(EVALID, ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, .keep_all = TRUE) %>%
+      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, SUBP, CONDID, .keep_all = TRUE) %>%
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-      summarize(fa = sum(CONDPROP_UNADJ * aDI * aAdj, na.rm = TRUE),
-                plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0),
+      summarize(fa = sum(SUBPTYP_PROP_CHNG * chngAdj * aDI * aAdj, na.rm = TRUE),
+                plotIn_a = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0),
                 a = first(AREA_USED),
                 p1EU = first(P1PNTCNT_EU),
                 p1 = first(P1POINTCNT),
@@ -68,7 +67,8 @@ vitalRatesHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
 
     ## Compute COVARIANCE between numerator and denominator (for ratio estimates of variance)
     t <- tInt %>%
-      inner_join(aInt, by = c('PLT_CN', 'ESTN_UNIT_CN', 'ESTN_METHOD', 'STRATUM_CN'), suffix = c('_t', '_a')) %>%
+      #inner_join(aInt, by = c('PLT_CN', 'ESTN_UNIT_CN', 'ESTN_METHOD', 'STRATUM_CN'), suffix = c('_t', '_a')) %>%
+      left_join(aInt, by = c('ESTN_UNIT_CN', 'ESTN_METHOD', 'STRATUM_CN', 'PLT_CN'), suffix = c('_t', '_a'))  %>%
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN) %>%
       summarize(tStrat = mean(tPlot, na.rm = TRUE),
                 dStrat = mean(dPlot, na.rm = TRUE),
@@ -314,7 +314,7 @@ vitalRatesHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
         select(DIA_GROW, BA_GROW, BAA_GROW, NETVOL_GROW, NETVOL_GROW_AC,
                BIO_GROW, BIO_GROW_AC,
                TREE_TOTAL, DIA_TOTAL, BA_TOTAL, BAA_TOTAL, NETVOL_TOTAL,
-               NETVOL_AC_TOT, AREA_TOTAL, DIA_GROW_SE, BA_GROW_SE, BAA_GROW_SE, NETVOL_GROW_SE,
+               NETVOL_AC_TOT, BIO_TOTAL, BIO_AC_TOT, AREA_TOTAL, DIA_GROW_SE, BA_GROW_SE, BAA_GROW_SE, NETVOL_GROW_SE,
                NETVOL_GROW_AC_SE, BIO_GROW_SE, BIO_GROW_AC_SE,
                nPlots_TREE, nPlots_AREA)
     } else {

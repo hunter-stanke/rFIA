@@ -67,9 +67,11 @@ Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}
       \item{\strong{DIA_GROW}: estimate of mean annual diameter growth of a stem (inches/ yr)}
       \item{\strong{BA_GROW}: estimate of mean annual basal area growth of a stem (sq. ft./ yr)}
       \item{\strong{BAA_GROW}: estimate of mean annual basal area growth per acre (sq. ft./ acre/ yr)}
-      \item{\strong{HT_GROW}: estimate of mean annual basal area growth of a stem (ft./ yr)}
+      %%\item{\strong{HT_GROW}: estimate of mean annual basal area growth of a stem (ft./ yr)}
       \item{\strong{NETVOL_GROW}: estimate of mean annual sound net volume growth of a stem (cu. ft./ yr)}
       \item{\strong{NETVOL_GROW_AC}: estimate of mean annual sound net volume growth per acre (cu. ft./ acre/ yr)}
+      \item{\strong{BIO_GROW}: estimate of mean annual aboveground biomass growth of a stem (short tons/ yr)}
+      \item{\strong{BIO_GROW_AC}: estimate of mean annual aboveground biomass growth per acre (short tons/ acre/ yr)}
       \item{\strong{nPlots_TREE}: number of non-zero plots used to compute tree and basal area estimates}
       \item{\strong{nPlots_AREA}: number of non-zero plots used to compute land area estimates}
       }

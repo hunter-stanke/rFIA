@@ -268,7 +268,10 @@ biomassHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
 
     if (totals) {
       b <- b %>%
-        select(names(b)[str_detect(names(b), 'Var', negate = TRUE)], nPlots_VOL, nPlots_AREA)
+        select(NETVOL_ACRE, SAWVOL_ACRE,  BIO_AG_ACRE,  BIO_BG_ACRE, BIO_ACRE, CARB_AG_ACRE, CARB_BG_ACRE, CARB_ACRE,
+               NETVOL_ACRE_SE, SAWVOL_ACRE_SE,  BIO_AG_ACRE_SE,  BIO_BG_ACRE_SE, BIO_ACRE_SE, CARB_AG_ACRE_SE, CARB_BG_ACRE_SE, CARB_ACRE_SE,
+               NETVOL_TOTAL, SAWVOL_TOTAL,  BIO_AG_TOTAL,  BIO_BG_TOTAL, BIO_TOTAL, CARB_AG_TOTAL, CARB_BG_TOTAL, CARB_TOTAL, AREA_TOTAL,
+               nPlots_VOL, nPlots_AREA)
     } else {
       b <- b %>%
         select(names(b)[str_detect(names(b), 'Var', negate = TRUE) & str_detect(names(b), 'ACRE')], nPlots_VOL, nPlots_AREA)
@@ -331,8 +334,6 @@ biomassHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
 
 
   } # End SE Conditional
-
-  # Some cleanup
   gc()
 
   # Return t

@@ -251,26 +251,35 @@ unitMean <- function(ESTN_METHOD, a, nh, w, stratMean){
 }
 
 ## Calculate change for VR
+## Calculate change for VR
 vrChangeHelper <- function(attribute = NULL, attribute.mid = NULL, attribute.prev = NULL, remper, component){
-  change <- c()
+
   # IF a midpoint estimate is available, use it to grab the stems which aren't listed in current
   if (!is.null(attribute.mid)){
-    for (i in 1:length(attribute)){
-      if (!is.na(component[i])){
-        if (str_detect(component[i], 'SURVIVOR') | str_detect(component[i], 'INGROWTH') | str_detect(component[i], 'REVERSION')){
-          change[i] <- (attribute[i] - attribute.prev[i]) / remper[i]
-        } else {
-          change[i] <- (attribute.mid[i] - attribute.prev[i]) / (remper[i] / 2)
-        }
-      }
-    }
+    change <- case_when(
+      is.na(component) ~ NA_real_,
+      str_detect(component, 'SURVIVOR') | str_detect(component, 'INGROWTH') | str_detect(component, 'REVERSION') ~ (attribute - attribute.prev) / remper,
+      TRUE ~ (attribute.mid - attribute.prev) / (remper / 2)
+    )
+
+
+    # for (i in 1:length(attribute)){
+    #   if (!is.na(component[i])){
+    #     if (str_detect(component[i], 'SURVIVOR') | str_detect(component[i], 'INGROWTH') | str_detect(component[i], 'REVERSION')){
+    #       change[i] <- (attribute[i] - attribute.prev[i]) / remper[i]
+    #     } else {
+    #       change[i] <- (attribute.mid[i] - attribute.prev[i]) / (remper[i] / 2)
+    #     }
+    #   } else {
+    #     change[i] <- NA
+    #   }
+    # }
   } else {
     change <- (attribute - attribute.prev) / remper
   }
 
   return(change)
 }
-
 
 ## Some base functions for the FIA Database Class
 #' @export
@@ -1240,7 +1249,7 @@ standStruct <- function(db,
     if (byPlot) {
       sOut <- data %>%
         mutate(YEAR = INVYR) %>%
-        distinct(PLT_CN, TREE, .keep_all = TRUE) %>%
+        distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
         group_by(.dots = grpBy, PLT_CN) %>%
         summarize(stage = structHelper(DIA, CCLCD),
                   nStems = length(which(tDI == 1)))
@@ -1650,7 +1659,7 @@ diversity <- function(db,
     if (byPlot) {
       dOut <- data %>%
         mutate(YEAR = INVYR) %>%
-        distinct(PLT_CN, CONDID, TREE, .keep_all = TRUE) %>%
+        distinct(PLT_CN, SUBP, CONDID, TREE, .keep_all = TRUE) %>%
         group_by(.dots = grpBy, PLT_CN) %>%
         summarize(H = divIndex(SPCD, TPA_UNADJ  * tDI, index = 'H'),
                   S = divIndex(SPCD, TPA_UNADJ * tDI, index = 'S'),
@@ -2032,7 +2041,7 @@ tpa <- function(db,
       #grpBy_sym <- syms(grpBy)
       tOut <- data %>%
         mutate(YEAR = INVYR) %>%
-        distinct(PLT_CN, TREE, .keep_all = TRUE) %>%
+        distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
         group_by(.dots = grpBy, PLT_CN) %>%
         summarize(TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE),
                   BAA = sum(basalArea(DIA) * TPA_UNADJ * tDI, na.rm = TRUE),
@@ -2404,14 +2413,13 @@ growMort <- function(db,
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
 
-
   ### Snag the EVALIDs that are needed
   ## To speed up processing time we will loop over reporting years and use clipFIA to reduce the number of rows of data
   ## Joining is quick, so we just do that on each core. Grouping and summarizing is slow with high n, so we focus on reducing n
   ids <- db$POP_EVAL %>%
     select('CN', 'END_INVYR', 'EVALID', 'GROWTH_ACCT') %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP %in% c('EXPGROW','EXPMORT', 'EXPREMV', 'EXPCURR')) %>%
+    filter(EVAL_TYP %in% c('EXPGROW','EXPMORT', 'EXPREMV')) %>%
     filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
     distinct(END_INVYR, EVALID, .keep_all = TRUE) %>%
     group_by(END_INVYR) %>%
@@ -2462,16 +2470,15 @@ growMort <- function(db,
 
       # Previous attributes
       data <- data %>%
-        left_join(select(db_clip$SUBP_COND_CHNG_MTRX, SUBPTYP:PREVCOND), by = c('PLT_CN', 'CONDID'), suffix = c('', '.subp')) %>%
+        left_join(select(db_clip$SUBP_COND_CHNG_MTRX, SUBP:SUBPTYP_PROP_CHNG), by = c('PLT_CN', 'CONDID'), suffix = c('', '.subp')) %>%
         left_join(select(db_clip$COND, PLT_CN, CONDID, COND_STATUS_CD), by = c('PREV_PLT_CN.subp' = 'PLT_CN', 'PREVCOND.subp' = 'CONDID'), suffix = c('', '.chng')) %>%
         left_join(select(db_clip$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
         left_join(select(db_clip$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
         left_join(select(db_clip$TREE, c('TRE_CN', grpT, 'typeD', 'tD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
         mutate_if(is.factor,
                   as.character) %>%
-        mutate(aChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.chng == 1, 1, 0),
+        mutate(aChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.chng == 1 & !is.null(CONDPROP_UNADJ), 1, 0),
                tChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.prev == 1, 1, 0))
-
 
       #If previous attributes are unavailable for trees, default to current (otherwise we get NAs for early inventories)
       data$tD.prev <- ifelse(is.na(data$tD.prev), data$tD, data$tD.prev)
@@ -2487,6 +2494,9 @@ growMort <- function(db,
       # data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp #* data$aChng
       # data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp * data$tChng
 
+      ## If growth accounting, summing proportions at subplot level, otherwise full plot
+      chngAdj <- .25
+
       ## No growth accounting
     } else {
       # Previous attributes
@@ -2495,7 +2505,11 @@ growMort <- function(db,
         left_join(select(db_clip$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC)), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
         left_join(select(db_clip$TREE, c('TRE_CN', grpT, 'typeD', 'tD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
         mutate_if(is.factor,
-                  as.character)
+                  as.character) %>%
+        ## Rename CONDPROP_UNADJ for consistency with above
+        rename(SUBPTYP_PROP_CHNG = CONDPROP_UNADJ)
+      ## Plot level proportion
+      chngAdj <- 1
 
       # If previous attributes are unavailable for trees, default to current (otherwise we get NAs for early inventories)
       data$tD.prev <- ifelse(is.na(data$tD.prev), data$tD, data$tD.prev)
@@ -2508,6 +2522,7 @@ growMort <- function(db,
       ## Comprehensive indicator function
       data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
       data$tDI <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev
+
     }
 
 
@@ -2538,7 +2553,7 @@ growMort <- function(db,
     if (byPlot) {
       tOut <- data %>%
         mutate(YEAR = INVYR) %>%
-        distinct(PLT_CN, TREE, .keep_all = TRUE) %>%
+        distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
         #filter(EVALID %in% tID) %>%
         # Compute estimates at plot level
         group_by(.dots = grpBy, PLT_CN) %>%
@@ -2616,10 +2631,10 @@ growMort <- function(db,
             library(dplyr)
             library(stringr)
           })
-          tOut <- parLapply(cl, X = names(combos), fun = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE)
+          tOut <- parLapply(cl, X = names(combos), fun = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, chngAdj)
           stopCluster(cl)
         } else { # Unix systems
-          tOut <- mclapply(X = names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
+          tOut <- mclapply(X = names(combos), FUN = growMortHelper, combos, data, grpBy, aGrpBy, totals, SE, chngAdj, mc.cores = nCores)
         }
       })
 
@@ -2820,6 +2835,8 @@ vitalRates <- function(db,
       db$TREE$typeD <- 1
       ## Rename some variables in grm
       db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
+                                      TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_AL_FOREST,
+                                      TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_AL_FOREST,
                                       TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_AL_FOREST,
                                       SUBPTYP_GRM = SUBP_SUBPTYP_GRM_AL_FOREST,
                                       COMPONENT = SUBP_COMPONENT_AL_FOREST)
@@ -2827,6 +2844,8 @@ vitalRates <- function(db,
     } else if (tolower(treeType) == 'gs'){
       db$TREE$typeD <- ifelse(db$TREE$DIA >= 5, 1, 0)
       db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
+                                      TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_GS_FOREST,
+                                      TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_GS_FOREST,
                                       TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_GS_FOREST,
                                       SUBPTYP_GRM = SUBP_SUBPTYP_GRM_GS_FOREST,
                                       COMPONENT = SUBP_COMPONENT_GS_FOREST)
@@ -2834,10 +2853,12 @@ vitalRates <- function(db,
   } else if (tolower(landType) == 'timber'){
     db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
     # Tree Type domain indicator
-    if (tolower(treeType) == 'live'){
+    if (tolower(treeType) == 'all'){
       db$TREE$typeD <- 1
       ## Rename some variables in grm
       db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
+                                      TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_AL_TIMBER,
+                                      TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_AL_TIMBER,
                                       TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_AL_TIMBER,
                                       SUBPTYP_GRM = SUBP_SUBPTYP_GRM_AL_TIMBER,
                                       COMPONENT = SUBP_COMPONENT_AL_TIMBER)
@@ -2845,11 +2866,14 @@ vitalRates <- function(db,
     } else if (tolower(treeType) == 'gs'){
       db$TREE$typeD <- ifelse(db$TREE$DIA >= 5, 1, 0)
       db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
+                                      TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_GS_TIMBER,
+                                      TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_GS_TIMBER,
                                       TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_GS_TIMBER,
                                       SUBPTYP_GRM = SUBP_SUBPTYP_GRM_GS_TIMBER,
                                       COMPONENT = SUBP_COMPONENT_GS_TIMBER)
     }
   }
+
 
   # update spatial domain indicator
   if(!is.null(polys)){
@@ -2880,6 +2904,7 @@ vitalRates <- function(db,
   if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
   db$TREE$tD <- as.numeric(tD)
 
+
   ## Which grpByNames are in which table? Helps us subset below
   grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
   grpC <- names(db$COND)[names(db$COND) %in% grpBy]
@@ -2892,8 +2917,7 @@ vitalRates <- function(db,
   ids <- db$POP_EVAL %>%
     select('CN', 'END_INVYR', 'EVALID', 'GROWTH_ACCT') %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP %in% c('EXPGROW', 'EXPCURR')) %>%
-    #filter(EVAL_TYP %in% c('EXPGROW')) %>%
+    filter(EVAL_TYP %in% c('EXPGROW','EXPMORT', 'EXPREMV')) %>%
     filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
     distinct(END_INVYR, EVALID, .keep_all = TRUE) %>%
     group_by(END_INVYR) %>%
@@ -2930,7 +2954,7 @@ vitalRates <- function(db,
 
       # Previous attributes
       data <- data %>%
-        left_join(select(db_clip$SUBP_COND_CHNG_MTRX, SUBPTYP:PREVCOND), by = c('PLT_CN', 'CONDID'), suffix = c('', '.subp')) %>%
+        left_join(select(db_clip$SUBP_COND_CHNG_MTRX, SUBP:SUBPTYP_PROP_CHNG), by = c('PLT_CN', 'CONDID'), suffix = c('', '.subp')) %>%
         left_join(select(db_clip$COND, PLT_CN, CONDID, COND_STATUS_CD), by = c('PREV_PLT_CN.subp' = 'PLT_CN', 'PREVCOND.subp' = 'CONDID'), suffix = c('', '.chng')) %>%
         # Previous attributes
         left_join(select(db_clip$PLOT, c('PLT_CN',  grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
@@ -2938,7 +2962,7 @@ vitalRates <- function(db,
         left_join(select(db_clip$TREE, c('TRE_CN', 'DIA', 'HT', 'DRYBIO_AG', 'CARBON_AG', 'VOLCFNET', 'VOLCSNET', grpT, 'typeD', 'tD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
         mutate_if(is.factor,
                   as.character) %>%
-        mutate(aChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.chng == 1, 1, 0),
+        mutate(aChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.chng == 1 & !is.null(CONDPROP_UNADJ), 1, 0),
                tChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.prev == 1, 1, 0))
 
 
@@ -2956,6 +2980,8 @@ vitalRates <- function(db,
       # data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp #* data$aChng
       # data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp * data$tChng
 
+      chngAdj <- .25
+
       ## No growth accounting
     } else {
       # Previous attributes
@@ -2965,7 +2991,8 @@ vitalRates <- function(db,
         left_join(select(db_clip$COND, c('PLT_CN', 'CONDID',  'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
         left_join(select(db_clip$TREE, c('TRE_CN', 'DIA', 'HT', 'DRYBIO_AG', 'CARBON_AG', 'VOLCFNET', 'VOLCSNET', grpT, 'typeD', 'tD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
         mutate_if(is.factor,
-                  as.character)
+                  as.character) %>%
+        rename(SUBPTYP_PROP_CHNG = CONDPROP_UNADJ)
 
       # If previous attributes are unavailable for trees, default to current (otherwise we get NAs for early inventories)
       data$tD.prev <- ifelse(is.na(data$tD.prev), data$tD, data$tD.prev)
@@ -2978,7 +3005,10 @@ vitalRates <- function(db,
       ## Comprehensive indicator function
       data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
       data$tDI <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev
+
+      chngAdj <- 1
     }
+
 
 
     ## Recode a few of the estimation methods to make things easier below
@@ -3024,7 +3054,7 @@ vitalRates <- function(db,
       ### Compute total TREES in domain of interest
       tOut <- data %>%
         mutate(YEAR = INVYR) %>%
-        distinct(PLT_CN, TREE, .keep_all = TRUE) %>%
+        distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
         # Compute estimates at plot level
         group_by(.dots = grpBy, PLT_CN) %>%
         summarize(TPA = sum(TPAGROW_UNADJ  * tDI, na.rm = TRUE),
@@ -3099,10 +3129,10 @@ vitalRates <- function(db,
             library(stringr)
             library(tidyr)
           })
-          tOut <- parLapply(cl, X = names(combos), fun = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE)
+          tOut <- parLapply(cl, X = names(combos), fun = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE, chngAdj)
           stopCluster(cl)
         } else { # Unix systems
-          tOut <- mclapply(X = names(combos), FUN = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE, mc.cores = nCores)
+          tOut <- mclapply(X = names(combos), FUN = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE, chngAdj, mc.cores = nCores)
         }
       })
 
@@ -3408,7 +3438,7 @@ biomass <- function(db,
     if (byPlot) {
       bOut <- data %>%
         mutate(YEAR = INVYR) %>%
-        distinct(PLT_CN, TREE, .keep_all = TRUE) %>%
+        distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
         # Compute estimates at plot level
         group_by(.dots = grpBy, PLT_CN) %>%
         summarize(NETVOL_ACRE = sum(VOLCFNET * TPA_UNADJ * tDI, na.rm = TRUE),
