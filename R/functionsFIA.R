@@ -361,6 +361,7 @@ print.FIA.Database <- function(x, ...){
 #' @import gganimate
 #' @import ggplot2
 #' @import bit64
+#' @import progress
 #' @importFrom data.table fread fwrite
 #' @importFrom parallel makeCluster detectCores mclapply parLapply stopCluster clusterEvalQ
 #' @importFrom tidyr gather
@@ -1187,22 +1188,63 @@ standStruct <- function(db,
   grpC <- names(db$COND)[names(db$COND) %in% grpBy]
 
   ### Snag the EVALIDs that are needed
-  ## To speed up processing time we will loop over reporting years and use clipFIA to reduce the number of rows of data
+  ## To speed up processing time we will loop over reporting years and polygons and use clipFIA to reduce the number of rows of data
   ## Joining is quick, so we just do that on each core. Grouping and summarizing is slow with high n, so we focus on reducing n
-  ids <- db$POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID') %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-    distinct(END_INVYR, EVALID) %>%
-    group_by(END_INVYR) %>%
-    summarise(id = list(EVALID))
+  if (!is.null(polys)){
+    ids <- pltSF %>%
+      left_join(select(db$POP_PLOT_STRATUM_ASSGN, 'PLT_CN', 'EVALID'), by = 'PLT_CN') %>%
+      left_join(select(db$POP_EVAL, 'CN', 'END_INVYR', 'EVALID'), by = 'EVALID') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(polyID, END_INVYR, EVALID) %>%
+      group_by(polyID, END_INVYR) %>%
+      summarise(id = list(EVALID))
+  } else {
+    ids <- db$POP_EVAL %>%
+      select('CN', 'END_INVYR', 'EVALID') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(END_INVYR, EVALID) %>%
+      group_by(END_INVYR) %>%
+      summarise(id = list(EVALID))
+  }
+
+  ## Add a progress bar with ETA
+  pb <- progress_bar$new(
+    format = "  Computing Estimates [:bar] :percent  \t ETA: :eta \t Elapsed: :elapsed",
+    total = nrow(ids), clear = FALSE, width= 100)
 
   # Looping over years (NOT PARALLEL, parallelization is applied to the groups to prevent spreading the entire db across cores)
   out <- list()
   for (y in 1:nrow(ids)){
     ## Clip out the necessary data
-    db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+    if (!is.null(polys)){
+      ## We do the spatial and temporal clip seperately because we can reuse the spatially clipped object
+      ## in future temporal clips, assuming multiple reporting years exists within the polygons (not most recent clip)
+      ## This prevents us from re-running st_intersection for each year - poly combo when poly is the same as previous.
+      if (y == 1){
+        ## First iteration, do both spatial and temporal
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else if (polys$polyID[polys$polyID == ids$polyID[y]] == polys$polyID[polys$polyID == ids$polyID[y-1]]) {
+        ## Just rerun temporal clip with the same spatially clipped object
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else {
+        ## Hit a new poly, make a new spatial clip
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      }
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- ifelse(db_clip$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+
+      ## Polys not specified, just temporal
+    } else {
+      db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- 1
+    }
 
     ## Prep joins and filters
     data <- select(db_clip$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', grpP, 'aD_p', 'sp')) %>%
@@ -1263,45 +1305,28 @@ standStruct <- function(db,
 
       ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
     } else {
-      # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
-      ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
-      ## estimation unit, and cause estimates to be inflated substantially
-      # combos <- select(data, c(grpBy)) %>%
-      #   as.data.frame() %>%
-      #   group_by(.dots = grpBy) %>%
-      #   summarize() %>%
-      #   filter(!is.na(YEAR))
-      # if(!is.null(polys)){
-      #   combos <- filter(combos, !is.na(polyID))
-      # }
       ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
       if(is.null(polys)){
-        ## Non spatial combos
         combos <- select(data, c(grpBy)) %>%
           as.data.frame() %>%
           group_by(.dots = grpBy) %>%
           summarize() %>%
           filter(!is.na(YEAR))
       } else {
+        ## Non spatial combos
         combosNS <- select(data, c(grpBy[grpBy %in% names(polys) == FALSE])) %>%
           as.data.frame() %>%
           group_by(.dots = grpBy[grpBy %in% names(polys) == FALSE]) %>%
           summarize() %>%
           filter(!is.na(YEAR))
         combosNSpoly <- combosNS %>%
-          mutate(polyID = 1)
-        if(nrow(polys) > 1){
-          # Duplicate set of non spatial groups
-          for (p in 2:nrow(polys)) {
-            combosNS$polyID <- p
-            combosNSpoly <- rbind(combosNSpoly, combosNS)
-          }
-        }
+          mutate(polyID = polys$polyID[polys$polyID == ids$polyID[y]])
+
         # New combos for spatial objects
         combos <- pltSF %>%
           select(-c(PLT_CN)) %>%
           distinct(polyID, .keep_all = TRUE) %>%
-          left_join(combosNSpoly, by = 'polyID')
+          right_join(combosNSpoly, by = 'polyID')
       }
       # List of rows for lapply
       combos <- split(combos, seq(nrow(combos)))
@@ -1410,9 +1435,11 @@ standStruct <- function(db,
 
     } # End byPlot = FALSE
     out[[y]] <- sOut
+    pb$tick()
   }
   sOut <- do.call(rbind, out)
-  sOut <- filter(sOut, !is.na(YEAR))
+  sOut <- filter(sOut, !is.na(YEAR)) %>%
+    arrange(YEAR)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) sOut <- unique(sOut)
 
@@ -1589,22 +1616,64 @@ diversity <- function(db,
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
   ### Snag the EVALIDs that are needed
-  ## To speed up processing time we will loop over reporting years and use clipFIA to reduce the number of rows of data
+  ## To speed up processing time we will loop over reporting years and polygons and use clipFIA to reduce the number of rows of data
   ## Joining is quick, so we just do that on each core. Grouping and summarizing is slow with high n, so we focus on reducing n
-  ids <- db$POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID') %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-    distinct(END_INVYR, EVALID) %>%
-    group_by(END_INVYR) %>%
-    summarise(id = list(EVALID))
+  if (!is.null(polys)){
+    ids <- pltSF %>%
+      left_join(select(db$POP_PLOT_STRATUM_ASSGN, 'PLT_CN', 'EVALID'), by = 'PLT_CN') %>%
+      left_join(select(db$POP_EVAL, 'CN', 'END_INVYR', 'EVALID'), by = 'EVALID') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(polyID, END_INVYR, EVALID) %>%
+      group_by(polyID, END_INVYR) %>%
+      summarise(id = list(EVALID))
+  } else {
+    ids <- db$POP_EVAL %>%
+      select('CN', 'END_INVYR', 'EVALID') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(END_INVYR, EVALID) %>%
+      group_by(END_INVYR) %>%
+      summarise(id = list(EVALID))
+  }
+
+  ## Add a progress bar with ETA
+  pb <- progress_bar$new(
+    format = "  Computing Estimates [:bar] :percent  \t ETA: :eta \t Elapsed: :elapsed",
+    total = nrow(ids), clear = FALSE, width= 100)
 
   # Looping over years (NOT PARALLEL, parallelization is applied to the groups to prevent spreading the entire db across cores)
   out <- list()
   for (y in 1:nrow(ids)){
     ## Clip out the necessary data
-    db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+    if (!is.null(polys)){
+      ## We do the spatial and temporal clip seperately because we can reuse the spatially clipped object
+      ## in future temporal clips, assuming multiple reporting years exists within the polygons (not most recent clip)
+      ## This prevents us from re-running st_intersection for each year - poly combo when poly is the same as previous.
+      if (y == 1){
+        ## First iteration, do both spatial and temporal
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else if (polys$polyID[polys$polyID == ids$polyID[y]] == polys$polyID[polys$polyID == ids$polyID[y-1]]) {
+        ## Just rerun temporal clip with the same spatially clipped object
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else {
+        ## Hit a new poly, make a new spatial clip
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      }
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- ifelse(db_clip$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+
+      ## Polys not specified, just temporal
+    } else {
+      db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- 1
+    }
+
     ## Prep joins and filters
     data <- select(db_clip$PLOT, c('PLT_CN', 'STATECD', 'INVYR', 'MACRO_BREAKPOINT_DIA', grpP, 'aD_p', 'sp')) %>%
       left_join(select(db_clip$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
@@ -1684,6 +1753,7 @@ diversity <- function(db,
       #   combos <- filter(combos, !is.na(polyID))
       # }
       ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
+      ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
       if(is.null(polys)){
         combos <- select(data, c(grpBy)) %>%
           as.data.frame() %>%
@@ -1698,19 +1768,13 @@ diversity <- function(db,
           summarize() %>%
           filter(!is.na(YEAR))
         combosNSpoly <- combosNS %>%
-          mutate(polyID = 1)
-        if(nrow(polys) > 1){
-          # Duplicate set of non spatial groups
-          for (p in 2:nrow(polys)) {
-            combosNS$polyID <- p
-            combosNSpoly <- rbind(combosNSpoly, combosNS)
-          }
-        }
+          mutate(polyID = polys$polyID[polys$polyID == ids$polyID[y]])
+
         # New combos for spatial objects
         combos <- pltSF %>%
           select(-c(PLT_CN)) %>%
           distinct(polyID, .keep_all = TRUE) %>%
-          left_join(combosNSpoly, by = 'polyID')
+          right_join(combosNSpoly, by = 'polyID')
       }
       # List of rows for lapply
       combos <- split(combos, seq(nrow(combos)))
@@ -1781,9 +1845,11 @@ diversity <- function(db,
 
     } # End byPlot == FALSE
     out[[y]] <- dOut
+    pb$tick()
   }
   dOut <- do.call(rbind, out)
-  dOut <- filter(dOut, !is.na(YEAR))
+  dOut <- filter(dOut, !is.na(YEAR)) %>%
+    arrange(YEAR)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) dOut <- unique(dOut)
   return(dOut)
@@ -1959,22 +2025,63 @@ tpa <- function(db,
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
   ### Snag the EVALIDs that are needed
-  ## To speed up processing time we will loop over reporting years and use clipFIA to reduce the number of rows of data
+  ## To speed up processing time we will loop over reporting years and polygons and use clipFIA to reduce the number of rows of data
   ## Joining is quick, so we just do that on each core. Grouping and summarizing is slow with high n, so we focus on reducing n
-  ids <- db$POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID') %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-    distinct(END_INVYR, EVALID) %>%
-    group_by(END_INVYR) %>%
-    summarise(id = list(EVALID))
+  if (!is.null(polys)){
+    ids <- pltSF %>%
+      left_join(select(db$POP_PLOT_STRATUM_ASSGN, 'PLT_CN', 'EVALID'), by = 'PLT_CN') %>%
+      left_join(select(db$POP_EVAL, 'CN', 'END_INVYR', 'EVALID'), by = 'EVALID') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(polyID, END_INVYR, EVALID) %>%
+      group_by(polyID, END_INVYR) %>%
+      summarise(id = list(EVALID))
+  } else {
+    ids <- db$POP_EVAL %>%
+      select('CN', 'END_INVYR', 'EVALID') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(END_INVYR, EVALID) %>%
+      group_by(END_INVYR) %>%
+      summarise(id = list(EVALID))
+  }
+
+  ## Add a progress bar with ETA
+  pb <- progress_bar$new(
+    format = "  Computing Estimates [:bar] :percent  \t ETA: :eta \t Elapsed: :elapsed",
+    total = nrow(ids), clear = FALSE, width= 100)
 
   # Looping over years (NOT PARALLEL, parallelization is applied to the groups to prevent spreading the entire db across cores)
   out <- list()
   for (y in 1:nrow(ids)){
     ## Clip out the necessary data
-    db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+    if (!is.null(polys)){
+      ## We do the spatial and temporal clip seperately because we can reuse the spatially clipped object
+      ## in future temporal clips, assuming multiple reporting years exists within the polygons (not most recent clip)
+      ## This prevents us from re-running st_intersection for each year - poly combo when poly is the same as previous.
+      if (y == 1){
+        ## First iteration, do both spatial and temporal
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else if (polys$polyID[polys$polyID == ids$polyID[y]] == polys$polyID[polys$polyID == ids$polyID[y-1]]) {
+        ## Just rerun temporal clip with the same spatially clipped object
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else {
+        ## Hit a new poly, make a new spatial clip
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      }
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- ifelse(db_clip$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+
+      ## Polys not specified, just temporal
+    } else {
+      db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- 1
+    }
 
     ## Prep joins and filters
     data <- select(db_clip$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', grpP, 'aD_p', 'sp')) %>%
@@ -2068,18 +2175,6 @@ tpa <- function(db,
 
       ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
     } else {
-      #if (SE){
-      # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
-      ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
-      ## estimation unit, and cause estimates to be inflated substantially)
-      # combos <- select(data, c(grpBy)) %>%
-      #   as.data.frame() %>%
-      #   group_by(.dots = grpBy) %>%
-      #   summarize() %>%
-      #   filter(!is.na(YEAR))
-      # if(!is.null(polys)){
-      #   combos <- filter(combos, !is.na(polyID))
-      # }
       ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
       if(is.null(polys)){
         combos <- select(data, c(grpBy)) %>%
@@ -2095,19 +2190,13 @@ tpa <- function(db,
           summarize() %>%
           filter(!is.na(YEAR))
         combosNSpoly <- combosNS %>%
-          mutate(polyID = 1)
-        if(nrow(polys) > 1){
-          # Duplicate set of non spatial groups
-          for (p in 2:nrow(polys)) {
-            combosNS$polyID <- p
-            combosNSpoly <- rbind(combosNSpoly, combosNS)
-          }
-        }
+          mutate(polyID = polys$polyID[polys$polyID == ids$polyID[y]])
+
         # New combos for spatial objects
         combos <- pltSF %>%
           select(-c(PLT_CN)) %>%
           distinct(polyID, .keep_all = TRUE) %>%
-          left_join(combosNSpoly, by = 'polyID')
+          right_join(combosNSpoly, by = 'polyID')
       }
       # List of rows for lapply
       combos <- split(combos, seq(nrow(combos)))
@@ -2186,10 +2275,12 @@ tpa <- function(db,
 
     } # End byPlot == FALSE
     out[[y]] <- tOut
+    pb$tick()
   }
 
   tOut <- do.call(rbind, out)
-  tOut <- filter(tOut, !is.na(YEAR))
+  tOut <- filter(tOut, !is.na(YEAR)) %>%
+    arrange(YEAR)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) tOut <- unique(tOut)
   return(tOut)
@@ -2414,23 +2505,65 @@ growMort <- function(db,
 
 
   ### Snag the EVALIDs that are needed
-  ## To speed up processing time we will loop over reporting years and use clipFIA to reduce the number of rows of data
+  ## To speed up processing time we will loop over reporting years and polygons and use clipFIA to reduce the number of rows of data
   ## Joining is quick, so we just do that on each core. Grouping and summarizing is slow with high n, so we focus on reducing n
-  ids <- db$POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID', 'GROWTH_ACCT') %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP %in% c('EXPGROW','EXPMORT', 'EXPREMV')) %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-    distinct(END_INVYR, EVALID, .keep_all = TRUE) %>%
-    group_by(END_INVYR) %>%
-    summarise(id = list(EVALID),
-              ga = if_else(any(GROWTH_ACCT == 'Y'), 1, 0))
+  if (!is.null(polys)){
+    ids <- pltSF %>%
+      left_join(select(db$POP_PLOT_STRATUM_ASSGN, 'PLT_CN', 'EVALID'), by = 'PLT_CN') %>%
+      left_join(select(db$POP_EVAL, 'CN', 'END_INVYR', 'EVALID', 'GROWTH_ACCT'), by = 'EVALID') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(polyID, END_INVYR, EVALID, .keep_all = TRUE) %>%
+      group_by(polyID, END_INVYR) %>%
+      summarise(id = list(EVALID),
+                ga = if_else(any(GROWTH_ACCT == 'Y'), 1, 0))
+  } else {
+    ids <- db$POP_EVAL %>%
+      select('CN', 'END_INVYR', 'EVALID', 'GROWTH_ACCT') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP %in% c('EXPGROW', 'EXPMORT', 'EXPREMV')) %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(END_INVYR, EVALID, .keep_all = TRUE) %>%
+      group_by(END_INVYR) %>%
+      summarise(id = list(EVALID),
+                ga = if_else(any(GROWTH_ACCT == 'Y'), 1, 0))
+  }
+
+  ## Add a progress bar with ETA
+  pb <- progress_bar$new(
+    format = "  Computing Estimates [:bar] :percent  \t ETA: :eta \t Elapsed: :elapsed",
+    total = nrow(ids), clear = FALSE, width= 100)
 
   # Looping over years (NOT PARALLEL, parallelization is applied to the groups to prevent spreading the entire db across cores)
   out <- list()
   for (y in 1:nrow(ids)){
     ## Clip out the necessary data
-    db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+    if (!is.null(polys)){
+      ## We do the spatial and temporal clip seperately because we can reuse the spatially clipped object
+      ## in future temporal clips, assuming multiple reporting years exists within the polygons (not most recent clip)
+      ## This prevents us from re-running st_intersection for each year - poly combo when poly is the same as previous.
+      if (y == 1){
+        ## First iteration, do both spatial and temporal
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else if (polys$polyID[polys$polyID == ids$polyID[y]] == polys$polyID[polys$polyID == ids$polyID[y-1]]) {
+        ## Just rerun temporal clip with the same spatially clipped object
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else {
+        ## Hit a new poly, make a new spatial clip
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      }
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- ifelse(db_clip$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+
+      ## Polys not specified, just temporal
+    } else {
+      db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- 1
+    }
 
     data <- select(db_clip$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')) %>%
       left_join(select(db_clip$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
@@ -2572,17 +2705,6 @@ growMort <- function(db,
 
     } else {
       # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
-      ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
-      ## estimation unit, and cause estimates to be inflated substantially)
-      # combos <- select(data, c(grpBy)) %>%
-      #   as.data.frame() %>%
-      #   group_by(.dots = grpBy) %>%
-      #   summarize() %>%
-      #   filter(!is.na(YEAR))
-      # if(!is.null(polys)){
-      #   test <- filter(combos, !is.na(polyID))
-      #   if (nrow(test) > 0) combos <- test # If no points available, it produces zero rows & bugs
-      # }
       ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
       if(is.null(polys)){
         combos <- select(data, c(grpBy)) %>%
@@ -2598,19 +2720,13 @@ growMort <- function(db,
           summarize() %>%
           filter(!is.na(YEAR))
         combosNSpoly <- combosNS %>%
-          mutate(polyID = 1)
-        if(nrow(polys) > 1){
-          # Duplicate set of non spatial groups
-          for (p in 2:nrow(polys)) {
-            combosNS$polyID <- p
-            combosNSpoly <- rbind(combosNSpoly, combosNS)
-          }
-        }
+          mutate(polyID = polys$polyID[polys$polyID == ids$polyID[y]])
+
         # New combos for spatial objects
         combos <- pltSF %>%
           select(-c(PLT_CN)) %>%
           distinct(polyID, .keep_all = TRUE) %>%
-          left_join(combosNSpoly, by = 'polyID')
+          right_join(combosNSpoly, by = 'polyID')
       }
 
       # List of rows for lapply
@@ -2685,9 +2801,11 @@ growMort <- function(db,
       }
     } # End byPlot == FALSE
     out[[y]] <- tOut
+    pb$tick()
   }
   tOut <- do.call(rbind, out)
-  tOut <- filter(tOut, !is.na(YEAR))
+  tOut <- filter(tOut, !is.na(YEAR)) %>%
+    arrange(YEAR)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) tOut <- unique(tOut)
   return(tOut)
@@ -2912,23 +3030,65 @@ vitalRates <- function(db,
 
 
   ### Snag the EVALIDs that are needed
-  ## To speed up processing time we will loop over reporting years and use clipFIA to reduce the number of rows of data
+  ## To speed up processing time we will loop over reporting years and polygons and use clipFIA to reduce the number of rows of data
   ## Joining is quick, so we just do that on each core. Grouping and summarizing is slow with high n, so we focus on reducing n
-  ids <- db$POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID', 'GROWTH_ACCT') %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP %in% c('EXPGROW','EXPMORT', 'EXPREMV')) %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-    distinct(END_INVYR, EVALID, .keep_all = TRUE) %>%
-    group_by(END_INVYR) %>%
-    summarise(id = list(EVALID),
-              ga = if_else(any(GROWTH_ACCT == 'Y'), 1, 0))
+  if (!is.null(polys)){
+    ids <- pltSF %>%
+      left_join(select(db$POP_PLOT_STRATUM_ASSGN, 'PLT_CN', 'EVALID'), by = 'PLT_CN') %>%
+      left_join(select(db$POP_EVAL, 'CN', 'END_INVYR', 'EVALID', 'GROWTH_ACCT'), by = 'EVALID') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(polyID, END_INVYR, EVALID, .keep_all = TRUE) %>%
+      group_by(polyID, END_INVYR) %>%
+      summarise(id = list(EVALID),
+                ga = if_else(any(GROWTH_ACCT == 'Y'), 1, 0))
+  } else {
+    ids <- db$POP_EVAL %>%
+      select('CN', 'END_INVYR', 'EVALID', 'GROWTH_ACCT') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPGROW') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(END_INVYR, EVALID, .keep_all = TRUE) %>%
+      group_by(END_INVYR) %>%
+      summarise(id = list(EVALID),
+                ga = if_else(any(GROWTH_ACCT == 'Y'), 1, 0))
+  }
+
+  ## Add a progress bar with ETA
+  pb <- progress_bar$new(
+    format = "  Computing Estimates [:bar] :percent  \t ETA: :eta \t Elapsed: :elapsed",
+    total = nrow(ids), clear = FALSE, width= 100)
 
   # Looping over years (NOT PARALLEL, parallelization is applied to the groups to prevent spreading the entire db across cores)
   out <- list()
   for (y in 1:nrow(ids)){
     ## Clip out the necessary data
-    db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+    if (!is.null(polys)){
+      ## We do the spatial and temporal clip seperately because we can reuse the spatially clipped object
+      ## in future temporal clips, assuming multiple reporting years exists within the polygons (not most recent clip)
+      ## This prevents us from re-running st_intersection for each year - poly combo when poly is the same as previous.
+      if (y == 1){
+        ## First iteration, do both spatial and temporal
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else if (polys$polyID[polys$polyID == ids$polyID[y]] == polys$polyID[polys$polyID == ids$polyID[y-1]]) {
+        ## Just rerun temporal clip with the same spatially clipped object
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else {
+        ## Hit a new poly, make a new spatial clip
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      }
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- ifelse(db_clip$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+
+      ## Polys not specified, just temporal
+    } else {
+      db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- 1
+    }
 
     data <- select(db_clip$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')) %>%
       left_join(select(db_clip$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
@@ -3095,21 +3255,14 @@ vitalRates <- function(db,
           summarize() %>%
           filter(!is.na(YEAR))
         combosNSpoly <- combosNS %>%
-          mutate(polyID = 1)
-        if(nrow(polys) > 1){
-          # Duplicate set of non spatial groups
-          for (p in 2:nrow(polys)) {
-            combosNS$polyID <- p
-            combosNSpoly <- rbind(combosNSpoly, combosNS)
-          }
-        }
+          mutate(polyID = polys$polyID[polys$polyID == ids$polyID[y]])
+
         # New combos for spatial objects
         combos <- pltSF %>%
           select(-c(PLT_CN)) %>%
           distinct(polyID, .keep_all = TRUE) %>%
-          left_join(combosNSpoly, by = 'polyID')
+          right_join(combosNSpoly, by = 'polyID')
       }
-
       # List of rows for lapply
       combos <- split(combos, seq(nrow(combos)))
 
@@ -3182,9 +3335,11 @@ vitalRates <- function(db,
       }
     } # End byPlot == FALSE
     out[[y]] <- tOut
+    pb$tick()
   }
   tOut <- do.call(rbind, out)
-  tOut <- filter(tOut, !is.na(YEAR))
+  tOut <- filter(tOut, !is.na(YEAR)) %>%
+    arrange(YEAR)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) tOut <- unique(tOut)
   return(tOut)
@@ -3359,22 +3514,63 @@ biomass <- function(db,
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
   ### Snag the EVALIDs that are needed
-  ## To speed up processing time we will loop over reporting years and use clipFIA to reduce the number of rows of data
+  ## To speed up processing time we will loop over reporting years and polygons and use clipFIA to reduce the number of rows of data
   ## Joining is quick, so we just do that on each core. Grouping and summarizing is slow with high n, so we focus on reducing n
-  ids <- db$POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID') %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2005) %>%
-    distinct(END_INVYR, EVALID) %>%
-    group_by(END_INVYR) %>%
-    summarise(id = list(EVALID))
+  if (!is.null(polys)){
+    ids <- pltSF %>%
+      left_join(select(db$POP_PLOT_STRATUM_ASSGN, 'PLT_CN', 'EVALID'), by = 'PLT_CN') %>%
+      left_join(select(db$POP_EVAL, 'CN', 'END_INVYR', 'EVALID'), by = 'EVALID') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(polyID, END_INVYR, EVALID) %>%
+      group_by(polyID, END_INVYR) %>%
+      summarise(id = list(EVALID))
+  } else {
+    ids <- db$POP_EVAL %>%
+      select('CN', 'END_INVYR', 'EVALID') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(END_INVYR, EVALID) %>%
+      group_by(END_INVYR) %>%
+      summarise(id = list(EVALID))
+  }
+
+  ## Add a progress bar with ETA
+  pb <- progress_bar$new(
+    format = "  Computing Estimates [:bar] :percent  \t ETA: :eta \t Elapsed: :elapsed",
+    total = nrow(ids), clear = FALSE, width= 100)
 
   # Looping over years (NOT PARALLEL, parallelization is applied to the groups to prevent spreading the entire db across cores)
   out <- list()
   for (y in 1:nrow(ids)){
     ## Clip out the necessary data
-    db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+    if (!is.null(polys)){
+      ## We do the spatial and temporal clip seperately because we can reuse the spatially clipped object
+      ## in future temporal clips, assuming multiple reporting years exists within the polygons (not most recent clip)
+      ## This prevents us from re-running st_intersection for each year - poly combo when poly is the same as previous.
+      if (y == 1){
+        ## First iteration, do both spatial and temporal
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else if (polys$polyID[polys$polyID == ids$polyID[y]] == polys$polyID[polys$polyID == ids$polyID[y-1]]) {
+        ## Just rerun temporal clip with the same spatially clipped object
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else {
+        ## Hit a new poly, make a new spatial clip
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      }
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- ifelse(db_clip$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+
+      ## Polys not specified, just temporal
+    } else {
+      db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- 1
+    }
 
     ## Prep joins and filters
     data <- select(db_clip$PLOT, c('PLT_CN', 'STATECD', 'INVYR', 'MACRO_BREAKPOINT_DIA', grpP, 'sp', 'aD_p')) %>%
@@ -3460,14 +3656,6 @@ biomass <- function(db,
 
       ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
     } else {
-      # combos <- select(data, c(grpBy)) %>%
-      #   as.data.frame() %>%
-      #   group_by(.dots = grpBy) %>%
-      #   summarize() %>%
-      #   filter(!is.na(YEAR))
-      # if(!is.null(polys)){
-      #   combos <- filter(combos, !is.na(polyID))
-      # }
       ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
       if(is.null(polys)){
         combos <- select(data, c(grpBy)) %>%
@@ -3483,19 +3671,13 @@ biomass <- function(db,
           summarize() %>%
           filter(!is.na(YEAR))
         combosNSpoly <- combosNS %>%
-          mutate(polyID = 1)
-        if(nrow(polys) > 1){
-          # Duplicate set of non spatial groups
-          for (p in 2:nrow(polys)) {
-            combosNS$polyID <- p
-            combosNSpoly <- rbind(combosNSpoly, combosNS)
-          }
-        }
+          mutate(polyID = polys$polyID[polys$polyID == ids$polyID[y]])
+
         # New combos for spatial objects
         combos <- pltSF %>%
           select(-c(PLT_CN)) %>%
           distinct(polyID, .keep_all = TRUE) %>%
-          left_join(combosNSpoly, by = 'polyID')
+          right_join(combosNSpoly, by = 'polyID')
       }
       # List of rows for lapply
       combos <- split(combos, seq(nrow(combos)))
@@ -3570,9 +3752,11 @@ biomass <- function(db,
       }
     } # End byPlot == FALSE
     out[[y]] <- bOut
+    pb$tick()
   }
   bOut <- do.call(rbind, out)
-  bOut <- filter(bOut, !is.na(YEAR))
+  bOut <- filter(bOut, !is.na(YEAR)) %>%
+    arrange(YEAR)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) bOut <- unique(bOut)
   return(bOut)
@@ -3590,7 +3774,6 @@ dwm <- function(db,
                 totals = FALSE,
                 tidy = TRUE,
                 SE = TRUE,
-                #progress = TRUE,
                 nCores = 1) {
   ## Need a plotCN
   db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
@@ -3726,22 +3909,64 @@ dwm <- function(db,
   grpC <- names(db$COND)[names(db$COND) %in% grpBy]
 
   ### Snag the EVALIDs that are needed
-  ## To speed up processing time we will loop over reporting years and use clipFIA to reduce the number of rows of data
+  ## To speed up processing time we will loop over reporting years and polygons and use clipFIA to reduce the number of rows of data
   ## Joining is quick, so we just do that on each core. Grouping and summarizing is slow with high n, so we focus on reducing n
-  ids <- db$POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID') %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP %in% c('EXPDWM')) %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-    distinct(END_INVYR, EVALID) %>%
-    group_by(END_INVYR) %>%
-    summarise(id = list(EVALID))
+  if (!is.null(polys)){
+    ids <- pltSF %>%
+      left_join(select(db$POP_PLOT_STRATUM_ASSGN, 'PLT_CN', 'EVALID'), by = 'PLT_CN') %>%
+      left_join(select(db$POP_EVAL, 'CN', 'END_INVYR', 'EVALID'), by = 'EVALID') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(polyID, END_INVYR, EVALID) %>%
+      group_by(polyID, END_INVYR) %>%
+      summarise(id = list(EVALID))
+  } else {
+    ids <- db$POP_EVAL %>%
+      select('CN', 'END_INVYR', 'EVALID') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPDWM') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(END_INVYR, EVALID) %>%
+      group_by(END_INVYR) %>%
+      summarise(id = list(EVALID))
+  }
+
+  ## Add a progress bar with ETA
+  pb <- progress_bar$new(
+    format = "  Computing Estimates [:bar] :percent  \t ETA: :eta \t Elapsed: :elapsed",
+    total = nrow(ids), clear = FALSE, width= 100)
 
   # Looping over years (NOT PARALLEL, parallelization is applied to the groups to prevent spreading the entire db across cores)
   out <- list()
   for (y in 1:nrow(ids)){
     ## Clip out the necessary data
-    db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+    if (!is.null(polys)){
+      ## We do the spatial and temporal clip seperately because we can reuse the spatially clipped object
+      ## in future temporal clips, assuming multiple reporting years exists within the polygons (not most recent clip)
+      ## This prevents us from re-running st_intersection for each year - poly combo when poly is the same as previous.
+      if (y == 1){
+        ## First iteration, do both spatial and temporal
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else if (polys$polyID[polys$polyID == ids$polyID[y]] == polys$polyID[polys$polyID == ids$polyID[y-1]]) {
+        ## Just rerun temporal clip with the same spatially clipped object
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else {
+        ## Hit a new poly, make a new spatial clip
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      }
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- ifelse(db_clip$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+
+      ## Polys not specified, just temporal
+    } else {
+      db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- 1
+    }
+
     ## Prep joins and filters
     data <- select(db_clip$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', grpP, 'sp', 'aD_p')) %>%
       left_join(select(db_clip$COND, c('PLT_CN', 'CND_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'aD_c', 'landD', 'CONDID', grpC)), by = c('PLT_CN')) %>%
@@ -3822,17 +4047,6 @@ dwm <- function(db,
 
       ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
     } else {
-      # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
-      ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
-      ## estimation unit, and cause estimates to be inflated substantially
-      # combos <- select(data, c(grpBy)) %>%
-      #   as.data.frame() %>%
-      #   group_by(.dots = grpBy) %>%
-      #   summarize() %>%
-      #   filter(!is.na(YEAR))
-      # if(!is.null(polys)){
-      #   combos <- filter(combos, !is.na(polyID))
-      # }
       ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
       if(is.null(polys)){
         combos <- select(data, c(grpBy)) %>%
@@ -3848,19 +4062,13 @@ dwm <- function(db,
           summarize() %>%
           filter(!is.na(YEAR))
         combosNSpoly <- combosNS %>%
-          mutate(polyID = 1)
-        if(nrow(polys) > 1){
-          # Duplicate set of non spatial groups
-          for (p in 2:nrow(polys)) {
-            combosNS$polyID <- p
-            combosNSpoly <- rbind(combosNSpoly, combosNS)
-          }
-        }
+          mutate(polyID = polys$polyID[polys$polyID == ids$polyID[y]])
+
         # New combos for spatial objects
         combos <- pltSF %>%
           select(-c(PLT_CN)) %>%
           distinct(polyID, .keep_all = TRUE) %>%
-          left_join(combosNSpoly, by = 'polyID')
+          right_join(combosNSpoly, by = 'polyID')
       }
       # List of rows for lapply
       combos <- split(combos, seq(nrow(combos)))
@@ -4008,9 +4216,11 @@ dwm <- function(db,
 
     } # End byPlot = FALSE
     out[[y]] <- cOut
+    pb$tick()
   }
   cOut <- do.call(rbind, out)
-  cOut <- filter(cOut, !is.na(YEAR))
+  cOut <- filter(cOut, !is.na(YEAR)) %>%
+    arrange(YEAR)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) {
     cOut <- unique(cOut)
@@ -4033,7 +4243,6 @@ invasive <- function(db,
                      byPlot = FALSE,
                      totals = FALSE,
                      SE = TRUE,
-                     #progress = TRUE,
                      nCores = 1){
   # Need a PLT_CN
   db$PLOT <- db[["PLOT"]] %>% mutate(PLT_CN = CN)
@@ -4170,22 +4379,63 @@ invasive <- function(db,
   grpC <- names(db$COND)[names(db$COND) %in% grpBy]
 
   ### Snag the EVALIDs that are needed
-  ## To speed up processing time we will loop over reporting years and use clipFIA to reduce the number of rows of data
+  ## To speed up processing time we will loop over reporting years and polygons and use clipFIA to reduce the number of rows of data
   ## Joining is quick, so we just do that on each core. Grouping and summarizing is slow with high n, so we focus on reducing n
-  ids <- db$POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID') %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-    distinct(END_INVYR, EVALID) %>%
-    group_by(END_INVYR) %>%
-    summarise(id = list(EVALID))
+  if (!is.null(polys)){
+    ids <- pltSF %>%
+      left_join(select(db$POP_PLOT_STRATUM_ASSGN, 'PLT_CN', 'EVALID'), by = 'PLT_CN') %>%
+      left_join(select(db$POP_EVAL, 'CN', 'END_INVYR', 'EVALID'), by = 'EVALID') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(polyID, END_INVYR, EVALID) %>%
+      group_by(polyID, END_INVYR) %>%
+      summarise(id = list(EVALID))
+  } else {
+    ids <- db$POP_EVAL %>%
+      select('CN', 'END_INVYR', 'EVALID') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(END_INVYR, EVALID) %>%
+      group_by(END_INVYR) %>%
+      summarise(id = list(EVALID))
+  }
+
+  ## Add a progress bar with ETA
+  pb <- progress_bar$new(
+    format = "  Computing Estimates [:bar] :percent  \t ETA: :eta \t Elapsed: :elapsed",
+    total = nrow(ids), clear = FALSE, width= 100)
 
   # Looping over years (NOT PARALLEL, parallelization is applied to the groups to prevent spreading the entire db across cores)
   out <- list()
   for (y in 1:nrow(ids)){
     ## Clip out the necessary data
-    db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+    if (!is.null(polys)){
+      ## We do the spatial and temporal clip seperately because we can reuse the spatially clipped object
+      ## in future temporal clips, assuming multiple reporting years exists within the polygons (not most recent clip)
+      ## This prevents us from re-running st_intersection for each year - poly combo when poly is the same as previous.
+      if (y == 1){
+        ## First iteration, do both spatial and temporal
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else if (polys$polyID[polys$polyID == ids$polyID[y]] == polys$polyID[polys$polyID == ids$polyID[y-1]]) {
+        ## Just rerun temporal clip with the same spatially clipped object
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else {
+        ## Hit a new poly, make a new spatial clip
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      }
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- ifelse(db_clip$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+
+      ## Polys not specified, just temporal
+    } else {
+      db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- 1
+    }
 
     ## Prep joins and filters
     data <- select(db_clip$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'INVASIVE_SAMPLING_STATUS_CD', grpP, 'sp', 'aD_p')) %>%
@@ -4240,17 +4490,6 @@ invasive <- function(db,
                    crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
       }
     } else {
-      # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
-      ## produce a unique domain indicator for each individual output observation (ex. Red Oak in Ingham County) to produce valid estimates (otherwise subsampling the
-      ## estimation unit, and cause estimates to be inflated substantially)
-      # combos <- select(data, c(grpBy)) %>%
-      #   as.data.frame() %>%
-      #   group_by(.dots = grpBy) %>%
-      #   summarize() %>%
-      #   filter(!is.na(YEAR))
-      # if(!is.null(polys)){
-      #   combos <- filter(combos, !is.na(polyID))
-      # }
       ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
       if(is.null(polys)){
         combos <- select(data, c(grpBy)) %>%
@@ -4266,19 +4505,13 @@ invasive <- function(db,
           summarize() %>%
           filter(!is.na(YEAR))
         combosNSpoly <- combosNS %>%
-          mutate(polyID = 1)
-        if(nrow(polys) > 1){
-          # Duplicate set of non spatial groups
-          for (p in 2:nrow(polys)) {
-            combosNS$polyID <- p
-            combosNSpoly <- rbind(combosNSpoly, combosNS)
-          }
-        }
+          mutate(polyID = polys$polyID[polys$polyID == ids$polyID[y]])
+
         # New combos for spatial objects
         combos <- pltSF %>%
           select(-c(PLT_CN)) %>%
           distinct(polyID, .keep_all = TRUE) %>%
-          left_join(combosNSpoly, by = 'polyID')
+          right_join(combosNSpoly, by = 'polyID')
       }
       # List of rows for lapply
       combos <- split(combos, seq(nrow(combos)))
@@ -4344,9 +4577,11 @@ invasive <- function(db,
       }
     } # End byPlot == FALSE
     out[[y]] <- invOut
+    pb$tick()
   }
   invOut <- do.call(rbind, out)
-  invOut <- filter(invOut, !is.na(YEAR))
+  invOut <- filter(invOut, !is.na(YEAR)) %>%
+    arrange(YEAR)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) invOut <- unique(invOut)
   return(invOut)
@@ -4365,7 +4600,6 @@ area <- function(db,
                  totals = FALSE,
                  byPlot = FALSE,
                  SE = TRUE,
-                 #progress = TRUE,
                  nCores = 1) {
 
   ## Need a plotCN
@@ -4542,22 +4776,63 @@ area <- function(db,
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
   ### Snag the EVALIDs that are needed
-  ## To speed up processing time we will loop over reporting years and use clipFIA to reduce the number of rows of data
+  ## To speed up processing time we will loop over reporting years and polygons and use clipFIA to reduce the number of rows of data
   ## Joining is quick, so we just do that on each core. Grouping and summarizing is slow with high n, so we focus on reducing n
-  ids <- db$POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID') %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP == 'EXPCURR') %>%
-    filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-    distinct(END_INVYR, EVALID) %>%
-    group_by(END_INVYR) %>%
-    summarise(id = list(EVALID))
+  if (!is.null(polys)){
+    ids <- pltSF %>%
+      left_join(select(db$POP_PLOT_STRATUM_ASSGN, 'PLT_CN', 'EVALID'), by = 'PLT_CN') %>%
+      left_join(select(db$POP_EVAL, 'CN', 'END_INVYR', 'EVALID'), by = 'EVALID') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(polyID, END_INVYR, EVALID) %>%
+      group_by(polyID, END_INVYR) %>%
+      summarise(id = list(EVALID))
+  } else {
+    ids <- db$POP_EVAL %>%
+      select('CN', 'END_INVYR', 'EVALID') %>%
+      inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+      filter(EVAL_TYP == 'EXPCURR') %>%
+      filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
+      distinct(END_INVYR, EVALID) %>%
+      group_by(END_INVYR) %>%
+      summarise(id = list(EVALID))
+  }
+
+  ## Add a progress bar with ETA
+  pb <- progress_bar$new(
+    format = "  Computing Estimates [:bar] :percent  \t ETA: :eta \t Elapsed: :elapsed",
+    total = nrow(ids), clear = FALSE, width= 100)
 
   # Looping over years (NOT PARALLEL, parallelization is applied to the groups to prevent spreading the entire db across cores)
   out <- list()
   for (y in 1:nrow(ids)){
     ## Clip out the necessary data
-    db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+    if (!is.null(polys)){
+      ## We do the spatial and temporal clip seperately because we can reuse the spatially clipped object
+      ## in future temporal clips, assuming multiple reporting years exists within the polygons (not most recent clip)
+      ## This prevents us from re-running st_intersection for each year - poly combo when poly is the same as previous.
+      if (y == 1){
+        ## First iteration, do both spatial and temporal
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else if (polys$polyID[polys$polyID == ids$polyID[y]] == polys$polyID[polys$polyID == ids$polyID[y-1]]) {
+        ## Just rerun temporal clip with the same spatially clipped object
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      } else {
+        ## Hit a new poly, make a new spatial clip
+        db_poly <- clipFIA(db, mostRecent = FALSE, mask = polys[polys$polyID == ids$polyID[y],])
+        db_clip <- clipFIA(db_poly, mostRecent = FALSE, evalid = ids$id[[y]])
+      }
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- ifelse(db_clip$PLOT$PLT_CN %in% pltSF$PLT_CN, 1, 0)
+
+      ## Polys not specified, just temporal
+    } else {
+      db_clip <- clipFIA(db, mostRecent = FALSE, evalid = ids$id[[y]])
+      # update spatial domain indicator
+      db_clip$PLOT$sp <- 1
+    }
 
     ## Prep joins and filters
     data <- select(db_clip$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', grpP, 'aD_p', 'sp')) %>%
@@ -4636,19 +4911,13 @@ area <- function(db,
           summarize() %>%
           filter(!is.na(YEAR))
         combosNSpoly <- combosNS %>%
-          mutate(polyID = 1)
-        if(nrow(polys) > 1){
-          # Duplicate set of non spatial groups
-          for (p in 2:nrow(polys)) {
-            combosNS$polyID <- p
-            combosNSpoly <- rbind(combosNSpoly, combosNS)
-          }
-        }
+          mutate(polyID = polys$polyID[polys$polyID == ids$polyID[y]])
+
         # New combos for spatial objects
         combos <- pltSF %>%
           select(-c(PLT_CN)) %>%
           distinct(polyID, .keep_all = TRUE) %>%
-          left_join(combosNSpoly, by = 'polyID')
+          right_join(combosNSpoly, by = 'polyID')
       }
       # List of rows for lapply
       combos <- split(combos, seq(nrow(combos)))
@@ -4708,10 +4977,12 @@ area <- function(db,
       }
     } # End byPlot == FALSE
     out[[y]] <- aOut
+    pb$tick()
   }
 
   aOut <- do.call(rbind, out)
-  aOut <- filter(aOut, !is.na(YEAR))
+  aOut <- filter(aOut, !is.na(YEAR)) %>%
+    arrange(YEAR)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) aOut <- unique(aOut)
   return(aOut)

@@ -107,4 +107,6 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'DIA.prev', 'DRYBIO_AG.mid', 'DRYBIO_AG.prev', 'INVYR', 'VOLCFNET.mid',
                          'VOLCFNET.prev', 'bioAPlot', 'bioEst', 'bioPlot', 'bioStrat', 'bioVar', 'bioaEst',
                          'bioaStrat', 'bioaVar', 'bioagVar', 'bioav', 'biogVar', 'biov', 'cvBIO', 'cvBIOA', 'cvEst_bio',
-                         'cvEst_bioa', 'cvStrat_bio', 'cvStrat_bioa'))
+                         'cvEst_bioa', 'cvStrat_bio', 'cvStrat_bioa',
+                         'BIO_AG_ACRE_SE', 'BIO_BG_ACRE_SE', 'CARB_AG_ACRE_SE', 'CARB_BG_ACRE_SE',
+                         'NETVOL_ACRE_SE', 'SAWVOL_ACRE_SE', 'SUBPTYP_PROP_CHNG'))
