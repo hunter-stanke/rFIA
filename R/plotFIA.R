@@ -1,8 +1,9 @@
 #' @export
-plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, n.max = NULL, plot.title = NULL,
-                    y.lab = NULL, x.lab = NULL, legend.title = NULL, legend.labs = waiver(),
-                    color.option = 'viridis', line.color = "gray30", line.width =1,
-                    min.year = 2005, direction = 1, alpha = .9, transform = "identity",
+plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE,
+                    n.max = NULL, plot.title = NULL, y.lab = NULL, x.lab = NULL,
+                    legend.title = NULL, legend.labs = waiver(), color.option = 'viridis',
+                    line.color = "gray30", line.width =1, min.year = 2005,
+                    direction = 1, alpha = .9, transform = "identity",
                     text.size = 1, text.font = '', lab.width = 1, legend.height = 1,
                     legend.width = 1, device = 'png', savePath = NULL, fileName = NULL) {
 
@@ -54,26 +55,18 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, n.max
   y_quo = enquo(y)
   x_quo = enquo(x)
   grp_quo = enquo(grp)
+  se_quo = enquo(se)
 
 
   ## If a modifier was given to a variable, handle it (ex. y = TPA_PERC / 100)
   data <- data %>%
-    mutate(yVar = !!y_quo,
-           xVar = !!x_quo,
-           grpVar = !!grp_quo)
-  # data <- data %>%
-  #   mutate(yVar = !!y,
-  #          xVar = !!x,
-  #          grpVar = !!grp)
-
-
-  ## If data is an FIA.Database
+    mutate(xVar = !!x_quo,
+           grpVar = !!grp_quo,
+           yVar = !!y_quo)
 
   # Filter for the year specified
   data <- data %>%
     filter(YEAR >= min.year)
-
-
 
   ## If they want a subset of the groups
   if (!is.null(n.max) & quo_name(grp_quo) != 'NULL'){

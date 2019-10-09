@@ -104,10 +104,18 @@ makeClasses <- function(x, interval = NULL, lower = NULL, upper = NULL, brks = N
 #### Basal Area Function (returns sq units of diameter)
 basalArea <- function(diameter, DIA_MID = NULL){
   #ba = ((diameter/2)^2) * pi
-  if (!is.null(DIA_MID)){
-    diameter[is.null(diameter)] <- DIA_MID[is.null(diameter)]
-  }
-  ba = diameter^2 * .005454 # SQ FT, consistency with FIA EVALIDator
+  # if (!is.null(DIA_MID)){
+  #   diameter[is.null(diameter)] <- DIA_MID[is.null(diameter)]
+  # }
+  # ba = diameter^2 * .005454 # SQ FT, consistency with FIA EVALIDator
+
+  ba <- case_when(
+    is.na(diameter) ~ NA_real_,
+    ## Growth accounting only
+    diameter < 0 ~ -(diameter^2 * .005454),
+    TRUE ~ diameter^2 * .005454)
+
+
   return(ba)
 }
 
@@ -126,7 +134,7 @@ structHelper <- function(dia, crownClass){
   dia = dia[crownClass %in% c(2,3,4)]
 
   # Total basal area within plot
-  totalBA = sum(basalArea(dia[dia > 5]), na.rm = TRUE)
+  totalBA = sum(basalArea(dia[dia >= 5]), na.rm = TRUE)
 
   # Calculate proportion of stems in each size class by basal area
   pole = sum(basalArea(dia[dia >= 5 & dia < 10.23622]), na.rm = TRUE) / totalBA
@@ -252,33 +260,27 @@ unitMean <- function(ESTN_METHOD, a, nh, w, stratMean){
 
 ## Calculate change for VR
 ## Calculate change for VR
-vrChangeHelper <- function(attribute = NULL, attribute.mid = NULL, attribute.prev = NULL, remper, component){
+# vrNAHelper <- function(attribute2, attribute1){
+#   ## IF one time is NA, then both must be NA
+#   vals <- case_when(
+#     is.na(attribute)
+#   )
+# }
 
-  # IF a midpoint estimate is available, use it to grab the stems which aren't listed in current
-  if (!is.null(attribute.mid)){
-    change <- case_when(
-      is.na(component) ~ NA_real_,
-      str_detect(component, 'SURVIVOR') | str_detect(component, 'INGROWTH') | str_detect(component, 'REVERSION') ~ (attribute - attribute.prev) / remper,
-      TRUE ~ (attribute.mid - attribute.prev) / (remper / 2)
-    )
+## Replace current attributes with midpoint attributes depending on component
+vrAttHelper <- function(attribute, attribute.prev, attribute.mid, attribute.beg, component, remper, oneortwo){
 
+  ## ONLY WORKS FOR ATTRIBUTES DEFINED IN TRE_MIDPNT and TRE_BEGIN
+  at <- case_when(
+    oneortwo == 2 ~ case_when(
+      str_detect(component, c('SURVIVOR|INGROWTH|REVERSION')) ~ attribute / remper,
+      str_detect(component, c('CUT|DIVERSION')) ~ attribute.mid / remper),
+    oneortwo == 1 ~ case_when(
+      str_detect(component, c('SURVIVOR|CUT1|DIVERSION1|MORTALITY1')) ~ case_when(
+        !is.na(attribute.beg) ~ - attribute.beg / remper,
+        TRUE ~ - attribute.prev / remper)))
 
-    # for (i in 1:length(attribute)){
-    #   if (!is.na(component[i])){
-    #     if (str_detect(component[i], 'SURVIVOR') | str_detect(component[i], 'INGROWTH') | str_detect(component[i], 'REVERSION')){
-    #       change[i] <- (attribute[i] - attribute.prev[i]) / remper[i]
-    #     } else {
-    #       change[i] <- (attribute.mid[i] - attribute.prev[i]) / (remper[i] / 2)
-    #     }
-    #   } else {
-    #     change[i] <- NA
-    #   }
-    # }
-  } else {
-    change <- (attribute - attribute.prev) / remper
-  }
-
-  return(change)
+  return(at)
 }
 
 ## Some base functions for the FIA Database Class
@@ -364,7 +366,7 @@ print.FIA.Database <- function(x, ...){
 #' @import progress
 #' @importFrom data.table fread fwrite
 #' @importFrom parallel makeCluster detectCores mclapply parLapply stopCluster clusterEvalQ
-#' @importFrom tidyr gather
+#' @import tidyr
 #' @importFrom sp over proj4string<- coordinates<- spTransform proj4string
 #' @importFrom stats cov var
 #' @importFrom utils object.size read.csv tail globalVariables type.convert
@@ -414,7 +416,7 @@ readFIA <- function(dir,
   if (common){
     cFiles <- c('COND', 'COND_DWM_CALC', 'INVASIVE_SUBPLOT_SPP', 'PLOT', 'POP_ESTN_UNIT',
                 'POP_EVAL', 'POP_EVAL_GRP', 'POP_EVAL_TYP', 'POP_PLOT_STRATUM_ASSGN', 'POP_STRATUM',
-                'SUBPLOT', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_MIDPT', 'SUBP_COND_CHNG_MTRX')
+                'SUBPLOT', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_MIDPT', 'TREE_GRM_BEGIN', 'SUBP_COND_CHNG_MTRX')
     if (any(str_sub(files, 3, 3) == '_')){
       files <- files[str_sub(files,4,-5) %in% cFiles]
     } else{
@@ -548,7 +550,7 @@ Did you accidentally include the state abbreviation in front of the table name? 
   if (common & is.null(tables)){
     tables<- c('COND', 'COND_DWM_CALC', 'INVASIVE_SUBPLOT_SPP', 'PLOT', 'POP_ESTN_UNIT',
                 'POP_EVAL', 'POP_EVAL_GRP', 'POP_EVAL_TYP', 'POP_PLOT_STRATUM_ASSGN', 'POP_STRATUM',
-                'SUBPLOT', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_MIDPT', 'SUBP_COND_CHNG_MTRX')
+                'SUBPLOT', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_MIDPT', 'TREE_GRM_BEGIN', 'SUBP_COND_CHNG_MTRX')
   } else {
     tables <- str_to_upper(allTables)
   }
@@ -1253,8 +1255,8 @@ standStruct <- function(db,
       left_join(select(db_clip$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
       left_join(select(db_clip$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
       right_join(select(db_clip$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
-      left_join(select(db_clip$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
-      left_join(select(db_clip$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
+      #left_join(select(db_clip$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
+      #left_join(select(db_clip$POP_EVAL_GRP, c('RSCD', 'CN', 'EVAL_GRP')), by = c('EVAL_GRP_CN' = 'CN')) %>%
       left_join(select(db_clip$TREE, c('PLT_CN', 'CONDID', 'DIA', 'STATUSCD', 'CCLCD', 'TREECLCD', 'STANDING_DEAD_CD', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE')), by = c('PLT_CN', 'CONDID')) %>%
       mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
       mutate(tAdj = adjHelper(DIA, MACRO_BREAKPOINT_DIA, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
@@ -1262,7 +1264,8 @@ standStruct <- function(db,
              YEAR_RANGE = REPORT_YEAR_NM) %>%
       mutate_if(is.factor,
                 as.character)%>%
-      filter(!is.na(YEAR))
+      filter(!is.na(YEAR)) %>%
+      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE)
 
     ## Recode a few of the estimation methods to make things easier below
     data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
@@ -1690,7 +1693,8 @@ diversity <- function(db,
              YEAR_RANGE = REPORT_YEAR_NM)%>%
       mutate_if(is.factor,
                 as.character)%>%
-      filter(!is.na(YEAR))
+      filter(!is.na(YEAR)) %>%
+      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE)
 
     ## Recode a few of the estimation methods to make things easier below
     data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
@@ -2099,7 +2103,8 @@ tpa <- function(db,
              YEAR_RANGE = REPORT_YEAR_NM) %>%
       mutate_if(is.factor,
                 as.character) %>%
-      filter(!is.na(YEAR))
+      filter(!is.na(YEAR)) %>%
+      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE)
 
     ## Recode a few of the estimation methods to make things easier below
     data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
@@ -2624,7 +2629,7 @@ growMort <- function(db,
       ## Comprehensive indicator function
       data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp * data$aChng
       data$tDI <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev * data$tChng
-      # data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp #* data$aChng
+      #data$aDI <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$sp.prev * data$aChng
       # data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp * data$tChng
 
       ## If growth accounting, summing proportions at subplot level, otherwise full plot
@@ -3014,6 +3019,7 @@ vitalRates <- function(db,
     summarize(aD_p = as.numeric(any(aD > 0)))
   db$PLOT <- left_join(db$PLOT, aD_p, by = 'PLT_CN')
   rm(pcEval)
+  rm(aD_p)
 
   # Same as above for tree (ex. trees > 20 ft tall)
   treeDomain <- substitute(treeDomain)
@@ -3042,7 +3048,9 @@ vitalRates <- function(db,
       distinct(polyID, END_INVYR, EVALID, .keep_all = TRUE) %>%
       group_by(polyID, END_INVYR) %>%
       summarise(id = list(EVALID),
-                ga = if_else(any(GROWTH_ACCT == 'Y'), 1, 0))
+                ga = if_else(any(GROWTH_ACCT == 'Y'), 1, 0)) %>%
+      ## Need growth accounting
+      filter(ga == 1)
   } else {
     ids <- db$POP_EVAL %>%
       select('CN', 'END_INVYR', 'EVALID', 'GROWTH_ACCT') %>%
@@ -3052,7 +3060,9 @@ vitalRates <- function(db,
       distinct(END_INVYR, EVALID, .keep_all = TRUE) %>%
       group_by(END_INVYR) %>%
       summarise(id = list(EVALID),
-                ga = if_else(any(GROWTH_ACCT == 'Y'), 1, 0))
+                ga = if_else(any(GROWTH_ACCT == 'Y'), 1, 0)) %>%
+      ## Need growth accounting
+      filter(ga == 1)
   }
 
   ## Add a progress bar with ETA
@@ -3090,6 +3100,9 @@ vitalRates <- function(db,
       db_clip$PLOT$sp <- 1
     }
 
+    # Only subplots from cond change matrix
+    db_clip$SUBP_COND_CHNG_MTRX <- filter(db_clip$SUBP_COND_CHNG_MTRX, SUBPTYP == 1)
+
     data <- select(db_clip$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')) %>%
       left_join(select(db_clip$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MACR', 'CN', 'P1POINTCNT')), by = c('STRATUM_CN' = 'CN')) %>%
       left_join(select(db_clip$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
@@ -3097,79 +3110,107 @@ vitalRates <- function(db,
       left_join(select(db_clip$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
       left_join(select(db_clip$PLOT, c('PLT_CN', 'PREV_PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', grpP, 'sp', 'aD_p', 'REMPER')), by = 'PLT_CN') %>%
       left_join(select(db_clip$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID','landD', 'aD_c', grpC)), by = 'PLT_CN') %>%
-      left_join(select(db_clip$TREE, c('TRE_CN', 'PREV_TRE_CN', 'PLT_CN', 'DIA', 'HT', 'DRYBIO_AG', 'CARBON_AG', 'VOLCFNET', 'VOLCSNET', 'CONDID', 'PREVCOND', 'SPCD', grpT, 'typeD', 'tD')), by = c('PLT_CN', 'CONDID')) %>% ## ISSUE MAY BE HERE, SEE EVALIDATOR CODE
+      left_join(select(db_clip$TREE, c('TRE_CN', 'PREV_TRE_CN', 'PLT_CN', 'DIA', 'DRYBIO_AG', 'VOLCFNET', 'VOLCSNET', 'CONDID', 'PREVCOND', 'SPCD', grpT, 'typeD', 'tD')), by = c('PLT_CN', 'CONDID')) %>%
       # GRM
       left_join(select(db_clip$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'COMPONENT')), by = c('TRE_CN')) %>%
       left_join(select(db_clip$TREE_GRM_MIDPT, c("TRE_CN", 'DIA', 'VOLCFNET', 'VOLCSNET', 'DRYBIO_AG')), by = 'TRE_CN', suffix = c('', '.mid')) %>%
+      left_join(select(db_clip$TREE_GRM_BEGIN, c("TRE_CN", 'DIA', 'VOLCFNET', 'VOLCSNET', 'DRYBIO_AG')), by = 'TRE_CN', suffix = c('', '.beg')) %>%
+      # Condition change attributes
+      left_join(select(db_clip$SUBP_COND_CHNG_MTRX, SUBP:SUBPTYP_PROP_CHNG), by = c('PLT_CN', 'CONDID'), suffix = c('', '.subp')) %>%
+      left_join(select(db_clip$COND, PLT_CN, CONDID, COND_STATUS_CD), by = c('PREV_PLT_CN.subp' = 'PLT_CN', 'PREVCOND.subp' = 'CONDID'), suffix = c('', '.chng')) %>%
+      # Previous attributes
+      left_join(select(db_clip$PLOT, c('PLT_CN',  grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
+      left_join(select(db_clip$COND, c('PLT_CN', 'CONDID',  'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
+      left_join(select(db_clip$TREE, c('TRE_CN', 'DIA',  'DRYBIO_AG', 'VOLCFNET', 'VOLCSNET', grpT, 'typeD', 'tD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
+      ## Housekeeping and adjustment factors
+      mutate_if(is.factor,
+                as.character) %>%
+      mutate(aChng = ifelse(COND_STATUS_CD.prev == 1 & COND_STATUS_CD == 1 & !is.null(CONDPROP_UNADJ), 1, 0),
+             tChng = ifelse(COND_STATUS_CD.prev == 1 & COND_STATUS_CD == 1, 1, 0)) %>%
       mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
       mutate(tAdj = grmAdj(SUBPTYP_GRM, ADJ_FACTOR_MICR, ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
       rename(YEAR = END_INVYR,
-             YEAR_RANGE = REPORT_YEAR_NM)
+             YEAR_RANGE = REPORT_YEAR_NM) %>%
+      ## Remove duplicates
+      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, SUBP, CONDID, TRE_CN, .keep_all = TRUE)
 
+    #If previous attributes are unavailable for trees, default to current (otherwise we get NAs for early inventories)
+    data$tD.prev <- ifelse(is.na(data$tD.prev), data$tD, data$tD.prev)
+    data$typeD.prev <- ifelse(is.na(data$typeD.prev), data$typeD, data$typeD.prev)
+    data$landD.prev <- ifelse(is.na(data$landD.prev), data$landD, data$landD.prev)
+    data$aD_p.prev <- ifelse(is.na(data$aD_p.prev), data$aD_p, data$aD_p.prev)
+    data$aD_c.prev <- ifelse(is.na(data$aD_c.prev), data$aD_c, data$aD_c.prev)
+    data$sp.prev <- ifelse(is.na(data$sp.prev), data$sp, data$sp.prev)
 
-    ## MODIFY FOR GROWTH ACCOUNTING
-    if (ids$ga[y]){
-      # Only subplots from cond change matrix
-      db_clip$SUBP_COND_CHNG_MTRX <- filter(db_clip$SUBP_COND_CHNG_MTRX, SUBPTYP == 1)
+    ## Comprehensive indicator function
+    data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp * data$aChng
+    data$tDI <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev * data$tChng
 
-      # Previous attributes
+    # ## Comprehensive indicator function
+    # data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp * data$aChng
+    # data$tDI2 <- data$landD * data$aD_p * data$aD_c * data$sp * data$tD * data$typeD * data$tChng
+    # data$tDI1 <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$sp.prev * data$tD.prev * data$typeD.prev * data$tChng
+
+    ## Add species to groups
+    if (bySpecies) {
       data <- data %>%
-        left_join(select(db_clip$SUBP_COND_CHNG_MTRX, SUBP:SUBPTYP_PROP_CHNG), by = c('PLT_CN', 'CONDID'), suffix = c('', '.subp')) %>%
-        left_join(select(db_clip$COND, PLT_CN, CONDID, COND_STATUS_CD), by = c('PREV_PLT_CN.subp' = 'PLT_CN', 'PREVCOND.subp' = 'CONDID'), suffix = c('', '.chng')) %>%
-        # Previous attributes
-        left_join(select(db_clip$PLOT, c('PLT_CN',  grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
-        left_join(select(db_clip$COND, c('PLT_CN', 'CONDID',  'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
-        left_join(select(db_clip$TREE, c('TRE_CN', 'DIA', 'HT', 'DRYBIO_AG', 'CARBON_AG', 'VOLCFNET', 'VOLCSNET', grpT, 'typeD', 'tD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
+        left_join(select(intData$REF_SPECIES_2018, c('SPCD','COMMON_NAME', 'GENUS', 'SPECIES')), by = 'SPCD') %>%
+        mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' '))%>%
         mutate_if(is.factor,
-                  as.character) %>%
-        mutate(aChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.chng == 1 & !is.null(CONDPROP_UNADJ), 1, 0),
-               tChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.prev == 1, 1, 0))
+                  as.character)
+      grpBy <- c(grpBy, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
+      grpByOrig <- c(grpByOrig, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
+      grpT <- c(grpT, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
 
-
-      #If previous attributes are unavailable for trees, default to current (otherwise we get NAs for early inventories)
-      data$tD.prev <- ifelse(is.na(data$tD.prev), data$tD, data$tD.prev)
-      data$typeD.prev <- ifelse(is.na(data$typeD.prev), data$typeD, data$typeD.prev)
-      data$landD.prev <- ifelse(is.na(data$landD.prev), data$landD, data$landD.prev)
-      data$aD_p.prev <- ifelse(is.na(data$aD_p.prev), data$aD_p, data$aD_p.prev)
-      data$aD_c.prev <- ifelse(is.na(data$aD_c.prev), data$aD_c, data$aD_c.prev)
-      data$sp.prev <- ifelse(is.na(data$sp.prev), data$sp, data$sp.prev)
-
-      ## Comprehensive indicator function
-      data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp * data$aChng
-      data$tDI <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev * data$tChng
-      # data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp #* data$aChng
-      # data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp * data$tChng
-
-      chngAdj <- .25
-
-      ## No growth accounting
-    } else {
-      # Previous attributes
-      data <- data %>%
-        # Previous attributes
-        left_join(select(db_clip$PLOT, c('PLT_CN',  grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
-        left_join(select(db_clip$COND, c('PLT_CN', 'CONDID',  'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
-        left_join(select(db_clip$TREE, c('TRE_CN', 'DIA', 'HT', 'DRYBIO_AG', 'CARBON_AG', 'VOLCFNET', 'VOLCSNET', grpT, 'typeD', 'tD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
-        mutate_if(is.factor,
-                  as.character) %>%
-        rename(SUBPTYP_PROP_CHNG = CONDPROP_UNADJ)
-
-      # If previous attributes are unavailable for trees, default to current (otherwise we get NAs for early inventories)
-      data$tD.prev <- ifelse(is.na(data$tD.prev), data$tD, data$tD.prev)
-      data$typeD.prev <- ifelse(is.na(data$typeD.prev), data$typeD, data$typeD.prev)
-      data$landD.prev <- ifelse(is.na(data$landD.prev), data$landD, data$landD.prev)
-      data$aD_p.prev <- ifelse(is.na(data$aD_p.prev), data$aD_p, data$aD_p.prev)
-      data$aD_c.prev <- ifelse(is.na(data$aD_c.prev), data$aD_c, data$aD_c.prev)
-      data$sp.prev <- ifelse(is.na(data$sp.prev), data$sp, data$sp.prev)
-
-      ## Comprehensive indicator function
-      data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
-      data$tDI <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev
-
-      chngAdj <- 1
     }
 
+    ## Break into size classes
+    if (bySizeClass){
+      grpBy <- c(grpBy, 'sizeClass')
+      grpByOrig <- c(grpByOrig, 'sizeClass')
+      data$sizeClass <- makeClasses(data$DIA, interval = 2)
+      data <- data[!is.na(data$sizeClass),]
+      grpT <- c(grpT, 'sizeClass')
+    }
 
+    ## Modify  attributes depending on component (mortality uses midpoint)
+    data <- data %>%
+      mutate(DIA2 = vrAttHelper(DIA, DIA.prev, DIA.mid, DIA.beg, COMPONENT, REMPER, 2) * tDI,
+             DIA1 = vrAttHelper(DIA, DIA.prev, DIA.mid, DIA.beg, COMPONENT, REMPER, 1) * tDI,
+             BA2 = vrAttHelper(basalArea(DIA), basalArea(DIA.prev), basalArea(DIA.mid), basalArea(DIA.beg), COMPONENT, REMPER, 2) * tDI,
+             BA1 = vrAttHelper(basalArea(DIA), basalArea(DIA.prev), basalArea(DIA.mid), basalArea(DIA.beg), COMPONENT, REMPER, 1) * tDI,
+             VOLCFNET2 = vrAttHelper(VOLCFNET, VOLCFNET.prev, VOLCFNET.mid, VOLCFNET.beg, COMPONENT, REMPER, 2) * tDI,
+             VOLCFNET1 = vrAttHelper(VOLCFNET, VOLCFNET.prev, VOLCFNET.mid, VOLCFNET.beg, COMPONENT, REMPER, 1) * tDI,
+             DRYBIO_AG2 = vrAttHelper(DRYBIO_AG, DRYBIO_AG.prev, DRYBIO_AG.mid, DRYBIO_AG.beg, COMPONENT, REMPER, 2) * tDI,
+             DRYBIO_AG1 = vrAttHelper(DRYBIO_AG, DRYBIO_AG.prev, DRYBIO_AG.mid, DRYBIO_AG.beg, COMPONENT, REMPER, 1) * tDI) %>%
+      # ## Omitting columns where either time is an NA
+      # mutate(DIA2 = case_when(is.na(DIA1) ~ NA_real_, TRUE ~ DIA2),
+      #        DIA1 = case_when(is.na(DIA2) ~ NA_real_, TRUE ~ DIA1),
+      #        BA2 = case_when(is.na(BA1) ~ NA_real_, TRUE ~ BA2),
+      #        BA1 = case_when(is.na(BA2) ~ NA_real_, TRUE ~ BA1),
+      #        VOLCFNET2 = case_when(is.na(VOLCFNET1) ~ NA_real_, TRUE ~ VOLCFNET2),
+      #        VOLCFNET1 = case_when(is.na(VOLCFNET2) ~ NA_real_, TRUE ~ VOLCFNET1),
+      #        DRYBIO_AG2 = case_when(is.na(DRYBIO_AG1) ~ NA_real_, TRUE ~ DRYBIO_AG2),
+      #        DRYBIO_AG1 = case_when(is.na(DRYBIO_AG2) ~ NA_real_, TRUE ~ DRYBIO_AG1)) %>%
+      select(-c(DIA.mid, VOLCFNET.mid, VOLCSNET.mid, DRYBIO_AG.mid,
+                DIA.prev, VOLCFNET.prev, VOLCSNET.prev, DRYBIO_AG.prev,
+                DIA.beg, VOLCFNET.beg, VOLCSNET.beg, DRYBIO_AG.beg,
+                DIA, VOLCFNET, VOLCSNET, DRYBIO_AG))
+
+
+    ## Just what we need
+    data <- data %>%
+      select(YEAR, ESTN_UNIT_CN, STRATUM_CN, PLT_CN, TRE_CN, SUBP, CONDID, ESTN_METHOD, aDI, tDI, SUBPTYP_PROP_CHNG,
+             grpP, grpC, grpT, TPAGROW_UNADJ, tAdj, aAdj, AREA_USED, P1POINTCNT, P1PNTCNT_EU, P2POINTCNT,
+             DIA2, DIA1, BA2, BA1, DRYBIO_AG2, DRYBIO_AG1, VOLCFNET2, VOLCFNET1) %>%
+      ## Dropping NA columns
+      #drop_na(SUBPTYP_PROP_CHNG) %>%
+      ## Rearrange previous values as observations
+      pivot_longer(cols = DIA2:VOLCFNET1,
+                   names_to = c(".value", 'ONEORTWO'),
+                   names_sep = -1)
+
+    chngAdj <- .25
 
     ## Recode a few of the estimation methods to make things easier below
     data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
@@ -3186,26 +3227,6 @@ vitalRates <- function(db,
         select(-c(YEAR)) %>%
         mutate(YEAR = maxYear)
     }
-
-    ## Add species to groups
-    if (bySpecies) {
-      data <- data %>%
-        left_join(select(intData$REF_SPECIES_2018, c('SPCD','COMMON_NAME', 'GENUS', 'SPECIES')), by = 'SPCD') %>%
-        mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' '))%>%
-        mutate_if(is.factor,
-                  as.character)
-      grpBy <- c(grpBy, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
-      grpByOrig <- c(grpByOrig, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
-    }
-
-    ## Break into size classes
-    if (bySizeClass){
-      grpBy <- c(grpBy, 'sizeClass')
-      grpByOrig <- c(grpByOrig, 'sizeClass')
-      data$sizeClass <- makeClasses(data$DIA, interval = 2)
-      data <- data[!is.na(data$sizeClass),]
-    }
-
 
 
     ####################  COMPUTE ESTIMATES  ###########################
@@ -3588,7 +3609,8 @@ biomass <- function(db,
       rename(YEAR = END_INVYR,
              YEAR_RANGE = REPORT_YEAR_NM) %>%
       mutate_if(is.factor,
-                as.character)
+                as.character)%>%
+      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE)
     ## Recode a few of the estimation methods to make things easier below
     data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
                               `Post-Stratification` = 'strat',
@@ -3761,6 +3783,7 @@ biomass <- function(db,
   if (byPlot) bOut <- unique(bOut)
   return(bOut)
 }
+
 
 # Coarse Woody Debris
 #' @export
@@ -3983,7 +4006,10 @@ dwm <- function(db,
       rename(YEAR = END_INVYR,
              YEAR_RANGE = REPORT_YEAR_NM) %>%
       mutate_if(is.factor,
-                as.character)
+                as.character) %>%
+      filter(EVAL_TYP == 'EXPDWM') %>%
+      distinct(PLT_CN, CONDID, EVALID, COND_STATUS_CD, .keep_all = TRUE)
+
     ## Recode a few of the estimation methods to make things easier below
     data$ESTN_METHOD = recode(.x = data$ESTN_METHOD,
                               `Post-Stratification` = 'strat',
@@ -4229,7 +4255,6 @@ dwm <- function(db,
   }
   return(cOut)
 }
-
 
 
 # Invasive coverage
@@ -4587,6 +4612,8 @@ invasive <- function(db,
   return(invOut)
 
 }
+
+
 
 #' @export
 area <- function(db,

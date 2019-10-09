@@ -6,7 +6,7 @@ vitalRatesHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE, chngAdj
     # Tree domain indicator for each column in
     tObs <- as.character(combos[[x]][[grpBy[n]]]) == as.character(data[[grpBy[n]]])
     if (length(which(is.na(tObs))) == length(tObs)) tObs <- 1
-    td <- data$tDI * tObs * td
+    td <-  tObs * td * data$tDI
     # Area domain indicator for each column in
     if(grpBy[n] %in% aGrpBy){
       aObs <- as.character(combos[[x]][[aGrpBy[n]]]) == as.character(data[[aGrpBy[n]]])
@@ -29,26 +29,19 @@ vitalRatesHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE, chngAdj
     ### Compute total TREES in domain of interest
 
     tInt <- data %>%
-      #filter(EVAL_TYP == 'EXPGROW') %>%
-      #distinct(EVALID, ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
-      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, TRE_CN, .keep_all = TRUE) %>%
-      #filter(EVALID %in% tID) %>%
-      # Compute estimates at plot level
+      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, TRE_CN, ONEORTWO, .keep_all = TRUE) %>%
+      ## Plot level estimates
+      # ## Omitting columns where either time is an NA
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
       summarize(tPlot = sum(TPAGROW_UNADJ * tAdj * tDI, na.rm = TRUE),
-                dPlot = sum(vrChangeHelper(DIA, DIA.mid, DIA.prev, REMPER, COMPONENT) * tAdj * tDI, na.rm = TRUE),
-                bPlot = sum(vrChangeHelper(basalArea(DIA), basalArea(DIA.mid), basalArea(DIA.prev), REMPER, COMPONENT) * tAdj * tDI, na.rm = TRUE),
-                baaPlot = sum(TPAGROW_UNADJ * vrChangeHelper(basalArea(DIA), basalArea(DIA.mid), basalArea(DIA.prev), REMPER, COMPONENT) * tAdj * tDI, na.rm = TRUE),
-                #htPlot = sum(vrChangeHelper(HT, attribute.mid = NULL, HT.prev, REMPER, COMPONENT) * tAdj * tDI, na.rm = TRUE),
-                gPlot = sum(vrChangeHelper(VOLCFNET, attribute.mid = VOLCFNET.mid, VOLCFNET.prev, REMPER, COMPONENT) * tAdj * tDI, na.rm = TRUE),
-                gaPlot = sum(vrChangeHelper(VOLCFNET, attribute.mid = VOLCFNET.mid, VOLCFNET.prev, REMPER, COMPONENT) * TPAGROW_UNADJ * tAdj * tDI, na.rm = TRUE),
-                #sPlot = sum(vrChangeHelper(VOLCSNET, attribute.mid = VOLCSNET.mid, VOLCSNET.prev, REMPER, COMPONENT) * tAdj * tDI, na.rm = TRUE),
-                #saPlot = sum(vrChangeHelper(VOLCSNET, attribute.mid = VOLCSNET.mid, VOLCSNET.prev, REMPER, COMPONENT) * TPAGROW_UNADJ * tAdj * tDI, na.rm = TRUE),
-                bioPlot = sum(vrChangeHelper(DRYBIO_AG, DRYBIO_AG.mid, DRYBIO_AG.prev, REMPER, COMPONENT) * tAdj * tDI / 2000, na.rm = TRUE),
-                bioAPlot = sum(vrChangeHelper(DRYBIO_AG, DRYBIO_AG.mid, DRYBIO_AG.prev, REMPER, COMPONENT) * TPAGROW_UNADJ * tAdj * tDI / 2000, na.rm = TRUE),
-                #carbPlot = sum(vrChangeHelper(CARBON_AG, attribute.mid = NULL, CARBON_AG.prev, REMPER, COMPONENT) * tAdj * tDI, na.rm = TRUE),
-                #carbAPlot = sum(vrChangeHelper(CARBON_AG, attribute.mid = NULL, CARBON_AG.prev, REMPER, COMPONENT) * TPAGROW_UNADJ *tAdj * tDI, na.rm = TRUE),
-                plotIn_t = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0),
+                dPlot = sum(DIA * tAdj * tDI, na.rm = TRUE),
+                bPlot = sum(BA * tAdj * tDI, na.rm = TRUE),
+                baaPlot = sum(TPAGROW_UNADJ * BA * tAdj * tDI, na.rm = TRUE),
+                gPlot = sum(VOLCFNET * tAdj * tDI, na.rm = TRUE),
+                gaPlot = sum(TPAGROW_UNADJ *VOLCFNET * tAdj * tDI, na.rm = TRUE),
+                bioPlot = sum(DRYBIO_AG* tAdj * tDI / 2000, na.rm = TRUE),
+                bioAPlot = sum(TPAGROW_UNADJ * DRYBIO_AG* tAdj * tDI / 2000, na.rm = TRUE),
+                plotIn_t = ifelse(sum(tDI, na.rm = TRUE) > 0, 1,0),
                 a = first(AREA_USED),
                 p1EU = first(P1PNTCNT_EU),
                 p1 = first(P1POINTCNT),
@@ -59,7 +52,7 @@ vitalRatesHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE, chngAdj
       distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, SUBP, CONDID, .keep_all = TRUE) %>%
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
       summarize(fa = sum(SUBPTYP_PROP_CHNG * chngAdj * aDI * aAdj, na.rm = TRUE),
-                plotIn_a = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0),
+                plotIn_a = ifelse(sum(aDI, na.rm = TRUE) >  0, 1,0),
                 a = first(AREA_USED),
                 p1EU = first(P1PNTCNT_EU),
                 p1 = first(P1POINTCNT),
