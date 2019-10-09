@@ -27,7 +27,8 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE,
 
   ## Plot plot locations in a database
   if (any(class(data) == 'FIA.Database')){
-    pltSF <- data$PLOT
+    pltSF <- data$PLOT %>%
+      drop_na(LON, LAT)
     coordinates(pltSF) <- ~LON+LAT
     proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
     pltSF <- as(pltSF, 'sf')

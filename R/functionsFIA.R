@@ -1276,7 +1276,7 @@ standStruct <- function(db,
                               `Subsampling units of unequal size` = 'simple')
 
     # Test if any polygons cross state boundaries w/ different recent inventory years
-    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1 & !is.null(polys)){
       # Replace YEAR from above w/ max year so that data is pooled across states
       data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
@@ -1705,7 +1705,7 @@ diversity <- function(db,
                               `Subsampling units of unequal size` = 'simple')
 
     # Test if any polygons cross state boundaries w/ different recent inventory years
-    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1 & !is.null(polys)){
       # Replace YEAR from above w/ max year so that data is pooled across states
       data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
@@ -2115,7 +2115,7 @@ tpa <- function(db,
                               `Subsampling units of unequal size` = 'simple')
 
     # Test if any polygons cross state boundaries w/ different recent inventory years
-    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1 & !is.null(polys)){
       # Replace YEAR from above w/ max year so that data is pooled across states
       data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
@@ -2593,7 +2593,7 @@ growMort <- function(db,
                               `Subsampling units of unequal size` = 'simple')
 
     # Test if any polygons cross state boundaries w/ different recent inventory years
-    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1 & !is.null(polys)){
       # Replace YEAR from above w/ max year so that data is pooled across states
       data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
@@ -3221,13 +3221,12 @@ vitalRates <- function(db,
                               `Subsampling units of unequal size` = 'simple')
 
     # Test if any polygons cross state boundaries w/ different recent inventory years
-    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1 & !is.null(polys)){
       # Replace YEAR from above w/ max year so that data is pooled across states
       data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
         mutate(YEAR = maxYear)
     }
-
 
     ####################  COMPUTE ESTIMATES  ###########################
     ### -- BYPLOT -- TPA Estimates at each plot location
@@ -3620,7 +3619,7 @@ biomass <- function(db,
                               `Subsampling units of unequal size` = 'simple')
 
     # Test if any polygons cross state boundaries w/ different recent inventory years
-    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1 & !is.null(polys)){
       # Replace YEAR from above w/ max year so that data is pooled across states
       data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
@@ -4019,7 +4018,7 @@ dwm <- function(db,
                               `Subsampling units of unequal size` = 'simple')
 
     # Test if any polygons cross state boundaries w/ different recent inventory years
-    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1 & !is.null(polys)){
       # Replace YEAR from above w/ max year so that data is pooled across states
       data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
@@ -4487,7 +4486,7 @@ invasive <- function(db,
                               `Simple random sampling` = "simple", `Subsampling units of unequal size` = "simple")
 
     # Test if any polygons cross state boundaries w/ different recent inventory years
-    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1 & !is.null(polys)){
       # Replace YEAR from above w/ max year so that data is pooled across states
       data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
@@ -4886,7 +4885,7 @@ area <- function(db,
                               `Subsampling units of unequal size` = 'simple')
 
     # Test if any polygons cross state boundaries w/ different recent inventory years
-    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
+    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1 & !is.null(polys)){
       # Replace YEAR from above w/ max year so that data is pooled across states
       data <- left_join(data, mergeYears, by = 'polyID') %>%
         select(-c(YEAR)) %>%
