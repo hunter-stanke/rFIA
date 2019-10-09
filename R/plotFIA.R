@@ -56,8 +56,6 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE,
   y_quo = enquo(y)
   x_quo = enquo(x)
   grp_quo = enquo(grp)
-  se_quo = enquo(se)
-
 
   ## If a modifier was given to a variable, handle it (ex. y = TPA_PERC / 100)
   data <- data %>%
