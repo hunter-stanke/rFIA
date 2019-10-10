@@ -250,9 +250,9 @@ growMortHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE, chngAdj){
     ### Compute total AREA in the domain of interest
     aInt <- data %>%
       #filter(EVAL_TYP == 'EXPCURR') %>%
-      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, .keep_all = TRUE) %>%
+      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, SUBP, CONDID, .keep_all = TRUE) %>%
       group_by(.dots = aGrpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-      summarize(fa = sum(CONDPROP_UNADJ * aDI * aAdj * EXPNS, na.rm = TRUE),
+      summarize(fa = sum(SUBPTYP_PROP_CHNG * chngAdj * aDI * aAdj * EXPNS, na.rm = TRUE),
                 plotIn_a = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
 
     suppressMessages({

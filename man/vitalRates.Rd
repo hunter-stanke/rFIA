@@ -4,7 +4,7 @@
 \title{ Estimate tree growth rates from FIADB}
 
 \description{
-Computes estimates of average annual DBH, basal area, height, and net volume growth rates for individual stems, along with average annual basal area and net volume growth per acre. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by species, size class, and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}). Easy options to implement parallel processing.}
+Computes estimates of average annual DBH, basal area, height, and net volume growth rates for individual stems, along with average annual basal area and net volume growth per acre. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by species, size class, and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}).}
 
 \usage{
 vitalRates(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE,
@@ -44,9 +44,11 @@ vitalRates(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FA
 }
 
 \details{
+A known issue in FIA's EVALIDator causes a mismatch between \code{rFIA} and EVALIDator estimates of tree growth. Estimates output by \code{rFIA} have been compared against updated estimates produced with EVALIDator (not yet publicly available), and tend to differ by approximately +/- 1\%. Current development seeks to identify the cause of this remaining discrepancy.
+
 Estimation of attributes follows the procedures documented in Bechtold and Patterson (2005). Average annual diameter, basal area, height, and net volume growth of a stem is computed using a sample-based ratio of means estimator of total diameter (basal area, height, net volume) growth / total trees, and average annual basal area and net volume growth per acre is computed as total basal area (net volume) growth / total area. All estimates are returned as average annual rates. Only conditions which were forest in time 1 and in time 2 are included in estimates (excluding converted stands). Only stems 5 inches DBH or greater are included in estimates.
 
-As estimates are of net growth rates, they may attain a negative value. Negative growth estimates most likely indicate a substantial change in some attribute of the tree or area between time 1 and time 2, which caused the attribute to decrease. For example, if a stem loses its top between time 1 and time 2, albiet remains alive during this interval, the stem will have a negative height growth rate (assuming regrowth in height does not exceed that lost after breakage).
+As estimates are of net growth rates, they may attain a negative value. Negative growth estimates most likely indicate a substantial change in an attribute of the tree or area between time 1 and time 2, which caused the attribute to decrease. Implementation of the growth accounting method allows us to more accurately representshifts in forest attributes (biomass) between classified groups (size classes) over time.
 
 Stratified random sampling techniques are most often employed to compute estimates in recent inventories, although double sampling and simple random sampling may be employed for early inventories. Estimates are adjusted for non-response bias by assuming attributes of non-response plot locations to be equal to the mean of other plots included within thier respective stratum or population.
 

@@ -72,7 +72,7 @@ The first step to using `rFIA` is to download subsets of the FIA Database. The e
 ct <- getFIA(states = 'CT', dir = '/path/to/save/data')
 ```
 
-By default, `getFIA` only downloads the portions of the database required to produce summaries with other `rFIA` functions (`common = TRUE`). This conserves memory on your machine and speeds download time. If you would like to download all available tables for a state, simple specify `common = FALSE` in the call to `getFIA`.
+By default, `getFIA` only loads the portions of the database required to produce summaries with other `rFIA` functions (`common = TRUE`). This conserves memory on your machine and speeds download time. If you would like to download all available tables for a state, simple specify `common = FALSE` in the call to `getFIA`.
 
 **But what if I want to load multiple states worth of FIA data into R?** No problem! Simply specify mutiple state abbreviations in the `states` argument of `getFIA` (e.g. `states = c('MI', 'IN', 'WI', 'IL'`)), and all state subsets will be downloaded and merged into a single `FIA.Database` object. This will allow you to use other `rFIA` functions to produce estimates within polygons which straddle state boundaries!
 

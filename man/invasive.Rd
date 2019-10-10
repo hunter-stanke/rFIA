@@ -48,7 +48,7 @@ Easy, efficient parallelization is implemented with the \code{\link{parallel}} p
 \note{All sampling error estimates are returned as percentages, and represent ~68\% confidence (1 standard deviation). To compute sampling error percent with 95\% confidence, multiply by 1.96.}
 
 \value{
-Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}, values of areal coverage are returned for each plot. All variables with names ending in \code{SE}, represent the estimate of sampling error (\%) of the variable.
+Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}, values of areal coverage are returned for each plot (sq. ft.). All variables with names ending in \code{SE}, represent the estimate of sampling error (\%) of the variable.
 
 \itemize{
       \item{\strong{YEAR}: reporting year associated with estimates}

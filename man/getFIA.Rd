@@ -1,7 +1,7 @@
 \name{getFIA}
 \alias{getFIA}
 \title{Download FIA Data and Load into R}
-\description{Easiest way to access FIA Data. Downloads FIA Data from the FIA Datamart, loads the data into R environment, and optionally saves all downloaded tables as .csv files to local directory. Capable of merging multiple state downloads of the FIA database for regional analysis. Requires an internet connection to access and download tables from the FIA Datamart.}
+\description{Easiest and most efficient way to access FIA Data in R. Downloads FIA Data from the FIA Datamart, loads the data into R environment, and optionally saves all downloaded tables as .csv files to local directory. Capable of merging multiple state downloads of the FIA database for regional analysis. Requires an internet connection to access and download tables from the FIA Datamart.}
 
 \usage{
 getFIA(states, dir = NULL, common = TRUE, tables = NULL, nCores = 1)
@@ -16,7 +16,7 @@ getFIA(states, dir = NULL, common = TRUE, tables = NULL, nCores = 1)
 }
 
 \details{
-If \code{common = TRUE}, the following tables will be downloaded: COND, COND_DWM_CALC, INVASIVE_SUBPLOT_SPP, PLOT, POP_ESTN_UNIT, POP_EVAL, POP_EVAL_GRP, POP_EVAL_TYP, POP_PLOT_STRATUM_ASSGN, POP_STRATUM, SUBPLOT, TREE, TREE_GRM_COMPONENT. These tables currently support all functionality with \code{rFIA}, and it is recommended that only these tables be imported to conserve RAM and reduce processing time.
+If \code{common = TRUE}, the following tables will be loaded: COND, COND_DWM_CALC, INVASIVE_SUBPLOT_SPP, PLOT, POP_ESTN_UNIT, POP_EVAL, POP_EVAL_GRP, POP_EVAL_TYP, POP_PLOT_STRATUM_ASSGN, POP_STRATUM, SUBPLOT, TREE, TREE_GRM_COMPONENT. These tables currently support all functionality with \code{rFIA}, and it is recommended that only these tables be imported to conserve RAM and reduce processing time.
 
 If you wish to merge multiple state downloads of FIA data (e.g. Michigan and Indiana state downloads), simply specify multiple state abbreviations to the \code{states} argument. Upon import, corresponding tables (e.g. MI_PLOT and IN_PLOT) will be merged, and analysis can be completed for the entire region or within spatial units which transcend state boundaries (e.g. Ecoregion subsections).
 
@@ -59,7 +59,7 @@ db <- getFIA(states = 'MI', dir = 'path/to/your/directory/)
 db <- getFIA(states = 'MI')
 
 ## Only download the PLOT & TREE Tables
-db <- getFIA(states = 'MI', tables = c(PLOT, TREE))
+db <- getFIA(states = 'MI', tables = c('PLOT', 'TREE'))
 
 ## Run in parallel
 db <- getFIA(states = 'MI', nCores = 3) # Check available cores with detectCores()

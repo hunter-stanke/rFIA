@@ -157,9 +157,9 @@ diversityHelper <- function(x, combos, data, grpBy, SE){
                 plotIn = sum(plotIn, na.rm = TRUE)) %>%
       group_by(.dots = grpBy) %>%
       summarize(AREA_TOTAL = sum(fa, na.rm = TRUE),
-                H_a = sum(hPlot, na.rm = TRUE),
-                Eh_a = sum(EhPlot, na.rm = TRUE),
-                S_a = sum(sPlot, na.rm = TRUE),
+                H_a = sum(hPlot, na.rm = TRUE) / AREA_TOTAL,
+                Eh_a = sum(EhPlot, na.rm = TRUE) / AREA_TOTAL,
+                S_a = sum(sPlot, na.rm = TRUE) / AREA_TOTAL,
                 nStands = sum(plotIn, na.rm = TRUE)) #%>%
     #filter(S > 0) #%>%
     #select(c(grpByOrig, 'H_a', 'Eh_a', 'S_a', 'nStands'))

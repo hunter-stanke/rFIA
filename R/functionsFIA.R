@@ -369,7 +369,7 @@ print.FIA.Database <- function(x, ...){
 #' @import tidyr
 #' @importFrom sp over proj4string<- coordinates<- spTransform proj4string
 #' @importFrom stats cov var
-#' @importFrom utils object.size read.csv tail globalVariables type.convert
+#' @importFrom utils object.size read.csv tail globalVariables type.convert download.file unzip
 NULL
 
 #globalVariables(c('.'))
@@ -496,15 +496,15 @@ getFIA <- function(states,
                    tables = NULL,
                    nCores = 1){
 
-  #cat(sys.call()$dir)
   if (!is.null(dir)){
     # Add a slash to end of directory name if missing
     if (str_sub(dir,-1) != '/'){
       dir <- paste(dir, '/', sep = "")
     }
-    # Check to see directory exists
+    # Check to see directory exists, if not, make it
     if(!dir.exists(dir)) {
-      stop(paste('Directory', dir, 'does not exist. Cannot create new directory.'))
+      dir.create(dir)
+      message(paste('Creating directory:', dir))
     }
   }
 
@@ -545,101 +545,126 @@ getFIA <- function(states,
 Did you accidentally include the state abbreviation in front of the table name? e.g. tables = "AL_PLOT" (wrong) instead of tables = "PLOT" (correct).'))
   }
 
-  ## Make a list of tables names to read in
-  ## Append table names with state abbs and then add url link
-  if (common & is.null(tables)){
-    tables<- c('COND', 'COND_DWM_CALC', 'INVASIVE_SUBPLOT_SPP', 'PLOT', 'POP_ESTN_UNIT',
-                'POP_EVAL', 'POP_EVAL_GRP', 'POP_EVAL_TYP', 'POP_PLOT_STRATUM_ASSGN', 'POP_STRATUM',
-                'SUBPLOT', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_MIDPT', 'TREE_GRM_BEGIN', 'SUBP_COND_CHNG_MTRX')
-  } else {
-    tables <- str_to_upper(allTables)
-  }
+  ## If individual tables are specified, then just grab those .csvs, otherwise download the .zip file, extract and read with fread. Should be quite a bit quicker.
+  if (!is.null(tables)){
+    ## Make a list of tables names to read in
+    ## Append table names with state abbs and then add url link
+    tables <- str_to_upper(tables)
 
-  # Make sure state Abbs are in right format
-  states <- str_to_upper(states)
-  if ('ENTIRE' %in% states == FALSE) {
-    states <- paste0(states, '_')
-  } else {
-    states <- ''
-  }
-
-  # Convert all to url paths
-  urls <- c()
-  for (i in 1:length(states)){
-    if (i == 1){
-      urls <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', states[i], tables, '.csv')
+    # Make sure state Abbs are in right format
+    states <- str_to_upper(states)
+    if ('ENTIRE' %in% states == FALSE) {
+      states <- paste0(states, '_')
     } else {
-      urls <- c(urls, paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', states[i], tables, '.csv'))
-    }
-  }
-
-  # ## Read/write tables in parallel -- Clusters in windows, forking otherwise
-  # if (Sys.info()['sysname'] == 'Windows'){
-  #   cl <- makeCluster(nCores) # Set up snow cluster
-  #   inTables <- parLapply(cl, X = urls, fun = getFIAHelper, dir)
-  # } else { # Unix systems
-  #   inTables <- mclapply(X = urls, FUN = getFIAHelper, dir, mc.cores = nCores)
-  # }
-  inTables = list()
-  for (n in 1:length(urls)){
-    # Download and append each file to a list
-    file <- fread(urls[n], showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores)
-
-    # Write the data out the directory they've chosen
-    if(!is.null(dir)){
-      fwrite(x = file, file = paste0(dir, str_sub(n, 43, -1)), showProgress = FALSE, nThread = nCores)
+      states <- ''
     }
 
-    # We don't want data.table formats
-    file <- as.data.frame(file)
-
-    inTables[[str_sub(urls[n], 43, -5)]] <- file
-  }
-
-
-
-  # Give them some names
-  #names(inTables) <- str_sub(urls, 43, -5)
-
-  # Check for corresponding tables (multiple states)
-  # If they exist, loop through and merge corresponding tables
-  ## Check if the directory has the entire US naming convention or state naming convention
-  tableNames <- names(inTables)
-  outTables <- list()
-  if (any(str_sub(tableNames, 3, 3) == '_')){ ## STATE NAMING CONVENTION
-    if (anyDuplicated(str_sub(tableNames, 4)) != 0){
-      for (i in 1:length(unique(str_sub(tableNames, 4)))){
-        subList <- inTables[str_sub(tableNames, 4) == unique(str_sub(tableNames,4))[i]]
-        name <- unique(str_sub(tableNames, 4))[i]
-        # Give a ton of warnings about factors and characters, don't do that
-        outTables[[name]] <- suppressWarnings(do.call(rbind, subList))
+    # Convert all to url paths
+    urls <- c()
+    tblNames <- c()
+    for (i in 1:length(states)){
+      if (i == 1){
+        tblNames <- paste0(states[i], tables, '.csv')
+        urls <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', tblNames[i])
+      } else {
+        tblNames <- c(tblNames, paste0(states[i], tables, '.csv'))
+        urls <- c(urls, paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', tblNames[i]))
       }
-    } else {
-      outTables <- inTables
-      names(outTables) <- unique(str_sub(tableNames, 4))
     }
-  } else{ ## ENTIRE NAMING CONVENTION
-    if (anyDuplicated(tableNames) != 0){
-      for (i in 1:length(unique(tableNames))){
-        subList <- inTables[tableNames == unique(tableNames)[i]]
-        name <- unique(str_sub(tableNames, 1))[i]
-        # Give a ton of warnings about factors and characters, don't do that
-        outTables[[name]] <- suppressWarnings(do.call(rbind, subList))
+
+    inTables = list()
+    for (n in 1:length(urls)){
+
+      # Write the data out the directory they've chosen
+      if(is.null(dir)){
+        temp <- tempfile()
+        download.file(urls[n], temp)
+        file <- fread(temp, showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores)
+        unlink(temp)
+      } else {
+        download.file(urls[n], paste0(dir, tblNames[n]))
+        file <- fread(paste0(dir, tblNames[n]), showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores)
       }
-    } else {
-      outTables <- inTables
-      names(outTables) <- unique(str_sub(tableNames, 1))
+
+      # We don't want data.table formats
+      file <- as.data.frame(file)
+
+      inTables[[str_sub(urls[n], 43, -5)]] <- file
     }
+
+    # Check for corresponding tables (multiple states)
+    # If they exist, loop through and merge corresponding tables
+    ## Check if the directory has the entire US naming convention or state naming convention
+    tableNames <- names(inTables)
+    outTables <- list()
+    if (any(str_sub(tableNames, 3, 3) == '_')){ ## STATE NAMING CONVENTION
+      if (anyDuplicated(str_sub(tableNames, 4)) != 0){
+        for (i in 1:length(unique(str_sub(tableNames, 4)))){
+          subList <- inTables[str_sub(tableNames, 4) == unique(str_sub(tableNames,4))[i]]
+          name <- unique(str_sub(tableNames, 4))[i]
+          # Give a ton of warnings about factors and characters, don't do that
+          outTables[[name]] <- suppressWarnings(do.call(rbind, subList))
+        }
+      } else {
+        outTables <- inTables
+        names(outTables) <- unique(str_sub(tableNames, 4))
+      }
+    } else{ ## ENTIRE NAMING CONVENTION
+      if (anyDuplicated(tableNames) != 0){
+        for (i in 1:length(unique(tableNames))){
+          subList <- inTables[tableNames == unique(tableNames)[i]]
+          name <- unique(str_sub(tableNames, 1))[i]
+          # Give a ton of warnings about factors and characters, don't do that
+          outTables[[name]] <- suppressWarnings(do.call(rbind, subList))
+        }
+      } else {
+        outTables <- inTables
+        names(outTables) <- unique(str_sub(tableNames, 1))
+      }
+    }
+    # NEW CLASS NAME FOR FIA DATABASE OBJECTS
+    #outTables <- lapply(outTables, as.data.frame)
+    class(outTables) <- 'FIA.Database'
+    #### DOWNLOADING THE WHOLE ZIP FILE
+  } else {
+    ## Download to a temporary file location, then extract to the permanent if wanted. Read extracted tables into R w/ readFIA.
+
+    # Make sure state Abbs are in right format
+    states <- str_to_upper(states)
+
+    ## If dir is not specified, hold in a temporary directory
+    if (is.null(dir)){tempDir <- tempdir()}
+
+    ## Download each state and extract to directory
+    for (i in 1:length(states)){
+      # Temporary directory to download to
+      temp <- tempfile()
+      ## Make the URL
+      url <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', states[i],'.zip')
+      ## Download as temporary file
+      download.file(url, temp)
+      ## Extract
+      if (is.null(dir)){
+        unzip(temp, exdir = tempDir)
+      } else {
+        unzip(temp, exdir = dir)
+      }
+      unlink(temp)
+    }
+
+    ## Read in the files w/ readFIA
+    if (is.null(dir)){
+      outTables <- readFIA(tempDir, nCores = nCores, common = common)
+      unlink(tempDir)
+    } else {
+      outTables <- readFIA(dir, nCores = nCores, common = common)
+    }
+
+    ## If you are on windows, close explicitly
+    closeAllConnections()
+
+    return(outTables)
   }
-
-  # NEW CLASS NAME FOR FIA DATABASE OBJECTS
-  #outTables <- lapply(outTables, as.data.frame)
-  class(outTables) <- 'FIA.Database'
-
-  ## If you are on windows, close explicitly
-  closeAllConnections()
-
-  return(outTables)
 }
 
 ## Write out the raw FIA files
@@ -2157,6 +2182,8 @@ tpa <- function(db,
         group_by(.dots = grpBy, PLT_CN) %>%
         summarize(TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE),
                   BAA = sum(basalArea(DIA) * TPA_UNADJ * tDI, na.rm = TRUE),
+                  TPA_PERC = TPA / sum(TPA_UNADJ * pDI, na.rm = TRUE) * 100,
+                  BAA_PERC = BAA / sum(basalArea(DIA) * TPA_UNADJ * pDI, na.rm = TRUE) * 100,
                   nStems = length(which(tDI == 1)))
 
       # tOut <- data %>%
@@ -2699,6 +2726,9 @@ growMort <- function(db,
                   RECR_TPA = sum(TPAGROW_UNADJ[COMPONENT == 'INGROWTH'] * tAdj[COMPONENT == 'INGROWTH'] * tDI[COMPONENT == 'INGROWTH'], na.rm = TRUE),
                   MORT_TPA = sum(TPAMORT_UNADJ * tDI, na.rm = TRUE),
                   REMV_TPA = sum(TPAREMV_UNADJ * tDI, na.rm = TRUE),
+                  RECR_PERC = RECR_TPA / TOTAL_TPA * 100,
+                  MORT_PERC = MORT_TPA / TOTAL_TPA * 100,
+                  REMV_PERC = REMV_TPA / TOTAL_TPA * 100,
                   nStems = length(which(tDI == 1)))
 
       if (returnSpatial){
@@ -3110,7 +3140,7 @@ vitalRates <- function(db,
       left_join(select(db_clip$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
       left_join(select(db_clip$PLOT, c('PLT_CN', 'PREV_PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', grpP, 'sp', 'aD_p', 'REMPER')), by = 'PLT_CN') %>%
       left_join(select(db_clip$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID','landD', 'aD_c', grpC)), by = 'PLT_CN') %>%
-      left_join(select(db_clip$TREE, c('TRE_CN', 'PREV_TRE_CN', 'PLT_CN', 'DIA', 'DRYBIO_AG', 'VOLCFNET', 'VOLCSNET', 'CONDID', 'PREVCOND', 'SPCD', grpT, 'typeD', 'tD')), by = c('PLT_CN', 'CONDID')) %>%
+      left_join(select(db_clip$TREE, c('TRE_CN', 'PREV_TRE_CN', 'PLT_CN', 'TREE', 'DIA', 'DRYBIO_AG', 'VOLCFNET', 'VOLCSNET', 'CONDID', 'PREVCOND', 'SPCD', grpT, 'typeD', 'tD')), by = c('PLT_CN', 'CONDID')) %>%
       # GRM
       left_join(select(db_clip$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'COMPONENT')), by = c('TRE_CN')) %>%
       left_join(select(db_clip$TREE_GRM_MIDPT, c("TRE_CN", 'DIA', 'VOLCFNET', 'VOLCSNET', 'DRYBIO_AG')), by = 'TRE_CN', suffix = c('', '.mid')) %>%
@@ -3200,7 +3230,7 @@ vitalRates <- function(db,
 
     ## Just what we need
     data <- data %>%
-      select(YEAR, ESTN_UNIT_CN, STRATUM_CN, PLT_CN, TRE_CN, SUBP, CONDID, ESTN_METHOD, aDI, tDI, SUBPTYP_PROP_CHNG,
+      select(YEAR, ESTN_UNIT_CN, STRATUM_CN, PLT_CN, TRE_CN, SUBP, CONDID, ESTN_METHOD, EXPNS, INVYR, TREE, aDI, tDI, SUBPTYP_PROP_CHNG,
              grpP, grpC, grpT, TPAGROW_UNADJ, tAdj, aAdj, AREA_USED, P1POINTCNT, P1PNTCNT_EU, P2POINTCNT,
              DIA2, DIA1, BA2, BA1, DRYBIO_AG2, DRYBIO_AG1, VOLCFNET2, VOLCFNET1) %>%
       ## Dropping NA columns
@@ -3234,17 +3264,25 @@ vitalRates <- function(db,
       ### Compute total TREES in domain of interest
       tOut <- data %>%
         mutate(YEAR = INVYR) %>%
-        distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
+        distinct(PLT_CN, SUBP, TREE, ONEORTWO, .keep_all = TRUE) %>%
+        group_by(.dots = grpBy, PLT_CN, SUBP, TREE) %>%
+        summarize(d = sum(DIA * tDI, na.rm = TRUE),
+                  ba = sum(BA * tDI, na.rm = TRUE),
+                  baa = sum(TPAGROW_UNADJ * BA * tDI, na.rm = TRUE),
+                  vol = sum(VOLCFNET * tDI, na.rm = TRUE),
+                  volA = sum(TPAGROW_UNADJ * VOLCFNET * tDI, na.rm = TRUE),
+                  bio = sum(DRYBIO_AG * tDI, na.rm = TRUE),
+                  bioA = sum(TPAGROW_UNADJ * DRYBIO_AG * tDI, na.rm = TRUE)) %>%
         # Compute estimates at plot level
         group_by(.dots = grpBy, PLT_CN) %>%
-        summarize(TPA = sum(TPAGROW_UNADJ  * tDI, na.rm = TRUE),
-                  DIA_GROW = mean(ANN_DIA_GROWTH  * tDI, na.rm = TRUE),
-                  BA_GROW = mean(ANN_BA_GROWTH * tDI, na.rm = TRUE),
-                  BAA_GROW = sum(TPAGROW_UNADJ * ANN_BA_GROWTH  * tDI, na.rm = TRUE),
-                  HT_GROW = mean(ANN_HT_GROWTH  * tDI, na.rm = TRUE),
-                  NETVOL_GROW = mean(ANN_NET_GROWTH * tDI, na.rm = TRUE),
-                  NETVOL_GROW_ACRE = sum(ANN_NET_GROWTH * TPAGROW_UNADJ * tDI, na.rm = TRUE),
-                  nStems = length(which(tDI == 1)))
+        summarize(DIA_GROW = mean(d, na.rm = TRUE),
+                  BA_GROW = mean(ba, na.rm = TRUE),
+                  BAA_GROW = sum(baa, na.rm = TRUE),
+                  NETVOL_GROW = mean(vol, na.rm = TRUE),
+                  NETVOL_GROW_AC = sum(volA, na.rm = TRUE),
+                  BIO_GROW = mean(vol, na.rm = TRUE),
+                  BIO_GROW_AC = sum(volA, na.rm = TRUE),
+                  nStems = length(which(!is.na(d))))
 
       if (returnSpatial){
         tOut <- tOut %>%
@@ -3293,7 +3331,7 @@ vitalRates <- function(db,
         aGrpBy <- c('YEAR', grpBy[grpBy %in% names(db_clip$PLOT) | grpBy %in% names(db_clip$COND)])
       }
 
-      suppressWarnings({
+      #suppressWarnings({
         ## Compute estimates in parallel -- Clusters in windows, forking otherwise
         if (Sys.info()['sysname'] == 'Windows'){
           cl <- makeCluster(nCores)
@@ -3307,7 +3345,7 @@ vitalRates <- function(db,
         } else { # Unix systems
           tOut <- mclapply(X = names(combos), FUN = vitalRatesHelper, combos, data, grpBy, aGrpBy, totals, SE, chngAdj, mc.cores = nCores)
         }
-      })
+      #})
 
       if (SE){
         # Convert from list to dataframe

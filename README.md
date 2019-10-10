@@ -86,11 +86,11 @@ use\!
 ct <- getFIA(states = 'CT', dir = '/path/to/save/data')
 ```
 
-By default, `getFIA` only downloads the portions of the database
-required to produce summaries with other `rFIA` functions (`common =
-TRUE`). This conserves memory on your machine and speeds download time.
-If you would like to download all available tables for a state, simple
-specify `common = FALSE` in the call to `getFIA`.
+By default, `getFIA` only loads the portions of the database required to
+produce summaries with other `rFIA` functions (`common = TRUE`). This
+conserves memory on your machine and speeds download time. If you would
+like to download all available tables for a state, simple specify
+`common = FALSE` in the call to `getFIA`.
 
 **But what if I want to load multiple states worth of FIA data into R?**
 No problem\! Simply specify mutiple state abbreviations in the `states`

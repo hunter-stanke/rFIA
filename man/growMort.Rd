@@ -44,7 +44,7 @@ growMort(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALS
 }
 
 \details{
-A known issue in FIA's EVALIDator causes a mismatch between \code{rFIA} and EVALIDator estimates of mortality and removals. Estimates output by \code{rFIA} have been validated against updates estimates produced with EVALIDator (not yet publicly available).
+A known issue in FIA's EVALIDator causes a mismatch between \code{rFIA} and EVALIDator estimates of mortality and removals. Estimates output by \code{rFIA} have been compared against updated estimates produced with EVALIDator (not yet publicly available), and tend to differ by approximately +/- 0.02\%. Current development seeks to identify the cause of this remaining discrepancy.
 
 Estimation of attributes follows the procedures documented in Bechtold and Patterson (2005). Average annual rates are computed using a sample-based ratio of means estimator of total trees subject to an event (e.g. recruitment, mortality) annually / total area. Similarly, the proportion of individuals subject to each event annually is computed as the total trees subject to the event / total trees. All estimates are returned as average annual rates. Only conditions which were forested in time 1 and in time 2 are included in estimates (excluding converted stands).
 
@@ -70,7 +70,10 @@ Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}
       \item{\strong{RECR_PERC}: estimate of mean percent of individuals subject to recruitment annually}
       \item{\strong{MORT_PERC}: estimate of mean percent of individuals subject to mortality annually}
       \item{\strong{REMV_PERC}: estimate of mean percent of individuals subject to removal (harvest) annually}
-      \item{\strong{nPlots_TREE}: number of non-zero plots used to compute tree estimates}
+      \item{\strong{nPlots_TREE}: number of non-zero plots used to compute total tree estimates}
+      \item{\strong{nPlots_RECR}: number of non-zero plots used to compute recruitment estimates}
+      \item{\strong{nPlots_MORT}: number of non-zero plots used to compute mortality estimates}
+      \item{\strong{nPlots_REMV}: number of non-zero plots used to compute removal estimates}
       \item{\strong{nPlots_AREA}: number of non-zero plots used to compute land area estimates}
       }
 }

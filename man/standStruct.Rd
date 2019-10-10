@@ -73,7 +73,6 @@ Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}
 \itemize{
       \item{\strong{STAGE}: Stand structural stage.}
       \item{\strong{PERC_AREA}: \% land area in each structural stage.}
-      \item{\strong{TOTAL_AREA}: Total land area used to produce estimates (forest or timberland) (acres).}
       }
 }
 

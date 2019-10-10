@@ -5,7 +5,7 @@
 Load FIA database into R environment from local directory
 }
 \description{
-Loads FIA Datatables into R from .csv files stored in a local directory. If you have not previously downloaded FIA Data from the FIA Datamart, use \code{\link{getFIA}} to download data for your region of interest and load it into R. Capable of merging multiple state downloads of the FIA database for regional analysis. Simply store each set of state data, as download from the FIA Datamart, in the same directory and hand to \code{readFIA}.}
+Loads FIA Datatables into R from .csv files stored in a local directory. If you have not previously downloaded FIA Data from the FIA Datamart, use \code{\link{getFIA}} to download data for your region of interest and load it into R. Capable of merging multiple state downloads of the FIA database for regional analysis. Simply store each set of state data, as downloaded from the FIA Datamart, in the same directory and hand to \code{readFIA}.}
 
 \usage{
 readFIA(dir, common = TRUE, tables = NULL, nCores = 1, ...)}
@@ -47,7 +47,7 @@ Hunter Stanke and Andrew Finley
 \note{
 To download subsets of the FIA Database manually, go online to the FIA Datamart (\url{https://apps.fs.usda.gov/fia/datamart/datamart.html}) and choose to download .csv files. Here you can choose to download subsets of the full database for individual states, or select to download individual tables. For use with the \code{rFIA} package, we recommend download of subsets of the full database representing individual states of interest. Files must be unzipped in order to be imported.
 
-Alternatively, use \code{\link{getFIA}} to automate the download and saving process for you (recommended).
+Alternatively, use \code{\link{getFIA}} to automate the download, reading, and saving process for you (recommended).
 }
 
 \seealso{

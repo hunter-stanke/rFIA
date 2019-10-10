@@ -49,7 +49,7 @@ Easy, efficient parallelization is implemented with the \code{\link{parallel}} p
 }
 
 \value{
-Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}, values are returned for each plot. All variables with names ending in \code{SE}, represent the estimate of sampling error (\%) of the variable.
+Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}, values are returned for each plot (proportion of plot in domain of interest). All variables with names ending in \code{SE}, represent the estimate of sampling error (\%) of the variable.
 
 \itemize{
       \item{\strong{YEAR}: reporting year associated with estimates}
