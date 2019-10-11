@@ -98,35 +98,41 @@ Hunter Stanke and Andrew Finley
 \code{\link{tpa}}, \code{\link{diversity}}
 }
 \examples{
-\dontrun{
-
 ## Load data from rFIA package
-library(rFIA)
 data(fiaRI)
 data(countiesRI)
 
-## Calculate structural stage distribution of all forestland, over time
-standStruct(fiaRI)
+## Most recents subset
+fiaRI_mr <- clipFIA(fiaRI)
 
-## Same as above, but implemented in parallel
-detectCores() # 4 cores available, we will take 3
-standStruct(fiaRI, nCores = 3)
+## Calculate structural stage distribution of all forestland
+standStruct(fiaRI_mr)
 
 ## Same as above, but output contains seperate column for each structural stage,
 ##   rathern than grouping variable
-standStruct(fiaRI, tidy = FALSE)
+standStruct(fiaRI_mr, tidy = FALSE)
 
 ## Calculate structural stage distribution of all forestland by owner group, over time
-standStruct(clipFIA(fiaRI, mostRecent = TRUE),
-            grpBy = c(OWNGRPCD))
+standStruct(fiaRI_mr,
+            grpBy = OWNGRPCD)
+
+## Same as above, but implemented in parallel
+parallel::detectCores(logical = TRUE) # 4 cores available, we will take 2
+standStruct(fiaRI_mr,
+            grpBy = OWNGRPCD,
+            nCores = 2)
 
 ## Calculate structural stage distribution of all forestland on xeric sites, over time
-standStruct(clipFIA(fiaRI, mostRecent = TRUE),
+standStruct(fiaRI_mr,
             areaDomain = PHYSCLCD \%in\% c(11:19))
+
+\donttest{
+## Calculate structural stage distribution of all forestland, over time
+standStruct(fiaRI)
 
 ## Calculate structural stage distribution of all forestland by county and return
 #   return spatial object
-sdSF <- standStruct(clipFIA(fiaRI, mostRecent = TRUE),
+sdSF <- standStruct(fiaRI_mr,
             polys = countiesRI,
             returnSpatial = TRUE,
             tidy = FALSE)

@@ -78,37 +78,29 @@ Bechtold, W.A.; Patterson, P.L., eds. 2005. The Enhanced Forest Inventory and An
 }
 
 \examples{
-\dontrun{
 
-## Load data from rFIA package
-library(rFIA)
+## Load data from the rFIA package
 data(fiaRI)
 data(countiesRI)
 
+## Most recents subset
+fiaRI_mr <- clipFIA(fiaRI)
 
 ## Most recent estimates on forest land
-invasive(db = clipFIA(fiaRI),
+invasive(db = fiaRI_mr,
     landType = 'forest')
 
 ## Same as above, but implemented in parallel (much quicker)
-detectCores() # 4 cores available, we will take 3
-invasive(db = clipFIA(fiaRI),
+parallel::detectCores(logical = TRUE) # 4 cores available, we will take 2
+invasive(db = fiaRI_mr,
          landType = 'forest',
-         nCores = 3)
+         nCores = 2)
 
-## Same as above, but return population totals as well (total areal coverage, total forest area)
-invasive(db = clipFIA(fiaRI, mostRecent = TRUE),
-    landType = 'forest',
-    totals = TRUE)
-
-## Estimates for all available inventories (time-series) on forestland,
-##  with no sampling error estimates (~5x faster)
-invasive(db = fiaRI, SE = FALSE)
-
+\donttest{
 ## Most recent estimates grouped by stand age on forest land
 # Make a categorical variable which represents stand age (grouped by 10 yr intervals)
-fiaRI$COND$STAND_AGE <- makeClasses(fiaRI$COND$STDAGE, interval = 10)
-invasive(db = clipFIA(fiaRI, mostRecent = TRUE),
+fiaRI_mr$COND$STAND_AGE <- makeClasses(fiaRI_mr$COND$STDAGE, interval = 10)
+invasive(db = fiaRI_mr,
          grpBy = STAND_AGE)
 
 ## Estimates on forested mesic sites (all available inventories)
@@ -116,7 +108,7 @@ invasive(fiaRI,
          areaDomain = PHYSCLCD \%in\% 21:29) # Mesic Physiographic classes
 
 ## Most recent estimates on forest land grouped by user-defined areal units
-ctSF <- invasive(clipFIA(fiaRI, mostRecent = TRUE),
+ctSF <- invasive(fiaRI_mr,
                  polys = countiesRI,
                  returnSpatial = TRUE)
 plot(ctSF) # Plot multiple variables simultaneously

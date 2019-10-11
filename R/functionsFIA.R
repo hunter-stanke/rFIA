@@ -240,13 +240,23 @@ unitVar <- function(method, ESTN_METHOD, a, nh, w, v, stratMean, unitM, stratMea
                 ifelse(first(ESTN_METHOD) == 'double',
                        (first(a)^2) * (sum(((nh-1)/(sum(nh)-1))*(nh/sum(nh))*v) + ((1/(sum(nh)-1))*sum((nh/sum(nh))*(stratMean - (unitM/first(a)))^2))),
                        sum(v))) # Stratified random case
-  } else { # Compute covariance
+  } else {
     cv = ifelse(first(ESTN_METHOD) == 'strat',
                 ((first(a)^2)/sum(nh)) * (sum(w*nh*v) + sum((1-w)*(nh/sum(nh))*v)),
                 ifelse(first(ESTN_METHOD) == 'double',
                        (first(a)^2) * (sum(((nh-1)/(sum(nh)-1))*(nh/sum(nh))*v) + ((1/(sum(nh)-1))*sum((nh/sum(nh))*(stratMean - unitM) * (stratMean1 - (unitM1/first(a)))))),
                        sum(v))) # Stratified random case (additive covariance)
   }
+}
+
+## Compute ratio variances at the estimation unit level
+rVar <- function(x, y, xVar, yVar, xyCov){
+  ## Ratio
+  r <- y / x
+  ## Ratio variance
+  rv <- (1 / x^2) * (yVar + (r^2 * xVar) - (2 * r * xyCov))
+
+  return(rv)
 }
 
 # Helper function to compute variance for estimation units (manages different estimation methods)
@@ -2524,7 +2534,7 @@ growMort <- function(db,
       left_join(select(db$POP_PLOT_STRATUM_ASSGN, 'PLT_CN', 'EVALID'), by = 'PLT_CN') %>%
       left_join(select(db$POP_EVAL, 'CN', 'END_INVYR', 'EVALID', 'GROWTH_ACCT'), by = 'EVALID') %>%
       inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(EVAL_TYP %in% c('EXPGROW', 'EXPMORT', 'EXPREMV')) %>%
       filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
       distinct(polyID, END_INVYR, EVALID, .keep_all = TRUE) %>%
       group_by(polyID, END_INVYR) %>%
@@ -3053,7 +3063,7 @@ vitalRates <- function(db,
       left_join(select(db$POP_PLOT_STRATUM_ASSGN, 'PLT_CN', 'EVALID'), by = 'PLT_CN') %>%
       left_join(select(db$POP_EVAL, 'CN', 'END_INVYR', 'EVALID', 'GROWTH_ACCT'), by = 'EVALID') %>%
       inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(EVAL_TYP == 'EXPGROW') %>%
       filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
       distinct(polyID, END_INVYR, EVALID, .keep_all = TRUE) %>%
       group_by(polyID, END_INVYR) %>%
@@ -4827,7 +4837,7 @@ area <- function(db,
       left_join(select(db$POP_PLOT_STRATUM_ASSGN, 'PLT_CN', 'EVALID'), by = 'PLT_CN') %>%
       left_join(select(db$POP_EVAL, 'CN', 'END_INVYR', 'EVALID'), by = 'EVALID') %>%
       inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(EVAL_TYP == 'EXPCURR') %>%
       filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
       distinct(polyID, END_INVYR, EVALID) %>%
       group_by(polyID, END_INVYR) %>%

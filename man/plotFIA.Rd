@@ -87,7 +87,7 @@ Hunter Stanke and Andrew Finley
 }
 
 \examples{
-\dontrun{
+\donttest{
 ################### SPATIAL PLOTTING #############################
 ## Compute abundance estimates for live stems in Rhode Island
 ## for all available inventory years, summarized by counties and

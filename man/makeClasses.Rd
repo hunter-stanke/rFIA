@@ -37,7 +37,6 @@ Hunter Stanke and Andrew Finley
 
 \examples{
 ## Load data from the rFIA package
-library(rFIA)
 data(fiaRI)
 
 ## Compute Diameter Classes on 1-inch intervals for each tree in TREE table ----
@@ -59,7 +58,6 @@ makeClasses(fiaRI$COND$GSSTK, interval = 10) # Growing Stock
 
 ## Compute \% Slope Classes (20\%) for each condition in COND table ----
 makeClasses(fiaRI$COND$SLOPE, interval = 20)
-
 
 }
 

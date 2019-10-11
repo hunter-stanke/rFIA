@@ -119,7 +119,8 @@ tpaHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
                 cvEst_t = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_t, tStrat, tEst, aStrat, aEst),
                 cvEst_b = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_b, bStrat, bEst, aStrat, aEst),
                 cvEst_tT = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_t, tStrat, tEst, tTStrat, tTEst),
-                cvEst_bT = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_b, bStrat, bEst, bTStrat, bTEst)) %>%
+                cvEst_bT = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_b, bStrat, bEst, bTStrat, bTEst)
+                ) %>%
       # Compute totals
       summarize(TREE_TOTAL = sum(tEst, na.rm = TRUE),
                 BA_TOTAL = sum(bEst, na.rm = TRUE),
@@ -148,8 +149,6 @@ tpaHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
                 ## Sampling Errors
                 TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
                 BA_SE = sqrt(baVar) / BA_TOTAL * 100,
-                TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
-                BA_SE = sqrt(baVar) / BA_TOTAL * 100,
                 AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
                 TPA_SE = sqrt(tpaVar) / TPA * 100,
                 BAA_SE = sqrt(baaVar) / BAA * 100,
@@ -164,7 +163,7 @@ tpaHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
                TPA_PERC_SE, BAA_PERC_SE, TREE_SE, BA_SE, AREA_TOTAL_SE, nPlots_TREE, nPlots_AREA)
     } else {
       t <- t %>%
-        select(TPA, BAA, TPA_PERC, BAA_PERC, TPA_SE, BAA_SE,
+        select(TPA, BAA, TPA_PERC, BAA_PERC,  TPA_SE, BAA_SE,
                TPA_PERC_SE, BAA_PERC_SE, nPlots_TREE, nPlots_AREA)
     }
     #names(combos) <- 1:length(combos)

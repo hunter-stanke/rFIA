@@ -93,51 +93,48 @@ Bechtold, W.A.; Patterson, P.L., eds. 2005. The Enhanced Forest Inventory and An
 }
 
 \examples{
-\dontrun{
-
-## Load data from rFIA package
-library(rFIA)
+## Load data from the rFIA package
 data(fiaRI)
 data(countiesRI)
 
+## Most recents subset
+fiaRI_mr <- clipFIA(fiaRI)
 
-## Most recent estimates for all stems on forest land by species
-growMort(db = clipFIA(fiaRI, mostRecent = TRUE),
+
+## Most recent estimates for growing-stock on timber land by species
+growMort(db = fiaRI_mr,
+         landType = 'timber',
+         treeType = 'gs')
+
+## Estimates for white pine ( > 12" DBH) on forested mesic sites
+growMort(fiaRI_mr,
+         treeType = 'all',
+         treeDomain = SPCD == 129 & DIA > 12, # Species code for white pine
+         areaDomain = PHYSCLCD \%in\% 21:29) # Mesic Physiographic classes
+
+
+\donttest{
+## Most recent estimates grouped by stand age on forest land
+# Make a categorical variable which represents stand age (grouped by 10 yr intervals)
+fiaRI_mr$COND$STAND_AGE <- makeClasses(fiaRI_mr$COND$STDAGE, interval = 10)
+growMort(db = fiaRI_mr,
+         grpBy = STAND_AGE)
+
+## Most recent estimates for stems on forest land by species
+growMort(db = fiaRI_mr,
          landType = 'forest',
          bySpecies = TRUE)
 
 ## Same as above, but implemented in parallel (much quicker)
-detectCores() # 4 cores available, we will take 3
-growMort(db = clipFIA(fiaRI, mostRecent = TRUE),
+parallel::detectCores(logical = TRUE) # 4 cores available, we will take 2
+growMort(db = fiaRI_mr,
          landType = 'forest',
          bySpecies = TRUE,
-         nCores = 3)
+         nCores = 2)
 
-## Most recent estimates for growing-stock on timber land by species
-growMort(db = clipFIA(fiaRI, mostRecent = TRUE),
-         landType = 'timber',
-         treeType = 'gs',
-         bySpecies = TRUE)
-
-## Estimates for all stems greater than 20 in DBH on forestland for all
-##  available inventories (time-series)
-growMort(db = fiaRI,
-         landType = 'forest',
-         treeDomain = DIA > 20)
-
-## Most recent estimates grouped by stand age on forest land
-# Make a categorical variable which represents stand age (grouped by 10 yr intervals)
-fiaRI$COND$STAND_AGE <- makeClasses(fiaRI$COND$STDAGE, interval = 10, lower = 0)
-growMort(db = clipFIA(fiaRI, mostRecent = TRUE),
-         grpBy = STAND_AGE)
-
-## Estimates for all white pine ( > 12" DBH) on forested mesic sites (all available inventories)
-growMort(fiaRI,
-         treeDomain = SPCD == 129 & DIA > 12, # Species code for white pine
-         areaDomain = PHYSCLCD \%in\% 21:29) # Mesic Physiographic classes
 
 ## Most recent estimates for all stems on forest land grouped by user-defined areal units
-ctSF <- growMort(clipFIA(fiaRI, mostRecent = TRUE),
+ctSF <- growMort(fiaRI_mr,
                  polys = countiesRI,
                  returnSpatial = TRUE)
 plot(ctSF) # Plot multiple variables simultaneously

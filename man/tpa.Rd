@@ -85,27 +85,31 @@ Bechtold, W.A.; Patterson, P.L., eds. 2005. The Enhanced Forest Inventory and An
 \code{\link{biomass}}, \code{\link{growMort}}
 }
 
-
 \examples{
-\dontrun{
-
-## Load data from rFIA package
-library(rFIA)
+## Load data from the rFIA package
 data(fiaRI)
 data(countiesRI)
 
+## Most recents subset
+fiaRI_mr <- clipFIA(fiaRI)
 
-## Most recent estimates for live stems on forest land by species
-tpa(db = clipFIA(fiaRI, mostRecent = TRUE),
-    landType = 'forest',
-    treeType = 'live',
-    bySpecies = TRUE)
 
 ## Most recent estimates for growing-stock on timber land by species
-tpa(db = clipFIA(fiaRI, mostRecent = TRUE),
+tpa(db = fiaRI_mr,
     landType = 'timber',
-    treeType = 'gs',
-    bySpecies = TRUE)
+    treeType = 'gs')
+
+## Estimates for live white pine ( > 12" DBH) on forested mesic sites (all available inventories)
+tpa(fiaRI_mr,
+    treeType = 'live',
+    treeDomain = SPCD == 129 & DIA > 12, # Species code for white pine
+    areaDomain = PHYSCLCD \%in\% 21:29) # Mesic Physiographic classes
+
+## Most recent estimates grouped by stand age on forest land
+# Make a categorical variable which represents stand age (grouped by 10 yr intervals)
+fiaRI_mr$COND$STAND_AGE <- makeClasses(fiaRI_mr$COND$STDAGE, interval = 10)
+tpa(db = fiaRI_mr,
+    grpBy = STAND_AGE)
 
 ## Estimates for snags greater than 20 in DBH on forestland for all
 ##  available inventories (time-series)
@@ -114,31 +118,28 @@ tpa(db = fiaRI,
     treeType = 'dead',
     treeDomain = DIA > 20)
 
-## Same as above, but implemented in parallel (much quicker)
-detectCores() # 4 cores available, we will take 3
-tpa(db = fiaRI,
+\donttest{
+## Most recent estimates for live stems on forest land by species
+tpa(db = fiaRI_mr,
     landType = 'forest',
-    treeType = 'dead',
-    treeDomain = DIA > 20,
-    nCores = 3)
-
-## Most recent estimates grouped by stand age on forest land
-# Make a categorical variable which represents stand age (grouped by 10 yr intervals)
-fiaRI$COND$STAND_AGE <- makeClasses(fiaRI$COND$STDAGE, interval = 10)
-tpa(db = clipFIA(fiaRI, mostRecent = TRUE),
-    grpBy = STAND_AGE)
-
-## Estimates for live white pine ( > 12" DBH) on forested mesic sites (all available inventories)
-tpa(fiaRI,
     treeType = 'live',
-    treeDomain = SPCD == 129 & DIA > 12, # Species code for white pine
-    areaDomain = PHYSCLCD \%in\% 21:29) # Mesic Physiographic classes
+    bySpecies = TRUE)
+
+## Same as above, but implemented in parallel (much quicker)
+parallel::detectCores(logical = TRUE) # 4 cores available, we will take 2
+tpa(db = fiaRI_mr,
+    landType = 'forest',
+    treeType = 'live',
+    bySpecies = TRUE,
+    nCores = 2)
+
 
 ## Most recent estimates for all stems on forest land grouped by user-defined areal units
-ctSF <- tpa(clipFIA(fiaRI, mostRecent = TRUE),
+ctSF <- tpa(fiaRI_mr,
             polys = countiesRI,
             returnSpatial = TRUE)
 plot(ctSF) # Plot multiple variables simultaneously
 plotFIA(ctSF, TPA) # Plot of TPA with color scale
 }
 }
+

@@ -81,12 +81,13 @@ Woodall, C.; Monleon, V.J., eds. 2007. Sampling Protocol, Estimation, and Analys
 
 
 \examples{
-\dontrun{
-
 ## Load data from rFIA package
-library(rFIA)
 data(fiaRI)
 data(countiesRI)
+
+## Most recents subset
+fiaRI_mr <- clipFIA(fiaRI)
+
 
 ## Estimates of all forestland, over time
 dwm(fiaRI)
@@ -96,26 +97,27 @@ dwm(fiaRI)
 dwm(fiaRI,
     tidy = FALSE)
 
-## Same as above, but implemented in parallel (much quicker)
-detectCores() # 4 cores available, we will take 3
-dwm(fiaRI,
-    tidy = FALSE,
-    nCores = 3)
+## Estimates of all forestland on mesic sites (most recent)
+dwm(fiaRI_mr,
+    areaDomain = PHYSCLCD \%in\% 21:29)
 
 ## Estimates of all forestland by owner group (most recent subset)
-dwm(clipFIA(fiaRI, mostRecent = TRUE),
+dwm(fiaRI_mr,
     grpBy = OWNGRPCD)
 
-## Estimates of all forestland on mesic sites (most recent)
-dwm(clipFIA(fiaRI, mostRecent = TRUE),
-    areaDomain = PHYSCLCD \%in\% 21:29)
+## Same as above, but implemented in parallel (much quicker)
+parallel::detectCores(logical = TRUE) # 4 cores available, we will take 2
+dwm(fiaRI_mr,
+    tidy = FALSE,
+    nCores = 2)
 
 ## Estimates of all forestland by county and return
 #   return spatial object
-dwmSF <- dwm(clipFIA(fiaRI, mostRecent = TRUE),
-            polys = countiesRI,
-            returnSpatial = TRUE,
-            tidy = FALSE)
+dwmSF <- dwm(fiaRI_mr,
+             polys = countiesRI,
+             returnSpatial = TRUE,
+             tidy = FALSE)
+\donttest{
 plot(dwmSF)
 plotFIA(dwmSF, BIO_ACRE) # TOTAL BIOMASS / ACRE (tons)
 }

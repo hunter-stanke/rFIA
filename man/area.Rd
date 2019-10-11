@@ -77,12 +77,18 @@ Hunter Stanke and Andrew Finley
 
 
 \examples{
-\dontrun{
+## Load data from the rFIA package
+data(fiaRI)
+data(countiesRI)
+
+## Most recents subset
+fiaRI_mr <- clipFIA(fiaRI)
+
 ## Most recent estimates of forested area in RI
-area(db = clipFIA(fiaRI))
+area(db = fiaRI_mr)
 
 ## Same as above grouped by land class
-area(db = clipFIA(fiaRI))
+area(db = fiaRI_mr, byLandType = TRUE)
 
 ## Estimates for area where stems greater than 20 in DBH occur for
 ##  available inventories (time-series)
@@ -91,11 +97,10 @@ area(db = fiaRI,
      treeDomain = DIA > 20)
 
 ## Same as above, but implemented in parallel (much quicker)
-detectCores() # 4 cores available, we will take 3
+parallel::detectCores(logical = TRUE) # 4 cores available, we will take 2
 area(db = fiaRI,
      landType = 'forest',
      treeDomain = DIA > 20,
-    nCores = 3)
-}
+     nCores =2)
 }
 

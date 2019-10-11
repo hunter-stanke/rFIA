@@ -126,7 +126,6 @@ biomass(db = fiaRI,
         treeType = 'dead',
         treeDomain = DIA > 20)
 
-
 \donttest{
 ## Most recent estimates for live stems on forest land by species
 biomass(db = fiaRI_mr,

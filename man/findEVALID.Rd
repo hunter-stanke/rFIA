@@ -43,13 +43,11 @@ Hunter Stanke and Andrew Finley
 }
 
 \examples{
-library(rFIA)
-
 ## Lookup all EVALIDs in an FIA.Database object
-findEVALID(fiaRI, mostRecent = FALSE)
+findEVALID(fiaRI)
 
 ## Find the most recent EVALIDs
-findEVALID(fiaRI)
+findEVALID(fiaRI, mostRecent = FALSE)
 
 }
 

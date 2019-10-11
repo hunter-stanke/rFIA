@@ -48,8 +48,10 @@ Hunter Stanke and Andrew Finley
 }
 
 \examples{
+\donttest{
 ## Download the common tables for Rhode Island, load into R, and save to local directory
 ## Replace tempDir() with the path to your directory (where data will be saved)
 db <- getFIA(states = 'RI', dir = tempdir())
+}
 }
 
