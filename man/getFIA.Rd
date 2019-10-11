@@ -48,32 +48,8 @@ Hunter Stanke and Andrew Finley
 }
 
 \examples{
-
-\dontrun{
-library(rFIA)
-
-## Download the common tables for Michigan, load into R, and save to local directory
-db <- getFIA(states = 'MI', dir = 'path/to/your/directory/)
-
-## Download tables, but do not save to disk
-db <- getFIA(states = 'MI')
-
-## Only download the PLOT & TREE Tables
-db <- getFIA(states = 'MI', tables = c('PLOT', 'TREE'))
-
-## Run in parallel
-db <- getFIA(states = 'MI', nCores = 3) # Check available cores with detectCores()
-
-## Access individual tables from the FIA Database
-# Plot table
-db$PLOT
-
-# Tree table
-db$TREE
-
-# Condition table
-db$COND
-
-}
+## Download the common tables for Rhode Island, load into R, and save to local directory
+## Replace tempDir() with the path to your directory (where data will be saved)
+db <- getFIA(states = 'RI', dir = tempdir())
 }
 

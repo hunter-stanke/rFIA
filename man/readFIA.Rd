@@ -57,24 +57,13 @@ Alternatively, use \code{\link{getFIA}} to automate the download, reading, and s
 
 \examples{
 
-\dontrun{
-library(rFIA)
+## First we write the 'fiaRI' object to a temporary directory
+## Replace temp_dir with the path to your directory (where data will be saved)
+temp_dir = tempdir()
+writeFIA(fiaRI, dir = temp_dir)
 
-## Read in database from local directory (files are as download from FIA Datamart)
-db <- readFIA(dir = 'path/to/files', common = TRUE)
-
-## Access individual tables from the FIA Database
-# Plot table
-db$PLOT
-
-# Tree table
-db$TREE
-
-# Condition table
-db$COND
-
-}
-
+## Then read it back in with readFIA
+db <- readFIA(dir = temp_dir)
 
 }
 

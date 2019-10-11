@@ -384,7 +384,6 @@ readFIA <- function(dir,
                     nCores = 1,
                     ...){
 
-  cat(sys.call()$dir)
   # Add a slash to end of directory name if missing
   if (str_sub(dir,-1) != '/') dir <- paste(dir, '/', sep = "")
   # Grab all the file names in directory
@@ -438,8 +437,9 @@ readFIA <- function(dir,
     file <- fread(paste(dir, files[n], sep = ""), showProgress = FALSE, logical01 = FALSE, nThread = nCores, ...)
     # We don't want data.table formats
     file <- as.data.frame(file)
+    fileName <- str_sub(files[n], 1, -5)
 
-    inTables[[files[n]]] <- file
+    inTables[[fileName]] <- file
   }
 
 
@@ -447,35 +447,15 @@ readFIA <- function(dir,
   #names(inTables) <- files
   #inTables <- lapply(inTables, as.data.frame)
 
-  # Check for corresponding tables (multiple states)
-  # If they exist, loop through and merge corresponding tables
-  tableNames <- names(inTables)
   outTables <- list()
-  ## Check if the directory has the entire US naming convention or state naming convention
-  if (any(str_sub(files, 3, 3) == '_')){ ## STATE NAMING CONVENTION
-    if (anyDuplicated(str_sub(tableNames, 4)) != 0){
-      for (i in 1:length(unique(str_sub(tableNames, 4)))){
-        subList <- inTables[str_sub(tableNames, 4) == unique(str_sub(tableNames,4))[i]]
-        name <- unique(str_sub(tableNames, 4, -5))[i]
-        # Give a ton of warnings about factors and characters, don't do that
-        outTables[[name]] <- suppressWarnings(do.call(rbind, subList))
-      }
-    } else {
-      outTables <- inTables
-      names(outTables) <- unique(str_sub(tableNames, 4, -5))
-    }
-  } else{ ## ENTIRE NAMING CONVENTION
-    if (anyDuplicated(tableNames) != 0){
-      for (i in 1:length(unique(tableNames))){
-        subList <- inTables[tableNames == unique(tableNames)[i]]
-        name <- unique(str_sub(tableNames, 1, -5))[i]
-        # Give a ton of warnings about factors and characters, don't do that
-        outTables[[name]] <- suppressWarnings(do.call(rbind, subList))
-      }
-    } else {
-      outTables <- inTables
-      names(outTables) <- unique(str_sub(tableNames, 1, -5))
-    }
+  if (any(str_sub(names(inTables), 3, 3) == '_')){ ## STATE NAMING CONVENTION
+    # Remove the state prefix
+    names(inTables) <- str_sub(names(inTables), 4, -1)
+  }
+  uniqueNames <- unique(names(inTables))
+  ## Works regardless of whether or not there are duplicate names (multiple states)
+  for (i in 1:length(uniqueNames)){
+    outTables[[uniqueNames[i]]] <- bind_rows(inTables[names(inTables) == uniqueNames[i]])
   }
 
   # NEW CLASS NAME FOR FIA DATABASE OBJECTS
