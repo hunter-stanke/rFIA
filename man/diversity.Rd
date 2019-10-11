@@ -92,43 +92,44 @@ Hunter Stanke and Andrew Finley
 
 
 \examples{
-\dontrun{
-
 ## Load data from rFIA package
-library(rFIA)
 data(fiaRI)
 data(countiesRI)
 
+## Make a most recent subset
+fiaRI_mr <- clipFIA(fiaRI)
 
 ## Most recent estimates for live stems on forest land
-diversity(db = clipFIA(fiaRI, mostRecent = TRUE),
-         landType = 'forest',
-         treeType = 'live')
-
-## Same as above, implemented in parallel
-detectCores() # 4 cores available, we will take 3
-diversity(db = clipFIA(fiaRI, mostRecent = TRUE),
-         landType = 'forest',
-         treeType = 'live',
-         nCores = 3)
-
-## Most recent estimates for growing-stock on timber land by species
-diversity(db = clipFIA(fiaRI, mostRecent = TRUE),
-          landType = 'timber',
-          treeType = 'gs',
-          bySizeClass = TRUE)
+diversity(db = fiaRI_mr,
+          landType = 'forest',
+          treeType = 'live')
 
 ## Most recent estimates grouped by stand age on forest land
 # Make a categorical variable which represents stand age (grouped by 10 yr intervals)
-fiaRI$COND$STAND_AGE <- makeClasses(fiaRI$COND$STDAGE, interval = 10)
-diversity(db = clipFIA(fiaRI, mostRecent = TRUE),
+fiaRI_mr$COND$STAND_AGE <- makeClasses(fiaRI_mr$COND$STDAGE, interval = 10)
+diversity(db = fiaRI_mr,
           grpBy = STAND_AGE)
 
+\donttest{
 ## Estimates for live white pine ( > 12" DBH) on forested mesic sites (all available inventories)
 diversity(fiaRI,
           treeType = 'live',
           treeDomain = DIA > 12,
           areaDomain = PHYSCLCD \%in\% 21:29) # Mesic Physiographic classes
+
+## Most recent estimates for growing-stock on timber land by species
+diversity(db = fiaRI_mr,
+          landType = 'timber',
+          treeType = 'gs',
+          bySizeClass = TRUE)
+
+## Same as above, implemented in parallel
+parallel::detectCores(logical = TRUE) # 4 cores available, we will take 2
+diversity(db = fiaRI_mr,
+          landType = 'timber',
+          treeType = 'gs',
+          bySizeClass = TRUE,
+          nCores = 2)
 
 ## Most recent estimates for all stems on forest land grouped by user-defined areal units
 ctSF <- diversity(clipFIA(fiaRI, mostRecent = TRUE),

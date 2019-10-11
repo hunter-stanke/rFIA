@@ -3956,7 +3956,7 @@ dwm <- function(db,
       left_join(select(db$POP_PLOT_STRATUM_ASSGN, 'PLT_CN', 'EVALID'), by = 'PLT_CN') %>%
       left_join(select(db$POP_EVAL, 'CN', 'END_INVYR', 'EVALID'), by = 'EVALID') %>%
       inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-      filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+      filter(EVAL_TYP == 'EXPDWM') %>%
       filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
       distinct(polyID, END_INVYR, EVALID) %>%
       group_by(polyID, END_INVYR) %>%

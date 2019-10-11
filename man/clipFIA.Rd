@@ -49,7 +49,6 @@ FIA Database User Guide: \url{https://www.fia.fs.fed.us/library/database-documen
 
 \examples{
 ## Load data from rFIA package
-library(rFIA)
 data(fiaRI)
 
 ## Most recent inventory

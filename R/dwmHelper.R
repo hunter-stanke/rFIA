@@ -12,7 +12,6 @@ dwmHelper <- function(x, combos, data, grpBy, totals, SE){
     data$aDI <- ad
     data$aDI[is.na(data$aDI)] <- 0
     cwd <- data %>%
-      filter(EVAL_TYP == 'EXPDWM') %>%
       distinct(PLT_CN, CONDID, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
       summarize(vsmPlot = sum(FWD_SM_VOLCF_ADJ * aDI, na.rm = TRUE),
