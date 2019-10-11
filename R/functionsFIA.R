@@ -1214,7 +1214,17 @@ standStruct <- function(db,
       inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
       filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
       filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-      distinct(polyID, END_INVYR, EVALID) %>%
+      distinct(polyID, END_INVYR, EVALID)
+    ## Must be a most recent subset for mergeYears to exists
+    ## If so, we want to combine EVALIDs for poygons which straddle state boundaries
+    ## w/ different most recent inventory years (ex. VA - 2016, NC - 2017)
+    if (exists('mergeYears')){
+      ids <- ids %>%
+        left_join(mergeYears, by = 'polyID') %>%
+        mutate(END_INVYR = maxYear)
+    }
+    ## Snag all the EVALIDs for each poly
+    ids <- ids %>%
       group_by(polyID, END_INVYR) %>%
       summarise(id = list(EVALID))
   } else {
@@ -1643,7 +1653,17 @@ diversity <- function(db,
       inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
       filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
       filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-      distinct(polyID, END_INVYR, EVALID) %>%
+      distinct(polyID, END_INVYR, EVALID)
+    ## Must be a most recent subset for mergeYears to exists
+    ## If so, we want to combine EVALIDs for poygons which straddle state boundaries
+    ## w/ different most recent inventory years (ex. VA - 2016, NC - 2017)
+    if (exists('mergeYears')){
+      ids <- ids %>%
+        left_join(mergeYears, by = 'polyID') %>%
+        mutate(END_INVYR = maxYear)
+    }
+    ## Snag all the EVALIDs for each poly
+    ids <- ids %>%
       group_by(polyID, END_INVYR) %>%
       summarise(id = list(EVALID))
   } else {
@@ -2053,9 +2073,22 @@ tpa <- function(db,
       inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
       filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
       filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-      distinct(polyID, END_INVYR, EVALID) %>%
+      distinct(polyID, END_INVYR, EVALID)
+
+    ## Must be a most recent subset for mergeYears to exists
+    ## If so, we want to combine EVALIDs for poygons which straddle state boundaries
+    ## w/ different most recent inventory years (ex. VA - 2016, NC - 2017)
+    if (exists('mergeYears')){
+      ids <- ids %>%
+        left_join(mergeYears, by = 'polyID') %>%
+        mutate(END_INVYR = maxYear)
+    }
+    ## Snag all the EVALIDs for each poly
+    ids <- ids %>%
       group_by(polyID, END_INVYR) %>%
       summarise(id = list(EVALID))
+
+
   } else {
     ids <- db$POP_EVAL %>%
       select('CN', 'END_INVYR', 'EVALID') %>%
@@ -2128,14 +2161,6 @@ tpa <- function(db,
                               `Double sampling for stratification` = 'double',
                               `Simple random sampling` = 'simple',
                               `Subsampling units of unequal size` = 'simple')
-
-    # Test if any polygons cross state boundaries w/ different recent inventory years
-    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1 & !is.null(polys)){
-      # Replace YEAR from above w/ max year so that data is pooled across states
-      data <- left_join(data, mergeYears, by = 'polyID') %>%
-        select(-c(YEAR)) %>%
-        mutate(YEAR = maxYear)
-    }
 
     ## Comprehensive indicator function
     data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
@@ -2536,7 +2561,18 @@ growMort <- function(db,
       inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
       filter(EVAL_TYP %in% c('EXPGROW', 'EXPMORT', 'EXPREMV')) %>%
       filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-      distinct(polyID, END_INVYR, EVALID, .keep_all = TRUE) %>%
+      distinct(polyID, END_INVYR, EVALID, .keep_all = TRUE)
+
+    ## Must be a most recent subset for mergeYears to exists
+    ## If so, we want to combine EVALIDs for poygons which straddle state boundaries
+    ## w/ different most recent inventory years (ex. VA - 2016, NC - 2017)
+    if (exists('mergeYears')){
+      ids <- ids %>%
+        left_join(mergeYears, by = 'polyID') %>%
+        mutate(END_INVYR = maxYear)
+    }
+    ## Snag all the EVALIDs for each poly
+    ids <- ids %>%
       group_by(polyID, END_INVYR) %>%
       summarise(id = list(EVALID),
                 ga = if_else(any(GROWTH_ACCT == 'Y'), 1, 0))
@@ -3065,10 +3101,20 @@ vitalRates <- function(db,
       inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
       filter(EVAL_TYP == 'EXPGROW') %>%
       filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-      distinct(polyID, END_INVYR, EVALID, .keep_all = TRUE) %>%
+      distinct(polyID, END_INVYR, EVALID, .keep_all = TRUE)
+    ## Must be a most recent subset for mergeYears to exists
+    ## If so, we want to combine EVALIDs for poygons which straddle state boundaries
+    ## w/ different most recent inventory years (ex. VA - 2016, NC - 2017)
+    if (exists('mergeYears')){
+      ids <- ids %>%
+        left_join(mergeYears, by = 'polyID') %>%
+        mutate(END_INVYR = maxYear)
+    }
+    ## Snag all the EVALIDs for each poly
+    ids <- ids %>%
       group_by(polyID, END_INVYR) %>%
       summarise(id = list(EVALID),
-                ga = if_else(any(GROWTH_ACCT == 'Y'), 1, 0)) %>%
+                ga = if_else(any(GROWTH_ACCT == 'Y'), 1, 0))%>%
       ## Need growth accounting
       filter(ga == 1)
   } else {
@@ -3571,9 +3617,20 @@ biomass <- function(db,
       inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
       filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
       filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-      distinct(polyID, END_INVYR, EVALID) %>%
+      distinct(polyID, END_INVYR, EVALID)
+    ## Must be a most recent subset for mergeYears to exists
+    ## If so, we want to combine EVALIDs for poygons which straddle state boundaries
+    ## w/ different most recent inventory years (ex. VA - 2016, NC - 2017)
+    if (exists('mergeYears')){
+      ids <- ids %>%
+        left_join(mergeYears, by = 'polyID') %>%
+        mutate(END_INVYR = maxYear)
+    }
+    ## Snag all the EVALIDs for each poly
+    ids <- ids %>%
       group_by(polyID, END_INVYR) %>%
       summarise(id = list(EVALID))
+
   } else {
     ids <- db$POP_EVAL %>%
       select('CN', 'END_INVYR', 'EVALID') %>%
@@ -3968,7 +4025,17 @@ dwm <- function(db,
       inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
       filter(EVAL_TYP == 'EXPDWM') %>%
       filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-      distinct(polyID, END_INVYR, EVALID) %>%
+      distinct(polyID, END_INVYR, EVALID)
+    ## Must be a most recent subset for mergeYears to exists
+    ## If so, we want to combine EVALIDs for poygons which straddle state boundaries
+    ## w/ different most recent inventory years (ex. VA - 2016, NC - 2017)
+    if (exists('mergeYears')){
+      ids <- ids %>%
+        left_join(mergeYears, by = 'polyID') %>%
+        mutate(END_INVYR = maxYear)
+    }
+    ## Snag all the EVALIDs for each poly
+    ids <- ids %>%
       group_by(polyID, END_INVYR) %>%
       summarise(id = list(EVALID))
   } else {
@@ -4440,7 +4507,17 @@ invasive <- function(db,
       inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
       filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
       filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-      distinct(polyID, END_INVYR, EVALID) %>%
+      distinct(polyID, END_INVYR, EVALID)
+    ## Must be a most recent subset for mergeYears to exists
+    ## If so, we want to combine EVALIDs for poygons which straddle state boundaries
+    ## w/ different most recent inventory years (ex. VA - 2016, NC - 2017)
+    if (exists('mergeYears')){
+      ids <- ids %>%
+        left_join(mergeYears, by = 'polyID') %>%
+        mutate(END_INVYR = maxYear)
+    }
+    ## Snag all the EVALIDs for each poly
+    ids <- ids %>%
       group_by(polyID, END_INVYR) %>%
       summarise(id = list(EVALID))
   } else {
@@ -4839,7 +4916,17 @@ area <- function(db,
       inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
       filter(EVAL_TYP == 'EXPCURR') %>%
       filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-      distinct(polyID, END_INVYR, EVALID) %>%
+      distinct(polyID, END_INVYR, EVALID)
+    ## Must be a most recent subset for mergeYears to exists
+    ## If so, we want to combine EVALIDs for poygons which straddle state boundaries
+    ## w/ different most recent inventory years (ex. VA - 2016, NC - 2017)
+    if (exists('mergeYears')){
+      ids <- ids %>%
+        left_join(mergeYears, by = 'polyID') %>%
+        mutate(END_INVYR = maxYear)
+    }
+    ## Snag all the EVALIDs for each poly
+    ids <- ids %>%
       group_by(polyID, END_INVYR) %>%
       summarise(id = list(EVALID))
   } else {

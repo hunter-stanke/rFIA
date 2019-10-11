@@ -114,13 +114,12 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE,
               plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),
               legend.key.height = unit(2.2 * legend.height, "cm"),
               legend.key.width  = unit(1 * legend.width, "cm"))
-
-      ## Animate if they want to
-      if (animate){
-        map <- map +
-          transition_manual(YEAR) +
-          labs(title = 'Year: {current_frame}')
-      }
+    }
+    ## Animate if they want to
+    if (animate){
+      map <- map +
+        transition_manual(YEAR) +
+        labs(title = 'Year: {current_frame}')
     }
 
   ###### TIME SERIES PLOTS  (or UD x) ######
