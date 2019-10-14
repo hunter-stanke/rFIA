@@ -374,7 +374,7 @@ print.FIA.Database <- function(x, ...){
 #' @import ggplot2
 #' @import bit64
 #' @import progress
-#' @importFrom data.table fread fwrite
+#' @importFrom data.table fread fwrite rbindlist
 #' @importFrom parallel makeCluster detectCores mclapply parLapply stopCluster clusterEvalQ
 #' @import tidyr
 #' @importFrom sp over proj4string<- coordinates<- spTransform proj4string
@@ -444,9 +444,9 @@ readFIA <- function(dir,
   inTables <- list()
   for (n in 1:length(files)){
     # Read in and append each file to a list
-    file <- fread(paste(dir, files[n], sep = ""), showProgress = FALSE, logical01 = FALSE, nThread = nCores, ...)
+    file <- fread(paste(dir, files[n], sep = ""), showProgress = FALSE, integer64 = 'double', logical01 = FALSE, nThread = nCores, ...)
     # We don't want data.table formats
-    file <- as.data.frame(file)
+    #file <- as.data.frame(file)
     fileName <- str_sub(files[n], 1, -5)
 
     inTables[[fileName]] <- file
@@ -465,11 +465,11 @@ readFIA <- function(dir,
   uniqueNames <- unique(names(inTables))
   ## Works regardless of whether or not there are duplicate names (multiple states)
   for (i in 1:length(uniqueNames)){
-    outTables[[uniqueNames[i]]] <- bind_rows(inTables[names(inTables) == uniqueNames[i]])
+    outTables[[uniqueNames[i]]] <- rbindlist(inTables[names(inTables) == uniqueNames[i]])
   }
 
   # NEW CLASS NAME FOR FIA DATABASE OBJECTS
-  #outTables <- lapply(outTables, as.data.frame)
+  outTables <- lapply(outTables, as.data.frame)
   class(outTables) <- 'FIA.Database'
 
   ## If you are on windows, close explicitly
