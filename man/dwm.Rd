@@ -92,6 +92,8 @@ fiaRI_mr <- clipFIA(fiaRI)
 ## Estimates of all forestland, over time
 dwm(fiaRI)
 
+\donttest{
+
 ## Same as above, but output contains seperate column for each structural stage,
 ##   rathern than grouping variable
 dwm(fiaRI,
@@ -106,7 +108,7 @@ dwm(fiaRI_mr,
     grpBy = OWNGRPCD)
 
 ## Same as above, but implemented in parallel (much quicker)
-parallel::detectCores(logical = TRUE) # 4 cores available, we will take 2
+parallel::detectCores(logical = FALSE) # 4 cores available, we will take 2
 dwm(fiaRI_mr,
     tidy = FALSE,
     nCores = 2)
@@ -117,7 +119,6 @@ dwmSF <- dwm(fiaRI_mr,
              polys = countiesRI,
              returnSpatial = TRUE,
              tidy = FALSE)
-\donttest{
 plot(dwmSF)
 plotFIA(dwmSF, BIO_ACRE) # TOTAL BIOMASS / ACRE (tons)
 }

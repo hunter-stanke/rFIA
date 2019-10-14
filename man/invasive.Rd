@@ -91,7 +91,7 @@ invasive(db = fiaRI_mr,
     landType = 'forest')
 
 ## Same as above, but implemented in parallel (much quicker)
-parallel::detectCores(logical = TRUE) # 4 cores available, we will take 2
+parallel::detectCores(logical = FALSE) # 4 cores available, we will take 2
 invasive(db = fiaRI_mr,
          landType = 'forest',
          nCores = 2)

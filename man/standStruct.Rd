@@ -112,12 +112,13 @@ standStruct(fiaRI_mr)
 ##   rathern than grouping variable
 standStruct(fiaRI_mr, tidy = FALSE)
 
+\donttest{
 ## Calculate structural stage distribution of all forestland by owner group, over time
 standStruct(fiaRI_mr,
             grpBy = OWNGRPCD)
 
 ## Same as above, but implemented in parallel
-parallel::detectCores(logical = TRUE) # 4 cores available, we will take 2
+parallel::detectCores(logical = FAlSE) # 4 cores available, we will take 2
 standStruct(fiaRI_mr,
             grpBy = OWNGRPCD,
             nCores = 2)
@@ -126,7 +127,6 @@ standStruct(fiaRI_mr,
 standStruct(fiaRI_mr,
             areaDomain = PHYSCLCD \%in\% c(11:19))
 
-\donttest{
 ## Calculate structural stage distribution of all forestland, over time
 standStruct(fiaRI)
 

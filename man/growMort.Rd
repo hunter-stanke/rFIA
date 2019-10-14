@@ -105,6 +105,7 @@ fiaRI_mr <- clipFIA(fiaRI)
 growMort(db = fiaRI_mr,
          landType = 'timber',
          treeType = 'gs')
+\donttest{
 
 ## Estimates for white pine ( > 12" DBH) on forested mesic sites
 growMort(fiaRI_mr,
@@ -112,8 +113,6 @@ growMort(fiaRI_mr,
          treeDomain = SPCD == 129 & DIA > 12, # Species code for white pine
          areaDomain = PHYSCLCD \%in\% 21:29) # Mesic Physiographic classes
 
-
-\donttest{
 ## Most recent estimates grouped by stand age on forest land
 # Make a categorical variable which represents stand age (grouped by 10 yr intervals)
 fiaRI_mr$COND$STAND_AGE <- makeClasses(fiaRI_mr$COND$STDAGE, interval = 10)
@@ -126,7 +125,7 @@ growMort(db = fiaRI_mr,
          bySpecies = TRUE)
 
 ## Same as above, but implemented in parallel (much quicker)
-parallel::detectCores(logical = TRUE) # 4 cores available, we will take 2
+parallel::detectCores(logical = FALSE) # 4 cores available, we will take 2
 growMort(db = fiaRI_mr,
          landType = 'forest',
          bySpecies = TRUE,

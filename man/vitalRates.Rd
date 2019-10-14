@@ -104,6 +104,7 @@ fiaRI_mr <- clipFIA(fiaRI)
 vitalRates(db = fiaRI_mr,
            landType = 'timber',
            treeType = 'gs')
+\donttest{
 
 ## Estimates for white pine ( > 12" DBH) on forested mesic sites
 vitalRates(fiaRI_mr,
@@ -117,14 +118,13 @@ fiaRI_mr$COND$STAND_AGE <- makeClasses(fiaRI_mr$COND$STDAGE, interval = 10)
 vitalRates(db = fiaRI_mr,
            grpBy = STAND_AGE)
 
-\donttest{
 ## Most recent estimates for live stems on forest land by species
 vitalRates(db = fiaRI_mr,
            landType = 'forest',
            bySpecies = TRUE)
 
 ## Same as above, but implemented in parallel (much quicker)
-parallel::detectCores(logical = TRUE) # 4 cores available, we will take 2
+parallel::detectCores(logical = FALSE) # 4 cores available, we will take 2
 vitalRates(db = fiaRI_mr,
            landType = 'forest',
            bySpecies = TRUE,

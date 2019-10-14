@@ -98,6 +98,7 @@ fiaRI_mr <- clipFIA(fiaRI)
 tpa(db = fiaRI_mr,
     landType = 'timber',
     treeType = 'gs')
+\donttest{
 
 ## Estimates for live white pine ( > 12" DBH) on forested mesic sites (all available inventories)
 tpa(fiaRI_mr,
@@ -118,7 +119,6 @@ tpa(db = fiaRI,
     treeType = 'dead',
     treeDomain = DIA > 20)
 
-\donttest{
 ## Most recent estimates for live stems on forest land by species
 tpa(db = fiaRI_mr,
     landType = 'forest',
@@ -126,7 +126,7 @@ tpa(db = fiaRI_mr,
     bySpecies = TRUE)
 
 ## Same as above, but implemented in parallel (much quicker)
-parallel::detectCores(logical = TRUE) # 4 cores available, we will take 2
+parallel::detectCores(logical = FALSE) # 4 cores available, we will take 2
 tpa(db = fiaRI_mr,
     landType = 'forest',
     treeType = 'live',

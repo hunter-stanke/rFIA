@@ -87,6 +87,7 @@ fiaRI_mr <- clipFIA(fiaRI)
 ## Most recent estimates of forested area in RI
 area(db = fiaRI_mr)
 
+\donttest{
 ## Same as above grouped by land class
 area(db = fiaRI_mr, byLandType = TRUE)
 
@@ -97,10 +98,11 @@ area(db = fiaRI,
      treeDomain = DIA > 20)
 
 ## Same as above, but implemented in parallel (much quicker)
-parallel::detectCores(logical = TRUE) # 4 cores available, we will take 2
+parallel::detectCores(logical = FALSE) # 4 cores available, we will take 2
 area(db = fiaRI,
      landType = 'forest',
      treeDomain = DIA > 20,
      nCores =2)
+  }
 }
 
