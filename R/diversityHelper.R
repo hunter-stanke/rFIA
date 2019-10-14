@@ -183,7 +183,7 @@ diversityHelper <- function(x, combos, data, grpBy, SE){
   }
 
   # Do some cleanup
-  gc()
+  #gc()
 
   #Return a dataframe
   d

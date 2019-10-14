@@ -334,7 +334,7 @@ biomassHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
 
 
   } # End SE Conditional
-  gc()
+  #gc()
 
   # Return t
   b

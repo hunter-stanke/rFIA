@@ -180,7 +180,7 @@ invasiveHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
   } # End SE conditional
 
   # Do some cleanup
-  gc()
+  #gc()
 
   #Return a dataframe
   inv

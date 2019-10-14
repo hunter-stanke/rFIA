@@ -186,7 +186,7 @@ standStructHelper <- function(x, combos, data, grpBy, totals, tidy, SE){
   } # End SE Conditional
 
   # Do some cleanup
-  gc()
+  #gc()
 
   #Return a dataframe
   s

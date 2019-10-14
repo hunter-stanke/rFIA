@@ -511,10 +511,9 @@ dwmHelper <- function(x, combos, data, grpBy, totals, SE){
   } # End SE Conditional
 
   # Do some cleanup
-  gc()
+  #gc()
 
   #Return a dataframe
   cwd
-
 
 }

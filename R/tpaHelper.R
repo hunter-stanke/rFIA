@@ -472,7 +472,7 @@ tpaNewHelper <- function(x, combos, data, totals, SE){
   } # End SE conditional
 
   # Do some cleanup
-  gc()
+  #gc()
 
   #Return a dataframe
   t

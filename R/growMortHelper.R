@@ -293,7 +293,7 @@ growMortHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE, chngAdj){
   } # End SE Conditional
 
   # Some cleanup
-  gc()
+  #gc()
 
   # Return t
   t

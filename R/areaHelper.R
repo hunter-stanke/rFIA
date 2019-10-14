@@ -80,7 +80,7 @@ areaHelper <- function(x, combos, data, grpBy, totals, SE){
   } # End SE Conditional
 
   # Some cleanup
-  gc()
+  #gc()
 
   # Return t
   a
