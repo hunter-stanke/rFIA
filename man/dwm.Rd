@@ -88,11 +88,12 @@ data(countiesRI)
 ## Most recents subset
 fiaRI_mr <- clipFIA(fiaRI)
 
-
-## Estimates of all forestland, over time
-dwm(fiaRI)
+## Most recent estimates
+dwm(fiaRI_mr)
 
 \donttest{
+## Estimates of all forestland, over time
+dwm(fiaRI)
 
 ## Same as above, but output contains seperate column for each structural stage,
 ##   rathern than grouping variable

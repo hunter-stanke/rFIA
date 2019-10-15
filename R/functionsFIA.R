@@ -3217,6 +3217,7 @@ vitalRates <- function(db,
     # data$tDI2 <- data$landD * data$aD_p * data$aD_c * data$sp * data$tD * data$typeD * data$tChng
     # data$tDI1 <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$sp.prev * data$tD.prev * data$typeD.prev * data$tChng
 
+    xtraGrp = NULL
     ## Add species to groups
     if (bySpecies) {
       data <- data %>%
@@ -3226,8 +3227,7 @@ vitalRates <- function(db,
                   as.character)
       grpBy <- c(grpBy, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
       grpByOrig <- c(grpByOrig, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
-      grpT <- c(grpT, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
-
+      xtraGrp <- c('SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
     }
 
     ## Break into size classes
@@ -3236,7 +3236,7 @@ vitalRates <- function(db,
       grpByOrig <- c(grpByOrig, 'sizeClass')
       data$sizeClass <- makeClasses(data$DIA, interval = 2)
       data <- data[!is.na(data$sizeClass),]
-      grpT <- c(grpT, 'sizeClass')
+      xtraGrp <- c(xtraGrp, 'sizeClass')
     }
 
     ## Modify  attributes depending on component (mortality uses midpoint)
@@ -3267,7 +3267,7 @@ vitalRates <- function(db,
     ## Just what we need
     data <- data %>%
       select(YEAR, ESTN_UNIT_CN, STRATUM_CN, PLT_CN, TRE_CN, SUBP, CONDID, ESTN_METHOD, EXPNS, INVYR, TREE, aDI, tDI, SUBPTYP_PROP_CHNG,
-             grpP, grpC, grpT, TPAGROW_UNADJ, tAdj, aAdj, AREA_USED, P1POINTCNT, P1PNTCNT_EU, P2POINTCNT,
+             grpP, grpC, grpT, xtraGrp, TPAGROW_UNADJ, tAdj, aAdj, AREA_USED, P1POINTCNT, P1PNTCNT_EU, P2POINTCNT,
              DIA2, DIA1, BA2, BA1, DRYBIO_AG2, DRYBIO_AG1, VOLCFNET2, VOLCFNET1) %>%
       ## Dropping NA columns
       #drop_na(SUBPTYP_PROP_CHNG) %>%
