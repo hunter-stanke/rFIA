@@ -561,13 +561,15 @@ Did you accidentally include the state abbreviation in front of the table name? 
     # Convert all to url paths
     urls <- c()
     tblNames <- c()
+
     for (i in 1:length(states)){
-      if (i == 1){
-        tblNames <- paste0(states[i], tables, '.csv')
-        urls <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', tblNames[i])
-      } else {
-        tblNames <- c(tblNames, paste0(states[i], tables, '.csv'))
-        urls <- c(urls, paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', tblNames[i]))
+      if (i){
+        tblNames[i] <- paste0(states[1], tables[1], '.csv')
+        urls[i] <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', tblNames)
+      }
+      for (n in 2:length(tables)){
+        tblNames <- c(tblNames, paste0(states[i], tables[n], '.csv'))
+        urls <- c(urls, paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', tblNames[n]))
       }
     }
 
