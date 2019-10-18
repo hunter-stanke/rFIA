@@ -83,21 +83,42 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE,
   if ('sf' %in% class(data)){
     ## Plotting spatial points
     if (any(str_detect(st_geometry_type(data), 'POINT'))){
-      # Make the spatial map
-      map <- data %>%
-        ggplot() +
-        geom_sf(aes(colour = yVar)) +
-        labs(colour = ifelse(is.null(legend.title), str_wrap(quo_name(y_quo), width = 10 * lab.width), str_wrap(legend.title, width = 10 * lab.width))) +
-        scale_colour_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform) +
-        #scale_fill_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform) +
-        theme_minimal() +
-        ggtitle(plot.title)+
-        theme(#axis.text = element_blank(),
-              legend.title = element_text(size = 14 * text.size, face = 'bold.italic', family = text.font),
-              legend.text = element_text(size = 11 * text.size, face = 'italic', family = text.font),
-              plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),
-              legend.key.height = unit(2.2 * legend.height, "cm"),
-              legend.key.width  = unit(1 * legend.width, "cm"))
+      if (quo_name(grp_quo) == 'NULL'){
+        # Make the spatial map
+        map <- data %>%
+          ggplot() +
+          geom_sf(aes(colour = yVar)) +
+          labs(colour = ifelse(is.null(legend.title), str_wrap(quo_name(y_quo), width = 10 * lab.width), str_wrap(legend.title, width = 10 * lab.width))) +
+          scale_colour_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform) +
+          #scale_fill_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform) +
+          theme_minimal() +
+          ggtitle(plot.title)+
+          theme(#axis.text = element_blank(),
+            legend.title = element_text(size = 14 * text.size, face = 'bold.italic', family = text.font),
+            legend.text = element_text(size = 11 * text.size, face = 'italic', family = text.font),
+            plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),
+            legend.key.height = unit(2.2 * legend.height, "cm"),
+            legend.key.width  = unit(1 * legend.width, "cm"))
+
+      ## Grouped spatial points
+      } else {
+        map <- data %>%
+          ggplot() +
+          geom_sf(aes(size = yVar, colour = grpVar), show.legend = "point") +
+          labs(size = ifelse(is.null(legend.title[1]), str_wrap(quo_name(y_quo), width = 10 * lab.width), str_wrap(legend.title[1], width = 10 * lab.width)),
+               colour = ifelse(is.null(legend.title[2]), str_wrap(quo_name(grp_quo), width = 10 * lab.width), str_wrap(legend.title[2], width = 10 * lab.width))) +
+          scale_colour_viridis_d(alpha = alpha, option = color.option, direction = direction) +
+          #scale_fill_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform) +
+          theme_minimal() +
+          ggtitle(plot.title)+
+          theme(#axis.text = element_blank(),
+            legend.title = element_text(size = 14 * text.size, face = 'bold.italic', family = text.font),
+            legend.text = element_text(size = 11 * text.size, face = 'italic', family = text.font),
+            plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),
+            legend.key.height = unit(2.2 * legend.height, "cm"),
+            legend.key.width  = unit(1 * legend.width, "cm"))
+      }
+
     ## Plotting spatial polygons
     } else{
       # Make the spatial map
