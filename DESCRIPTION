@@ -1,6 +1,6 @@
 Package: rFIA
 Type: Package
-Title: Spatio-Temporal Estimation of Forest Variables using the USFS Forest Inventory and Analysis Database
+Title: Space-Time Estimation of Forest Variables using the FIA Database
 Version: 0.1.0
 Author: Hunter Stanke [aut, cre],
   Andrew Finley [aut]

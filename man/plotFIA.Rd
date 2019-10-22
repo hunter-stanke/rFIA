@@ -71,13 +71,15 @@ plotFIA(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, n.max = NULL,
 
 
 \details{
-If \code{animate = FALSE} and multiple reporting years are present in the summary, produces plots of the most recent subset.
+To produce spatial plots, summaries must be returned as spatial objects (e.g. specify \code{returnSpatial = TRUE} when computing summaries using \code{\link{tpa}}). For animated plots, also requires that multiple reporting years be present in the summary data (animations iterate through time). For a map of plot locations contained in your \code{FIA.Database}, specify the object as the \code{data} argument.
 
-To produce spatial plots, summaries must be returned as spatial objects (e.g. specify \code{returnSpatial = TRUE} when computing summaries using \code{\link{tpa}}). For animated plots, also requires that multiple reporting years be present in the summary data (animations iterate through time).
+For objects produced with \code{byPlot = TRUE} and \code{returnSpatial = TRUE} (spatial point patterns), a categorical grouping variable can be specified to \code{grp}. Point radii will reflect magnitude of \code{y} and color will reflect categorical groups (\code{grp}).
+
+If \code{animate = FALSE} and multiple reporting years are present in the summary, produces plots of the most recent subset.
 
 Specify \code{savePath} and \code{fileName} to save plots (animations saved as .gif files).
 
-For a map of plot locations contained in your \code{FIA.Database}, specify the object as the \code{data} argument.
+
 }
 
 

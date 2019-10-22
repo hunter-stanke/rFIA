@@ -764,8 +764,10 @@ findEVALID <- function(db = NULL,
   if (mostRecent) {
     ## Grouped filter wasn't working as intended, use filtering join
     maxYear <- ids %>%
-      group_by(LOCATION_NM, EVAL_TYP) %>%
-      summarize(END_INVYR = max(END_INVYR, na.rm = TRUE))
+      mutate(place = str_to_upper(LOCATION_NM)) %>%
+      group_by(place, EVAL_TYP) %>%
+      summarize(END_INVYR = max(END_INVYR, na.rm = TRUE),
+                LOCATION_NM = first(LOCATION_NM))
       #filter(END_INVYR == max(END_INVYR, na.rm = TRUE))
 
     ids <- left_join(maxYear, select(ids, c('LOCATION_NM', 'EVAL_TYP', 'END_INVYR', 'EVALID')), by = c('LOCATION_NM', 'EVAL_TYP', 'END_INVYR'))
@@ -1478,8 +1480,12 @@ standStruct <- function(db,
     pb$tick()
   }
   sOut <- do.call(rbind, out)
-  sOut <- filter(sOut, !is.na(YEAR)) %>%
+  sOut <- drop_na(sOut, grpBy) %>%
     arrange(YEAR)
+
+  ## Above converts to tibble
+  if (returnSpatial) sOut <- st_sf(sOut)
+
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) sOut <- unique(sOut)
 
@@ -1899,8 +1905,10 @@ diversity <- function(db,
     pb$tick()
   }
   dOut <- do.call(rbind, out)
-  dOut <- filter(dOut, !is.na(YEAR)) %>%
+  dOut <- drop_na(dOut, grpBy) %>%
     arrange(YEAR)
+  ## Above converts to tibble
+  if (returnSpatial) dOut <- st_sf(dOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) dOut <- unique(dOut)
   return(dOut)
@@ -2338,8 +2346,10 @@ tpa <- function(db,
   }
 
   tOut <- do.call(rbind, out)
-  tOut <- filter(tOut, !is.na(YEAR)) %>%
+  tOut <- drop_na(tOut, grpBy) %>%
     arrange(YEAR)
+  ## Above converts to tibble
+  if (returnSpatial) tOut <- st_sf(tOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) tOut <- unique(tOut)
   return(tOut)
@@ -2877,8 +2887,10 @@ growMort <- function(db,
     pb$tick()
   }
   tOut <- do.call(rbind, out)
-  tOut <- filter(tOut, !is.na(YEAR)) %>%
+  tOut <- drop_na(tOut, grpBy) %>%
     arrange(YEAR)
+  ## Above converts to tibble
+  if (returnSpatial) tOut <- st_sf(tOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) tOut <- unique(tOut)
   return(tOut)
@@ -3444,8 +3456,10 @@ vitalRates <- function(db,
     pb$tick()
   }
   tOut <- do.call(rbind, out)
-  tOut <- filter(tOut, !is.na(YEAR)) %>%
+  tOut <- drop_na(tOut, grpBy) %>%
     arrange(YEAR)
+  ## Above converts to tibble
+  if (returnSpatial) tOut <- st_sf(tOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) tOut <- unique(tOut)
   return(tOut)
@@ -3873,8 +3887,10 @@ biomass <- function(db,
     pb$tick()
   }
   bOut <- do.call(rbind, out)
-  bOut <- filter(bOut, !is.na(YEAR)) %>%
+  bOut <- drop_na(bOut, grpBy) %>%
     arrange(YEAR)
+  ## Above converts to tibble
+  if (returnSpatial) bOut <- st_sf(bOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) bOut <- unique(bOut)
   return(bOut)
@@ -4351,8 +4367,10 @@ dwm <- function(db,
     pb$tick()
   }
   cOut <- do.call(rbind, out)
-  cOut <- filter(cOut, !is.na(YEAR)) %>%
+  cOut <- drop_na(cOut, grpBy) %>%
     arrange(YEAR)
+  ## Above converts to tibble
+  if (returnSpatial) cOut <- st_sf(cOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) {
     cOut <- unique(cOut)
@@ -4721,8 +4739,10 @@ invasive <- function(db,
     pb$tick()
   }
   invOut <- do.call(rbind, out)
-  invOut <- filter(invOut, !is.na(YEAR)) %>%
+  invOut <- drop_na(invOut, grpBy) %>%
     arrange(YEAR)
+  ## Above converts to tibble
+  if (returnSpatial) invOut <- st_sf(invOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) invOut <- unique(invOut)
   return(invOut)
@@ -5134,8 +5154,10 @@ area <- function(db,
   }
 
   aOut <- do.call(rbind, out)
-  aOut <- filter(aOut, !is.na(YEAR)) %>%
+  aOut <- drop_na(aOut, grpBy) %>%
     arrange(YEAR)
+  ## Above converts to tibble
+  if (returnSpatial) aOut <- st_sf(aOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) aOut <- unique(aOut)
   return(aOut)
