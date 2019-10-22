@@ -1343,6 +1343,7 @@ standStruct <- function(db,
           filter(!is.na(LAT) & !is.na(LON)) %>%
           st_as_sf(coords = c('LON', 'LAT'),
                    crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+
       }
 
       ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
@@ -1480,6 +1481,8 @@ standStruct <- function(db,
     pb$tick()
   }
   sOut <- do.call(rbind, out)
+  ## For spatial plots
+  if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   sOut <- drop_na(sOut, grpBy) %>%
     arrange(YEAR)
 
@@ -1797,6 +1800,7 @@ diversity <- function(db,
           filter(!is.na(LAT) & !is.na(LON)) %>%
           st_as_sf(coords = c('LON', 'LAT'),
                    crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+
       }
 
       ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
@@ -1905,6 +1909,8 @@ diversity <- function(db,
     pb$tick()
   }
   dOut <- do.call(rbind, out)
+  ## For spatial plots
+  if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   dOut <- drop_na(dOut, grpBy) %>%
     arrange(YEAR)
   ## Above converts to tibble
@@ -2238,6 +2244,7 @@ tpa <- function(db,
           filter(!is.na(LAT) & !is.na(LON)) %>%
           st_as_sf(coords = c('LON', 'LAT'),
                    crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+
       }
 
       ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
@@ -2346,6 +2353,8 @@ tpa <- function(db,
   }
 
   tOut <- do.call(rbind, out)
+  ## For spatial plots
+  if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   tOut <- drop_na(tOut, grpBy) %>%
     arrange(YEAR)
   ## Above converts to tibble
@@ -2784,7 +2793,8 @@ growMort <- function(db,
           filter(!is.na(LAT) & !is.na(LON)) %>%
           st_as_sf(coords = c('LON', 'LAT'),
                    crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
-      }
+
+        }
 
     } else {
       # Unique combinations of specified grouping variables. Simply listing the grouping variables in estimation code below does not produce valid estimates. Have to
@@ -2887,6 +2897,8 @@ growMort <- function(db,
     pb$tick()
   }
   tOut <- do.call(rbind, out)
+  ## For spatial plots
+  if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   tOut <- drop_na(tOut, grpBy) %>%
     arrange(YEAR)
   ## Above converts to tibble
@@ -3349,6 +3361,7 @@ vitalRates <- function(db,
           filter(!is.na(LAT) & !is.na(LON)) %>%
           st_as_sf(coords = c('LON', 'LAT'),
                    crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+
       }
 
       ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
@@ -3456,6 +3469,8 @@ vitalRates <- function(db,
     pb$tick()
   }
   tOut <- do.call(rbind, out)
+  ## For spatial plots
+  if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   tOut <- drop_na(tOut, grpBy) %>%
     arrange(YEAR)
   ## Above converts to tibble
@@ -3784,6 +3799,7 @@ biomass <- function(db,
           filter(!is.na(LAT) & !is.na(LON)) %>%
           st_as_sf(coords = c('LON', 'LAT'),
                    crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+
       }
 
       ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
@@ -3887,6 +3903,8 @@ biomass <- function(db,
     pb$tick()
   }
   bOut <- do.call(rbind, out)
+  ## For spatial plots
+  if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   bOut <- drop_na(bOut, grpBy) %>%
     arrange(YEAR)
   ## Above converts to tibble
@@ -4191,6 +4209,7 @@ dwm <- function(db,
           filter(!is.na(LAT) & !is.na(LON)) %>%
           st_as_sf(coords = c('LON', 'LAT'),
                    crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+
       }
 
       ### -- TOTALS & MEAN TPA -- Total number of trees in region & Mean TPA for the region
@@ -4367,6 +4386,8 @@ dwm <- function(db,
     pb$tick()
   }
   cOut <- do.call(rbind, out)
+  ## For spatial plots
+  if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   cOut <- drop_na(cOut, grpBy) %>%
     arrange(YEAR)
   ## Above converts to tibble
@@ -4647,6 +4668,7 @@ invasive <- function(db,
           filter(!is.na(LAT) & !is.na(LON)) %>%
           st_as_sf(coords = c('LON', 'LAT'),
                    crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+
       }
     } else {
       ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
@@ -4739,6 +4761,8 @@ invasive <- function(db,
     pb$tick()
   }
   invOut <- do.call(rbind, out)
+  ## For spatial plots
+  if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   invOut <- drop_na(invOut, grpBy) %>%
     arrange(YEAR)
   ## Above converts to tibble
@@ -5067,6 +5091,14 @@ area <- function(db,
         summarize(area = sum(CONDPROP_UNADJ * aDI, na.rm = TRUE),
                   plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
 
+      if (returnSpatial){
+        invOut <- invOut %>%
+          filter(!is.na(LAT) & !is.na(LON)) %>%
+          st_as_sf(coords = c('LON', 'LAT'),
+                   crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+
+      }
+
       ### -- TOTALS & MEAN
     } else {
       ## Duplicate and rbind so we have a unique poly key for the entire set of non-spatial combos
@@ -5154,6 +5186,9 @@ area <- function(db,
   }
 
   aOut <- do.call(rbind, out)
+  ## For spatial plots
+  if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
+  ## Remove NA values from groups
   aOut <- drop_na(aOut, grpBy) %>%
     arrange(YEAR)
   ## Above converts to tibble
