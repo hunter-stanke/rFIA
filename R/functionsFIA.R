@@ -1144,7 +1144,7 @@ standStruct <- function(db,
       mutate_if(is.factor,
                 as.character)
     # Add shapefile names to grpBy
-    grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
+    grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
     pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
     coordinates(pltSF) <- ~LON+LAT
@@ -1571,7 +1571,7 @@ diversity <- function(db,
       mutate_if(is.factor,
                 as.character)
     # Add shapefile names to grpBy
-    grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
+    grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
     pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
     coordinates(pltSF) <- ~LON+LAT
@@ -2000,7 +2000,7 @@ tpa <- function(db,
       mutate_if(is.factor,
                 as.character)
     # Add shapefile names to grpBy
-    grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
+    grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
     pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
     coordinates(pltSF) <- ~LON+LAT
@@ -2459,7 +2459,7 @@ growMort <- function(db,
       mutate_if(is.factor,
                 as.character)
     # Add shapefile names to grpBy
-    grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
+    grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
     pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
     coordinates(pltSF) <- ~LON+LAT
@@ -3002,7 +3002,7 @@ vitalRates <- function(db,
       mutate_if(is.factor,
                 as.character)
     # Add shapefile names to grpBy
-    grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
+    grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
     pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
     coordinates(pltSF) <- ~LON+LAT
@@ -3557,7 +3557,7 @@ biomass <- function(db,
       mutate_if(is.factor,
                 as.character)
     # Add shapefile names to grpBy
-    grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
+    grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
     pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
     coordinates(pltSF) <- ~LON+LAT
@@ -3989,7 +3989,7 @@ dwm <- function(db,
       mutate_if(is.factor,
                 as.character)
     # Add shapefile names to grpBy
-    grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
+    grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
     pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
     coordinates(pltSF) <- ~LON+LAT
@@ -4475,7 +4475,7 @@ invasive <- function(db,
       mutate_if(is.factor,
                 as.character)
     # Add shapefile names to grpBy
-    grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
+    grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
     pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
     coordinates(pltSF) <- ~LON+LAT
@@ -4852,7 +4852,7 @@ area <- function(db,
       mutate_if(is.factor,
                 as.character)
     # Add shapefile names to grpBy
-    grpBy = c(names(polys)[1:ncol(polys)-1], 'polyID', grpBy)
+    grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
     ## Make plot data spatial, projected same as polygon layer
     pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
     coordinates(pltSF) <- ~LON+LAT
