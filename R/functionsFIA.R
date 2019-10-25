@@ -558,34 +558,34 @@ Did you accidentally include the state abbreviation in front of the table name? 
       states <- ''
     }
 
-    # Convert all to url paths
-    urls <- c()
-    tblNames <- c()
 
-    for (i in 1:length(states)){
-      if (i){
-        tblNames[i] <- paste0(states[1], tables[1], '.csv')
-        urls[i] <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', tblNames)
-      }
-      for (n in 2:length(tables)){
-        tblNames <- c(tblNames, paste0(states[i], tables[n], '.csv'))
-        urls <- c(urls, paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', tblNames[n]))
-      }
-    }
+    tblNames <- sapply(states, FUN = function(x, y){paste0(x,y,'.zip')}, y = tables)
+    tblNames <- c(tblNames)
+    urls <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', tblNames)
+
 
     inTables = list()
     for (n in 1:length(urls)){
+
+      ## If dir is not specified, hold in a temporary directory
+      if (is.null(dir)){tempDir <- tempdir()}
+
+      newName <- paste0(str_sub(tblNames[n], 1, -5), '.csv')
 
       # Write the data out the directory they've chosen
       if(is.null(dir)){
         temp <- tempfile()
         download.file(urls[n], temp)
-        file <- fread(temp, showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores)
+        unzip(temp, exdir = tempDir)
+        file <- fread(paste0(tempDir, '/', newName), showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores)
         unlink(temp)
       } else {
         download.file(urls[n], paste0(dir, tblNames[n]))
-        file <- fread(paste0(dir, tblNames[n]), showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores)
+        unzip(temp, exdir = dir)
+        file <- fread(paste0(dir, newName), showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores)
       }
+
+      unlink(temp)
 
       # We don't want data.table formats
       file <- as.data.frame(file)
