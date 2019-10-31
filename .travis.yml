@@ -2,6 +2,7 @@ language: r
 
 before_install:
   - sudo apt-get update
-  - sudo apt-get -y install libudunits2-dev
+  - sudo apt-get -y install libudunits2-dev gdal
   - Rscript -e 'install.packages("units")'
+  - Rscript -e 'install.packages("sf")'
 
