@@ -1,1 +1,5 @@
 language: r
+
+before_install:
+	sudo apt-get install libudunits2-dev
+
