@@ -3,7 +3,10 @@
 
 # rFIA: Unlocking the FIA Database in R
 
-![US Biomass](man/figures/usBiomass.png) <!-- badges: start -->
+![US Biomass](man/figures/usBiomass.png) <!-- badges: start --> [![CRAN
+status](https://www.r-pkg.org/badges/version/rFIA)](https://cran.r-project.org/package=rFIA)
+[![](https://cranlogs.r-pkg.org/badges/grand-total/rFIA)](https://cran.r-project.org/package=rFIA)
+
 <!-- badges: end -->
 
 The goal of `rFIA` is to increase the accessibility and use of the USFS
@@ -211,11 +214,9 @@ head(tpaRI_own)
 #>   YEAR OWNGRPCD       TPA      BAA TPA_PERC BAA_PERC   TPA_SE   BAA_SE
 #> 1 2018       30 0.8482522 3.567751      100      100 58.95933 59.06494
 #> 2 2018       40 1.4920940 3.992055      100      100 25.69191 27.70682
-#> 3 2018       NA 1.2884293 3.857836      100      100 23.72942 25.98661
 #>   TPA_PERC_SE BAA_PERC_SE nPlots_TREE nPlots_AREA
 #> 1    60.69603    60.74652           3          38
 #> 2    26.85686    28.61007          12          82
-#> 3    24.15310    26.25434          15         118
 ```
 
 **What if I want to produce estimates within my own population
