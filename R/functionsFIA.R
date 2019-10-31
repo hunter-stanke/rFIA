@@ -75,6 +75,7 @@ divIndex <- function(SPCD, TPA, index) {
   return(value)
 }
 
+
 #' @export
 makeClasses <- function(x, interval = NULL, lower = NULL, upper = NULL, brks = NULL, numLabs = FALSE){
   if(is.null(brks)){
