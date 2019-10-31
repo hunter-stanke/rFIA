@@ -3,11 +3,16 @@
 
 # rFIA: Unlocking the FIA Database in R
 
-![US Biomass](man/figures/usBiomass.png) <!-- badges: start --> [![CRAN
+<!-- badges: start -->
+
+[![CRAN
 status](https://www.r-pkg.org/badges/version/rFIA)](https://cran.r-project.org/package=rFIA)
 [![](https://cranlogs.r-pkg.org/badges/grand-total/rFIA)](https://cran.r-project.org/package=rFIA)
-
+[![Travis build
+status](https://travis-ci.org/hunter-stanke/rFIA.svg?branch=master)](https://travis-ci.org/hunter-stanke/rFIA)
 <!-- badges: end -->
+
+![US Biomass](man/figures/usBiomass.png)
 
 The goal of `rFIA` is to increase the accessibility and use of the USFS
 Forest Inventory and Analysis (FIA) Database by providing a

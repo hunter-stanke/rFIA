@@ -1,7 +1,7 @@
 
 #### A Start up Message ------------
 .onAttach <- function(libname, pkgname){
-  packageStartupMessage('Download FIA Data Here: https://apps.fs.usda.gov/fia/datamart/datamart.html')
+  #packageStartupMessage('Download FIA Data Here: https://apps.fs.usda.gov/fia/datamart/datamart.html')
 }
 
 
