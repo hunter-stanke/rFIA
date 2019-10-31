@@ -10,6 +10,8 @@ status](https://www.r-pkg.org/badges/version/rFIA)](https://cran.r-project.org/p
 [![](https://cranlogs.r-pkg.org/badges/grand-total/rFIA)](https://cran.r-project.org/package=rFIA)
 [![Travis build
 status](https://travis-ci.org/hunter-stanke/rFIA.svg?branch=master)](https://travis-ci.org/hunter-stanke/rFIA)
+[![Lifecycle:
+maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing)
 <!-- badges: end -->
 
 ![US Biomass](man/figures/usBiomass.png)
