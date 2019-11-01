@@ -584,7 +584,7 @@ Did you accidentally include the state abbreviation in front of the table name? 
         unlink(temp)
       } else {
         #download.file(urls[n], paste0(dir, tblNames[n]))
-        unzip(temp, exdir = str_sub(dir, 1, -1))
+        unzip(temp, exdir = str_sub(dir, 1, -2))
         file <- fread(paste0(dir, newName), showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores)
       }
 
@@ -651,7 +651,7 @@ Did you accidentally include the state abbreviation in front of the table name? 
       if (is.null(dir)){
         unzip(temp, exdir = tempDir)
       } else {
-        unzip(temp, exdir = str_sub(dir, 1, -1))
+        unzip(temp, exdir = str_sub(dir, 1, -2))
       }
       unlink(temp)
     }
