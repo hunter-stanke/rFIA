@@ -573,16 +573,18 @@ Did you accidentally include the state abbreviation in front of the table name? 
 
       newName <- paste0(str_sub(tblNames[n], 1, -5), '.csv')
 
+      ## Download the zip to a temporary file
+      temp <- tempfile()
+      download.file(urls[n], temp)
+
       # Write the data out the directory they've chosen
       if(is.null(dir)){
-        temp <- tempfile()
-        download.file(urls[n], temp)
         unzip(temp, exdir = tempDir)
         file <- fread(paste0(tempDir, '/', newName), showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores)
         unlink(temp)
       } else {
-        download.file(urls[n], paste0(dir, tblNames[n]))
-        unzip(temp, exdir = dir)
+        #download.file(urls[n], paste0(dir, tblNames[n]))
+        unzip(temp, exdir = str_sub(dir, 1, -2))
         file <- fread(paste0(dir, newName), showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores)
       }
 
@@ -649,7 +651,7 @@ Did you accidentally include the state abbreviation in front of the table name? 
       if (is.null(dir)){
         unzip(temp, exdir = tempDir)
       } else {
-        unzip(temp, exdir = dir)
+        unzip(temp, exdir = str_sub(dir, 1, -2))
       }
       unlink(temp)
     }
