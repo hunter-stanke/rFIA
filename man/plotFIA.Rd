@@ -6,13 +6,13 @@ Default behavior for non-spatial summaries produces time-series plots, and for s
 }
 
 \usage{
-plotFIA(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, n.max = NULL,
-        plot.title = NULL, y.lab = NULL, x.lab = NULL, legend.title = NULL,
-        legend.labs = waiver(), color.option = 'viridis', line.color = "gray30",
-        line.width =1, min.year = 2005, direction = 1, alpha = .9,
-        transform = "identity", text.size = 1, text.font = '', lab.width = 1,
-        legend.height = 1, legend.width = 1, device = "png", savePath = NULL,
-        fileName = NULL)
+plotFIA(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet = FALSE,
+        n.max = NULL, plot.title = NULL, y.lab = NULL, x.lab = NULL,
+        legend.title = NULL, legend.labs = waiver(), color.option = 'viridis',
+        line.color = "gray30", line.width =1, min.year = 2005, direction = 1,
+        alpha = .9, transform = "identity", text.size = 1, text.font = '',
+        lab.width = 1, legend.height = 1, legend.width = 1, device = "png",
+        savePath = NULL, fileName = NULL)
            }
 
 \arguments{
@@ -25,6 +25,8 @@ plotFIA(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, n.max = NULL,
   \item{x}{variable contained in \code{data} which will be used as a x-axis in place of time. If NULL, time-series plot will be produced. Not meaningful for spatial summaries. NOT quoted.}
 
   \item{animate}{logical; if TRUE, produces temporally animated plots.}
+
+  \item{facet}{logical; if TRUE, produces temporally grouped plots (stationary).}
 
   \item{n.max}{numeric; maximum number of groups to plot. If positive, will plot the top \code{n} groups with respect to \code{y}, and if negative, will plot the bottom \code{n}. Not meaningful for spatial summaries.}
 

@@ -1,5 +1,5 @@
 #' @export
-plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE,
+plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet = FALSE,
                     n.max = NULL, plot.title = NULL, y.lab = NULL, x.lab = NULL,
                     legend.title = NULL, legend.labs = waiver(), color.option = 'viridis',
                     line.color = "gray30", line.width =1, min.year = 2005,
@@ -63,9 +63,9 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE,
            grpVar = !!grp_quo,
            yVar = !!y_quo)
 
-  # Filter for the year specified
-  data <- data %>%
-    filter(YEAR >= min.year)
+  # # Filter for the year specified
+  # data <- data %>%
+  #   filter(YEAR >= min.year)
 
   ## If they want a subset of the groups
   if (!is.null(n.max) & quo_name(grp_quo) != 'NULL'){
@@ -120,7 +120,7 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE,
       }
 
     ## Plotting spatial polygons
-    } else{
+    } else {
       # Make the spatial map
       map <- data %>%
         ggplot() +
@@ -141,6 +141,8 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE,
       map <- map +
         transition_manual(YEAR) +
         labs(title = 'Year: {current_frame}')
+    } else if(facet){
+      map <- map + facet_wrap(~YEAR)
     }
 
   ###### TIME SERIES PLOTS  (or UD x) ######
