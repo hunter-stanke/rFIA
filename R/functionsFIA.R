@@ -1487,7 +1487,8 @@ standStruct <- function(db,
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   sOut <- drop_na(sOut, grpBy) %>%
-    arrange(YEAR)
+    arrange(YEAR)%>%
+    as_tibble()
 
   ## Above converts to tibble
   if (returnSpatial) sOut <- st_sf(sOut)
@@ -1915,7 +1916,8 @@ diversity <- function(db,
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   dOut <- drop_na(dOut, grpBy) %>%
-    arrange(YEAR)
+    arrange(YEAR)%>%
+    as_tibble()
   ## Above converts to tibble
   if (returnSpatial) dOut <- st_sf(dOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
@@ -2359,7 +2361,8 @@ tpa <- function(db,
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   tOut <- drop_na(tOut, grpBy) %>%
-    arrange(YEAR)
+    arrange(YEAR) %>%
+    as_tibble()
   ## Above converts to tibble
   if (returnSpatial) tOut <- st_sf(tOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
@@ -2903,7 +2906,8 @@ growMort <- function(db,
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   tOut <- drop_na(tOut, grpBy) %>%
-    arrange(YEAR)
+    arrange(YEAR)%>%
+    as_tibble()
   ## Above converts to tibble
   if (returnSpatial) tOut <- st_sf(tOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
@@ -3475,7 +3479,8 @@ vitalRates <- function(db,
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   tOut <- drop_na(tOut, grpBy) %>%
-    arrange(YEAR)
+    arrange(YEAR)%>%
+    as_tibble()
   ## Above converts to tibble
   if (returnSpatial) tOut <- st_sf(tOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
@@ -3909,7 +3914,8 @@ biomass <- function(db,
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   bOut <- drop_na(bOut, grpBy) %>%
-    arrange(YEAR)
+    arrange(YEAR) %>%
+    as_tibble()
   ## Above converts to tibble
   if (returnSpatial) bOut <- st_sf(bOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
@@ -4392,7 +4398,8 @@ dwm <- function(db,
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   cOut <- drop_na(cOut, grpBy) %>%
-    arrange(YEAR)
+    arrange(YEAR)%>%
+    as_tibble()
   ## Above converts to tibble
   if (returnSpatial) cOut <- st_sf(cOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
@@ -4767,7 +4774,8 @@ invasive <- function(db,
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   invOut <- drop_na(invOut, grpBy) %>%
-    arrange(YEAR)
+    arrange(YEAR)%>%
+    as_tibble()
   ## Above converts to tibble
   if (returnSpatial) invOut <- st_sf(invOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
@@ -5193,7 +5201,8 @@ area <- function(db,
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   ## Remove NA values from groups
   aOut <- drop_na(aOut, grpBy) %>%
-    arrange(YEAR)
+    arrange(YEAR)%>%
+    as_tibble()
   ## Above converts to tibble
   if (returnSpatial) aOut <- st_sf(aOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
