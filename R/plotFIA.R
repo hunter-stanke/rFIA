@@ -142,7 +142,10 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet
         transition_manual(YEAR) +
         labs(title = 'Year: {current_frame}')
     } else if(facet){
-      map <- map + facet_wrap(~YEAR)
+      map <- map + facet_wrap(~YEAR) +
+        theme(strip.text = element_text(size = 12 * text.size, family = text.font),
+              strip.background = element_rect(fill = 'gray'),
+              panel.background = element_rect(color = 'black'))
     }
 
   ###### TIME SERIES PLOTS  (or UD x) ######
