@@ -2450,7 +2450,7 @@ growMort <- function(db,
   if(any(unique(db$PLOT$STATECD) %in% c(69, 72, 78, 15, 02))){
     vState <- unique(db$PLOT$STATECD[db$PLOT$STATECD %in% c(69, 72, 78, 15, 02)])
     fancyName <- unique(intData$EVAL_GRP$STATE[intData$EVAL_GRP$STATECD %in% vState])
-    stop(paste('Growth & Mortality Estimates unavailable for: ', as.character(fancyName), sep = ''))
+    stop(paste('Growth & Mortality Estimates unavailable for: ', paste(as.character(fancyName), collapse = ', '), sep = ''))
   }
 
   # Save original grpByfor pretty return with spatial objects
