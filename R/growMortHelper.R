@@ -41,7 +41,7 @@ growMortHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE, chngAdj){
       # Compute estimates at plot level
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
       summarize(tPlot = sum(TPAGROW_UNADJ * tAdj * tDI, na.rm = TRUE),
-                rPlot = sum(TPAGROW_UNADJ[COMPONENT == 'INGROWTH'] * tAdj[COMPONENT == 'INGROWTH'] * tDI[COMPONENT == 'INGROWTH'], na.rm = TRUE),
+                rPlot = sum(TPAGROW_UNADJ[COMPONENT == 'INGROWTH'] * tAdj[COMPONENT == 'INGROWTH'] * tDI[COMPONENT == 'INGROWTH'] / REMPER[COMPONENT == 'INGROWTH'], na.rm = TRUE),
                 mPlot = sum(TPAMORT_UNADJ* tAdj * tDI, na.rm = TRUE),
                 hPlot = sum(TPAREMV_UNADJ * tAdj * tDI, na.rm = TRUE),
                 #prevPop = tPlot + mPlot * first(REMPER) + hPlot * first(REMPER) - rPlot * first(REMPER),
