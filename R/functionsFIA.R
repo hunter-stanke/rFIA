@@ -385,6 +385,174 @@ NULL
 
 #globalVariables(c('.'))
 
+## Not exported
+readFHM <- function(dir, tables = NULL, nCores = 1){
+  # Add a slash to end of directory name if missing
+  if (str_sub(dir,-1) != '/') dir <- paste(dir, '/', sep = "")
+  # Grab all the file names in directory
+  files <- list.files(dir)
+  inTables <- list()
+
+  # Some warnings
+  if(!dir.exists(dir)) {
+    stop(paste('Directory', dir, 'does not exist.'))
+  }
+  if(length(files[str_to_lower(str_sub(files,-4, -1)) == '.csv']) < 1){
+    stop(paste('Directory', dir, 'contains no .csv files.'))
+  }
+
+
+  # Only read in the specified tables
+  if (!is.null(tables)){
+    if (any(str_sub(files, 3, 3) == '_')){
+      files <- files[str_sub(files,4,-5) %in% tables]
+    } else {
+      files <- files[str_sub(files,1,-5) %in% tables]
+    }
+  }
+
+  # Only csvs
+  files <- files[str_to_lower(str_sub(files,-4,-1)) == '.csv']
+
+  inTables <- list()
+  for (n in 1:length(files)){
+    # Read in and append each file to a list
+    file <- fread(paste(dir, files[n], sep = ""), showProgress = FALSE, integer64 = 'double', logical01 = FALSE, nThread = nCores)
+    # We don't want data.table formats
+    #file <- as.data.frame(file)
+    fileName <- str_sub(files[n], 1, -5)
+
+    inTables[[fileName]] <- file
+  }
+
+  outTables <- list()
+  names(inTables) <- str_sub(names(inTables), 4, -6)
+
+  uniqueNames <- unique(names(inTables))
+  ## Works regardless of whether or not there are duplicate names (multiple states)
+  for (i in 1:length(uniqueNames)){
+    outTables[[uniqueNames[i]]] <- rbindlist(inTables[names(inTables) == uniqueNames[i]], fill=TRUE)
+  }
+
+  # NEW CLASS NAME FOR FIA DATABASE OBJECTS
+  outTables <- lapply(outTables, as_tibble)
+  class(outTables) <- 'FIA.Database'
+
+  ## If you are on windows, close explicitly
+  #closeAllConnections()
+
+  return(outTables)
+}
+## Not exported
+getFHM <- function(states,
+                   dir = NULL,
+                   nCores = 1){
+
+  if (!is.null(dir)){
+    # Add a slash to end of directory name if missing
+    if (str_sub(dir,-1) != '/'){
+      dir <- paste(dir, '/', sep = "")
+    }
+    # Check to see directory exists, if not, make it
+    if(!dir.exists(dir)) {
+      dir.create(dir)
+      message(paste('Creating directory:', dir))
+    }
+  }
+
+  #   ## Some warnings up front
+  #   ## Do not try to merge ENTIRE with other states
+  #   if (length(states) > 1 & any(str_detect(str_to_upper(states), 'ENTIRE'))){
+  #     stop('Cannot merge ENITRE with other state tables. ENTIRE includes all state tables combined. Do you only need data for a particular region?')
+  #   }
+  #   ## Check to make sure states exist
+  #   allStates <- c('AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID',
+  #                  'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS',
+  #                  'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK',
+  #                  'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV',
+  #                  'WI', 'WY', 'AS', 'FM', 'GU', 'MP', 'PW', 'PR', 'VI', 'ENTIRE', 'REF')
+  #   if (any(str_to_upper(states) %in% allStates == FALSE)){
+  #     missStates <- states[str_to_upper(states) %in% allStates == FALSE]
+  #     stop(paste('Data unavailable for: ', paste(as.character(missStates),collapse = ', '), '. Did you use state/terrority abbreviations? e.g. use states = "AL" (correct) instead of states = "ALABAMA".'))
+  #   }
+  #
+  #   ## Check to make sure tables exist
+  #   allTables <- c("BOUNDARY", "COND_DWM_CALC", "COND","COUNTY","DWM_COARSE_WOODY_DEBRIS",
+  #                  "DWM_DUFF_LITTER_FUEL","DWM_FINE_WOODY_DEBRIS","DWM_MICROPLOT_FUEL",
+  #                  "DWM_RESIDUAL_PILE", "DWM_TRANSECT_SEGMENT", "DWM_VISIT","GRND_CVR",
+  #                  "INVASIVE_SUBPLOT_SPP","LICHEN_LAB","LICHEN_PLOT_SUMMARY","LICHEN_VISIT",
+  #                  "OZONE_BIOSITE_SUMMARY","OZONE_PLOT_SUMMARY","OZONE_PLOT","OZONE_SPECIES_SUMMARY",
+  #                  "OZONE_VALIDATION","OZONE_VISIT", "P2VEG_SUBP_STRUCTURE","P2VEG_SUBPLOT_SPP",
+  #                  "PLOT_REGEN","PLOT", "PLOTGEOM", "PLOTSNAP","POP_ESTN_UNIT","POP_EVAL_ATTRIBUTE",
+  #                  "POP_EVAL_GRP","POP_EVAL_TYP","POP_EVAL","POP_PLOT_STRATUM_ASSGN","POP_STRATUM",
+  #                  "SEEDLING_REGEN","SEEDLING","SITETREE","SOILS_EROSION","SOILS_LAB","SOILS_SAMPLE_LOC" ,
+  #                  "SOILS_VISIT", "SUBP_COND_CHNG_MTRX","SUBP_COND","SUBPLOT_REGEN","SUBPLOT",
+  #                  "SURVEY","TREE_GRM_BEGIN","TREE_GRM_COMPONENT","TREE_GRM_ESTN", "TREE_GRM_MIDPT",
+  #                  "TREE_REGIONAL_BIOMASS", "TREE_WOODLAND_STEMS","TREE","VEG_PLOT_SPECIES",
+  #                  "VEG_QUADRAT","VEG_SUBPLOT_SPP","VEG_SUBPLOT", "VEG_VISIT",
+  #                  'CITATION', 'DIFFERENCE_TEST_PER_ACRE', 'DIFFERENCE_TEST_TOTALS',
+  #                  'FIADB_VERSION', 'FOREST_TYPE', 'FOREST_TYPE_GROUP',
+  #                  'GRM_TYPE', 'HABTYP_DESCRIPTION', 'HABTYP_PUBLICATION',
+  #                  'INVASIVE_SPECIES', 'LICHEN_SPECIES', 'LICHEN_SPP_COMMENTS',
+  #                  'NVCS_HEIRARCHY_STRCT', 'NVCS_LEVEL_1_CODES', 'NVCS_LEVEL_2_CODES',
+  #                  'NVCS_LEVEL_3_CODES', 'NVCS_LEVEL_4_CODES', 'NVCS_LEVEL_5_CODES',
+  #                  'NVCS_LEVEL_6_CODES', 'NVCS_LEVEL_7_CODES', 'NVCS_LEVEL_8_CODES',
+  #                  'OWNGRPCD', 'PLANT_DICTIONARY', 'POP_ATTRIBUTE', 'POP_EVAL_TYP_DESCR',
+  #                  'RESEARCH_STATION', 'SPECIES', 'SPECIES_GROUP', 'STATE_ELEV', 'UNIT')
+  #   if (any(str_to_upper(tables) %in% allTables == FALSE)){
+  #     missTables <- tables[str_to_upper(tables) %in% allTables == FALSE]
+  #     stop(paste('Tables: ', paste(as.character(missTables),collapse = ', '), ' unavailble. Check the FIA Datamart at https://apps.fs.usda.gov/fia/datamart/CSV/datamart_csv.html for a list of available tables for each state. Alternatively, specify common = TRUE to download the most commonly used tables.
+  #
+  # Did you accidentally include the state abbreviation in front of the table name? e.g. tables = "AL_PLOT" (wrong) instead of tables = "PLOT" (correct).'))
+  #   }
+  #
+
+
+  ## If individual tables are specified, then just grab those .csvs, otherwise download the .zip file, extract and read with fread. Should be quite a bit quicker.
+  urlNames <- sapply(states, FUN = function(x){paste0(x,'.zip')})
+  urlNames <- c(urlNames)
+  ## Set up urls
+  urls <- paste0('https://www.fia.fs.fed.us/tools-data/other_data/csv/', urlNames)
+
+  # Make sure state Abbs are in right format
+  states <- str_to_upper(states)
+
+  ## If dir is not specified, hold in a temporary directory
+  if (is.null(dir)){tempDir <- tempdir()}
+
+  ## Download each state and extract to directory
+  for (i in 1:length(states)){
+    # Temporary directory to download to
+    temp <- tempfile()
+    ## Make the URL
+    url <- paste0('https://www.fia.fs.fed.us/tools-data/other_data/csv/', states[i],'.zip')
+    ## Download as temporary file
+    download.file(url, temp)
+    ## Extract
+    if (is.null(dir)){
+      unzip(temp, exdir = tempDir)
+    } else {
+      unzip(temp, exdir = str_sub(dir, 1, -2))
+    }
+    unlink(temp)
+  }
+
+  ## Read in the files w/ readFHM
+  if (is.null(dir)){
+    outTables <- readFHM(tempDir, nCores = nCores)
+    unlink(tempDir)
+  } else {
+    outTables <- readFHM(dir, nCores = nCores)
+  }
+
+  # NEW CLASS NAME FOR FIA DATABASE OBJECTS
+  #outTables <- lapply(outTables, as.data.frame)
+  class(outTables) <- 'FHM.Database'
+
+  return(outTables)
+
+}
+
 
 ################### FIA FUNCTIONS #########################
 # Read in FIA database files (.csv) from local directory
@@ -1487,7 +1655,8 @@ standStruct <- function(db,
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   sOut <- drop_na(sOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
-    arrange(YEAR)
+    arrange(YEAR) %>%
+    as_tibble()
 
   ## Above converts to tibble
   if (returnSpatial) sOut <- st_sf(sOut)
@@ -1914,8 +2083,14 @@ diversity <- function(db,
   dOut <- do.call(rbind, out)
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
+<<<<<<< HEAD
   dOut <- drop_na(dOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
+=======
+  dOut <- drop_na(dOut, grpBy) %>%
+    arrange(YEAR)%>%
+    as_tibble()
+>>>>>>> fda7a286c9277fc2b7b9e99dd7386a440bdccfb0
   ## Above converts to tibble
   if (returnSpatial) dOut <- st_sf(dOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
@@ -2358,8 +2533,14 @@ tpa <- function(db,
   tOut <- do.call(rbind, out)
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
+<<<<<<< HEAD
   tOut <- drop_na(tOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
+=======
+  tOut <- drop_na(tOut, grpBy) %>%
+    arrange(YEAR) %>%
+    as_tibble()
+>>>>>>> fda7a286c9277fc2b7b9e99dd7386a440bdccfb0
   ## Above converts to tibble
   if (returnSpatial) tOut <- st_sf(tOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
@@ -2447,7 +2628,7 @@ growMort <- function(db,
   if(any(unique(db$PLOT$STATECD) %in% c(69, 72, 78, 15, 02))){
     vState <- unique(db$PLOT$STATECD[db$PLOT$STATECD %in% c(69, 72, 78, 15, 02)])
     fancyName <- unique(intData$EVAL_GRP$STATE[intData$EVAL_GRP$STATECD %in% vState])
-    stop(paste('Growth & Mortality Estimates unavailable for: ', as.character(fancyName), sep = ''))
+    stop(paste('Growth & Mortality Estimates unavailable for: ', paste(as.character(fancyName), collapse = ', '), sep = ''))
   }
 
   # Save original grpByfor pretty return with spatial objects
@@ -2662,7 +2843,7 @@ growMort <- function(db,
       left_join(select(db_clip$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('ESTN_UNIT_CN' = 'CN')) %>%
       right_join(select(db_clip$POP_EVAL, c('EVALID', 'EVAL_GRP_CN', 'ESTN_METHOD', 'CN', 'END_INVYR', 'REPORT_YEAR_NM')), by = c('EVAL_CN' = 'CN')) %>%
       left_join(select(db_clip$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
-      left_join(select(db_clip$PLOT, c('PLT_CN', 'PREV_PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', grpP, 'sp', 'aD_p')), by = 'PLT_CN') %>%
+      left_join(select(db_clip$PLOT, c('PLT_CN', 'PREV_PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'REMPER', grpP, 'sp', 'aD_p')), by = 'PLT_CN') %>%
       left_join(select(db_clip$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID','landD', 'aD_c', grpC)), by = 'PLT_CN') %>%
       left_join(select(db_clip$TREE, c('TRE_CN', 'PREV_TRE_CN', 'TREE', 'PLT_CN', 'CONDID', 'PREVCOND', 'SPCD', grpT, 'typeD', 'tD')), by = c('PLT_CN', 'CONDID')) %>% ## ISSUE MAY BE HERE, SEE EVALIDATOR CODE
       # GRM
@@ -2783,7 +2964,7 @@ growMort <- function(db,
         # Compute estimates at plot level
         group_by(.dots = grpBy, PLT_CN) %>%
         summarize(TOTAL_TPA = sum(TPAGROW_UNADJ * tDI, na.rm = TRUE),
-                  RECR_TPA = sum(TPAGROW_UNADJ[COMPONENT == 'INGROWTH'] * tAdj[COMPONENT == 'INGROWTH'] * tDI[COMPONENT == 'INGROWTH'], na.rm = TRUE),
+                  RECR_TPA = sum(TPAGROW_UNADJ[COMPONENT == 'INGROWTH'] * tAdj[COMPONENT == 'INGROWTH'] * tDI[COMPONENT == 'INGROWTH'] / REMPER[COMPONENT == 'INGROWTH'], na.rm = TRUE),
                   MORT_TPA = sum(TPAMORT_UNADJ * tDI, na.rm = TRUE),
                   REMV_TPA = sum(TPAREMV_UNADJ * tDI, na.rm = TRUE),
                   RECR_PERC = RECR_TPA / TOTAL_TPA * 100,
@@ -2902,8 +3083,14 @@ growMort <- function(db,
   tOut <- do.call(rbind, out)
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
+<<<<<<< HEAD
   tOut <- drop_na(tOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
+=======
+  tOut <- drop_na(tOut, grpBy) %>%
+    arrange(YEAR)%>%
+    as_tibble()
+>>>>>>> fda7a286c9277fc2b7b9e99dd7386a440bdccfb0
   ## Above converts to tibble
   if (returnSpatial) tOut <- st_sf(tOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
@@ -3474,8 +3661,14 @@ vitalRates <- function(db,
   tOut <- do.call(rbind, out)
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
+<<<<<<< HEAD
   tOut <- drop_na(tOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
+=======
+  tOut <- drop_na(tOut, grpBy) %>%
+    arrange(YEAR)%>%
+    as_tibble()
+>>>>>>> fda7a286c9277fc2b7b9e99dd7386a440bdccfb0
   ## Above converts to tibble
   if (returnSpatial) tOut <- st_sf(tOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
@@ -3908,8 +4101,14 @@ biomass <- function(db,
   bOut <- do.call(rbind, out)
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
+<<<<<<< HEAD
   bOut <- drop_na(bOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
+=======
+  bOut <- drop_na(bOut, grpBy) %>%
+    arrange(YEAR) %>%
+    as_tibble()
+>>>>>>> fda7a286c9277fc2b7b9e99dd7386a440bdccfb0
   ## Above converts to tibble
   if (returnSpatial) bOut <- st_sf(bOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
@@ -4391,8 +4590,14 @@ dwm <- function(db,
   cOut <- do.call(rbind, out)
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
+<<<<<<< HEAD
   cOut <- drop_na(cOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
+=======
+  cOut <- drop_na(cOut, grpBy) %>%
+    arrange(YEAR)%>%
+    as_tibble()
+>>>>>>> fda7a286c9277fc2b7b9e99dd7386a440bdccfb0
   ## Above converts to tibble
   if (returnSpatial) cOut <- st_sf(cOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
@@ -4766,8 +4971,14 @@ invasive <- function(db,
   invOut <- do.call(rbind, out)
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
+<<<<<<< HEAD
   invOut <- drop_na(invOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
+=======
+  invOut <- drop_na(invOut, grpBy) %>%
+    arrange(YEAR)%>%
+    as_tibble()
+>>>>>>> fda7a286c9277fc2b7b9e99dd7386a440bdccfb0
   ## Above converts to tibble
   if (returnSpatial) invOut <- st_sf(invOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
@@ -5192,8 +5403,14 @@ area <- function(db,
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   ## Remove NA values from groups
+<<<<<<< HEAD
   aOut <- drop_na(aOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
+=======
+  aOut <- drop_na(aOut, grpBy) %>%
+    arrange(YEAR)%>%
+    as_tibble()
+>>>>>>> fda7a286c9277fc2b7b9e99dd7386a440bdccfb0
   ## Above converts to tibble
   if (returnSpatial) aOut <- st_sf(aOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
