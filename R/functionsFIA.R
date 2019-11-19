@@ -1486,7 +1486,7 @@ standStruct <- function(db,
   sOut <- do.call(rbind, out)
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
-  sOut <- drop_na(sOut, grpBy) %>%
+  sOut <- drop_na(sOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
 
   ## Above converts to tibble
@@ -1914,7 +1914,7 @@ diversity <- function(db,
   dOut <- do.call(rbind, out)
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
-  dOut <- drop_na(dOut, grpBy) %>%
+  dOut <- drop_na(dOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
   ## Above converts to tibble
   if (returnSpatial) dOut <- st_sf(dOut)
@@ -2358,7 +2358,7 @@ tpa <- function(db,
   tOut <- do.call(rbind, out)
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
-  tOut <- drop_na(tOut, grpBy) %>%
+  tOut <- drop_na(tOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
   ## Above converts to tibble
   if (returnSpatial) tOut <- st_sf(tOut)
@@ -2902,7 +2902,7 @@ growMort <- function(db,
   tOut <- do.call(rbind, out)
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
-  tOut <- drop_na(tOut, grpBy) %>%
+  tOut <- drop_na(tOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
   ## Above converts to tibble
   if (returnSpatial) tOut <- st_sf(tOut)
@@ -3474,7 +3474,7 @@ vitalRates <- function(db,
   tOut <- do.call(rbind, out)
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
-  tOut <- drop_na(tOut, grpBy) %>%
+  tOut <- drop_na(tOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
   ## Above converts to tibble
   if (returnSpatial) tOut <- st_sf(tOut)
@@ -3908,7 +3908,7 @@ biomass <- function(db,
   bOut <- do.call(rbind, out)
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
-  bOut <- drop_na(bOut, grpBy) %>%
+  bOut <- drop_na(bOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
   ## Above converts to tibble
   if (returnSpatial) bOut <- st_sf(bOut)
@@ -4391,7 +4391,7 @@ dwm <- function(db,
   cOut <- do.call(rbind, out)
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
-  cOut <- drop_na(cOut, grpBy) %>%
+  cOut <- drop_na(cOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
   ## Above converts to tibble
   if (returnSpatial) cOut <- st_sf(cOut)
@@ -4766,7 +4766,7 @@ invasive <- function(db,
   invOut <- do.call(rbind, out)
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
-  invOut <- drop_na(invOut, grpBy) %>%
+  invOut <- drop_na(invOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
   ## Above converts to tibble
   if (returnSpatial) invOut <- st_sf(invOut)
@@ -5192,7 +5192,7 @@ area <- function(db,
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
   ## Remove NA values from groups
-  aOut <- drop_na(aOut, grpBy) %>%
+  aOut <- drop_na(aOut, grpBy[grpBy %in% names(polys) == FALSE]) %>%
     arrange(YEAR)
   ## Above converts to tibble
   if (returnSpatial) aOut <- st_sf(aOut)
