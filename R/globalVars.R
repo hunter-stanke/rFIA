@@ -112,4 +112,6 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'NETVOL_ACRE_SE', 'SAWVOL_ACRE_SE', 'SUBPTYP_PROP_CHNG',
                          'BA', 'BA1', 'BA2', 'DIA.beg', 'DIA1', 'DIA2', 'DRYBIO_AG.beg', 'DRYBIO_AG1', 'DRYBIO_AG2',
                          'ONEORTWO', 'VOLCFNET.beg', 'VOLCFNET1', 'VOLCFNET2', 'VOLCSNET.beg', 'VOLCSNET.mid',
-                         'VOLCSNET.prev', 'ga', 'se', 'ba', 'baa', 'd', 'vol', 'volA', 'place'))
+                         'VOLCSNET.prev', 'ga', 'se', 'ba', 'baa', 'd', 'vol', 'volA', 'place',
+                         'ANN_INVENTORY', 'MANUAL', 'RSCD', 'SEEDLING', 'SEEDLING_SE', 'SEEDLING_TOTAL',
+                         'SEEDLING_TOTAL_full', 'STATENM', 'nPlots_SEEDLING', 'plotIn_SEEDLING'))
