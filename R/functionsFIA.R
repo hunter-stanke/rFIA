@@ -460,6 +460,9 @@ getFHM <- function(states,
     }
   }
 
+  ## If dir is not specified, hold in a temporary directory
+  if (is.null(dir)){tempDir <- tempdir()}
+
   #   ## Some warnings up front
   #   ## Do not try to merge ENTIRE with other states
   #   if (length(states) > 1 & any(str_detect(str_to_upper(states), 'ENTIRE'))){
@@ -517,9 +520,6 @@ getFHM <- function(states,
   # Make sure state Abbs are in right format
   states <- str_to_upper(states)
 
-  ## If dir is not specified, hold in a temporary directory
-  if (is.null(dir)){tempDir <- tempdir()}
-
   ## Download each state and extract to directory
   for (i in 1:length(states)){
     # Temporary directory to download to
@@ -540,7 +540,7 @@ getFHM <- function(states,
   ## Read in the files w/ readFHM
   if (is.null(dir)){
     outTables <- readFHM(tempDir, nCores = nCores)
-    unlink(tempDir)
+    #unlink(tempDir, recursive = TRUE)
   } else {
     outTables <- readFHM(dir, nCores = nCores)
   }
@@ -667,6 +667,9 @@ getFIA <- function(states,
     }
   }
 
+  ## If dir is not specified, hold in a temporary directory
+  if (is.null(dir)){tempDir <- tempdir()}
+
   ## Some warnings up front
   ## Do not try to merge ENTIRE with other states
   if (length(states) > 1 & any(str_detect(str_to_upper(states), 'ENTIRE'))){
@@ -736,9 +739,6 @@ Did you accidentally include the state abbreviation in front of the table name? 
     inTables = list()
     for (n in 1:length(urls)){
 
-      ## If dir is not specified, hold in a temporary directory
-      if (is.null(dir)){tempDir <- tempdir()}
-
       newName <- paste0(str_sub(tblNames[n], 1, -5), '.csv')
 
       ## Download the zip to a temporary file
@@ -749,7 +749,6 @@ Did you accidentally include the state abbreviation in front of the table name? 
       if(is.null(dir)){
         unzip(temp, exdir = tempDir)
         file <- fread(paste0(tempDir, '/', newName), showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores)
-        unlink(temp)
       } else {
         #download.file(urls[n], paste0(dir, tblNames[n]))
         unzip(temp, exdir = str_sub(dir, 1, -2))
@@ -796,6 +795,7 @@ Did you accidentally include the state abbreviation in front of the table name? 
     }
     # NEW CLASS NAME FOR FIA DATABASE OBJECTS
     #outTables <- lapply(outTables, as.data.frame)
+    unlink(tempDir, recursive = TRUE)
     class(outTables) <- 'FIA.Database'
     #### DOWNLOADING THE WHOLE ZIP FILE
   } else {
@@ -804,13 +804,10 @@ Did you accidentally include the state abbreviation in front of the table name? 
     # Make sure state Abbs are in right format
     states <- str_to_upper(states)
 
-    ## If dir is not specified, hold in a temporary directory
-    if (is.null(dir)){tempDir <- tempdir()}
-
     ## Download each state and extract to directory
     for (i in 1:length(states)){
       # Temporary directory to download to
-      temp <- tempfile()
+      temp <- paste0(tempDir, '/', states[i],'.zip') #tempfile()
       ## Make the URL
       url <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', states[i],'.zip')
       ## Download as temporary file
@@ -827,15 +824,24 @@ Did you accidentally include the state abbreviation in front of the table name? 
     ## Read in the files w/ readFIA
     if (is.null(dir)){
       outTables <- readFIA(tempDir, nCores = nCores, common = common)
-      unlink(tempDir)
+      #unlink(tempDir, recursive = TRUE)
     } else {
       outTables <- readFIA(dir, nCores = nCores, common = common)
     }
 
     ## If you are on windows, close explicitly
-    closeAllConnections()
+    #closeAllConnections()
+    #unlink(temp)
 
   }
+  #unlink(tempDir, recursive = TRUE)
+  #closeAllConnections()
+
+  if (is.null(dir)){
+     tmp <- list.files(tempDir, full.names = TRUE, pattern = '.csv')
+     invisible(file.remove(tmp))
+    }
+
   return(outTables)
 
 }
