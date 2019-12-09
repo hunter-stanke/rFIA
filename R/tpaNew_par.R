@@ -70,6 +70,12 @@ tpaNew_par <- function(db,
   # Save original grpBy for pretty return with spatial objects
   grpByOrig <- grpBy
 
+  ## IF the object was clipped
+  if ('prev' %in% names(db$PLOT)){
+    ## Only want the current plots, no grm
+    db$PLOT <- filter(db$PLOT, prev == 0)
+  }
+
 
 
   ### AREAL SUMMARY PREP

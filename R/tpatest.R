@@ -3,7 +3,7 @@ plotsum <- function(x, plts, db, grpBy, aGrpBy, byPlot){
   ## Selecting the plots for one county
   db$PLOT <- plts[[x]]
   ## Carrying out filter across all tables
-  db <- clipFIA(db, mostRecent = FALSE)
+  #db <- clipFIA(db, mostRecent = FALSE)
 
 
   ## Which grpByNames are in which table? Helps us subset below

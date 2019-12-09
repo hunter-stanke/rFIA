@@ -1173,6 +1173,8 @@ clipFIA <- function(db,
       name <- tableNames[i]
 
       if (name == "PLOT"){
+        db$PLOT$prev = 0
+        PPLOT$prev = 1
         clippedData[['PLOT']] <- rbind(db$PLOT, PPLOT)
 
       } else if (!is.null(db$OZONE_PLOT) & name == 'OZONE_PLOT'){
