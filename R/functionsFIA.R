@@ -75,6 +75,12 @@ divIndex <- function(SPCD, TPA, index) {
   return(value)
 }
 
+areal_par <- function(x, pltSF, polys){
+  pltSF <- st_intersection(pltSF, polys[[x]]) %>%
+    as.data.frame() %>%
+    select(-c('geometry')) # removes artifact of SF object
+}
+
 
 #' @export
 makeClasses <- function(x, interval = NULL, lower = NULL, upper = NULL, brks = NULL, numLabs = FALSE){
@@ -246,6 +252,22 @@ unitVar <- function(method, ESTN_METHOD, a, nh, w, v, stratMean, unitM, stratMea
                 ((first(a)^2)/sum(nh)) * (sum(w*nh*v) + sum((1-w)*(nh/sum(nh))*v)),
                 ifelse(first(ESTN_METHOD) == 'double',
                        (first(a)^2) * (sum(((nh-1)/(sum(nh)-1))*(nh/sum(nh))*v) + ((1/(sum(nh)-1))*sum((nh/sum(nh))*(stratMean - unitM) * (stratMean1 - (unitM1/first(a)))))),
+                       sum(v))) # Stratified random case (additive covariance)
+  }
+}
+
+unitVarNew <- function(method, ESTN_METHOD, a, nh, n, w, v, stratMean, unitM, stratMean1 = NULL, unitM1 = NULL){
+  if(method == 'var'){
+    uv = ifelse(first(ESTN_METHOD) == 'strat',
+                ((first(a)^2)/n) * (sum(w*nh*v) + sum((1-w)*(nh/n)*v)),
+                ifelse(first(ESTN_METHOD) == 'double',
+                       (first(a)^2) * (sum(((nh-1)/(n-1))*(nh/n)*v) + ((1/(n-1))*sum((nh/n)*(stratMean - (unitM/first(a)))^2))),
+                       sum(v))) # Stratified random case
+  } else {
+    cv = ifelse(first(ESTN_METHOD) == 'strat',
+                ((first(a)^2)/n) * (sum(w*nh*v) + sum((1-w)*(nh/n)*v)),
+                ifelse(first(ESTN_METHOD) == 'double',
+                       (first(a)^2) * (sum(((nh-1)/(n-1))*(nh/n)*v) + ((1/(n-1))*sum((nh/n)*(stratMean - unitM) * (stratMean1 - (unitM1/first(a)))))),
                        sum(v))) # Stratified random case (additive covariance)
   }
 }
@@ -978,7 +1000,7 @@ clipFIA <- function(db,
   db$PLOT <- db$PLOT %>%
     mutate(PLT_CN = CN) %>%
     #mutate(date = ymd(paste(MEASYEAR, MEASMON, MEASDAY, sep = '-'))) %>%
-    mutate(plotID = paste(STATECD, COUNTYCD, PLOT, sep = '')) # Make a unique ID for each plot, irrespective of time
+    mutate(pltID = paste(UNITCD, STATECD, COUNTYCD, PLOT, sep = '_')) # Make a unique ID for each plot, irrespective of time
 
   if (!is.null(designCD)) db$PLOT <- filter(db$PLOT, DESIGNCD == any(as.integer(designCD)))
 
@@ -1047,62 +1069,90 @@ clipFIA <- function(db,
    if (!is.null(mask)){
      # Convert polygons to an sf object
      mask <- mask %>%
-       as('sf')
-
+       as('sf') %>%
+       mutate(polyID = 1:nrow(mask))
      ## Make plot data spatial, projected same as polygon layer
-     pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
+     pltSF <- select(db$PLOT, c('LON', 'LAT', pltID)) %>%
+       filter(!is.na(LAT) & !is.na(LON)) %>%
+       distinct(pltID, .keep_all = TRUE)
      coordinates(pltSF) <- ~LON+LAT
      proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
      pltSF <- as(pltSF, 'sf') %>%
        st_transform(crs = st_crs(mask)$proj4string)
 
-     # Intersect plot with polygons
-     mask$polyID <- 1:nrow(mask)
+     ## Split up mask
+     polyList <- split(mask, as.factor(mask$polyID))
+
      suppressMessages({suppressWarnings({
-       pltSF <- st_intersection(pltSF, mask) %>%
-         as.data.frame() %>%
-         select(-c('geometry')) # removes artifact of SF object
+       ## Intersect it
+       out <- lapply(names(polyList), FUN = areal_par, pltSF, polyList)
      })})
 
-     # Identify the estimation units to which plots within the mask belong to
-     estUnits <- pltSF %>%
-       inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'STRATUM_CN')), by = 'PLT_CN') %>%
-       inner_join(select(db$POP_STRATUM, c('CN', 'ESTN_UNIT_CN')), by = c('STRATUM_CN' = 'CN')) %>%
-       group_by(ESTN_UNIT_CN) %>%
-       summarize()
 
-     # Identify all the plots which fall inside the above estimation units
-     plts <- select(db$PLOT, PLT_CN, PREV_PLT_CN) %>%
-       inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'STRATUM_CN')), by = 'PLT_CN') %>%
-       inner_join(select(db$POP_STRATUM, c('CN', 'ESTN_UNIT_CN')), by = c('STRATUM_CN' = 'CN')) %>%
-       filter(ESTN_UNIT_CN %in% estUnits$ESTN_UNIT_CN) %>%
-       group_by(PLT_CN, PREV_PLT_CN) %>%
-       summarize()
 
-     # Clip out the above plots from the full database, will reduce size by a shit pile
-     PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% plts$PREV_PLT_CN)
-     db$PLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% plts$PLT_CN)
+     pltSF <- bind_rows(out) %>%
+       left_join(select(db$PLOT, PLT_CN, PREV_PLT_CN, pltID), by = 'pltID')
 
-    ## IF ozone is specified, do a seperate intersection (PLOTs not colocated w/ veg PLOTs)
-    if (!is.null(db$OZONE_PLOT)) {
-      # Seperate spatial object
-      ozoneSP <- db$OZONE_PLOT
+     PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PREV_PLT_CN)
+     db$PLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PLT_CN)
+     # # Convert polygons to an sf object
+     # mask <- mask %>%
+     #   as('sf')
+     #
+     # ## Make plot data spatial, projected same as polygon layer
+     # pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
+     # coordinates(pltSF) <- ~LON+LAT
+     # proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+     # pltSF <- as(pltSF, 'sf') %>%
+     #   st_transform(crs = st_crs(mask)$proj4string)
+     #
+     # # Intersect plot with polygons
+     # mask$polyID <- 1:nrow(mask)
+     # suppressMessages({suppressWarnings({
+     #   pltSF <- st_intersection(pltSF, mask) %>%
+     #     as.data.frame() %>%
+     #     select(-c('geometry')) # removes artifact of SF object
+     # })})
+     #
+     # # Identify the estimation units to which plots within the mask belong to
+     # estUnits <- pltSF %>%
+     #   inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'STRATUM_CN')), by = 'PLT_CN') %>%
+     #   inner_join(select(db$POP_STRATUM, c('CN', 'ESTN_UNIT_CN')), by = c('STRATUM_CN' = 'CN')) %>%
+     #   group_by(ESTN_UNIT_CN) %>%
+     #   summarize()
+     #
+     # # Identify all the plots which fall inside the above estimation units
+     # plts <- select(db$PLOT, PLT_CN, PREV_PLT_CN) %>%
+     #   inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'STRATUM_CN')), by = 'PLT_CN') %>%
+     #   inner_join(select(db$POP_STRATUM, c('CN', 'ESTN_UNIT_CN')), by = c('STRATUM_CN' = 'CN')) %>%
+     #   filter(ESTN_UNIT_CN %in% estUnits$ESTN_UNIT_CN) %>%
+     #   group_by(PLT_CN, PREV_PLT_CN) %>%
+     #   summarize()
+     #
+     # # Clip out the above plots from the full database, will reduce size by a shit pile
+     # PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% plts$PREV_PLT_CN)
+     # db$PLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% plts$PLT_CN)
 
-      ## Make PLOT data spatial, projected same as mask layer
-      coordinates(ozoneSP) <- ~LON+LAT
-      proj4string(ozoneSP) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-      ozoneSP <- spTransform(ozoneSP, CRSobj = proj4string(mask))
-
-      ## Spatial query (keep only PLOTs that fall within shell)
-      db$OZONE_PLOT <- ozoneSP[mask,]
-
-      ## Add coordinates back in to dataframe
-      coords <- st_coordinates(db$OZONE_PLOT)
-      db$OZONE_PLOT <- db$OZONE_PLOT %>%
-        data.frame() %>%
-        mutate(LAT = coords[,2]) %>%
-        mutate(LON = coords[,1])
-    }
+    # ## IF ozone is specified, do a seperate intersection (PLOTs not colocated w/ veg PLOTs)
+    # if (!is.null(db$OZONE_PLOT)) {
+    #   # Seperate spatial object
+    #   ozoneSP <- db$OZONE_PLOT
+    #
+    #   ## Make PLOT data spatial, projected same as mask layer
+    #   coordinates(ozoneSP) <- ~LON+LAT
+    #   proj4string(ozoneSP) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+    #   ozoneSP <- spTransform(ozoneSP, CRSobj = proj4string(mask))
+    #
+    #   ## Spatial query (keep only PLOTs that fall within shell)
+    #   db$OZONE_PLOT <- ozoneSP[mask,]
+    #
+    #   ## Add coordinates back in to dataframe
+    #   coords <- st_coordinates(db$OZONE_PLOT)
+    #   db$OZONE_PLOT <- db$OZONE_PLOT %>%
+    #     data.frame() %>%
+    #     mutate(LAT = coords[,2]) %>%
+    #     mutate(LON = coords[,1])
+    # }
    }
 
   ## IF no spatial or temporal clip was specified, make PPLOT NULL

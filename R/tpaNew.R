@@ -106,7 +106,6 @@ tpaNew <- function(db,
         group_by(polyID) %>%
         summarize(maxYear = max(END_INVYR, na.rm = TRUE))
     }
-
     ## TO RETURN SPATIAL PLOTS
   } else if (byPlot & returnSpatial){
     grpBy <- c(grpBy, 'LON', 'LAT')
@@ -175,38 +174,20 @@ tpaNew <- function(db,
     rename(ESTN_UNIT_CN = CN) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'CN', 'P1POINTCNT', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MICR', "ADJ_FACTOR_MACR")), by = c('ESTN_UNIT_CN')) %>%
     rename(STRATUM_CN = CN) %>%
-    left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN')), by = 'STRATUM_CN') %>%
+    left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN', 'INVYR', 'STATECD')), by = 'STRATUM_CN') %>%
     rename(YEAR = END_INVYR) %>%
     mutate_if(is.factor,
               as.character) %>%
     filter(!is.na(YEAR))
 
-  # ## How many plots per stratum
-  # pltStrat <- pops %>%
-  #   group_by(ESTN_UNIT_CN, STRATUM_CN) %>%
-  #   summarize(plts = length(unique(PLT_CN)),
-  #             p2 = first(P2POINTCNT))
-  # ## Count total plts per EU, some get dropped in grouping below
-  # p2eu <- pops %>%
-  #   distinct(ESTN_UNIT_CN, STRATUM_CN, P2POINTCNT) %>%
-  #   group_by(ESTN_UNIT_CN) %>%
-  #   summarize(p2eu = sum(P2POINTCNT, na.rm = TRUE))
-  #
-  # ### Add columns from above
-  # data <- data %>%
-  #   left_join(pltStrat, by = c('ESTN_UNIT_CN', 'STRATUM_CN')) %>%
-  #   left_join(p2eu, by = c('ESTN_UNIT_CN'))
+  ## Want a count of p2 points / eu, gets screwed up with grouping below
+  p2eu <- pops %>%
+    distinct(ESTN_UNIT_CN, STRATUM_CN, P2POINTCNT) %>%
+    group_by(ESTN_UNIT_CN) %>%
+    summarize(p2eu = sum(P2POINTCNT, na.rm = TRUE))
 
-
-  # ## Grab some adjustment factors from stratum
-  # adj <- db$POP_PLOT_STRATUM_ASSGN %>%
-  #   left_join(db$POP_STRATUM, by = c('STRATUM_CN' = 'CN')) #%>%
-  #   group_by(PLT_CN) %>%
-  #   summarize(ADJ_FACTOR_SUBP = first(ADJ_FACTOR_SUBP),
-  #             ADJ_FACTOR_SUBPm = mean(ADJ_FACTOR_SUBP),
-  #             ADJ_FACTOR_SUBPv = var(ADJ_FACTOR_SUBP),
-  #             ADJ_FACTOR_MICR = first(ADJ_FACTOR_MICR),
-  #             ADJ_FACTOR_MACR = first(ADJ_FACTOR_MACR))
+  ## Rejoin
+  pops <- left_join(pops, p2eu, by = 'ESTN_UNIT_CN')
 
 
   ## Which grpByNames are in which table? Helps us subset below
@@ -229,12 +210,8 @@ tpaNew <- function(db,
       ## When DIA is greater than 5", use subplot value
       DIA >= 5 & is.na(MACRO_BREAKPOINT_DIA) ~ 'SUBP',
       DIA >= 5 & DIA < MACRO_BREAKPOINT_DIA ~ 'SUBP',
-      DIA >= MACRO_BREAKPOINT_DIA ~ 'MACR')) #%>%
-    #filter(!is.na(PLOT_BASIS))
-    # rename(YEAR = INVYR) %>%
-    # mutate_if(is.factor,
-    #           as.character) %>%
-    # filter(!is.na(YEAR))
+      DIA >= MACRO_BREAKPOINT_DIA ~ 'MACR'))
+
 
   ## Comprehensive indicator function
   data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
@@ -249,28 +226,6 @@ tpaNew <- function(db,
                             `Double sampling for stratification` = 'double',
                             `Simple random sampling` = 'simple',
                             `Subsampling units of unequal size` = 'simple')
-
-  # ### Make sure appropriate adjustment factors are used here
-  # data <- data %>%
-  #   mutate(
-  #     ## AREA
-  #     aAdj = case_when(
-  #       ## When NA, stay NA
-  #       is.na(PROP_BASIS) ~ NA_real_,
-  #       ## If the proportion was measured for a macroplot,
-  #       ## use the macroplot value
-  #       PROP_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
-  #       ## Otherwise, use the subpplot value
-  #       PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
-  #     ## TREE
-  #     tAdj = case_when(
-  #       ## When DIA is na, adjustment is NA
-  #       is.na(DIA) ~ ADJ_FACTOR_SUBP,
-  #       ## When DIA is less than 5", use microplot value
-  #       DIA < 5 ~ ADJ_FACTOR_MICR,
-  #       ## When DIA is greater than 5", use subplot value
-  #       DIA >= 5 ~ ADJ_FACTOR_SUBP
-  #     ))
 
   ## Add species to groups
   if (bySpecies) {
@@ -337,16 +292,17 @@ tpaNew <- function(db,
               nh = first(P2POINTCNT),
               a = first(AREA_USED),
               w = first(P1POINTCNT) / first(P1PNTCNT_EU),
+              p2eu = first(p2eu),
               ndif = nh - n,
               ## Strata level variances
               av = ifelse(first(ESTN_METHOD == 'simple'),
                           var(c(fa, numeric(ndif)) * first(a) / nh),
-                          (sum((c(fa, numeric(ndif))^2)) - sum(nh * aStrat^2)) / (nh * (nh-1))))
+                          (sum((c(fa, numeric(ndif))^2)) - nh * aStrat^2) / (nh * (nh-1))))
   ## Estimation unit
   aEst <- aStrat %>%
     group_by(ESTN_UNIT_CN, .dots = aGrpBy) %>%
-    summarize(aEst = unitMean(ESTN_METHOD, a, nh, w, aStrat),
-              aVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, av, aStrat, aEst),
+    summarize(aEst = unitMean(ESTN_METHOD, a, nh,  w, aStrat),
+              aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, av, aStrat, aEst),
               plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
 
 
@@ -370,7 +326,7 @@ tpaNew <- function(db,
     ## Rejoin with population tables
     right_join(pops, by = 'PLT_CN') %>%
     ## Need this for covariance later on
-    left_join(select(a, fa, PLT_CN, aGrpBy[aGrpBy %in% 'YEAR' == FALSE]), by = c('PLT_CN', aGrpBy[aGrpBy %in% 'YEAR' == FALSE])) %>%
+    left_join(select(a, fa, PLT_CN, PROP_BASIS, aGrpBy[aGrpBy %in% 'YEAR' == FALSE]), by = c('PLT_CN', aGrpBy[aGrpBy %in% 'YEAR' == FALSE])) %>%
     #Add adjustment factors
     mutate(
       ## AREA
@@ -383,6 +339,16 @@ tpaNew <- function(db,
         ## Otherwise, use the subpplot value
         PLOT_BASIS == 'SUBP' ~ as.numeric(ADJ_FACTOR_SUBP),
         PLOT_BASIS == 'MICR' ~ as.numeric(ADJ_FACTOR_MICR)),
+      ## AREA
+      aAdj = case_when(
+        ## When NA, stay NA
+        is.na(PROP_BASIS) ~ NA_real_,
+        ## If the proportion was measured for a macroplot,
+        ## use the macroplot value
+        PROP_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
+        ## Otherwise, use the subpplot value
+        PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
+      fa = fa * aAdj,
       tPlot = tPlot * tAdj,
       bPlot = bPlot * tAdj,
       tTPlot = tTPlot * tAdj,
@@ -396,6 +362,7 @@ tpaNew <- function(db,
               fa = first(fa),
               plotIn = ifelse(sum(plotIn >  0, na.rm = TRUE), 1,0),
               nh = first(P2POINTCNT),
+              p2eu = first(p2eu),
               a = first(AREA_USED),
               w = first(P1POINTCNT) / first(P1PNTCNT_EU)) %>%
     ## Joining area data so we can compute ratio variances
@@ -414,6 +381,7 @@ tpaNew <- function(db,
               nh = first(nh),
               a = first(a),
               w = first(w),
+              p2eu = first(p2eu),
               ndif = nh - n,
               ## Strata level variances
               #aVar = (sum(forArea^2) - sum(P2POINTCNT * aStrat^2)) / (P2POINTCNT * (P2POINTCNT-1)),
@@ -445,20 +413,20 @@ tpaNew <- function(db,
     ## Estimation unit
     left_join(select(aEst, ESTN_UNIT_CN, aEst, aVar, aGrpBy), by = c('ESTN_UNIT_CN', aGrpBy)) %>%
     group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
-    summarize(tEst = unitMean(ESTN_METHOD, a, nh, w, tStrat),
-              bEst = unitMean(ESTN_METHOD, a, nh, w, bStrat),
-              tTEst = unitMean(ESTN_METHOD, a, nh, w, tTStrat),
-              bTEst = unitMean(ESTN_METHOD, a, nh, w, bTStrat),
+    summarize(tEst = unitMean(ESTN_METHOD, a, nh,  w, tStrat),
+              bEst = unitMean(ESTN_METHOD, a, nh,  w, bStrat),
+              tTEst = unitMean(ESTN_METHOD, a, nh,  w, tTStrat),
+              bTEst = unitMean(ESTN_METHOD, a, nh,  w, bTStrat),
               plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE),
-              tVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, tv, tStrat, tEst),
-              bVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, bv, bStrat, bEst),
-              tTVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, tTv, tTStrat, tTEst),
-              bTVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, bTv, bTStrat, bTEst),
+              tVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tv, tStrat, tEst),
+              bVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bv, bStrat, bEst),
+              tTVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tTv, tTStrat, tTEst),
+              bTVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bTv, bTStrat, bTEst),
               # Unit Covariance
-              cvEst_t = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_t, tStrat, tEst, aStrat, aEst),
-              cvEst_b = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_b, bStrat, bEst, aStrat, aEst),
-              cvEst_tT = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_t, tStrat, tEst, tTStrat, tTEst),
-              cvEst_bT = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_b, bStrat, bEst, bTStrat, bTEst))
+              cvEst_t = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_t, tStrat, tEst, aStrat, aEst),
+              cvEst_b = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_b, bStrat, bEst, aStrat, aEst),
+              cvEst_tT = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_t, tStrat, tEst, tTStrat, tTEst),
+              cvEst_bT = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_b, bStrat, bEst, bTStrat, bTEst))
 
 
 
@@ -476,47 +444,50 @@ tpaNew <- function(db,
     #left_join(aTotal, by = c(aGrpBy)) %>%
     summarize(TREE_TOTAL = sum(tEst, na.rm = TRUE),
               BA_TOTAL = sum(bEst, na.rm = TRUE),
-              TREE_TOTAL_full = sum(tTEst, na.rm = TRUE),
-              BA_TOTAL_full = sum(bTEst, na.rm = TRUE),
-              ## Ratios
-              #TPA = TREE_TOTAL / AREA_TOTAL,
-              #BAA = BA_TOTAL / AREA_TOTAL,
-              TPA_PERC = TREE_TOTAL / TREE_TOTAL_full * 100,
-              BAA_PERC = BA_TOTAL / BA_TOTAL_full * 100,
               ## Variances
               treeVar = sum(tVar, na.rm = TRUE),
               baVar = sum(bVar, na.rm = TRUE),
-              tTVar = sum(tTVar, na.rm = TRUE),
-              bTVar = sum(bTVar, na.rm = TRUE),
               #aVar = first(aVar),
               cvT = sum(cvEst_t, na.rm = TRUE),
               cvB = sum(cvEst_b, na.rm = TRUE),
-              cvTT = sum(cvEst_tT, na.rm = TRUE),
-              cvBT = sum(cvEst_bT, na.rm = TRUE),
               #tpaVar = (1/AREA_TOTAL^2) * (treeVar + (TPA^2 * aVar) - 2 * TPA * cvT),
               #baaVar = (1/AREA_TOTAL^2) * (baVar + (BAA^2 * aVar) - (2 * BAA * cvB)),
-              tpVar = (1/TREE_TOTAL_full^2) * (treeVar + (TPA_PERC^2 * tTVar) - 2 * TPA_PERC * cvTT),
-              bpVar = (1/BA_TOTAL_full^2) * (baVar + (BAA_PERC^2 * bTVar) - (2 * BAA_PERC * cvBT)),
+              # tpVar = (1/TREE_TOTAL_full^2) * (treeVar + (TPA_PERC^2 * tTVar) - 2 * TPA_PERC * cvTT),
+              # bpVar = (1/BA_TOTAL_full^2) * (baVar + (BAA_PERC^2 * bTVar) - (2 * BAA_PERC * cvBT)),
               ## Sampling Errors
               TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
               BA_SE = sqrt(baVar) / BA_TOTAL * 100,
               #AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
               #TPA_SE = sqrt(tpaVar) / TPA * 100,
               #BAA_SE = sqrt(baaVar) / BAA * 100,
-              TPA_PERC_SE = sqrt(tpVar) / TPA_PERC * 100,
-              BAA_PERC_SE = sqrt(bpVar) / BAA_PERC * 100,
-              nPlots_TREE = sum(plotIn_TREE, na.rm = TRUE))
-              #nPlots_AREA = first(nPlots_AREA))
+              nPlots_TREE = sum(plotIn_TREE, na.rm = TRUE)) #%>%
+  ## Hand the proportions
+  tpTotal <- tEst %>%
+    group_by(YEAR) %>%
+    summarize(TREE_TOTAL_full = sum(tTEst, na.rm = TRUE), ## Need to sum this
+              BA_TOTAL_full = sum(bTEst, na.rm = TRUE), ## Need to sum this
+              tTVar = sum(tTVar, na.rm = TRUE),
+              bTVar = sum(bTVar, na.rm = TRUE),
+              cvTT = sum(cvEst_tT, na.rm = TRUE),
+              cvBT = sum(cvEst_bT, na.rm = TRUE))
+
 
   ## Bring them together
   tTotal <- tTotal %>%
     left_join(aTotal, by = aGrpBy) %>%
+    left_join(tpTotal, by = 'YEAR') %>%
     mutate(TPA = TREE_TOTAL / AREA_TOTAL,
            BAA = BA_TOTAL / AREA_TOTAL,
            tpaVar = (1/AREA_TOTAL^2) * (treeVar + (TPA^2 * aVar) - 2 * TPA * cvT),
            baaVar = (1/AREA_TOTAL^2) * (baVar + (BAA^2 * aVar) - (2 * BAA * cvB)),
            TPA_SE = sqrt(tpaVar) / TPA * 100,
-           BAA_SE = sqrt(baaVar) / BAA * 100)
+           BAA_SE = sqrt(baaVar) / BAA * 100,
+           TPA_PERC = TREE_TOTAL / (TREE_TOTAL_full) * 100,
+           BAA_PERC = BA_TOTAL / (BA_TOTAL_full) * 100,
+           tpVar = (1/TREE_TOTAL_full^2) * (treeVar + (TPA_PERC^2 * tTVar) - 2 * TPA_PERC * cvTT),
+           bpVar = (1/BA_TOTAL_full^2) * (baVar + (BAA_PERC^2 * bTVar) - (2 * BAA_PERC * cvBT)),
+           TPA_PERC_SE = sqrt(tpVar) / TPA_PERC * 100,
+           BAA_PERC_SE = sqrt(bpVar) / BAA_PERC * 100)
 
   if (totals) {
     tOut <- tTotal %>%

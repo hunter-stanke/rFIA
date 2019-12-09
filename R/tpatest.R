@@ -1,4 +1,4 @@
-plotsum <- function(x, plts, db, grpBy, aGrpBy){
+plotsum <- function(x, plts, db, grpBy, aGrpBy, byPlot){
 
   ## Selecting the plots for one county
   db$PLOT <- plts[[x]]
@@ -12,7 +12,7 @@ plotsum <- function(x, plts, db, grpBy, aGrpBy){
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy]
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', grpP, 'aD_p', 'sp')) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', grpP, 'aD_p', 'sp')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
     left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT, 'tD', 'typeD')), by = c('PLT_CN', 'CONDID')) %>%
     ## Need a code that tells us where the tree was measured
@@ -38,36 +38,52 @@ plotsum <- function(x, plts, db, grpBy, aGrpBy){
   data$pDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$sp
 
 
+  if (byPlot){
+    grpBy <- c('YEAR', grpBy, 'PLOT_STATUS_CD')
+    t <- data %>%
+      mutate(YEAR = MEASYEAR) %>%
+      distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
+      group_by(.dots = grpBy, PLT_CN) %>%
+      summarize(TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE),
+                BAA = sum(basalArea(DIA) * TPA_UNADJ * tDI, na.rm = TRUE),
+                TPA_PERC = TPA / sum(TPA_UNADJ * pDI, na.rm = TRUE) * 100,
+                BAA_PERC = BAA / sum(basalArea(DIA) * TPA_UNADJ * pDI, na.rm = TRUE) * 100,
+                nStems = length(which(tDI == 1)))
+
+    a = NULL
+
+  } else {
+    ### Plot-level estimates
+    a <- data %>%
+      ## Will be lots of trees here, so CONDPROP listed multiple times
+      ## Adding PROP_BASIS so we can handle adjustment factors at strata level
+      distinct(PLT_CN, CONDID, .keep_all = TRUE) %>%
+      group_by(PLT_CN, PROP_BASIS, .dots = aGrpBy) %>%
+      summarize(fa = sum(CONDPROP_UNADJ * aDI, na.rm = TRUE),
+                plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
+
+    ## Tree plts
+    t <- data %>%
+      filter(!is.na(PLOT_BASIS)) %>%
+      group_by(PLT_CN, PLOT_BASIS, .dots = grpBy) %>%
+      summarize(tPlot = sum(TPA_UNADJ * tDI, na.rm = TRUE),
+                bPlot = sum(rFIA:::basalArea(DIA) * TPA_UNADJ * tDI, na.rm = TRUE),
+                tTPlot = sum(TPA_UNADJ * pDI, na.rm = TRUE),
+                bTPlot = sum(rFIA:::basalArea(DIA) * TPA_UNADJ * pDI, na.rm = TRUE),
+                plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0))
+  }
 
 
 
-  ### Plot-level estimates, no parallel, slows it all down
-  ## area -- plot level
-  a <- data %>%
-    ## Will be lots of trees here, so CONDPROP listed multiple times
-    ## Adding PROP_BASIS so we can handle adjustment factors at strata level
-    distinct(PLT_CN, CONDID, .keep_all = TRUE) %>%
-    group_by(PLT_CN, PROP_BASIS, .dots = aGrpBy) %>%
-    summarize(fa = sum(CONDPROP_UNADJ * aDI, na.rm = TRUE),
-              plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
-
-  ## Tree plts
-  t <- data %>%
-    filter(!is.na(PLOT_BASIS)) %>%
-    group_by(PLT_CN, PLOT_BASIS, .dots = grpBy) %>%
-    summarize(tPlot = sum(TPA_UNADJ * tDI, na.rm = TRUE),
-              bPlot = sum(rFIA:::basalArea(DIA) * TPA_UNADJ * tDI, na.rm = TRUE),
-              tTPlot = sum(TPA_UNADJ * pDI, na.rm = TRUE),
-              bTPlot = sum(rFIA:::basalArea(DIA) * TPA_UNADJ * pDI, na.rm = TRUE),
-              plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0))
 
   pltOut <- list(a = a, t = t)
   return(pltOut)
 
 }
 
-estsum <- function(x, popState, a, t, grpBy, aGrpBy){
 
+
+estsum <- function(x, popState, a, t, grpBy, aGrpBy){
 
   ## Strata level estimates
   aStrat <- a %>%
@@ -93,31 +109,27 @@ estsum <- function(x, popState, a, t, grpBy, aGrpBy){
               nh = first(P2POINTCNT),
               a = first(AREA_USED),
               w = first(P1POINTCNT) / first(P1PNTCNT_EU),
+              p2eu = first(p2eu),
               ndif = nh - n,
               ## Strata level variances
               av = ifelse(first(ESTN_METHOD == 'simple'),
                           var(c(fa, numeric(ndif)) * first(a) / nh),
-                          (sum((c(fa, numeric(ndif))^2)) - sum(nh * aStrat^2)) / (nh * (nh-1))))
+                          (sum((c(fa, numeric(ndif))^2)) - nh * aStrat^2) / (nh * (nh-1))))
   ## Estimation unit
   aEst <- aStrat %>%
     group_by(ESTN_UNIT_CN, .dots = aGrpBy) %>%
-    summarize(aEst = rFIA:::unitMean(ESTN_METHOD, a, nh, w, aStrat),
-              aVar = rFIA:::unitVar(method = 'var', ESTN_METHOD, a, nh, w, av, aStrat, aEst),
+    summarize(aEst = unitMean(ESTN_METHOD, a, nh,  w, aStrat),
+              aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, av, aStrat, aEst),
               plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
 
-
   ######## ------------------ TREE ESTIMATES + CV
-
-
-
-
 
   ## Strata level estimates
   tEst <- t %>%
     ## Rejoin with population tables
     right_join(popState[[x]], by = 'PLT_CN') %>%
     ## Need this for covariance later on
-    left_join(select(a, fa, PLT_CN, aGrpBy[aGrpBy %in% 'YEAR' == FALSE]), by = c('PLT_CN', aGrpBy[aGrpBy %in% 'YEAR' == FALSE])) %>%
+    left_join(select(a, fa, PLT_CN, PROP_BASIS, aGrpBy[aGrpBy %in% 'YEAR' == FALSE]), by = c('PLT_CN', aGrpBy[aGrpBy %in% 'YEAR' == FALSE])) %>%
     #Add adjustment factors
     mutate(
       ## AREA
@@ -130,6 +142,16 @@ estsum <- function(x, popState, a, t, grpBy, aGrpBy){
         ## Otherwise, use the subpplot value
         PLOT_BASIS == 'SUBP' ~ as.numeric(ADJ_FACTOR_SUBP),
         PLOT_BASIS == 'MICR' ~ as.numeric(ADJ_FACTOR_MICR)),
+      ## AREA
+      aAdj = case_when(
+        ## When NA, stay NA
+        is.na(PROP_BASIS) ~ NA_real_,
+        ## If the proportion was measured for a macroplot,
+        ## use the macroplot value
+        PROP_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
+        ## Otherwise, use the subpplot value
+        PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
+      fa = fa * aAdj,
       tPlot = tPlot * tAdj,
       bPlot = bPlot * tAdj,
       tTPlot = tTPlot * tAdj,
@@ -143,6 +165,7 @@ estsum <- function(x, popState, a, t, grpBy, aGrpBy){
               fa = first(fa),
               plotIn = ifelse(sum(plotIn >  0, na.rm = TRUE), 1,0),
               nh = first(P2POINTCNT),
+              p2eu = first(p2eu),
               a = first(AREA_USED),
               w = first(P1POINTCNT) / first(P1PNTCNT_EU)) %>%
     ## Joining area data so we can compute ratio variances
@@ -161,6 +184,7 @@ estsum <- function(x, popState, a, t, grpBy, aGrpBy){
               nh = first(nh),
               a = first(a),
               w = first(w),
+              p2eu = first(p2eu),
               ndif = nh - n,
               ## Strata level variances
               #aVar = (sum(forArea^2) - sum(P2POINTCNT * aStrat^2)) / (P2POINTCNT * (P2POINTCNT-1)),
@@ -192,20 +216,20 @@ estsum <- function(x, popState, a, t, grpBy, aGrpBy){
     ## Estimation unit
     left_join(select(aEst, ESTN_UNIT_CN, aEst, aVar, aGrpBy), by = c('ESTN_UNIT_CN', aGrpBy)) %>%
     group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
-    summarize(tEst = rFIA:::unitMean(ESTN_METHOD, a, nh, w, tStrat),
-              bEst = rFIA:::unitMean(ESTN_METHOD, a, nh, w, bStrat),
-              tTEst = rFIA:::unitMean(ESTN_METHOD, a, nh, w, tTStrat),
-              bTEst = rFIA:::unitMean(ESTN_METHOD, a, nh, w, bTStrat),
+    summarize(tEst = unitMean(ESTN_METHOD, a, nh,  w, tStrat),
+              bEst = unitMean(ESTN_METHOD, a, nh,  w, bStrat),
+              tTEst = unitMean(ESTN_METHOD, a, nh,  w, tTStrat),
+              bTEst = unitMean(ESTN_METHOD, a, nh,  w, bTStrat),
               plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE),
-              tVar = rFIA:::unitVar(method = 'var', ESTN_METHOD, a, nh, w, tv, tStrat, tEst),
-              bVar = rFIA:::unitVar(method = 'var', ESTN_METHOD, a, nh, w, bv, bStrat, bEst),
-              tTVar = rFIA:::unitVar(method = 'var', ESTN_METHOD, a, nh, w, tTv, tTStrat, tTEst),
-              bTVar = rFIA:::unitVar(method = 'var', ESTN_METHOD, a, nh, w, bTv, bTStrat, bTEst),
+              tVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tv, tStrat, tEst),
+              bVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bv, bStrat, bEst),
+              tTVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tTv, tTStrat, tTEst),
+              bTVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bTv, bTStrat, bTEst),
               # Unit Covariance
-              cvEst_t = rFIA:::unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_t, tStrat, tEst, aStrat, aEst),
-              cvEst_b = rFIA:::unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_b, bStrat, bEst, aStrat, aEst),
-              cvEst_tT = rFIA:::unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_t, tStrat, tEst, tTStrat, tTEst),
-              cvEst_bT = rFIA:::unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_b, bStrat, bEst, bTStrat, bTEst))
+              cvEst_t = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_t, tStrat, tEst, aStrat, aEst),
+              cvEst_b = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_b, bStrat, bEst, aStrat, aEst),
+              cvEst_tT = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_t, tStrat, tEst, tTStrat, tTEst),
+              cvEst_bT = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_b, bStrat, bEst, bTStrat, bTEst))
 
   out <- list(tEst = tEst, aEst = aEst)
 
