@@ -1067,92 +1067,94 @@ clipFIA <- function(db,
   ##  plot data is avaliable for any intersecting ESTN_UNIT, we can cut back on memory requirements and still
   ##  produce valid estimates
    if (!is.null(mask)){
-     # Convert polygons to an sf object
-     mask <- mask %>%
-       as('sf') %>%
-       mutate(polyID = 1:nrow(mask))
-     ## Make plot data spatial, projected same as polygon layer
-     pltSF <- select(db$PLOT, c('LON', 'LAT', pltID)) %>%
-       filter(!is.na(LAT) & !is.na(LON)) %>%
-       distinct(pltID, .keep_all = TRUE)
-     coordinates(pltSF) <- ~LON+LAT
-     proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-     pltSF <- as(pltSF, 'sf') %>%
-       st_transform(crs = st_crs(mask)$proj4string)
-
-     ## Split up mask
-     polyList <- split(mask, as.factor(mask$polyID))
-
-     suppressMessages({suppressWarnings({
-       ## Intersect it
-       out <- lapply(names(polyList), FUN = areal_par, pltSF, polyList)
-     })})
-
-
-
-     pltSF <- bind_rows(out) %>%
-       left_join(select(db$PLOT, PLT_CN, PREV_PLT_CN, pltID), by = 'pltID')
-
-     PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PREV_PLT_CN)
-     db$PLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PLT_CN)
      # # Convert polygons to an sf object
      # mask <- mask %>%
-     #   as('sf')
-     #
+     #   as('sf') %>%
+     #   mutate(polyID = 1:nrow(mask))
      # ## Make plot data spatial, projected same as polygon layer
-     # pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
+     # pltSF <- select(db$PLOT, c('LON', 'LAT', pltID)) %>%
+     #   filter(!is.na(LAT) & !is.na(LON)) %>%
+     #   distinct(pltID, .keep_all = TRUE)
      # coordinates(pltSF) <- ~LON+LAT
      # proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
      # pltSF <- as(pltSF, 'sf') %>%
      #   st_transform(crs = st_crs(mask)$proj4string)
      #
-     # # Intersect plot with polygons
-     # mask$polyID <- 1:nrow(mask)
+     # ## Split up mask
+     # polyList <- split(mask, as.factor(mask$polyID))
+     #
      # suppressMessages({suppressWarnings({
-     #   pltSF <- st_intersection(pltSF, mask) %>%
-     #     as.data.frame() %>%
-     #     select(-c('geometry')) # removes artifact of SF object
+     #   ## Intersect it
+     #   out <- lapply(names(polyList), FUN = areal_par, pltSF, polyList)
      # })})
      #
-     # # Identify the estimation units to which plots within the mask belong to
-     # estUnits <- pltSF %>%
-     #   inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'STRATUM_CN')), by = 'PLT_CN') %>%
-     #   inner_join(select(db$POP_STRATUM, c('CN', 'ESTN_UNIT_CN')), by = c('STRATUM_CN' = 'CN')) %>%
-     #   group_by(ESTN_UNIT_CN) %>%
-     #   summarize()
      #
-     # # Identify all the plots which fall inside the above estimation units
-     # plts <- select(db$PLOT, PLT_CN, PREV_PLT_CN) %>%
-     #   inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'STRATUM_CN')), by = 'PLT_CN') %>%
-     #   inner_join(select(db$POP_STRATUM, c('CN', 'ESTN_UNIT_CN')), by = c('STRATUM_CN' = 'CN')) %>%
-     #   filter(ESTN_UNIT_CN %in% estUnits$ESTN_UNIT_CN) %>%
-     #   group_by(PLT_CN, PREV_PLT_CN) %>%
-     #   summarize()
      #
-     # # Clip out the above plots from the full database, will reduce size by a shit pile
-     # PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% plts$PREV_PLT_CN)
-     # db$PLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% plts$PLT_CN)
+     # pltSF <- bind_rows(out) %>%
+     #   left_join(select(db$PLOT, PLT_CN, PREV_PLT_CN, pltID), by = 'pltID')
+     #
+     # PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PREV_PLT_CN)
+     # db$PLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PLT_CN)
 
-    # ## IF ozone is specified, do a seperate intersection (PLOTs not colocated w/ veg PLOTs)
-    # if (!is.null(db$OZONE_PLOT)) {
-    #   # Seperate spatial object
-    #   ozoneSP <- db$OZONE_PLOT
-    #
-    #   ## Make PLOT data spatial, projected same as mask layer
-    #   coordinates(ozoneSP) <- ~LON+LAT
-    #   proj4string(ozoneSP) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-    #   ozoneSP <- spTransform(ozoneSP, CRSobj = proj4string(mask))
-    #
-    #   ## Spatial query (keep only PLOTs that fall within shell)
-    #   db$OZONE_PLOT <- ozoneSP[mask,]
-    #
-    #   ## Add coordinates back in to dataframe
-    #   coords <- st_coordinates(db$OZONE_PLOT)
-    #   db$OZONE_PLOT <- db$OZONE_PLOT %>%
-    #     data.frame() %>%
-    #     mutate(LAT = coords[,2]) %>%
-    #     mutate(LON = coords[,1])
-    # }
+     ###OLD
+     # Convert polygons to an sf object
+     mask <- mask %>%
+       as('sf')
+
+     ## Make plot data spatial, projected same as polygon layer
+     pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
+     coordinates(pltSF) <- ~LON+LAT
+     proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+     pltSF <- as(pltSF, 'sf') %>%
+       st_transform(crs = st_crs(mask)$proj4string)
+
+     # Intersect plot with polygons
+     mask$polyID <- 1:nrow(mask)
+     suppressMessages({suppressWarnings({
+       pltSF <- st_intersection(pltSF, mask) %>%
+         as.data.frame() %>%
+         select(-c('geometry')) # removes artifact of SF object
+     })})
+
+     # Identify the estimation units to which plots within the mask belong to
+     estUnits <- pltSF %>%
+       inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'STRATUM_CN')), by = 'PLT_CN') %>%
+       inner_join(select(db$POP_STRATUM, c('CN', 'ESTN_UNIT_CN')), by = c('STRATUM_CN' = 'CN')) %>%
+       group_by(ESTN_UNIT_CN) %>%
+       summarize()
+
+     # Identify all the plots which fall inside the above estimation units
+     plts <- select(db$PLOT, PLT_CN, PREV_PLT_CN) %>%
+       inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'STRATUM_CN')), by = 'PLT_CN') %>%
+       inner_join(select(db$POP_STRATUM, c('CN', 'ESTN_UNIT_CN')), by = c('STRATUM_CN' = 'CN')) %>%
+       filter(ESTN_UNIT_CN %in% estUnits$ESTN_UNIT_CN) %>%
+       group_by(PLT_CN, PREV_PLT_CN) %>%
+       summarize()
+
+     # Clip out the above plots from the full database, will reduce size by a shit pile
+     PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% plts$PREV_PLT_CN)
+     db$PLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% plts$PLT_CN)
+
+    ## IF ozone is specified, do a seperate intersection (PLOTs not colocated w/ veg PLOTs)
+    if (!is.null(db$OZONE_PLOT)) {
+      # Seperate spatial object
+      ozoneSP <- db$OZONE_PLOT
+
+      ## Make PLOT data spatial, projected same as mask layer
+      coordinates(ozoneSP) <- ~LON+LAT
+      proj4string(ozoneSP) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+      ozoneSP <- spTransform(ozoneSP, CRSobj = proj4string(mask))
+
+      ## Spatial query (keep only PLOTs that fall within shell)
+      db$OZONE_PLOT <- ozoneSP[mask,]
+
+      ## Add coordinates back in to dataframe
+      coords <- st_coordinates(db$OZONE_PLOT)
+      db$OZONE_PLOT <- db$OZONE_PLOT %>%
+        data.frame() %>%
+        mutate(LAT = coords[,2]) %>%
+        mutate(LON = coords[,1])
+    }
    }
 
   ## IF no spatial or temporal clip was specified, make PPLOT NULL
