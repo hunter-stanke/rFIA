@@ -213,12 +213,22 @@ tpaNew_par <- function(db,
     filter(!is.na(YEAR))
 
   ### Which estimator to use?
-  if (str_to_upper(method) == 'ANNUAL'){
-    pops <- filter(pops, YEAR == INVYR)
-  } else if (str_to_upper(method) == 'MA'){
+   if (str_to_upper(method) == 'MA'){
     ## Need a weighting scheme for the estimation units (panels?)
+    ## USE INVYR grouped by END_INVYR
+    ## Assuming a uniform weighting scheme
+    wgts <- pops %>%
+      group_by(YEAR, STATECD) %>%
+      summarize(wgt = 1 / length(unique(INVYR)))
+    pops <- left_join(pops, wgts, by = c('YEAR', 'STATECD'))
+    ### Annual estimates
+   } else {
+     pops$wgt <- 1
+   }
 
-  }
+   if (str_to_upper(method) == 'ANNUAL'){
+     pops <- filter(pops, YEAR == INVYR)
+   }
 
   ## Want a count of p2 points / eu, gets screwed up with grouping below
   p2eu <- pops %>%
