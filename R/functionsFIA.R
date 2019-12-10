@@ -259,15 +259,15 @@ unitVar <- function(method, ESTN_METHOD, a, nh, w, v, stratMean, unitM, stratMea
 unitVarNew <- function(method, ESTN_METHOD, a, nh, n, w, v, stratMean, unitM, stratMean1 = NULL, unitM1 = NULL){
   if(method == 'var'){
     uv = ifelse(first(ESTN_METHOD) == 'strat',
-                ((first(a)^2)/n) * (sum(w*nh*v) + sum((1-w)*(nh/n)*v)),
+                ((first(a)^2)/n) * (sum(w*nh*v, na.rm = TRUE) + sum((1-w)*(nh/n)*v, na.rm = TRUE)),
                 ifelse(first(ESTN_METHOD) == 'double',
-                       (first(a)^2) * (sum(((nh-1)/(n-1))*(nh/n)*v) + ((1/(n-1))*sum((nh/n)*(stratMean - (unitM/first(a)))^2))),
-                       sum(v))) # Stratified random case
+                       (first(a)^2) * (sum(((nh-1)/(n-1))*(nh/n)*v, na.rm = TRUE) + ((1/(n-1))*sum((nh/n)*(stratMean - (unitM/first(a)))^2, na.rm = TRUE))),
+                       sum(v, na.rm = TRUE))) # Stratified random case
   } else {
     cv = ifelse(first(ESTN_METHOD) == 'strat',
-                ((first(a)^2)/n) * (sum(w*nh*v) + sum((1-w)*(nh/n)*v)),
+                ((first(a)^2)/n) * (sum(w*nh*v, na.rm = TRUE) + sum((1-w)*(nh/n)*v, na.rm = TRUE)),
                 ifelse(first(ESTN_METHOD) == 'double',
-                       (first(a)^2) * (sum(((nh-1)/(n-1))*(nh/n)*v) + ((1/(n-1))*sum((nh/n)*(stratMean - unitM) * (stratMean1 - (unitM1/first(a)))))),
+                       (first(a)^2) * (sum(((nh-1)/(n-1))*(nh/n)*v, na.rm = TRUE) + ((1/(n-1))*sum((nh/n)*(stratMean - unitM) * (stratMean1 - (unitM1/first(a))), na.rm = TRUE))),
                        sum(v))) # Stratified random case (additive covariance)
   }
 }

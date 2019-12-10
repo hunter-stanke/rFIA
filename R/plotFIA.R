@@ -63,9 +63,8 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet
            grpVar = !!grp_quo,
            yVar = !!y_quo)
 
-  # # Filter for the year specified
-  # data <- data %>%
-  #   filter(YEAR >= min.year)
+  ## Identify the associated sampling error field
+
 
   ## If they want a subset of the groups
   if (!is.null(n.max) & quo_name(grp_quo) != 'NULL'){
@@ -175,11 +174,14 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet
       if (quo_name(grp_quo) == 'NULL'){
         map <- data %>%
           ggplot(aes(x = xVar, y = yVar)) +
+          #geom_ribbon(aes(x = xVar, ymin = (yVar * ))) +
           geom_line(aes(group = 1), color = line.color, lwd = line.width) +
           theme_bw() +
           ggtitle(plot.title) +
           xlab(ifelse(is.null(x.lab), 'YEAR', x.lab)) +
           ylab(ifelse(is.null(y.lab), quo_name(y_quo), y.lab)) +
+          #scale_y_continuous(limits = c(0, NA), expand = c(0,0))
+          ylim(0, max(data$yVar) * 1.4) +
           theme(axis.text = element_text(size = 11 * text.size, family = text.font),
                 axis.title = element_text(size = 15 * text.size, family = text.font),
                 plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font))
@@ -201,6 +203,7 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet
           ggtitle(plot.title) +
           xlab(ifelse(is.null(x.lab), quo_name(y_quo), x.lab)) +
           ylab(ifelse(is.null(y.lab), quo_name(y_quo), y.lab)) +
+          ylim(0, max(data$yVar) * 1.4) +
           theme(axis.text = element_text(size = 11 * text.size, family = text.font),
                 axis.title = element_text(size = 15 * text.size, family = text.font),
                 plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),

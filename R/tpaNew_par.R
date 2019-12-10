@@ -8,11 +8,11 @@ tpaNew_par <- function(db,
                        landType = 'forest',
                        treeType = 'live',
                        method = 'TI',
+                       yrs = 5,
                        treeDomain = NULL,
                        areaDomain = NULL,
                        totals = FALSE,
                        byPlot = FALSE,
-                       SE = TRUE,
                        nCores = 1) {
 
 
@@ -199,6 +199,8 @@ tpaNew_par <- function(db,
   #group_by(END_INVYR) %>%
   #summarise(id = list(EVALID)
 
+  ## Make an annual panel ID, associated with an INVYR
+
   ### The population tables
   pops <- select(db$POP_EVAL, c('EVALID', 'ESTN_METHOD', 'CN', 'END_INVYR')) %>%
     rename(EVAL_CN = CN) %>%
@@ -207,28 +209,61 @@ tpaNew_par <- function(db,
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'CN', 'P1POINTCNT', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MICR', "ADJ_FACTOR_MACR")), by = c('ESTN_UNIT_CN')) %>%
     rename(STRATUM_CN = CN) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN', 'INVYR', 'STATECD')), by = 'STRATUM_CN') %>%
-    rename(YEAR = END_INVYR) %>%
     mutate_if(is.factor,
-              as.character) %>%
-    filter(!is.na(YEAR))
+              as.character)
 
   ### Which estimator to use?
-   if (str_to_upper(method) == 'MA'){
-    ## Need a weighting scheme for the estimation units (panels?)
-    ## USE INVYR grouped by END_INVYR
-    ## Assuming a uniform weighting scheme
-    wgts <- pops %>%
-      group_by(YEAR, STATECD) %>%
-      summarize(wgt = 1 / length(unique(INVYR)))
-    pops <- left_join(pops, wgts, by = c('YEAR', 'STATECD'))
-    ### Annual estimates
-   } else {
-     pops$wgt <- 1
+   if (str_to_upper(method) %in% c('ANNUAL', "SMA")){
+     ## Keep an original
+     popOrig <- pops
+     ## Want to use the year where plots are measured, no repeats
+     ## Breaking this up into pre and post reporting becuase
+     ## Estimation units get weird on us otherwise
+     #pops <- distinct(pops, INVYR, PLT_CN, .keep_all = TRUE)
+     pops <- pops %>%
+       group_by(STATECD) %>%
+       filter(END_INVYR == INVYR)
+
+     prePops <- popOrig %>%
+       group_by(STATECD) %>%
+       filter(INVYR < min(END_INVYR, na.rm = TRUE)) %>%
+       distinct(PLT_CN, .keep_all = TRUE)
+
+     pops <- bind_rows(pops, prePops)
+
+     ## P2POINTCNT column is NOT consistent for annnual estimates, plots
+     ## within individual strata and est units are related to different INVYRs
+     p2 <- pops %>%
+       group_by(STRATUM_CN, INVYR) %>%
+       summarize(P2POINTCNT = length(unique(PLT_CN)))
+     ## Rejoin
+     pops <- pops %>%
+       mutate(YEAR = INVYR) %>%
+       select(-c(P2POINTCNT)) %>%
+       left_join(p2, by = c('STRATUM_CN', 'YEAR' = 'INVYR'))
+
+   } else {     # Otherwise temporally indifferent
+     pops <- rename(pops, YEAR = END_INVYR)
    }
 
-   if (str_to_upper(method) == 'ANNUAL'){
-     pops <- filter(pops, YEAR == INVYR)
-   }
+  # ### The population tables
+  # pops <- select(db$POP_EVAL, c('EVALID', 'ESTN_METHOD', 'CN', 'END_INVYR')) %>%
+  #   rename(EVAL_CN = CN) %>%
+  #   left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('EVAL_CN')) %>%
+  #   rename(ESTN_UNIT_CN = CN) %>%
+  #   left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'CN', 'P1POINTCNT', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MICR', "ADJ_FACTOR_MACR")), by = c('ESTN_UNIT_CN')) %>%
+  #   rename(STRATUM_CN = CN) %>%
+  #   left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN', 'INVYR', 'STATECD')), by = 'STRATUM_CN') %>%
+  #   rename(YEAR = END_INVYR) %>%
+  #   mutate_if(is.factor,
+  #             as.character)
+  #
+  # ### Which estimator to use?
+  # if (str_to_upper(method) %in% c('ANNUAL', "SMA")){
+  #   popOrig <- pops
+  #   ## Want to use the year where plots are measured, no repeats
+  #   pops <- filter(pops, YEAR == INVYR)
+  # }
 
   ## Want a count of p2 points / eu, gets screwed up with grouping below
   p2eu <- pops %>%
@@ -349,6 +384,139 @@ tpaNew_par <- function(db,
     tEst <- bind_rows(out[names(out) == 'tEst'])
 
 
+    ##### ----------------- MOVING AVERAGES
+    if (str_to_upper(method) %in% c("SMA", 'EMA')){
+      ## Need a STATECD on aEst and tEst to join wgts
+      aEst <- left_join(aEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
+      tEst <- left_join(tEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
+
+      #### Summarizing to state level here to apply weights by panel
+      # Area
+      aEst <- aEst %>%
+        group_by(STATECD, .dots = aGrpBy) %>%
+        summarize(aEst = sum(aEst, na.rm = TRUE),
+                  aVar = sum(aVar, na.rm = TRUE),
+                  plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
+      # Tree
+      tEst <- tEst %>%
+        group_by(STATECD, .dots = grpBy) %>%
+        #left_join(aTotal, by = c(aGrpBy)) %>%
+        summarize(tEst = sum(tEst, na.rm = TRUE),
+                  bEst = sum(bEst, na.rm = TRUE),
+                  tTEst = sum(tTEst, na.rm = TRUE), ## Need to sum this
+                  bTEst = sum(bTEst, na.rm = TRUE), ## Need to sum this
+                  tTVar = sum(tTVar, na.rm = TRUE),
+                  bTVar = sum(bTVar, na.rm = TRUE),
+                  cvEst_tT = sum(cvEst_tT, na.rm = TRUE),
+                  cvEst_bT = sum(cvEst_bT, na.rm = TRUE),
+                  ## Variances
+                  tVar = sum(tVar, na.rm = TRUE),
+                  bVar = sum(bVar, na.rm = TRUE),
+                  #aVar = first(aVar),
+                  cvEst_t = sum(cvEst_t, na.rm = TRUE),
+                  cvEst_b = sum(cvEst_b, na.rm = TRUE),
+                  plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE))
+
+      ### ---- SIMPLE MOVING AVERAGE
+      if (method == 'SMA'){
+        ## Assuming a uniform weighting scheme
+        popOrig <- mutate(popOrig, YEAR = END_INVYR)
+        wgts <- popOrig %>%
+          group_by(YEAR, STATECD) %>%
+          summarize(wgt = 1 / length(unique(INVYR))) %>%
+          ## Expand it out again
+          right_join(popOrig, by = c('YEAR', 'STATECD')) %>%
+          distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
+          select(YEAR, INVYR, STATECD, wgt)
+
+        # Area
+        aEst <- left_join(wgts, aEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
+        group_by(STATECD, .dots = aGrpBy) %>%
+          summarize(aEst = sum(aEst * wgt, na.rm = TRUE),
+                    aVar = sum(aVar * wgt^2, na.rm = TRUE),
+                    plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
+
+        tEst <- left_join(wgts, tEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
+          group_by(STATECD, .dots = grpBy) %>%
+          #left_join(aTotal, by = c(aGrpBy)) %>%
+          summarize(tEst = sum(tEst * wgt, na.rm = TRUE),
+                    bEst = sum(bEst* wgt, na.rm = TRUE),
+                    tTEst = sum(tTEst* wgt, na.rm = TRUE), ## Need to sum this
+                    bTEst = sum(bTEst* wgt, na.rm = TRUE), ## Need to sum this
+                    tTVar = sum(tTVar* wgt^2, na.rm = TRUE),
+                    bTVar = sum(bTVar* wgt^2, na.rm = TRUE),
+                    cvEst_tT = sum(cvEst_tT* wgt^2, na.rm = TRUE),
+                    cvEst_bT = sum(cvEst_bT* wgt^2, na.rm = TRUE),
+                    ## Variances
+                    tVar = sum(tVar* wgt^2, na.rm = TRUE),
+                    bVar = sum(bVar* wgt^2, na.rm = TRUE),
+                    #aVar = first(aVar),
+                    cvEst_t = sum(cvEst_t* wgt^2, na.rm = TRUE),
+                    cvEst_b = sum(cvEst_b* wgt^2, na.rm = TRUE),
+                    plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE))
+
+
+      #### ----- EXPONENTIAL MOVING AVERAGE
+      } else if (method == 'EMA'){
+        ## All eval combos
+        evals <- popOrig %>%
+          distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
+          select(YEAR, INVYR, STATECD) %>%
+          mutate(lamda = 2 / (yrs + 1))
+
+        ## Minimum eval year
+        minEval <- evals %>%
+          group_by(STATECD) %>%
+          summarize(minYear = min(INVYR, na.rm = TRUE))
+
+        ### Exponential moving average function
+        ema <- function(x, l){
+          val = c()
+          val[1] = x[1]
+          if (length(x > 1)){
+            for (i in 2:length(x)){
+              val[i] = l[i]*x[i] + val[i-1] * (1-l[i-1])
+            }
+          }
+          return(val)
+        }
+
+        emaVar <- function(x,l){
+          val[1] = x[1]
+          if (length(x > 1)){
+            for (i in 2:length(x)){
+              val[i] = l[i]*x[i] + val[i-1] * (1-l[i-1])
+            }
+          }
+          return(val)
+        }
+
+        emaWgt <- function(n, yrs){
+          l <- 2 / (1 +yrs)
+          wgts <- c()
+          for (i in 1:n) wgts[i] <- l^i*(1-l)
+          return(wgts)
+        }
+
+        # Area
+        aEst <- left_join(evals, aEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
+          left_join(minEval, by = 'STATECD') %>%
+          ## Make a previous year column, NA if earliest recorded
+          mutate(PREV_INVYR = ifelse(INVYR == minYear, NA_integer_, as.numeric(INVYR) -1),
+                 )# %>%
+           #%>%
+          group_by(STATECD, .dots = aGrpBy) %>%
+          summarize(aEst = sum(aEst * wgt, na.rm = TRUE),
+                    aVar = sum(aVar * wgt^2, na.rm = TRUE),
+                    plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
+
+      }
+
+    }
+
+
+
+
     ##---------------------  TOTALS and RATIOS
     # Area
     aTotal <- aEst %>%
@@ -369,16 +537,9 @@ tpaNew_par <- function(db,
                 #aVar = first(aVar),
                 cvT = sum(cvEst_t, na.rm = TRUE),
                 cvB = sum(cvEst_b, na.rm = TRUE),
-                #tpaVar = (1/AREA_TOTAL^2) * (treeVar + (TPA^2 * aVar) - 2 * TPA * cvT),
-                #baaVar = (1/AREA_TOTAL^2) * (baVar + (BAA^2 * aVar) - (2 * BAA * cvB)),
-                # tpVar = (1/TREE_TOTAL_full^2) * (treeVar + (TPA_PERC^2 * tTVar) - 2 * TPA_PERC * cvTT),
-                # bpVar = (1/BA_TOTAL_full^2) * (baVar + (BAA_PERC^2 * bTVar) - (2 * BAA_PERC * cvBT)),
                 ## Sampling Errors
                 TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
                 BA_SE = sqrt(baVar) / BA_TOTAL * 100,
-                #AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
-                #TPA_SE = sqrt(tpaVar) / TPA * 100,
-                #BAA_SE = sqrt(baaVar) / BAA * 100,
                 nPlots_TREE = sum(plotIn_TREE, na.rm = TRUE)) #%>%
     ## IF using polys, we treat each zone as a unique population
     if (!is.null(polys)){
