@@ -7,6 +7,7 @@ tpaNew_par <- function(db,
                        bySizeClass = FALSE,
                        landType = 'forest',
                        treeType = 'live',
+                       method = 'TI',
                        treeDomain = NULL,
                        areaDomain = NULL,
                        totals = FALSE,
@@ -210,6 +211,14 @@ tpaNew_par <- function(db,
     mutate_if(is.factor,
               as.character) %>%
     filter(!is.na(YEAR))
+
+  ### Which estimator to use?
+  if (str_to_upper(method) == 'ANNUAL'){
+    pops <- filter(pops, YEAR == INVYR)
+  } else if (str_to_upper(method) == 'MA'){
+    ## Need a weighting scheme for the estimation units (panels?)
+
+  }
 
   ## Want a count of p2 points / eu, gets screwed up with grouping below
   p2eu <- pops %>%

@@ -67,9 +67,9 @@ plotsum <- function(x, plts, db, grpBy, aGrpBy, byPlot){
       filter(!is.na(PLOT_BASIS)) %>%
       group_by(PLT_CN, PLOT_BASIS, .dots = grpBy) %>%
       summarize(tPlot = sum(TPA_UNADJ * tDI, na.rm = TRUE),
-                bPlot = sum(rFIA:::basalArea(DIA) * TPA_UNADJ * tDI, na.rm = TRUE),
+                bPlot = sum(basalArea(DIA) * TPA_UNADJ * tDI, na.rm = TRUE),
                 tTPlot = sum(TPA_UNADJ * pDI, na.rm = TRUE),
-                bTPlot = sum(rFIA:::basalArea(DIA) * TPA_UNADJ * pDI, na.rm = TRUE),
+                bTPlot = sum(basalArea(DIA) * TPA_UNADJ * pDI, na.rm = TRUE),
                 plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0))
   }
 
