@@ -55,5 +55,5 @@ data(fiaRI)
 clipFIA(fiaRI, mostRecent = TRUE)
 
 ## Only plots w/in estimation units w/in a user defined polygon
-clipFIA(fiaRI, mask = countiesRI[1,])
+clipFIA(fiaRI, mask = countiesRI[1,], mostRecent = FALSE)
 }
