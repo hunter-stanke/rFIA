@@ -1,4 +1,4 @@
-plotsum <- function(x, plts, db, grpBy, aGrpBy, byPlot){
+tpaHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
 
   ## Selecting the plots for one county
   db$PLOT <- plts[[x]]
@@ -83,7 +83,7 @@ plotsum <- function(x, plts, db, grpBy, aGrpBy, byPlot){
 
 
 
-estsum <- function(x, popState, a, t, grpBy, aGrpBy){
+tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
 
   ## Strata level estimates
   aStrat <- a %>%

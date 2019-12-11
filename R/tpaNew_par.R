@@ -327,10 +327,10 @@ tpaNew_par <- function(db,
         library(stringr)
         library(rFIA)
       })
-      out <- parLapply(cl, X = names(plts), fun = plotsum, plts, db, grpBy, aGrpBy, byPlot)
+      out <- parLapply(cl, X = names(plts), fun = tpaHelper1, plts, db, grpBy, aGrpBy, byPlot)
       #stopCluster(cl) # Keep the cluster active for the next run
     } else { # Unix systems
-      out <- mclapply(names(plts), FUN = plotsum, plts, db, grpBy, aGrpBy, byPlot, mc.cores = nCores)
+      out <- mclapply(names(plts), FUN = tpaHelper1, plts, db, grpBy, aGrpBy, byPlot, mc.cores = nCores)
     }
   })
 
@@ -372,10 +372,10 @@ tpaNew_par <- function(db,
         #   library(stringr)
         #   library(rFIA)
         # })
-        out <- parLapply(cl, X = names(popState), fun = estsum, popState, a, t, grpBy, aGrpBy)
+        out <- parLapply(cl, X = names(popState), fun = tpaHelper2, popState, a, t, grpBy, aGrpBy)
         stopCluster(cl)
       } else { # Unix systems
-        out <- mclapply(names(popState), FUN = estsum, popState, a, t, grpBy, aGrpBy, mc.cores = nCores)
+        out <- mclapply(names(popState), FUN = tpaHelper2, popState, a, t, grpBy, aGrpBy, mc.cores = nCores)
       }
     })
     ## back to dataframes
