@@ -214,7 +214,7 @@ grmAdj <- function(subtyp, adjMicr, adjSubp, adjMacr) {
   return(data$adj)
 }
 
-stratVar <- function(x, a, p2, method, y = NULL){
+#stratVar <- function(x, a, p2, method, y = NULL){
   p2 <- first(p2)
   method <- first(method)
   a <- first(a)
@@ -234,6 +234,20 @@ stratVar <- function(x, a, p2, method, y = NULL){
     }
   }
 
+}
+
+startVar <- function(ESTN_METHOD, x, xStrat, ndif, a, nh, y = NULL, yStrat = NULL){
+  ## Variance
+  if (is.null(y)){
+    v <- ifelse(first(ESTN_METHOD == 'simple'),
+                var(c(x, numeric(ndif)) * first(a) / nh),
+                (sum(c(xPlot, numeric(ndif))^2) - sum(nh * xStrat^2)) / (nh * (nh-1)))
+    ## Covariance
+  } else {
+    v <- ifelse(first(ESTN_METHOD == 'simple'),
+                cov(x,y),
+                (sum(x*y, na.rm = TRUE) - sum(nh * xStrat *yStrat)) / (nh * (nh-1)))
+  }
 }
 
 # Helper function to compute variance for estimation units (manages different estimation methods)
