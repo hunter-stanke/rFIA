@@ -15,7 +15,7 @@ bioHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', grpP, 'aD_p', 'sp')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
     left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT, 'tD', 'typeD',
-                                'VOLCFNET', 'DRYBIO_AG', 'DRYBIO_BG', 'CARBON_AG', 'CARBON_BG')), by = c('PLT_CN', 'CONDID')) %>%
+                                'VOLCFNET', 'VOLCSNET', 'DRYBIO_AG', 'DRYBIO_BG', 'CARBON_AG', 'CARBON_BG')), by = c('PLT_CN', 'CONDID')) %>%
     ## Need a code that tells us where the tree was measured
     ## macroplot, microplot, subplot
     mutate(PLOT_BASIS = case_when(
@@ -140,9 +140,7 @@ bioHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
     ## Need this for covariance later on
     left_join(select(a, fa, PLT_CN, PROP_BASIS, aGrpBy[aGrpBy %in% 'YEAR' == FALSE]), by = c('PLT_CN', aGrpBy[aGrpBy %in% 'YEAR' == FALSE])) %>%
     #Add adjustment factors
-    mutate(
-      ## AREA
-      tAdj = case_when(
+    mutate(tAdj = case_when(
         ## When NA, stay NA
         is.na(PLOT_BASIS) ~ NA_real_,
         ## If the proportion was measured for a macroplot,
@@ -207,45 +205,55 @@ bioHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
               w = first(w),
               p2eu = first(p2eu),
               ndif = nh - n,
-              ## Strata level variances
+              # ## Strata level variances
               nvv = stratVar(ESTN_METHOD, nvPlot, nvStrat, ndif, a, nh),
               svv = stratVar(ESTN_METHOD, svPlot, svStrat, ndif, a, nh),
               bagv = stratVar(ESTN_METHOD, bagPlot, bagStrat, ndif, a, nh),
-              bbgv = stratVar(ESTN_METHOD, bggPlot, bggStrat, ndif, a, nh),
+              bbgv = stratVar(ESTN_METHOD, bbgPlot, bbgStrat, ndif, a, nh),
               btv = stratVar(ESTN_METHOD, btPlot, btStrat, ndif, a, nh),
               cagv = stratVar(ESTN_METHOD, cagPlot, cagStrat, ndif, a, nh),
-              cbgv = stratVar(ESTN_METHOD, cggPlot, cggStrat, ndif, a, nh),
+              cbgv = stratVar(ESTN_METHOD, cbgPlot, cbgStrat, ndif, a, nh),
               ctv = stratVar(ESTN_METHOD, ctPlot, ctStrat, ndif, a, nh),
               # Strata level covariances
               cvStrat_nv = stratVar(ESTN_METHOD, nvPlot, nvStrat, ndif, a, nh, fa, aStrat),
               cvStrat_sv = stratVar(ESTN_METHOD, svPlot, svStrat, ndif, a, nh, fa, aStrat),
               cvStrat_bag = stratVar(ESTN_METHOD, bagPlot, bagStrat, ndif, a, nh, fa, aStrat),
-              cvStrat_bbg = stratVar(ESTN_METHOD, bggPlot, bggStrat, ndif, a, nh, fa, aStrat),
+              cvStrat_bbg = stratVar(ESTN_METHOD, bbgPlot, bbgStrat, ndif, a, nh, fa, aStrat),
               cvStrat_bt = stratVar(ESTN_METHOD, btPlot, btStrat, ndif, a, nh, fa, aStrat),
               cvStrat_cag = stratVar(ESTN_METHOD, cagPlot, cagStrat, ndif, a, nh, fa, aStrat),
               cvStrat_cbg = stratVar(ESTN_METHOD, cagPlot, cagStrat, ndif, a, nh, fa, aStrat),
-              cvStrat_ct = stratVar(ESTN_METHOD, cagPlot, cagStrat, ndif, a, nh, fa, aStrat)) %>%
-
-
-    ## START HERE
+              cvStrat_ct = stratVar(ESTN_METHOD, cagPlot, cagStrat, ndif, a, nh, fa, aStrat)
+              ) %>%
 
     ## Estimation unit
     left_join(select(aEst, ESTN_UNIT_CN, aEst, aVar, aGrpBy), by = c('ESTN_UNIT_CN', aGrpBy)) %>%
     group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
-    summarize(tEst = unitMean(ESTN_METHOD, a, nh,  w, tStrat),
-              bEst = unitMean(ESTN_METHOD, a, nh,  w, bStrat),
-              tTEst = unitMean(ESTN_METHOD, a, nh,  w, tTStrat),
-              bTEst = unitMean(ESTN_METHOD, a, nh,  w, bTStrat),
-              plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE),
-              tVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tv, tStrat, tEst),
-              bVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bv, bStrat, bEst),
-              tTVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tTv, tTStrat, tTEst),
-              bTVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bTv, bTStrat, bTEst),
-              # Unit Covariance
-              cvEst_t = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_t, tStrat, tEst, aStrat, aEst),
-              cvEst_b = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_b, bStrat, bEst, aStrat, aEst),
-              cvEst_tT = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_t, tStrat, tEst, tTStrat, tTEst),
-              cvEst_bT = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_b, bStrat, bEst, bTStrat, bTEst))
+    summarize(nvEst = unitMean(ESTN_METHOD, a, nh, w, nvStrat),
+              svEst = unitMean(ESTN_METHOD, a, nh, w, svStrat),
+              bagEst = unitMean(ESTN_METHOD, a, nh, w, bagStrat),
+              bbgEst = unitMean(ESTN_METHOD, a, nh, w, bbgStrat),
+              btEst = unitMean(ESTN_METHOD, a, nh, w, btStrat),
+              cagEst = unitMean(ESTN_METHOD, a, nh, w, cagStrat),
+              cbgEst = unitMean(ESTN_METHOD, a, nh, w, cbgStrat),
+              ctEst = unitMean(ESTN_METHOD, a, nh, w, ctStrat),
+              # Estimation of unit variance
+              nvVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, w, nvv, nvStrat, nvEst),
+              svVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, w, svv, svStrat, svEst),
+              bagVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, w, bagv, bagStrat, bagEst),
+              bbgVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, w, bbgv, bbgStrat, bbgEst),
+              btVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, w, btv, btStrat, btEst),
+              cagVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, w, cagv, cagStrat, cagEst),
+              cbgVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, w, cbgv, cbgStrat, cbgEst),
+              ctVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, w, ctv, ctStrat, ctEst),
+              cvEst_nv = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_nv, nvStrat, nvEst, aStrat, aEst),
+              cvEst_sv = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_sv, svStrat, svEst, aStrat, aEst),
+              cvEst_bag = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_bag, bagStrat, bagEst, aStrat, aEst),
+              cvEst_bbg = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_bbg, bbgStrat, bbgEst, aStrat, aEst),
+              cvEst_bt = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_bt, btStrat, btEst, aStrat, aEst),
+              cvEst_cag = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_cag, cagStrat, cagEst, aStrat, aEst),
+              cvEst_cbg = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_cbg, cbgStrat, cbgEst, aStrat, aEst),
+              cvEst_ct = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_ct, ctStrat, ctEst, aStrat, aEst),
+              plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE))
 
   out <- list(tEst = tEst, aEst = aEst)
 

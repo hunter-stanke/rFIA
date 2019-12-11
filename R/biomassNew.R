@@ -325,10 +325,10 @@ biomassNew <- function(db,
         library(stringr)
         library(rFIA)
       })
-      out <- parLapply(cl, X = names(plts), fun = tpaHelper1, plts, db, grpBy, aGrpBy, byPlot)
+      out <- parLapply(cl, X = names(plts), fun = bioHelper1, plts, db, grpBy, aGrpBy, byPlot)
       #stopCluster(cl) # Keep the cluster active for the next run
     } else { # Unix systems
-      out <- mclapply(names(plts), FUN = tpaHelper1, plts, db, grpBy, aGrpBy, byPlot, mc.cores = nCores)
+      out <- mclapply(names(plts), FUN = bioHelper1, plts, db, grpBy, aGrpBy, byPlot, mc.cores = nCores)
     }
   })
 
@@ -370,10 +370,10 @@ biomassNew <- function(db,
         #   library(stringr)
         #   library(rFIA)
         # })
-        out <- parLapply(cl, X = names(popState), fun = tpaHelper2, popState, a, t, grpBy, aGrpBy)
+        out <- parLapply(cl, X = names(popState), fun = bioHelper2, popState, a, t, grpBy, aGrpBy)
         stopCluster(cl)
       } else { # Unix systems
-        out <- mclapply(names(popState), FUN = tpaHelper2, popState, a, t, grpBy, aGrpBy, mc.cores = nCores)
+        out <- mclapply(names(popState), FUN = bioHelper2, popState, a, t, grpBy, aGrpBy, mc.cores = nCores)
       }
     })
     ## back to dataframes
@@ -399,21 +399,34 @@ biomassNew <- function(db,
       tEst <- tEst %>%
         group_by(STATECD, .dots = grpBy) %>%
         #left_join(aTotal, by = c(aGrpBy)) %>%
-        summarize(tEst = sum(tEst, na.rm = TRUE),
-                  bEst = sum(bEst, na.rm = TRUE),
-                  tTEst = sum(tTEst, na.rm = TRUE), ## Need to sum this
-                  bTEst = sum(bTEst, na.rm = TRUE), ## Need to sum this
-                  tTVar = sum(tTVar, na.rm = TRUE),
-                  bTVar = sum(bTVar, na.rm = TRUE),
-                  cvEst_tT = sum(cvEst_tT, na.rm = TRUE),
-                  cvEst_bT = sum(cvEst_bT, na.rm = TRUE),
-                  ## Variances
-                  tVar = sum(tVar, na.rm = TRUE),
-                  bVar = sum(bVar, na.rm = TRUE),
-                  #aVar = first(aVar),
-                  cvEst_t = sum(cvEst_t, na.rm = TRUE),
-                  cvEst_b = sum(cvEst_b, na.rm = TRUE),
+        summarize(nvEst = sum(nvEst, na.rm = TRUE),
+                  svEst = sum(svEst, na.rm = TRUE),
+                  bagEst = sum(bagEst, na.rm = TRUE),
+                  bbgEst = sum(bbgEst, na.rm = TRUE),
+                  btEst  =sum(btEst, na.rm = TRUE),
+                  cagEst = sum(cagEst, na.rm = TRUE),
+                  cbgEst = sum(cbgEst, na.rm = TRUE),
+                  ctEst = sum(ctEst, na.rm = TRUE),
+                  # Estimation of unit variance
+                  nvVar = sum(nvVar, na.rm = TRUE),
+                  svVar = sum(svVar, na.rm = TRUE),
+                  bagVar = sum(bagVar, na.rm = TRUE),
+                  bbgVar = sum(bbgVar, na.rm = TRUE),
+                  btVar = sum(btVar, na.rm = TRUE),
+                  cagVar = sum(cagVar, na.rm = TRUE),
+                  cbgVar = sum(cbgVar, na.rm = TRUE),
+                  ctVar = sum(ctVar, na.rm = TRUE),
+                  cvEst_nv =  sum(cvEst_nv, na.rm = TRUE),
+                  cvEst_sv = sum(cvEst_sv, na.rm = TRUE),
+                  cvEst_bag = sum(cvEst_bag, na.rm = TRUE),
+                  cvEst_bbg = sum(cvEst_bbg, na.rm = TRUE),
+                  cvEst_bt = sum(cvEst_bt, na.rm = TRUE),
+                  cvEst_cag = sum(cvEst_cag, na.rm = TRUE),
+                  cvEst_cbg = sum(cvEst_cbg, nar.rm = TRUE),
+                  cvEst_ct = sum(cvEst_ct, na.rm = TRUE),
                   plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE))
+
+
 
       ### ---- SIMPLE MOVING AVERAGE
       if (method == 'SMA'){
