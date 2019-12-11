@@ -81,6 +81,21 @@ areal_par <- function(x, pltSF, polys){
     select(-c('geometry')) # removes artifact of SF object
 }
 
+## Exponenetially weighted moving average
+ema <- function(x, yrs, var = FALSE){
+  l <- 2 / (1 +first(yrs))
+  wgts <- c()
+  for (i in 1:length(x)) wgts[i] <- l^(i-1)*(1-l)
+
+  if (var){
+    out <- sum(wgts^2 * x,na.rm = TRUE)
+  } else {
+    out <- sum(wgts * x,na.rm = TRUE)
+  }
+
+  return(out)
+}
+
 
 #' @export
 makeClasses <- function(x, interval = NULL, lower = NULL, upper = NULL, brks = NULL, numLabs = FALSE){

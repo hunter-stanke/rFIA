@@ -213,7 +213,7 @@ tpaNew_par <- function(db,
               as.character)
 
   ### Which estimator to use?
-   if (str_to_upper(method) %in% c('ANNUAL', "SMA")){
+   if (str_to_upper(method) %in% c('ANNUAL', "SMA", 'EMA')){
      ## Keep an original
      popOrig <- pops
      ## Want to use the year where plots are measured, no repeats
@@ -458,57 +458,42 @@ tpaNew_par <- function(db,
 
       #### ----- EXPONENTIAL MOVING AVERAGE
       } else if (method == 'EMA'){
-        ## All eval combos
+        ## Assuming a uniform weighting scheme
+        popOrig <- mutate(popOrig, YEAR = END_INVYR)
         evals <- popOrig %>%
           distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
           select(YEAR, INVYR, STATECD) %>%
-          mutate(lamda = 2 / (yrs + 1))
-
-        ## Minimum eval year
-        minEval <- evals %>%
-          group_by(STATECD) %>%
-          summarize(minYear = min(INVYR, na.rm = TRUE))
-
-        ### Exponential moving average function
-        ema <- function(x, l){
-          val = c()
-          val[1] = x[1]
-          if (length(x > 1)){
-            for (i in 2:length(x)){
-              val[i] = l[i]*x[i] + val[i-1] * (1-l[i-1])
-            }
-          }
-          return(val)
-        }
-
-        emaVar <- function(x,l){
-          val[1] = x[1]
-          if (length(x > 1)){
-            for (i in 2:length(x)){
-              val[i] = l[i]*x[i] + val[i-1] * (1-l[i-1])
-            }
-          }
-          return(val)
-        }
-
-        emaWgt <- function(n, yrs){
-          l <- 2 / (1 +yrs)
-          wgts <- c()
-          for (i in 1:n) wgts[i] <- l^i*(1-l)
-          return(wgts)
-        }
+          mutate(yrs = yrs)
 
         # Area
         aEst <- left_join(evals, aEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
-          left_join(minEval, by = 'STATECD') %>%
+          #left_join(minEval, by = 'STATECD') %>%
           ## Make a previous year column, NA if earliest recorded
-          mutate(PREV_INVYR = ifelse(INVYR == minYear, NA_integer_, as.numeric(INVYR) -1),
-                 )# %>%
+          #mutate(PREV_INVYR = ifelse(INVYR == minYear, NA_integer_, as.numeric(INVYR) -1))# %>%
            #%>%
           group_by(STATECD, .dots = aGrpBy) %>%
-          summarize(aEst = sum(aEst * wgt, na.rm = TRUE),
-                    aVar = sum(aVar * wgt^2, na.rm = TRUE),
+          summarize(aEst = ema(aEst, yrs),
+                    aVar = ema(aVar, yrs, var = TRUE),
                     plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
+
+        tEst <- left_join(evals, tEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
+          group_by(STATECD, .dots = grpBy) %>%
+          #left_join(aTotal, by = c(aGrpBy)) %>%
+          summarize(tEst = ema(tEst, yrs),
+                    bEst = ema(bEst, yrs),
+                    tTEst = ema(tTEst, yrs), ## Need to sum this
+                    bTEst = ema(bTEst, yrs), ## Need to sum this
+                    tTVar = ema(tTVar, yrs, var = TRUE),
+                    bTVar = ema(bTVar, yrs, var = TRUE),
+                    cvEst_tT = ema(cvEst_tT, yrs, var = TRUE),
+                    cvEst_bT = ema(cvEst_bT, yrs, var = TRUE),
+                    ## Variances
+                    tVar = ema(tVar, yrs, var = TRUE),
+                    bVar = ema(bVar, yrs, var = TRUE),
+                    #aVar = first(aVar),
+                    cvEst_t = ema(cvEst_t, yrs, var = TRUE),
+                    cvEst_b = ema(cvEst_b, yrs, var = TRUE),
+                    plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE))
 
       }
 
