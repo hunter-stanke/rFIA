@@ -209,12 +209,14 @@ biomassNew <- function(db,
     #pops <- distinct(pops, INVYR, PLT_CN, .keep_all = TRUE)
     pops <- pops %>%
       group_by(STATECD) %>%
-      filter(END_INVYR == INVYR)
+      filter(END_INVYR == INVYR) %>%
+      ungroup()
 
     prePops <- popOrig %>%
       group_by(STATECD) %>%
       filter(INVYR < min(END_INVYR, na.rm = TRUE)) %>%
-      distinct(PLT_CN, .keep_all = TRUE)
+      distinct(PLT_CN, .keep_all = TRUE) %>%
+      ungroup()
 
     pops <- bind_rows(pops, prePops)
 
@@ -375,8 +377,11 @@ biomassNew <- function(db,
     ##### ----------------- MOVING AVERAGES
     if (str_to_upper(method) %in% c("SMA", 'EMA')){
       ## Need a STATECD on aEst and tEst to join wgts
-      aEst <- left_join(aEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
-      tEst <- left_join(tEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
+      if ('STATECD' %in% names(tEst) == FALSE){
+        ## Need a STATECD on aEst and tEst to join wgts
+        tEst <- left_join(tEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
+        aEst <- left_join(aEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
+      }
 
       #### Summarizing to state level here to apply weights by panel
       #### Getting rid of ESTN_UNITS

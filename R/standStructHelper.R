@@ -4,7 +4,6 @@ ssHelper1 <- function(x, plts, db, grpBy, byPlot){
   db$PLOT <- plts[[x]]
   ## Carrying out filter across all tables
   #db <- clipFIA(db, mostRecent = FALSE)
-test <- plts[[1]]
 
   ## Which grpByNames are in which table? Helps us subset below
   grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
@@ -93,9 +92,6 @@ ssHelper2 <- function(x, popState, t, grpBy){
               ndif = nh - n,
               # ## Strata level variances
               av = stratVar(ESTN_METHOD, fa, aStrat, ndif, a, nh),
-              av1 = ifelse(first(ESTN_METHOD == 'simple'),
-                          var(c(fa, numeric(ndif)) * first(a) / nh),
-                          (sum((c(fa, numeric(ndif))^2), na.rm = TRUE) - nh * aStrat^2) / (nh * (nh-1))),
               pv = stratVar(ESTN_METHOD, p, pStrat, ndif, a, nh),
               mav = stratVar(ESTN_METHOD, ma, maStrat, ndif, a, nh),
               lv = stratVar(ESTN_METHOD, l, lStrat, ndif, a, nh),

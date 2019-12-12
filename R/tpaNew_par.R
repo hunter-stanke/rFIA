@@ -26,26 +26,15 @@ tpaNew <- function(db,
 
   # Probably cheating, but it works
   if (quo_name(grpBy_quo) != 'NULL'){
-    ## Have to join tables to run select with this object type
-    plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
-    ## We want a unique error message here to tell us when columns are not present in data
-    d_quo <- tryCatch(
-      error = function(cnd) {
-        return(0)
-      },
-      plt_quo[1,] %>% # Just the first row
-        inner_join(db$COND, by = 'PLT_CN') %>%
-        inner_join(db$TREE, by = 'PLT_CN') %>%
-        select(!!grpBy_quo)
-    )
+    ## Check if column exists
+    allNames <- c(names(db$PLOT), names(db$COND), names(db$TREE))
 
-    # If column doesnt exist, just returns 0, not a dataframe
-    if (is.null(nrow(d_quo))){
+    if (quo_name(grpBy_quo) %in% allNames){
+      # Convert to character
+      grpBy <- quo_name(grpBy_quo)
+    } else {
       grpName <- quo_name(grpBy_quo)
       stop(paste('Columns', grpName, 'not found in PLOT, TREE, or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
-    } else {
-      # Convert to character
-      grpBy <- names(d_quo)
     }
   }
 
@@ -213,38 +202,40 @@ tpaNew <- function(db,
               as.character)
 
   ### Which estimator to use?
-   if (str_to_upper(method) %in% c('ANNUAL', "SMA", 'EMA')){
-     ## Keep an original
-     popOrig <- pops
-     ## Want to use the year where plots are measured, no repeats
-     ## Breaking this up into pre and post reporting becuase
-     ## Estimation units get weird on us otherwise
-     #pops <- distinct(pops, INVYR, PLT_CN, .keep_all = TRUE)
-     pops <- pops %>%
-       group_by(STATECD) %>%
-       filter(END_INVYR == INVYR)
+  if (str_to_upper(method) %in% c('ANNUAL', "SMA", 'EMA')){
+    ## Keep an original
+    popOrig <- pops
+    ## Want to use the year where plots are measured, no repeats
+    ## Breaking this up into pre and post reporting becuase
+    ## Estimation units get weird on us otherwise
+    #pops <- distinct(pops, INVYR, PLT_CN, .keep_all = TRUE)
+    pops <- pops %>%
+      group_by(STATECD) %>%
+      filter(END_INVYR == INVYR) %>%
+      ungroup()
 
-     prePops <- popOrig %>%
-       group_by(STATECD) %>%
-       filter(INVYR < min(END_INVYR, na.rm = TRUE)) %>%
-       distinct(PLT_CN, .keep_all = TRUE)
+    prePops <- popOrig %>%
+      group_by(STATECD) %>%
+      filter(INVYR < min(END_INVYR, na.rm = TRUE)) %>%
+      distinct(PLT_CN, .keep_all = TRUE) %>%
+      ungroup()
 
-     pops <- bind_rows(pops, prePops)
+    pops <- bind_rows(pops, prePops)
 
-     ## P2POINTCNT column is NOT consistent for annnual estimates, plots
-     ## within individual strata and est units are related to different INVYRs
-     p2 <- pops %>%
-       group_by(STRATUM_CN, INVYR) %>%
-       summarize(P2POINTCNT = length(unique(PLT_CN)))
-     ## Rejoin
-     pops <- pops %>%
-       mutate(YEAR = INVYR) %>%
-       select(-c(P2POINTCNT)) %>%
-       left_join(p2, by = c('STRATUM_CN', 'YEAR' = 'INVYR'))
+    ## P2POINTCNT column is NOT consistent for annnual estimates, plots
+    ## within individual strata and est units are related to different INVYRs
+    p2 <- pops %>%
+      group_by(STRATUM_CN, INVYR) %>%
+      summarize(P2POINTCNT = length(unique(PLT_CN)))
+    ## Rejoin
+    pops <- pops %>%
+      mutate(YEAR = INVYR) %>%
+      select(-c(P2POINTCNT)) %>%
+      left_join(p2, by = c('STRATUM_CN', 'YEAR' = 'INVYR'))
 
-   } else {     # Otherwise temporally indifferent
-     pops <- rename(pops, YEAR = END_INVYR)
-   }
+  } else {     # Otherwise temporally indifferent
+    pops <- rename(pops, YEAR = END_INVYR)
+  }
 
   # ### The population tables
   # pops <- select(db$POP_EVAL, c('EVALID', 'ESTN_METHOD', 'CN', 'END_INVYR')) %>%
@@ -387,8 +378,11 @@ tpaNew <- function(db,
     ##### ----------------- MOVING AVERAGES
     if (str_to_upper(method) %in% c("SMA", 'EMA')){
       ## Need a STATECD on aEst and tEst to join wgts
-      aEst <- left_join(aEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
-      tEst <- left_join(tEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
+      if ('STATECD' %in% names(tEst) == FALSE){
+        ## Need a STATECD on aEst and tEst to join wgts
+        tEst <- left_join(tEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
+        aEst <- left_join(aEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
+      }
 
       #### Summarizing to state level here to apply weights by panel
       #### Getting rid of ESTN_UNITS
