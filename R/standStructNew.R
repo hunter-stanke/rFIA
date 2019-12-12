@@ -3,11 +3,12 @@ standStructNew <- function(db,
                           polys = NULL,
                           returnSpatial = FALSE,
                           landType = 'forest',
+                          method = 'TI',
+                          yrs = 5,
                           areaDomain = NULL,
                           byPlot = FALSE,
                           totals = FALSE,
                           tidy = TRUE,
-                          SE = TRUE,
                           nCores = 1) {
 
   ## Need a plotCN, and a new ID
@@ -20,24 +21,15 @@ standStructNew <- function(db,
 
   # Probably cheating, but it works
   if (quo_name(grpBy_quo) != 'NULL'){
-    ## Have to join tables to run select with this object type
-    plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
-    ## We want a unique error message here to tell us when columns are not present in data
-    d_quo <- tryCatch(
-      error = function(cnd) {
-        0
-      },
-      plt_quo[1,] %>% # Just the first row
-        inner_join(db$COND, by = 'PLT_CN') %>%
-        select(!!grpBy_quo)
-    )
-    # If column doesnt exist, just returns 0, not a dataframe
-    if (is.null(nrow(d_quo))){
-      grpName <- quo_name(grpBy_quo)
-      stop(paste('Columns', grpName, 'not found in PLOT, TREE, or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
-    } else {
+    ## Check if column exists
+    allNames <- c(names(db$PLOT), names(db$COND))
+
+    if (quo_name(grpBy_quo) %in% allNames){
       # Convert to character
-      grpBy <- names(d_quo)
+      grpBy <- quo_name(grpBy_quo)
+    } else {
+      grpName <- quo_name(grpBy_quo)
+      stop(paste('Columns', grpName, 'not found in PLOT or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
     }
   }
 
@@ -268,39 +260,206 @@ standStructNew <- function(db,
     }
   })
 
-  ## back to dataframes
-  out <- unlist(out, recursive = FALSE)
-  t <- bind_rows(out[names(out) == 't'])
+  if (byPlot){
+    ## back to dataframes
+    out <- unlist(out, recursive = FALSE)
+    tOut <- bind_rows(out[names(out) == 't'])
+    ## Make it spatial
+    if (returnSpatial){
+      tOut <- tOut %>%
+        filter(!is.na(LAT) & !is.na(LON)) %>%
+        st_as_sf(coords = c('LON', 'LAT'),
+                 crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
 
-
-  ## Adding YEAR to groups
-  grpBy <- c('YEAR', grpBy)
-
-
-  ## Splitting up by ESTN_UNIT
-  popState <- split(pops, as.factor(pops$STATECD))
-
-  suppressWarnings({
-    ## Compute estimates in parallel -- Clusters in windows, forking otherwise
-    if (Sys.info()['sysname'] == 'Windows'){
-      ## Use the same cluster as above
-      # cl <- makeCluster(nCores)
-      # clusterEvalQ(cl, {
-      #   library(dplyr)
-      #   library(stringr)
-      #   library(rFIA)
-      # })
-      out <- parLapply(cl, X = names(popState), fun = ssHelper2, popState, t, grpBy)
-      stopCluster(cl)
-    } else { # Unix systems
-      out <- mclapply(names(popState), FUN = ssHelper2, popState, t, grpBy, mc.cores = nCores)
     }
-  })
-  ## back to dataframes
-  out <- unlist(out, recursive = FALSE)
-  tEst <- bind_rows(out[names(out) == 'tEst'])
+    ## Population estimation
+  } else {
+    ## back to dataframes
+    out <- unlist(out, recursive = FALSE)
+    t <- bind_rows(out[names(out) == 't'])
+
+    ## Adding YEAR to groups
+    grpBy <- c('YEAR', grpBy)
 
 
+    ## Splitting up by ESTN_UNIT
+    popState <- split(pops, as.factor(pops$STATECD))
+
+    suppressWarnings({
+      ## Compute estimates in parallel -- Clusters in windows, forking otherwise
+      if (Sys.info()['sysname'] == 'Windows'){
+        ## Use the same cluster as above
+        # cl <- makeCluster(nCores)
+        # clusterEvalQ(cl, {
+        #   library(dplyr)
+        #   library(stringr)
+        #   library(rFIA)
+        # })
+        out <- parLapply(cl, X = names(popState), fun = ssHelper2, popState, t, grpBy)
+        stopCluster(cl)
+      } else { # Unix systems
+        out <- mclapply(names(popState), FUN = ssHelper2, popState, t, grpBy, mc.cores = nCores)
+      }
+    })
+    ## back to dataframes
+    out <- unlist(out, recursive = FALSE)
+    tEst <- bind_rows(out[names(out) == 'tEst'])
+
+
+
+    ##### ----------------- MOVING AVERAGES
+    if (str_to_upper(method) %in% c("SMA", 'EMA')){
+      ## Need a STATECD on aEst and tEst to join wgts
+      tEst <- left_join(tEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
+
+      #### Summarizing to state level here to apply weights by panel
+      #### Getting rid of ESTN_UNITS
+      # Tree
+      tEst <- tEst %>%
+        group_by(STATECD, .dots = grpBy) %>%
+        summarize_at(vars(aEst:plotIn_AREA),sum, na.rm = TRUE)
+
+      ## Naming
+      popOrig <- mutate(popOrig, YEAR = END_INVYR)
+
+      ### ---- SIMPLE MOVING AVERAGE
+      if (str_to_upper(method) == 'SMA'){
+        ## Assuming a uniform weighting scheme
+        wgts <- popOrig %>%
+          group_by(YEAR, STATECD) %>%
+          summarize(wgt = 1 / length(unique(INVYR))) %>%
+          ## Expand it out again
+          right_join(popOrig, by = c('YEAR', 'STATECD')) %>%
+          distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
+          select(YEAR, INVYR, STATECD, wgt)
+
+
+        #### ----- EXPONENTIAL MOVING AVERAGE
+      } else if (str_to_upper(method) == 'EMA'){
+        ## Assuming a uniform weighting scheme
+        popOrig <- mutate(popOrig, YEAR = END_INVYR)
+        wgts <- popOrig %>%
+          distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
+          select(YEAR, INVYR, STATECD) %>%
+          mutate(yrs = yrs,
+                 l = 2 / (1 + yrs),
+                 yrPrev = YEAR - INVYR,
+                 wgt = l^yrPrev *(1-l))
+      }
+
+      ### Applying the weights
+      # Area
+      tEst <- left_join(wgts, aEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
+        mutate_at(vars(aEst:moEst), ~(.*wgt)) %>%
+        mutate_at(vars(aVar:cvEst_mo), ~(.*(wgt^2))) %>%
+        group_by(STATECD, .dots = grpBy) %>%
+        summarize_at(vars(aEst:plotIn_AREA), sum, na.rm = TRUE)
+    }
+
+    ##---------------------  TOTALS and RATIOS
+    suppressWarnings({
+      ## Bring them together
+      tOut <- tEst %>%
+        group_by(.dots = grpBy) %>%
+        summarize_all(sum,na.rm = TRUE) %>%
+        # Renaming, computing ratios, and SE
+        mutate(POLE_AREA = pEst,
+               MATURE_AREA = maEst,
+               LATE_AREA = lEst,
+               MOSAIC_AREA = moEst,
+               AREA_TOTAL = aEst,
+               ## Ratios
+               POLE_PERC = POLE_AREA / AREA_TOTAL * 100,
+               MATURE_PERC = MATURE_AREA / AREA_TOTAL * 100,
+               LATE_PERC = LATE_AREA / AREA_TOTAL * 100,
+               MOSAIC_PERC = MOSAIC_AREA / AREA_TOTAL * 100,
+               ## Ratio Var
+               ppVar = (1/AREA_TOTAL^2) * (pVar + (POLE_PERC^2 * aVar) - 2 * POLE_PERC * cvEst_p),
+               mapVar = (1/AREA_TOTAL^2) * (maVar + (MATURE_PERC^2 * aVar) - 2 * MATURE_PERC * cvEst_ma),
+               lpVar = (1/AREA_TOTAL^2) * (lVar + (LATE_PERC^2 * aVar) - 2 * LATE_PERC * cvEst_l),
+               mopVar = (1/AREA_TOTAL^2) * (moVar + (MOSAIC_PERC^2 * aVar) - 2 * MOSAIC_PERC * cvEst_mo),
+               ## SE RATIO
+               POLE_PERC_SE = sqrt(ppVar) / POLE_PERC * 100,
+               MATURE_PERC_SE = sqrt(mapVar) / MATURE_PERC * 100,
+               LATE_PERC_SE = sqrt(lpVar) / LATE_PERC * 100,
+               MOSAIC_PERC_SE = sqrt(mopVar) / MOSAIC_PERC * 100,
+               ## SE TOTAL
+               POLE_AREA_SE = sqrt(pVar) / POLE_AREA * 100,
+               MATURE_AREA_SE = sqrt(maVar) / MATURE_AREA * 100,
+               LATE_AREA_SE = sqrt(lVar) / LATE_AREA * 100,
+               MOSAIC_AREA_SE = sqrt(moVar) / MOSAIC_AREA * 100,
+               AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL *100,
+               ## nPlots
+               nPlots_AREA = plotIn_AREA)
+    })
+
+    if (totals) {
+      tOut <- tOut %>%
+        select(grpBy,"POLE_PERC","MATURE_PERC", "LATE_PERC", "MOSAIC_PERC",
+               "POLE_AREA","MATURE_AREA","LATE_AREA","MOSAIC_AREA","AREA_TOTAL",
+               "POLE_PERC_SE","MATURE_PERC_SE","LATE_PERC_SE",   "MOSAIC_PERC_SE",
+               "POLE_AREA_SE",   "MATURE_AREA_SE", "LATE_AREA_SE",   "MOSAIC_AREA_SE",
+               "AREA_TOTAL_SE","nPlots_AREA")
+    } else {
+      tOut <- tOut %>%
+        select(grpBy,"POLE_PERC","MATURE_PERC", "LATE_PERC", "MOSAIC_PERC",
+               "POLE_PERC_SE","MATURE_PERC_SE","LATE_PERC_SE",   "MOSAIC_PERC_SE",
+               "nPlots_AREA")
+    }
+
+    # Snag the names
+    tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
+
+    # Return a spatial object
+    if (!is.null(polys) & returnSpatial) {
+      suppressMessages({suppressWarnings({tOut <- left_join(polys, tOut) %>%
+        select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
+        filter(!is.na(polyID))})})
+    } else if (!is.null(polys) & returnSpatial == FALSE){
+      tOut <- select(tOut, c('YEAR', grpByOrig, tNames, everything())) %>%
+        filter(!is.na(polyID))
+    }
+
+    ## Tidy things up if they didn't specify polys, returnSpatial
+    if (tidy & is.null(polys) & returnSpatial == FALSE){
+      ## pivot longer
+      stagePERC <- pivot_longer(select(tOut, grpBy, POLE_PERC:MOSAIC_PERC, nPlots_AREA), names_to = 'STAGE', values_to = 'PERC', cols = POLE_PERC:MOSAIC_PERC) %>%
+        mutate(STAGE = str_split(STAGE,pattern= '_', simplify = TRUE,)[,1])
+      stagePERC_SE <- pivot_longer(select(tOut, grpBy, POLE_PERC_SE:MOSAIC_PERC_SE), names_to = 'STAGE', values_to = 'PERC_SE', cols = POLE_PERC_SE:MOSAIC_PERC_SE) %>%
+        mutate(STAGE = str_split(STAGE,pattern= '_', simplify = TRUE,)[,1])
+      ## rejoin
+      stage <- left_join(stagePERC, stagePERC_SE, by = c(grpBy, 'STAGE')) %>%
+        select(grpBy, STAGE, PERC, PERC_SE, nPlots_AREA)
+
+      if (totals){
+        stageAREA <- pivot_longer(select(tOut, grpBy, POLE_AREA:MOSAIC_AREA), names_to = 'STAGE', values_to = 'AREA', cols = POLE_AREA:MOSAIC_AREA) %>%
+          mutate(STAGE = str_split(STAGE,pattern= '_', simplify = TRUE,)[,1])
+        stageAREA_SE <- pivot_longer(select(tOut, grpBy, POLE_AREA_SE:MOSAIC_AREA_SE), names_to = 'STAGE', values_to = 'AREA_SE', cols = POLE_AREA_SE:MOSAIC_AREA_SE) %>%
+          mutate(STAGE = str_split(STAGE,pattern= '_', simplify = TRUE,)[,1])
+        ## Rejoin
+        stage <- stage %>%
+          left_join(stageAREA, by = c(grpBy, 'STAGE')) %>%
+          left_join(stageAREA_SE, by = c(grpBy, 'STAGE'))%>%
+          select(grpBy, STAGE, PERC, AREA, PERC_SE, AREA_SE, nPlots_AREA)
+      }
+      tOut <- stage
+
+      }
+    } # End byPlot
+  ## For spatial plots
+  if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
+
+  ## Pretty output
+  tOut <- drop_na(tOut, grpBy) %>%
+    arrange(YEAR) %>%
+    as_tibble()
+
+
+  ## Above converts to tibble
+  if (returnSpatial) tOut <- st_sf(tOut)
+  # ## remove any duplicates in byPlot (artifact of END_INYR loop)
+  if (byPlot) tOut <- unique(tOut)
+  return(tOut)
 
 }
 

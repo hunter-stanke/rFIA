@@ -243,12 +243,12 @@ stratVar <- function(ESTN_METHOD, x, xStrat, ndif, a, nh, y = NULL, yStrat = NUL
   if (is.null(y)){
     v <- ifelse(first(ESTN_METHOD == 'simple'),
                 var(c(x, numeric(ndif)) * first(a) / nh),
-                (sum(c(x, numeric(ndif))^2) - sum(nh * xStrat^2)) / (nh * (nh-1)))
+                (sum(c(x, numeric(ndif))^2, na.rm = TRUE) - sum(nh * xStrat^2,na.rm = TRUE)) / (nh * (nh-1)))
     ## Covariance
   } else {
     v <- ifelse(first(ESTN_METHOD == 'simple'),
                 cov(x,y),
-                (sum(x*y, na.rm = TRUE) - sum(nh * xStrat *yStrat)) / (nh * (nh-1)))
+                (sum(x*y, na.rm = TRUE) - sum(nh * xStrat *yStrat, na.rm = TRUE)) / (nh * (nh-1)))
   }
 }
 
