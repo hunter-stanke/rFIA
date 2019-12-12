@@ -389,6 +389,7 @@ biomassNew <- function(db,
       tEst <- left_join(tEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
 
       #### Summarizing to state level here to apply weights by panel
+      #### Getting rid of ESTN_UNITS
       # Area
       aEst <- aEst %>%
         group_by(STATECD, .dots = aGrpBy) %>%
@@ -398,40 +399,14 @@ biomassNew <- function(db,
       # Tree
       tEst <- tEst %>%
         group_by(STATECD, .dots = grpBy) %>%
-        #left_join(aTotal, by = c(aGrpBy)) %>%
-        summarize(nvEst = sum(nvEst, na.rm = TRUE),
-                  svEst = sum(svEst, na.rm = TRUE),
-                  bagEst = sum(bagEst, na.rm = TRUE),
-                  bbgEst = sum(bbgEst, na.rm = TRUE),
-                  btEst  =sum(btEst, na.rm = TRUE),
-                  cagEst = sum(cagEst, na.rm = TRUE),
-                  cbgEst = sum(cbgEst, na.rm = TRUE),
-                  ctEst = sum(ctEst, na.rm = TRUE),
-                  # Estimation of unit variance
-                  nvVar = sum(nvVar, na.rm = TRUE),
-                  svVar = sum(svVar, na.rm = TRUE),
-                  bagVar = sum(bagVar, na.rm = TRUE),
-                  bbgVar = sum(bbgVar, na.rm = TRUE),
-                  btVar = sum(btVar, na.rm = TRUE),
-                  cagVar = sum(cagVar, na.rm = TRUE),
-                  cbgVar = sum(cbgVar, na.rm = TRUE),
-                  ctVar = sum(ctVar, na.rm = TRUE),
-                  cvEst_nv =  sum(cvEst_nv, na.rm = TRUE),
-                  cvEst_sv = sum(cvEst_sv, na.rm = TRUE),
-                  cvEst_bag = sum(cvEst_bag, na.rm = TRUE),
-                  cvEst_bbg = sum(cvEst_bbg, na.rm = TRUE),
-                  cvEst_bt = sum(cvEst_bt, na.rm = TRUE),
-                  cvEst_cag = sum(cvEst_cag, na.rm = TRUE),
-                  cvEst_cbg = sum(cvEst_cbg, nar.rm = TRUE),
-                  cvEst_ct = sum(cvEst_ct, na.rm = TRUE),
-                  plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE))
+        summarize_at(vars(nvEst:plotIn_TREE),sum, na.rm = TRUE)
 
-
+      ## Naming
+      popOrig <- mutate(popOrig, YEAR = END_INVYR)
 
       ### ---- SIMPLE MOVING AVERAGE
-      if (method == 'SMA'){
+      if (str_to_upper(method) == 'SMA'){
         ## Assuming a uniform weighting scheme
-        popOrig <- mutate(popOrig, YEAR = END_INVYR)
         wgts <- popOrig %>%
           group_by(YEAR, STATECD) %>%
           summarize(wgt = 1 / length(unique(INVYR))) %>%
@@ -440,153 +415,151 @@ biomassNew <- function(db,
           distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
           select(YEAR, INVYR, STATECD, wgt)
 
-        # Area
-        aEst <- left_join(wgts, aEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
-          group_by(STATECD, .dots = aGrpBy) %>%
-          summarize(aEst = sum(aEst * wgt, na.rm = TRUE),
-                    aVar = sum(aVar * wgt^2, na.rm = TRUE),
-                    plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
-
-        tEst <- left_join(wgts, tEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
-          group_by(STATECD, .dots = grpBy) %>%
-          #left_join(aTotal, by = c(aGrpBy)) %>%
-          summarize(tEst = sum(tEst * wgt, na.rm = TRUE),
-                    bEst = sum(bEst* wgt, na.rm = TRUE),
-                    tTEst = sum(tTEst* wgt, na.rm = TRUE), ## Need to sum this
-                    bTEst = sum(bTEst* wgt, na.rm = TRUE), ## Need to sum this
-                    tTVar = sum(tTVar* wgt^2, na.rm = TRUE),
-                    bTVar = sum(bTVar* wgt^2, na.rm = TRUE),
-                    cvEst_tT = sum(cvEst_tT* wgt^2, na.rm = TRUE),
-                    cvEst_bT = sum(cvEst_bT* wgt^2, na.rm = TRUE),
-                    ## Variances
-                    tVar = sum(tVar* wgt^2, na.rm = TRUE),
-                    bVar = sum(bVar* wgt^2, na.rm = TRUE),
-                    #aVar = first(aVar),
-                    cvEst_t = sum(cvEst_t* wgt^2, na.rm = TRUE),
-                    cvEst_b = sum(cvEst_b* wgt^2, na.rm = TRUE),
-                    plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE))
-
 
         #### ----- EXPONENTIAL MOVING AVERAGE
-      } else if (method == 'EMA'){
+      } else if (str_to_upper(method) == 'EMA'){
         ## Assuming a uniform weighting scheme
         popOrig <- mutate(popOrig, YEAR = END_INVYR)
-        evals <- popOrig %>%
+        wgts <- popOrig %>%
           distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
           select(YEAR, INVYR, STATECD) %>%
-          mutate(yrs = yrs)
-
-        # Area
-        aEst <- left_join(evals, aEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
-          #left_join(minEval, by = 'STATECD') %>%
-          ## Make a previous year column, NA if earliest recorded
-          #mutate(PREV_INVYR = ifelse(INVYR == minYear, NA_integer_, as.numeric(INVYR) -1))# %>%
-          #%>%
-          group_by(STATECD, .dots = aGrpBy) %>%
-          summarize(aEst = ema(aEst, yrs),
-                    aVar = ema(aVar, yrs, var = TRUE),
-                    plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
-
-        tEst <- left_join(evals, tEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
-          group_by(STATECD, .dots = grpBy) %>%
-          #left_join(aTotal, by = c(aGrpBy)) %>%
-          summarize(tEst = ema(tEst, yrs),
-                    bEst = ema(bEst, yrs),
-                    tTEst = ema(tTEst, yrs), ## Need to sum this
-                    bTEst = ema(bTEst, yrs), ## Need to sum this
-                    tTVar = ema(tTVar, yrs, var = TRUE),
-                    bTVar = ema(bTVar, yrs, var = TRUE),
-                    cvEst_tT = ema(cvEst_tT, yrs, var = TRUE),
-                    cvEst_bT = ema(cvEst_bT, yrs, var = TRUE),
-                    ## Variances
-                    tVar = ema(tVar, yrs, var = TRUE),
-                    bVar = ema(bVar, yrs, var = TRUE),
-                    #aVar = first(aVar),
-                    cvEst_t = ema(cvEst_t, yrs, var = TRUE),
-                    cvEst_b = ema(cvEst_b, yrs, var = TRUE),
-                    plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE))
-
+          mutate(yrs = yrs,
+                 l = 2 / (1 + yrs),
+                 yrPrev = YEAR - INVYR,
+                 wgt = l^yrPrev *(1-l))
       }
 
+      ### Applying the weights
+      # Area
+      aEst <- left_join(wgts, aEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
+        mutate_at(vars(aEst), ~(.*wgt)) %>%
+        mutate_at(vars(aVar), ~(.*(wgt^2))) %>%
+        group_by(STATECD, .dots = grpBy) %>%
+        summarize_at(vars(aEst:plotIn_AREA), sum, na.rm = TRUE)
+
+
+      tEst <- left_join(wgts, tEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
+        mutate_at(vars(nvEst:ctEst), ~(.*wgt)) %>%
+        mutate_at(vars(nvVar:cvEst_ct), ~(.*(wgt^2))) %>%
+        group_by(STATECD, .dots = grpBy) %>%
+        summarize_at(vars(nvEst:plotIn_TREE), sum, na.rm = TRUE)
+
     }
-
-
-
 
     ##---------------------  TOTALS and RATIOS
     # Area
     aTotal <- aEst %>%
       group_by(.dots = aGrpBy) %>%
-      summarize(AREA_TOTAL = sum(aEst, na.rm = TRUE),
-                aVar = sum(aVar, na.rm = TRUE),
-                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
-                nPlots_AREA = sum(plotIn_AREA, na.rm = TRUE))
+      summarize_all(sum,na.rm = TRUE)
+      # summarize(AREA_TOTAL = sum(aEst, na.rm = TRUE),
+      #           aVar = sum(aVar, na.rm = TRUE),
+      #           AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
+      #           nPlots_AREA = sum(plotIn_AREA, na.rm = TRUE))
     # Tree
     tTotal <- tEst %>%
       group_by(.dots = grpBy) %>%
-      #left_join(aTotal, by = c(aGrpBy)) %>%
-      summarize(TREE_TOTAL = sum(tEst, na.rm = TRUE),
-                BA_TOTAL = sum(bEst, na.rm = TRUE),
-                ## Variances
-                treeVar = sum(tVar, na.rm = TRUE),
-                baVar = sum(bVar, na.rm = TRUE),
-                #aVar = first(aVar),
-                cvT = sum(cvEst_t, na.rm = TRUE),
-                cvB = sum(cvEst_b, na.rm = TRUE),
-                ## Sampling Errors
-                TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
-                BA_SE = sqrt(baVar) / BA_TOTAL * 100,
-                nPlots_TREE = sum(plotIn_TREE, na.rm = TRUE)) #%>%
-    ## IF using polys, we treat each zone as a unique population
-    if (!is.null(polys)){
-      propGrp <- c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
-    } else {
-      propGrp <- 'YEAR'
-    }
-    ## Hand the proportions
-    tpTotal <- tEst %>%
-      group_by(.dots = propGrp) %>%
-      summarize(TREE_TOTAL_full = sum(tTEst, na.rm = TRUE), ## Need to sum this
-                BA_TOTAL_full = sum(bTEst, na.rm = TRUE), ## Need to sum this
-                tTVar = sum(tTVar, na.rm = TRUE),
-                bTVar = sum(bTVar, na.rm = TRUE),
-                cvTT = sum(cvEst_tT, na.rm = TRUE),
-                cvBT = sum(cvEst_bT, na.rm = TRUE))
+      summarize_all(sum,na.rm = TRUE)
 
+
+
+
+
+
+      # #left_join(aTotal, by = c(aGrpBy)) %>%
+      # summarize(TREE_TOTAL = sum(tEst, na.rm = TRUE),
+      #           BA_TOTAL = sum(bEst, na.rm = TRUE),
+      #           ## Variances
+      #           treeVar = sum(tVar, na.rm = TRUE),
+      #           baVar = sum(bVar, na.rm = TRUE),
+      #           #aVar = first(aVar),
+      #           cvT = sum(cvEst_t, na.rm = TRUE),
+      #           cvB = sum(cvEst_b, na.rm = TRUE),
+      #           ## Sampling Errors
+      #           TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
+      #           BA_SE = sqrt(baVar) / BA_TOTAL * 100,
+      #           nPlots_TREE = sum(plotIn_TREE, na.rm = TRUE)) #%>%
 
     suppressWarnings({
       ## Bring them together
-      tTotal <- tTotal %>%
+      tOut <- tTotal %>%
         left_join(aTotal, by = aGrpBy) %>%
-        left_join(tpTotal, by = propGrp) %>%
-        mutate(TPA = TREE_TOTAL / AREA_TOTAL,
-               BAA = BA_TOTAL / AREA_TOTAL,
-               tpaVar = (1/AREA_TOTAL^2) * (treeVar + (TPA^2 * aVar) - 2 * TPA * cvT),
-               baaVar = (1/AREA_TOTAL^2) * (baVar + (BAA^2 * aVar) - (2 * BAA * cvB)),
-               TPA_SE = sqrt(tpaVar) / TPA * 100,
-               BAA_SE = sqrt(baaVar) / BAA * 100,
-               TPA_PERC = TREE_TOTAL / (TREE_TOTAL_full) * 100,
-               BAA_PERC = BA_TOTAL / (BA_TOTAL_full) * 100,
-               tpVar = (1/TREE_TOTAL_full^2) * (treeVar + (TPA_PERC^2 * tTVar) - 2 * TPA_PERC * cvTT),
-               bpVar = (1/BA_TOTAL_full^2) * (baVar + (BAA_PERC^2 * bTVar) - (2 * BAA_PERC * cvBT)),
-               TPA_PERC_SE = sqrt(tpVar) / TPA_PERC * 100,
-               BAA_PERC_SE = sqrt(bpVar) / BAA_PERC * 100)
+        # Renaming, computing ratios, and SE
+        mutate(AREA_TOTAL = aEst,
+               NETVOL_TOTAL = nvEst,
+               SAWVOL_TOTAL = svEst,
+               BIO_AG_TOTAL = bagEst,
+               BIO_BG_TOTAL = bbgEst,
+               BIO_TOTAL = btEst,
+               CARB_AG_TOTAL = cagEst,
+               CARB_BG_TOTAL = cbgEst,
+               CARB_TOTAL = ctEst,
+               ## Ratios
+               NETVOL_ACRE = NETVOL_TOTAL / AREA_TOTAL,
+               SAWVOL_ACRE = SAWVOL_TOTAL / AREA_TOTAL,
+               BIO_AG_ACRE = BIO_AG_TOTAL / AREA_TOTAL,
+               BIO_BG_ACRE = BIO_BG_TOTAL / AREA_TOTAL,
+               BIO_ACRE = BIO_TOTAL / AREA_TOTAL,
+               CARB_AG_ACRE = CARB_AG_TOTAL / AREA_TOTAL,
+               CARB_BG_ACRE = CARB_BG_TOTAL / AREA_TOTAL,
+               CARB_ACRE = CARB_TOTAL / AREA_TOTAL,
+               ## Ratio Var
+               nvaVar = (1/AREA_TOTAL^2) * (nvVar + (NETVOL_ACRE^2 * aVar) - 2 * NETVOL_ACRE * cvEst_nv),
+               svaVar = (1/AREA_TOTAL^2) * (svVar + (SAWVOL_ACRE^2 * aVar) - 2 * SAWVOL_ACRE * cvEst_sv),
+               baaVar = (1/AREA_TOTAL^2) * (bagVar + (BIO_AG_ACRE^2 * aVar) - 2 * BIO_AG_ACRE * cvEst_bag),
+               bbaVar = (1/AREA_TOTAL^2) * (bbgVar + (BIO_BG_ACRE^2 * aVar) - 2 * BIO_BG_ACRE * cvEst_bbg),
+               btaVar = (1/AREA_TOTAL^2) * (btVar + (BIO_ACRE^2 * aVar) - 2 * BIO_ACRE * cvEst_bt),
+               caaVar = (1/AREA_TOTAL^2) * (cagVar + (CARB_AG_ACRE^2 * aVar) - 2 * CARB_AG_ACRE * cvEst_cag),
+               cbaVar = (1/AREA_TOTAL^2) * (bbgVar + (CARB_BG_ACRE^2 * aVar) - 2 * CARB_BG_ACRE * cvEst_bbg),
+               ctaVar = (1/AREA_TOTAL^2) * (ctVar + (CARB_ACRE^2 * aVar) - 2 * CARB_ACRE * cvEst_ct),
+               ## SE RATIO
+               NETVOL_ACRE_SE = sqrt(nvaVar) / NETVOL_ACRE *100,
+               SAWVOL_ACRE_SE = sqrt(svaVar) / SAWVOL_ACRE *100,
+               BIO_AG_ACRE_SE = sqrt(baaVar) / BIO_AG_ACRE *100,
+               BIO_BG_ACRE_SE = sqrt(bbaVar) / BIO_BG_ACRE *100,
+               BIO_ACRE_SE = sqrt(btVar) / BIO_ACRE * 100,
+               CARB_AG_ACRE_SE = sqrt(caaVar) / CARB_AG_ACRE *100,
+               CARB_BG_ACRE_SE = sqrt(cbaVar) / CARB_BG_ACRE *100,
+               CARB_ACRE_SE = sqrt(ctVar) / CARB_ACRE *100,
+               ## SE TOTAL
+               AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL *100,
+               NETVOL_TOTAL_SE = sqrt(nvVar) / NETVOL_TOTAL *100,
+               SAWVOL_TOTAL_SE = sqrt(svVar) / SAWVOL_TOTAL *100,
+               BIO_AG_TOTAL_SE = sqrt(bagVar) / BIO_AG_TOTAL *100,
+               BIO_BG_TOTAL_SE = sqrt(bbgVar) / BIO_BG_TOTAL *100,
+               BIO_TOTAL_SE = sqrt(btVar) / BIO_TOTAL *100,
+               CARB_AG_TOTAL_SE = sqrt(cagVar) / CARB_AG_TOTAL *100,
+               CARB_BG_TOTAL_SE = sqrt(cbgVar) / CARB_BG_TOTAL *100,
+               CARB_TOTAL_SE = sqrt(ctVar) / CARB_TOTAL *100,
+               ## nPlots
+               nPlots_TREE = plotIn_TREE,
+               nPlots_AREA = plotIn_AREA)
     })
 
 
     if (totals) {
-      tOut <- tTotal %>%
-        select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC, TREE_TOTAL, BA_TOTAL, AREA_TOTAL, TPA_SE, BAA_SE,
-               TPA_PERC_SE, BAA_PERC_SE, TREE_SE, BA_SE, AREA_TOTAL_SE, nPlots_TREE, nPlots_AREA)
+
+      tOut <- tOut %>%
+        select(grpBy, "NETVOL_ACRE","SAWVOL_ACRE","BIO_AG_ACRE","BIO_BG_ACRE",
+               "BIO_ACRE","CARB_AG_ACRE","CARB_BG_ACRE","CARB_ACRE","NETVOL_TOTAL",
+               "SAWVOL_TOTAL","BIO_AG_TOTAL","BIO_BG_TOTAL","BIO_TOTAL","CARB_AG_TOTAL",
+               "CARB_BG_TOTAL","CARB_TOTAL", "AREA_TOTAL","NETVOL_ACRE_SE",
+               "SAWVOL_ACRE_SE","BIO_AG_ACRE_SE", "BIO_BG_ACRE_SE", "BIO_ACRE_SE",
+               "CARB_AG_ACRE_SE","CARB_BG_ACRE_SE","CARB_ACRE_SE","NETVOL_TOTAL_SE",
+               "SAWVOL_TOTAL_SE",  "BIO_AG_TOTAL_SE",  "BIO_BG_TOTAL_SE",
+               "BIO_TOTAL_SE", "CARB_AG_TOTAL_SE", "CARB_BG_TOTAL_SE", "CARB_TOTAL_SE",
+               "AREA_TOTAL_SE","nPlots_TREE","nPlots_AREA")
+
     } else {
-      tOut <- tTotal %>%
-        select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC,  TPA_SE, BAA_SE,
-               TPA_PERC_SE, BAA_PERC_SE, nPlots_TREE, nPlots_AREA)
+      tOut <- tOut %>%
+        select(grpBy, "NETVOL_ACRE","SAWVOL_ACRE","BIO_AG_ACRE","BIO_BG_ACRE",
+               "BIO_ACRE","CARB_AG_ACRE","CARB_BG_ACRE","CARB_ACRE","NETVOL_ACRE_SE",
+               "SAWVOL_ACRE_SE","BIO_AG_ACRE_SE", "BIO_BG_ACRE_SE", "BIO_ACRE_SE",
+               "CARB_AG_ACRE_SE","CARB_BG_ACRE_SE","CARB_ACRE_SE","nPlots_TREE",
+               "nPlots_AREA")
     }
 
     # Snag the names
     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
-
 
     # Return a spatial object
     if (!is.null(polys) & returnSpatial) {
