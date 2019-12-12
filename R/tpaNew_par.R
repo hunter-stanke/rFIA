@@ -1,5 +1,5 @@
 
-tpaNew_par <- function(db,
+tpaNew <- function(db,
                        grpBy = NULL,
                        polys = NULL,
                        returnSpatial = FALSE,
@@ -391,6 +391,7 @@ tpaNew_par <- function(db,
       tEst <- left_join(tEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
 
       #### Summarizing to state level here to apply weights by panel
+      #### Getting rid of ESTN_UNITS
       # Area
       aEst <- aEst %>%
         group_by(STATECD, .dots = aGrpBy) %>%
@@ -400,27 +401,14 @@ tpaNew_par <- function(db,
       # Tree
       tEst <- tEst %>%
         group_by(STATECD, .dots = grpBy) %>%
-        #left_join(aTotal, by = c(aGrpBy)) %>%
-        summarize(tEst = sum(tEst, na.rm = TRUE),
-                  bEst = sum(bEst, na.rm = TRUE),
-                  tTEst = sum(tTEst, na.rm = TRUE), ## Need to sum this
-                  bTEst = sum(bTEst, na.rm = TRUE), ## Need to sum this
-                  tTVar = sum(tTVar, na.rm = TRUE),
-                  bTVar = sum(bTVar, na.rm = TRUE),
-                  cvEst_tT = sum(cvEst_tT, na.rm = TRUE),
-                  cvEst_bT = sum(cvEst_bT, na.rm = TRUE),
-                  ## Variances
-                  tVar = sum(tVar, na.rm = TRUE),
-                  bVar = sum(bVar, na.rm = TRUE),
-                  #aVar = first(aVar),
-                  cvEst_t = sum(cvEst_t, na.rm = TRUE),
-                  cvEst_b = sum(cvEst_b, na.rm = TRUE),
-                  plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE))
+        summarize_at(vars(tEst:cvEst_bT),sum, na.rm = TRUE)
+
+      ## Naming
+      popOrig <- mutate(popOrig, YEAR = END_INVYR)
 
       ### ---- SIMPLE MOVING AVERAGE
-      if (method == 'SMA'){
+      if (str_to_upper(method) == 'SMA'){
         ## Assuming a uniform weighting scheme
-        popOrig <- mutate(popOrig, YEAR = END_INVYR)
         wgts <- popOrig %>%
           group_by(YEAR, STATECD) %>%
           summarize(wgt = 1 / length(unique(INVYR))) %>%
@@ -429,73 +417,34 @@ tpaNew_par <- function(db,
           distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
           select(YEAR, INVYR, STATECD, wgt)
 
-        # Area
-        aEst <- left_join(wgts, aEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
-        group_by(STATECD, .dots = aGrpBy) %>%
-          summarize(aEst = sum(aEst * wgt, na.rm = TRUE),
-                    aVar = sum(aVar * wgt^2, na.rm = TRUE),
-                    plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
-
-        tEst <- left_join(wgts, tEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
-          group_by(STATECD, .dots = grpBy) %>%
-          #left_join(aTotal, by = c(aGrpBy)) %>%
-          summarize(tEst = sum(tEst * wgt, na.rm = TRUE),
-                    bEst = sum(bEst* wgt, na.rm = TRUE),
-                    tTEst = sum(tTEst* wgt, na.rm = TRUE), ## Need to sum this
-                    bTEst = sum(bTEst* wgt, na.rm = TRUE), ## Need to sum this
-                    tTVar = sum(tTVar* wgt^2, na.rm = TRUE),
-                    bTVar = sum(bTVar* wgt^2, na.rm = TRUE),
-                    cvEst_tT = sum(cvEst_tT* wgt^2, na.rm = TRUE),
-                    cvEst_bT = sum(cvEst_bT* wgt^2, na.rm = TRUE),
-                    ## Variances
-                    tVar = sum(tVar* wgt^2, na.rm = TRUE),
-                    bVar = sum(bVar* wgt^2, na.rm = TRUE),
-                    #aVar = first(aVar),
-                    cvEst_t = sum(cvEst_t* wgt^2, na.rm = TRUE),
-                    cvEst_b = sum(cvEst_b* wgt^2, na.rm = TRUE),
-                    plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE))
-
 
       #### ----- EXPONENTIAL MOVING AVERAGE
-      } else if (method == 'EMA'){
+      } else if (str_to_upper(method) == 'EMA'){
         ## Assuming a uniform weighting scheme
         popOrig <- mutate(popOrig, YEAR = END_INVYR)
-        evals <- popOrig %>%
+        wgts <- popOrig %>%
           distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
           select(YEAR, INVYR, STATECD) %>%
-          mutate(yrs = yrs)
-
-        # Area
-        aEst <- left_join(evals, aEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
-          #left_join(minEval, by = 'STATECD') %>%
-          ## Make a previous year column, NA if earliest recorded
-          #mutate(PREV_INVYR = ifelse(INVYR == minYear, NA_integer_, as.numeric(INVYR) -1))# %>%
-           #%>%
-          group_by(STATECD, .dots = aGrpBy) %>%
-          summarize(aEst = ema(aEst, yrs),
-                    aVar = ema(aVar, yrs, var = TRUE),
-                    plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
-
-        tEst <- left_join(evals, tEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
-          group_by(STATECD, .dots = grpBy) %>%
-          #left_join(aTotal, by = c(aGrpBy)) %>%
-          summarize(tEst = ema(tEst, yrs),
-                    bEst = ema(bEst, yrs),
-                    tTEst = ema(tTEst, yrs), ## Need to sum this
-                    bTEst = ema(bTEst, yrs), ## Need to sum this
-                    tTVar = ema(tTVar, yrs, var = TRUE),
-                    bTVar = ema(bTVar, yrs, var = TRUE),
-                    cvEst_tT = ema(cvEst_tT, yrs, var = TRUE),
-                    cvEst_bT = ema(cvEst_bT, yrs, var = TRUE),
-                    ## Variances
-                    tVar = ema(tVar, yrs, var = TRUE),
-                    bVar = ema(bVar, yrs, var = TRUE),
-                    #aVar = first(aVar),
-                    cvEst_t = ema(cvEst_t, yrs, var = TRUE),
-                    cvEst_b = ema(cvEst_b, yrs, var = TRUE),
-                    plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE))
-
+          mutate(yrs = yrs,
+                 l = 2 / (1 + yrs),
+                 yrPrev = YEAR - INVYR,
+                 wgt = l^yrPrev *(1-l))
       }
+
+      ### Applying the weights
+      # Area
+      aEst <- left_join(wgts, aEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
+        mutate_at(vars(aEst), ~(.*wgt)) %>%
+        mutate_at(vars(aVar), ~(.*(wgt^2))) %>%
+        group_by(STATECD, .dots = grpBy) %>%
+        summarize_at(vars(aEst:plotIn_AREA), sum, na.rm = TRUE)
+
+
+      tEst <- left_join(wgts, tEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
+        mutate_at(vars(tEst:bTEst), ~(.*wgt)) %>%
+        mutate_at(vars(tVar:cvEst_bT), ~(.*(wgt^2))) %>%
+        group_by(STATECD, .dots = grpBy) %>%
+        summarize_at(vars(tEst:cvEst_bT), sum, na.rm = TRUE)
 
     }
 

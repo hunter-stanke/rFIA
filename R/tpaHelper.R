@@ -88,7 +88,7 @@ tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
   ## Strata level estimates
   aStrat <- a %>%
     ## Rejoin with population tables
-    right_join(popState[[x]], by = 'PLT_CN') %>%
+    right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
     mutate(
       ## AREA
       aAdj = case_when(
@@ -127,7 +127,7 @@ tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
   ## Strata level estimates
   tEst <- t %>%
     ## Rejoin with population tables
-    right_join(popState[[x]], by = 'PLT_CN') %>%
+    right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
     ## Need this for covariance later on
     left_join(select(a, fa, PLT_CN, PROP_BASIS, aGrpBy[aGrpBy %in% 'YEAR' == FALSE]), by = c('PLT_CN', aGrpBy[aGrpBy %in% 'YEAR' == FALSE])) %>%
     #Add adjustment factors

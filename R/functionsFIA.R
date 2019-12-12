@@ -88,9 +88,11 @@ ema <- function(x, yrs, var = FALSE){
   for (i in 1:length(x)) wgts[i] <- l^(i-1)*(1-l)
 
   if (var){
-    out <- sum(wgts^2 * x,na.rm = TRUE)
+    #out <- sum(wgts^2 * x,na.rm = TRUE)
+    out <- wgts^2 * x
   } else {
-    out <- sum(wgts * x,na.rm = TRUE)
+    #out <- sum(wgts * x,na.rm = TRUE)
+    out <- wgts * x
   }
 
   return(out)
@@ -241,7 +243,7 @@ stratVar <- function(ESTN_METHOD, x, xStrat, ndif, a, nh, y = NULL, yStrat = NUL
   if (is.null(y)){
     v <- ifelse(first(ESTN_METHOD == 'simple'),
                 var(c(x, numeric(ndif)) * first(a) / nh),
-                (sum(c(xPlot, numeric(ndif))^2) - sum(nh * xStrat^2)) / (nh * (nh-1)))
+                (sum(c(x, numeric(ndif))^2) - sum(nh * xStrat^2)) / (nh * (nh-1)))
     ## Covariance
   } else {
     v <- ifelse(first(ESTN_METHOD == 'simple'),
@@ -5491,9 +5493,7 @@ seedling <- function(db,
                      polys = NULL,
                      returnSpatial = FALSE,
                      bySpecies = FALSE,
-                     #bySizeClass = FALSE,
                      landType = 'forest',
-                     #SEEDLINGType = 'live',
                      treeDomain = NULL,
                      areaDomain = NULL,
                      totals = FALSE,
