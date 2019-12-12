@@ -23,25 +23,15 @@ biomassNew <- function(db,
 
   # Probably cheating, but it works
   if (quo_name(grpBy_quo) != 'NULL'){
-    ## Have to join tables to run select with this object type
-    plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
-    ## We want a unique error message here to tell us when columns are not present in data
-    d_quo <- tryCatch(
-      error = function(cnd) {
-        0
-      },
-      plt_quo[1,] %>% # Just the first row
-        inner_join(db$COND, by = 'PLT_CN') %>%
-        inner_join(db$TREE, by = 'PLT_CN') %>%
-        select(!!grpBy_quo)
-    )
-    # If column doesnt exist, just returns 0, not a dataframe
-    if (is.null(nrow(d_quo))){
+    ## Check if column exists
+    allNames <- c(names(db$PLOT), names(db$COND), names(db$TREE))
+
+    if (quo_name(grpBy_quo) %in% allNames){
+      # Convert to character
+      grpBy <- quo_name(grpBy_quo)
+    } else {
       grpName <- quo_name(grpBy_quo)
       stop(paste('Columns', grpName, 'not found in PLOT, TREE, or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
-    } else {
-      # Convert to character
-      grpBy <- names(d_quo)
     }
   }
 
@@ -460,24 +450,6 @@ biomassNew <- function(db,
       group_by(.dots = grpBy) %>%
       summarize_all(sum,na.rm = TRUE)
 
-
-
-
-
-
-      # #left_join(aTotal, by = c(aGrpBy)) %>%
-      # summarize(TREE_TOTAL = sum(tEst, na.rm = TRUE),
-      #           BA_TOTAL = sum(bEst, na.rm = TRUE),
-      #           ## Variances
-      #           treeVar = sum(tVar, na.rm = TRUE),
-      #           baVar = sum(bVar, na.rm = TRUE),
-      #           #aVar = first(aVar),
-      #           cvT = sum(cvEst_t, na.rm = TRUE),
-      #           cvB = sum(cvEst_b, na.rm = TRUE),
-      #           ## Sampling Errors
-      #           TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
-      #           BA_SE = sqrt(baVar) / BA_TOTAL * 100,
-      #           nPlots_TREE = sum(plotIn_TREE, na.rm = TRUE)) #%>%
 
     suppressWarnings({
       ## Bring them together

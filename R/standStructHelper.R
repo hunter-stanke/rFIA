@@ -4,17 +4,17 @@ ssHelper1 <- function(x, plts, db, grpBy, byPlot){
   db$PLOT <- plts[[x]]
   ## Carrying out filter across all tables
   #db <- clipFIA(db, mostRecent = FALSE)
-
+test <- plts[[1]]
 
   ## Which grpByNames are in which table? Helps us subset below
   grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
-  grpC <- names(db$COND)[names(db$COND) %in% grpBy]
+  grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', grpP, 'aD_p', 'sp')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'TPA_UNADJ', 'CCLCD', 'SUBP', 'TREE')), by = c('PLT_CN', 'CONDID')) %>%
-    filter(DIA >= 5)
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'TPA_UNADJ', 'CCLCD', 'SUBP', 'TREE')), by = c('PLT_CN', 'CONDID')) #%>%
+    #filter(DIA >= 5)
 
    ## Comprehensive indicator function
    data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
@@ -93,6 +93,9 @@ ssHelper2 <- function(x, popState, t, grpBy){
               ndif = nh - n,
               # ## Strata level variances
               av = stratVar(ESTN_METHOD, fa, aStrat, ndif, a, nh),
+              av1 = ifelse(first(ESTN_METHOD == 'simple'),
+                          var(c(fa, numeric(ndif)) * first(a) / nh),
+                          (sum((c(fa, numeric(ndif))^2), na.rm = TRUE) - nh * aStrat^2) / (nh * (nh-1))),
               pv = stratVar(ESTN_METHOD, p, pStrat, ndif, a, nh),
               mav = stratVar(ESTN_METHOD, ma, maStrat, ndif, a, nh),
               lv = stratVar(ESTN_METHOD, l, lStrat, ndif, a, nh),
@@ -114,10 +117,10 @@ ssHelper2 <- function(x, popState, t, grpBy){
               maVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, mav, maStrat, maEst),
               lVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, lv, lStrat, lEst),
               moVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, mov, moStrat, moEst),
-              cvEst_p = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, pv, pStrat, pEst, aStrat, aEst),
-              cvEst_ma = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, mav, maStrat, maEst, aStrat, aEst),
-              cvEst_l = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, lv, lStrat, lEst, aStrat, aEst),
-              cvEst_mo = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, mov, moStrat, moEst, aStrat, aEst),
+              cvEst_p = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, pv, pStrat, pEst, aStrat, aEst),
+              cvEst_ma = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, mav, maStrat, maEst, aStrat, aEst),
+              cvEst_l = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, lv, lStrat, lEst, aStrat, aEst),
+              cvEst_mo = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, mov, moStrat, moEst, aStrat, aEst),
               plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
 
   out <- list(tEst = tEst)
@@ -330,10 +333,11 @@ standStructHelper <- function(x, combos, data, grpBy, totals, tidy, SE){
              POLE_AREA, MATURE_AREA, LATE_AREA, MOSAIC_AREA, TOTAL_AREA,
              nPlots)
 
-    if(totals == FALSE){
-      s <- s %>%
-        select(grpBy, POLE_PERC, MATURE_PERC, LATE_PERC, MOSAIC_PERC, nPlots)
-    }
+
+
+
+
+
 
 
   } # End SE Conditional
