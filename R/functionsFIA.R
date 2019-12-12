@@ -376,6 +376,7 @@ summary.FIA.Database <- function(object, ...){
   cat('Memory Used:     ', format(mem, units = 'MB'), '\n')
 
   ## Tables included
+
   cat('Tables:          ', names(object))
 
 }
@@ -511,12 +512,9 @@ getFHM <- function(states,
     }
   }
 
-<<<<<<< HEAD
-=======
   ## If dir is not specified, hold in a temporary directory
   if (is.null(dir)){tempDir <- tempdir()}
 
->>>>>>> dbc35551d8eee86b01c543f81b752f4f771a98e9
   #   ## Some warnings up front
   #   ## Do not try to merge ENTIRE with other states
   #   if (length(states) > 1 & any(str_detect(str_to_upper(states), 'ENTIRE'))){
@@ -574,12 +572,11 @@ getFHM <- function(states,
   # Make sure state Abbs are in right format
   states <- str_to_upper(states)
 
-<<<<<<< HEAD
+
   ## If dir is not specified, hold in a temporary directory
   if (is.null(dir)){tempDir <- tempdir()}
 
-=======
->>>>>>> dbc35551d8eee86b01c543f81b752f4f771a98e9
+
   ## Download each state and extract to directory
   for (i in 1:length(states)){
     # Temporary directory to download to
@@ -600,11 +597,11 @@ getFHM <- function(states,
   ## Read in the files w/ readFHM
   if (is.null(dir)){
     outTables <- readFHM(tempDir, nCores = nCores)
-<<<<<<< HEAD
+
     unlink(tempDir)
-=======
+
     #unlink(tempDir, recursive = TRUE)
->>>>>>> dbc35551d8eee86b01c543f81b752f4f771a98e9
+
   } else {
     outTables <- readFHM(dir, nCores = nCores)
   }
