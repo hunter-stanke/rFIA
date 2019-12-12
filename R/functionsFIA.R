@@ -214,29 +214,29 @@ grmAdj <- function(subtyp, adjMicr, adjSubp, adjMacr) {
   return(data$adj)
 }
 
-#stratVar <- function(x, a, p2, method, y = NULL){
-  p2 <- first(p2)
-  method <- first(method)
-  a <- first(a)
-  ## Variance Estimation
-  if (is.null(y)){
-    if (method == 'simple'){
-      out <- var(x * a / p2)
-    } else {
-      out <- (sum(x^2) - sum(p2 *  mean(x, na.rm = TRUE)^2)) / (p2 * (p2-1))
-    }
-    ## Covariance Estimation
-  } else {
-    if (method == 'simple'){
-      out <- cov(x,y)
-    } else {
-      out <- (sum(x*y) - sum(p2 * mean(x, na.rm = TRUE) * mean(y, na.rm = TRUE))) / (p2 * (p2-1))
-    }
-  }
+# #stratVar <- function(x, a, p2, method, y = NULL){
+#   p2 <- first(p2)
+#   method <- first(method)
+#   a <- first(a)
+#   ## Variance Estimation
+#   if (is.null(y)){
+#     if (method == 'simple'){
+#       out <- var(x * a / p2)
+#     } else {
+#       out <- (sum(x^2) - sum(p2 *  mean(x, na.rm = TRUE)^2)) / (p2 * (p2-1))
+#     }
+#     ## Covariance Estimation
+#   } else {
+#     if (method == 'simple'){
+#       out <- cov(x,y)
+#     } else {
+#       out <- (sum(x*y) - sum(p2 * mean(x, na.rm = TRUE) * mean(y, na.rm = TRUE))) / (p2 * (p2-1))
+#     }
+#   }
+#
+# }
 
-}
-
-startVar <- function(ESTN_METHOD, x, xStrat, ndif, a, nh, y = NULL, yStrat = NULL){
+stratVar <- function(ESTN_METHOD, x, xStrat, ndif, a, nh, y = NULL, yStrat = NULL){
   ## Variance
   if (is.null(y)){
     v <- ifelse(first(ESTN_METHOD == 'simple'),
@@ -4205,10 +4205,9 @@ dwm <- function(db,
                 tidy = TRUE,
                 SE = TRUE,
                 nCores = 1) {
+
   ## Need a plotCN
-  db$PLOT <- db[['PLOT']] %>% mutate(PLT_CN = CN)
-  db$COND_DWM_CALC <- db[['COND_DWM_CALC']] %>% mutate(DWM_CN = CN)
-  db$COND <- db[['COND']] %>% mutate(CND_CN = CN)
+  db$PLOT <- db$PLOT %>% mutate(PLT_CN = CN)
 
   ## Converting names given in grpBy to character vector (NSE to standard)
   ##  don't have to change original code
@@ -4221,21 +4220,26 @@ dwm <- function(db,
     ## We want a unique error message here to tell us when columns are not present in data
     d_quo <- tryCatch(
       error = function(cnd) {
-        0
+        return(0)
       },
       plt_quo[1,] %>% # Just the first row
         inner_join(db$COND, by = 'PLT_CN') %>%
+        inner_join(db$TREE, by = 'PLT_CN') %>%
         select(!!grpBy_quo)
     )
+
     # If column doesnt exist, just returns 0, not a dataframe
     if (is.null(nrow(d_quo))){
       grpName <- quo_name(grpBy_quo)
-      stop(paste('Columns', grpName, 'not found in PLOT or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
+      stop(paste('Columns', grpName, 'not found in PLOT, TREE, or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
     } else {
       # Convert to character
       grpBy <- names(d_quo)
     }
   }
+
+  db$COND_DWM_CALC <- db[['COND_DWM_CALC']] %>% mutate(DWM_CN = CN)
+  db$COND <- db[['COND']] %>% mutate(CND_CN = CN)
 
   reqTables <- c('PLOT', 'COND_DWM_CALC', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
