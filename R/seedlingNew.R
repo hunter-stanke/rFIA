@@ -1,5 +1,5 @@
-
-seedlingNew <- function(db,
+#' @export
+seedling <- function(db,
                    grpBy = NULL,
                    polys = NULL,
                    returnSpatial = FALSE,

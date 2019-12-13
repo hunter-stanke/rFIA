@@ -1,4 +1,5 @@
-dwmNew <- function(db,
+#' @export
+dwm <- function(db,
                            grpBy = NULL,
                            polys = NULL,
                            returnSpatial = FALSE,

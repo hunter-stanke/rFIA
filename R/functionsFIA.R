@@ -1342,8 +1342,7 @@ clipFIA <- function(db,
 }
 
 # Stand Structural Stage
-#' @export
-standStruct <- function(db,
+standStruct_old <- function(db,
                         grpBy = NULL,
                         polys = NULL,
                         returnSpatial = FALSE,
@@ -1771,8 +1770,7 @@ standStruct <- function(db,
 
 
 ##### Species diversity indices
-#' @export
-diversity <- function(db,
+diversity_old <- function(db,
                       grpBy = NULL,
                       polys = NULL,
                       returnSpatial = FALSE,
@@ -2197,8 +2195,7 @@ diversity <- function(db,
 
 
 ## TPA & BAA
-#' @export
-tpa <- function(db,
+tpa_old <- function(db,
                   grpBy = NULL,
                   polys = NULL,
                   returnSpatial = FALSE,
@@ -3760,8 +3757,7 @@ vitalRates <- function(db,
 
 
 # Volume Estimates
-#' @export
-biomass <- function(db,
+biomass_old <- function(db,
                     grpBy = NULL,
                     polys = NULL,
                     returnSpatial = FALSE,
@@ -4195,8 +4191,7 @@ biomass <- function(db,
 
 
 # Coarse Woody Debris
-#' @export
-dwm <- function(db,
+dwm_old <- function(db,
                 grpBy = NULL,
                 polys = NULL,
                 returnSpatial = FALSE,
@@ -5058,10 +5053,7 @@ invasive <- function(db,
 
 }
 
-
-
-#' @export
-area <- function(db,
+area_old <- function(db,
                  grpBy = NULL,
                  polys = NULL,
                  returnSpatial = FALSE,
@@ -5484,11 +5476,8 @@ area <- function(db,
   return(aOut)
 }
 
-
-
 ## Seedling TPA
-#' @export
-seedling <- function(db,
+seedling_old <- function(db,
                      grpBy = NULL,
                      polys = NULL,
                      returnSpatial = FALSE,

@@ -1,4 +1,5 @@
-diversityNew <- function(db,
+#' @export
+diversity <- function(db,
                       grpBy = NULL,
                       polys = NULL,
                       returnSpatial = FALSE,
@@ -57,17 +58,17 @@ diversityNew <- function(db,
   stateVar = enquo(stateVar)
   grpVar = enquo(grpVar)
 
-  if (quo_name(stateVar) %in% names(db$TREE) == FALSE){
-    stop(paste('Column',quo_name(stateVar), 'not found in TREE table. Did you accidentally quote the variables name? e.g. use stateVar = TPA_UNADJ (correct) instead of grpBy = "TPA_UNADJ". ', collapse = ', '))
-  }
-  if (quo_name(grpVar) %in% names(db$TREE) == FALSE){
-    stop(paste('Column',quo_name(grpVar), 'not found in TREE table. Did you accidentally quote the variables name? e.g. use stateVar = TPA_UNADJ (correct) instead of grpBy = "TPA_UNADJ". ', collapse = ', '))
-  }
-
   ## If a modifier was given to a variable, handle it (ex. y = TPA_PERC / 100)
   db$TREE <- db$TREE %>%
     mutate(state = !!stateVar,
            grp = !!grpVar)
+
+  # if (quo_name(stateVar) %in% names(db$TREE) == FALSE){
+  #   stop(paste('Column',quo_name(stateVar), 'not found in TREE table. Did you accidentally quote the variables name? e.g. use stateVar = TPA_UNADJ (correct) instead of grpBy = "TPA_UNADJ". ', collapse = ', '))
+  # }
+  # if (quo_name(grpVar) %in% names(db$TREE) == FALSE){
+  #   stop(paste('Column',quo_name(grpVar), 'not found in TREE table. Did you accidentally quote the variables name? e.g. use stateVar = TPA_UNADJ (correct) instead of grpBy = "TPA_UNADJ". ', collapse = ', '))
+  # }
 
 
 

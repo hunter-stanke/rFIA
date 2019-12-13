@@ -1,5 +1,5 @@
-
-tpaNew <- function(db,
+#' @export
+tpa <- function(db,
                        grpBy = NULL,
                        polys = NULL,
                        returnSpatial = FALSE,

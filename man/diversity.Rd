@@ -1,15 +1,16 @@
 \name{diversity}
 \alias{diversity}
-\title{Estimate species diversity from FIADB}
+\title{Estimate diversity from FIADB}
 
 \description{
-Produces estimates of species diversity from FIA data. Returns shannon's index, shannon's equitability, and species richness for alpha (mean/SE of stands), beta, and gamma diversity. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by size class and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}). Easy options to implement parallel processing.
+Produces estimates of diversity from FIA data. Returns shannon's index, shannon's equitability, and richness for alpha (mean/SE of stands), beta, and gamma diversity. Default behavior estimates species diversity, using \code{TPA} as a state variable and \code{SPCD} to groups of individuals. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by size class and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}). Easy options to implement parallel processing.
 }
 
 \usage{
 diversity(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySizeClass = FALSE,
-          landType = 'forest', treeType = 'live', treeDomain = NULL,
-          areaDomain = NULL, byPlot = FALSE, SE = TRUE, nCores = 1)
+          landType = 'forest', treeType = 'live', method = 'TI', yrs = 5,
+          stateVar = TPA_UNADJ, grpVar = SPCD, treeDomain = NULL,
+          areaDomain = NULL, byPlot = FALSE, totals = FALSE, nCores = 1)
 }
 
 \arguments{
@@ -27,13 +28,21 @@ diversity(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySizeClass = F
 
   \item{treeType}{character ('all', 'live', 'dead', or 'gs'); Type of tree which estimates will be produced for. All (default) includes all stems, live and dead, greater than 1 in. DBH. Live/Dead includes all stems greater than 1 in. DBH which are live or dead (leaning less than 45 degrees), respectively. GS (growing-stock) includes live stems greater than 5 in. DBH which contain at least one 8 ft merchantable log.}
 
+  \item{method}{character ('TI', 'annual', 'SMA', or 'EMA'); Method used for annual panel combination (see details).}
+
+  \item{yrs}{numeric; if \code{method == 'EMA'}, the number of years over which a temporal moving average should be computed (see details).}
+
+  \item{stateVar}{variable from TREE table to use as state variable (NOT quoted). Default, \code{TPA_UNADJ}. Try, \code{DRYBIO_AG} for aboveground biomass, \code{pi*(DIA/2)^2} for basal area, or others.}
+
+  \item{grpVar}{factor, variable from TREE table to define individual groups (NOT quoted). Default, \code{SPCD}. Try, \code{SPGRPCD} for species group, \code{makeClasses(db$TREE$DIA, interval = 2)} for diameter class, or others.}
+
   \item{treeDomain}{logical predicates defined in terms of the variables in PLOT, TREE, and/or COND tables. Used to define the type of trees for which estimates will be produced (e.g. DBH greater than 20 inches: \code{DIA > 20}, Dominant/Co-dominant crowns only: \code{CCLCD \%in\% c(2,3))}. Multiple conditions are combined with \code{&} (and) or \code{|} (or). Only trees where the condition evaluates to TRUE are used in producing estimates. Should NOT be quoted.}
 
   \item{areaDomain}{logical predicates defined in terms of the variables in PLOT and/or COND tables. Used to define the area for which estimates will be produced (e.g. within 1 mile of improved road: \code{RDDISTCD \%in\% c(1:6)}, Hard maple/basswood forest type: \code{FORTYPCD == 805)}. Multiple conditions are combined with \code{&} (and) or \code{|} (or). Only plots within areas where the condition evaluates to TRUE are used in producing estimates. Should NOT be quoted.}
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations (population totals not returned).}
 
-  \item{SE}{logical; if TRUE, returns estimates with samping error (approx. 5x faster without returning samping errors)}
+  \item{totals}{logical; if TRUE, returns population estimates in addition to ratios.}
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }
@@ -42,7 +51,9 @@ diversity(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySizeClass = F
 \details{
 Procedures for computing diversity indices are outlined in Hill (1973) and Shannon (1948), and estimation of mean/ sampling error follows the procedures documented in Bechtold and Patterson (2005).
 
-Alpha-level indices are computed as the mean (SE) species diversity of a stand or condition as defined by FIA. Specifically, alpha diversity is estimated using a sample-based ratio-of-means estimator of stand diversity (e.g. Richness) * land area of stand / total land area within the domain of interest. Thus estimates of alpha diversity within a stand are weighted by the area which that stand represents. Gamma-level diversity is computed as regional indicies, pooling all plot data. Beta diversity is computed as gamma diversity - alpha diversity, and thus represents the excess of regional diversity with respect to local diversity. As stems of various size classes do not have equal probability of detection under the National FIA plot design, we compute relative proportions of species abundances based on the trees per acre they represent.
+Alpha-level indices are computed as the mean (SE) diversity of a stand or condition as defined by FIA. Specifically, alpha diversity is estimated using a sample-based ratio-of-means estimator of stand diversity (e.g. Richness) * land area of stand / total land area within the domain of interest. Thus estimates of alpha diversity within a stand are weighted by the area which that stand represents. Gamma-level diversity is computed as regional indicies, pooling all plot data. Beta diversity is computed as gamma diversity - alpha diversity, and thus represents the excess of regional diversity with respect to local diversity.
+
+Users may specify alternatives to the 'Temporally Indifferent' method for panel combination using the \code{method} argument. Estimators are currently implemented for the temporally indifferent (TI) method (default, used by EVALIDator), simple moving average (SMA), exponential moving average (EMA), and annual estimation (no panel combination). Users may modify the temporal weighting scheme employed by the exponential moving average using the \code{yrs} argument. See Chapter 5 of Bechtold & Patterson (2005) for more details.
 
 Stratified random sampling techniques are most often employed to compute estimates in recent inventories, although double sampling and simple random sampling may be employed for early inventories. Estimates are adjusted for non-response bias by assuming attributes of non-response plot locations to be equal to the mean of other plots included within thier respective stratum or population.
 

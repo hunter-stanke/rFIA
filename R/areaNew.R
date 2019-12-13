@@ -1,4 +1,5 @@
-areaNew <- function(db,
+#' @export
+area <- function(db,
                  grpBy = NULL,
                  polys = NULL,
                  returnSpatial = FALSE,

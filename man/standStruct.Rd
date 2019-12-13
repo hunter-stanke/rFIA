@@ -10,9 +10,9 @@ Estimates the stand structural stage distribution of an area of forest/ timberla
 
 \usage{
 standStruct(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
-            landType = 'forest', areaDomain = NULL,
-            byPlot = FALSE, totals = FALSE, tidy = TRUE, SE = TRUE,
-            nCores = 1)
+            landType = 'forest', method = 'TI', yrs = 5,
+            areaDomain = NULL, byPlot = FALSE, totals = FALSE,
+            tidy = TRUE, nCores = 1)
 }
 
 %- maybe also 'usage' for other objects documented here.
@@ -27,6 +27,10 @@ standStruct(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
 
 \item{landType}{character ('forest' or 'timber'); Type of land which estimates will be produced for. Timberland is a subset of forestland (default) which has high site potential and non-reserve status (see details).}
 
+  \item{method}{character ('TI', 'annual', 'SMA', or 'EMA'); Method used for annual panel combination (see details).}
+
+  \item{yrs}{numeric; if \code{method == 'EMA'}, the number of years over which a temporal moving average should be computed (see details).}
+
   \item{areaDomain}{logical predicates defined in terms of the variables in PLOT and/or COND tables. Used to define the area for which estimates will be produced (e.g. within 1 mile of improved road: \code{RDDISTCD \%in\% c(1:6)}, Hard maple/basswood forest type: \code{FORTYPCD == 805)}. Multiple conditions are combined with \code{&} (and) or \code{|} (or). Only plots within areas where the condition evaluates to TRUE are used in producing estimates. Should NOT be quoted.}
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations (population totals not returned).}
@@ -34,8 +38,6 @@ standStruct(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
   \item{totals}{logical; if TRUE, returns population estimates in addition to ratios.}
 
   \item{tidy}{logical; if TRUE, returns estimates grouped by structural stage, rather than including individual columns for each stand structural stage (For use in tidyverse packages, e.g. \code{ggplot2}, \code{\link{dplyr}}). Not recommended when returning spatial objects (\code{returnSpatial = TRUE}), for consistency with shapefile data structures. }
-
-  \item{SE}{logical; if TRUE, returns estimates with samping error (approx. 5x faster without returning samping errors)}
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }
@@ -58,6 +60,8 @@ Estimation of attributes follows the procedures documented in Bechtold and Patte
 \item \emph{Mosiac}: Any plot not meeting above criteria.
 }
 
+Users may specify alternatives to the 'Temporally Indifferent' method for panel combination using the \code{method} argument. Estimators are currently implemented for the temporally indifferent (TI) method (default, used by EVALIDator), simple moving average (SMA), exponential moving average (EMA), and annual estimation (no panel combination). Users may modify the temporal weighting scheme employed by the exponential moving average using the \code{yrs} argument. See Chapter 5 of Bechtold & Patterson (2005) for more details.
+
 Stratified random sampling techniques are most often employed to compute estimates in recent inventories, although double sampling and simple random sampling may be employed for early inventories. Estimates are adjusted for non-response bias by assuming attributes of non-response plot locations to be equal to the mean of other plots included within thier respective stratum or population.
 
 Forest land must be at least 10-percent stocked by trees of any size, including land that formerly had such tree cover and that will be naturally or artificially regenerated. Forest land includes transition zones, such as areas between heavily forested and nonforested lands that are at least 10-percent stocked with trees and forest areas adjacent to urban and builtup lands. The minimum area for classification of forest land is 1 acre and 120 feet wide measured stem-to-stem from the outer-most edge. Unimproved roads and trails, streams, and clearings in forest areas are classified as forest if less than 120 feet wide. Timber land is a subset of forest land that is producing or is capable of producing crops of industrial wood and not withdrawn from timber utilization by statute or administrative regulation. (Note: Areas qualifying as timberland are capable of producing at least 20 cubic feet per acre per year of industrial wood in natural stands. Currently inaccessible and inoperable areas are NOT included).
@@ -72,7 +76,7 @@ Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}
 
 \itemize{
       \item{\strong{STAGE}: Stand structural stage.}
-      \item{\strong{PERC_AREA}: \% land area in each structural stage.}
+      \item{\strong{PERC}: \% land area in each structural stage.}
       }
 }
 

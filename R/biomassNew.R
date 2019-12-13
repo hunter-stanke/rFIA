@@ -1,4 +1,5 @@
-biomassNew <- function(db,
+#' @export
+biomass <- function(db,
                        grpBy = NULL,
                        polys = NULL,
                        returnSpatial = FALSE,

@@ -10,8 +10,8 @@ Produces estimates of down woody material stocks on a per acre basis from the Fo
 
 \usage{
 dwm(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = 'forest',
-    areaDomain = NULL, byPlot = FALSE, totals = FALSE, tidy = TRUE,
-    SE = TRUE, nCores = 1)
+    method = 'TI', yrs = 5, areaDomain = NULL, byPlot = FALSE, totals = FALSE,
+    tidy = TRUE, nCores = 1)
 }
 
 \arguments{
@@ -25,6 +25,10 @@ dwm(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = 'forest',
 
   \item{landType}{character ('forest' or 'timber'); Type of land which estimates will be produced for. Timberland is a subset of forestland (default) which has high site potential and non-reserve status (see details).}
 
+  \item{method}{character ('TI', 'annual', 'SMA', or 'EMA'); Method used for annual panel combination (see details).}
+
+  \item{yrs}{numeric; if \code{method == 'EMA'}, the number of years over which a temporal moving average should be computed (see details).}
+
   \item{areaDomain}{Logical predicates defined in terms of the variables in PLOT and/or COND tables. Used to define the area for which estimates will be produced (e.g. within 1 mile of improved road: \code{RDDISTCD \%in\% c(1:6)}, Hard maple/basswood forest type: \code{FORTYPCD == 805)}. Multiple conditions are combined with \code{&} (and) or \code{|} (or). Only plots within areas where the condition evaluates to TRUE are used in producing estimates. Should NOT be quoted.}
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations (population totals not returned).}
@@ -33,14 +37,15 @@ dwm(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = 'forest',
 
   \item{tidy}{logical; if TRUE, returns estimates grouped by fuel type, rather than including individual columns for each fuel type (For use in tidyverse packages, e.g. \code{ggplot2}, \code{\link{dplyr}}). Not recommended when returning spatial objects (\code{returnSpatial = TRUE}), for consistency with shapefile data structures. }
 
-  \item{SE}{logical; if TRUE, returns estimates with samping error (approx. 5x faster without returning samping errors)}
-
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }
+
 \details{
 Estimation of attributes follows the procedures documented in Bechtold and Patterson (2005). Specifically, per acre estimates are computed using a sample-based ratio-of-means estimator of total volume (biomass or carbon) / total land area within the domain of interest.
 
 As defined by FIA, down woody material includes dead organic materials (resulting from plant mortality and leaf turnover) and fuel complexes of live shrubs and herbs. To maintain relevance for forest fuels management, we report estimates grouped by fuel lag-time classes. Specifically, we report estimates for 1HR fuels (small, fine woody debris), 10HR fuels (medium, fine woody debris), 100HR fuels (large, fine woody debris), 1000HR fuels (coarse woody debris), and slash piles, in addition to duff (O horizon; all unidentifiable organic material above mineral soil, beneath litter) and litter (identifiable plant material which is downed and smaller than 10HR fuel class (1HR class includes standing herbaceous material). See Woodall and Monleon (2007) for definitions of fuel lag-time classes and for details on sampling and estimation procedures.
+
+Users may specify alternatives to the 'Temporally Indifferent' method for panel combination using the \code{method} argument. Estimators are currently implemented for the temporally indifferent (TI) method (default, used by EVALIDator), simple moving average (SMA), exponential moving average (EMA), and annual estimation (no panel combination). Users may modify the temporal weighting scheme employed by the exponential moving average using the \code{yrs} argument. See Chapter 5 of Bechtold & Patterson (2005) for more details.
 
 Stratified random sampling techniques are most often employed to compute estimates in recent inventories, although double sampling and simple random sampling may be employed for early inventories. Estimates are adjusted for non-response bias by assuming attributes of non-response plot locations to be equal to the mean of other plots included within thier respective stratum or population.
 

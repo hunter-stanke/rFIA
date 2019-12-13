@@ -10,8 +10,8 @@ Produces estimates of volume, biomass, and carbon on a per acre basis from FIA d
 \usage{
 biomass(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE,
         bySizeClass = FALSE, landType = 'forest', treeType = 'live',
-        treeDomain = NULL, areaDomain = NULL, totals = FALSE, byPlot = FALSE,
-        SE = TRUE, nCores = 1)
+        method = 'TI', yrs = 5, treeDomain = NULL, areaDomain = NULL,
+        totals = FALSE, byPlot = FALSE, nCores = 1)
 }
 
 \arguments{
@@ -31,6 +31,10 @@ biomass(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE
 
   \item{treeType}{character ('all', 'live', 'dead', or 'gs'); Type of tree which estimates will be produced for. All (default) includes all stems, live and dead, greater than 1 in. DBH. Live/Dead includes all stems greater than 1 in. DBH which are live or dead (leaning less than 45 degrees), respectively. GS (growing-stock) includes live stems greater than 5 in. DBH which contain at least one 8 ft merchantable log. }
 
+  \item{method}{character ('TI', 'annual', 'SMA', or 'EMA'); Method used for annual panel combination (see details).}
+
+  \item{yrs}{numeric; if \code{method == 'EMA'}, the number of years over which a temporal moving average should be computed (see details).}
+
   \item{treeDomain}{logical predicates defined in terms of the variables in PLOT, TREE, and/or COND tables. Used to define the type of trees for which estimates will be produced (e.g. DBH greater than 20 inches: \code{DIA > 20}, Dominant/Co-dominant crowns only: \code{CCLCD \%in\% c(2,3))}. Multiple conditions are combined with \code{&} (and) or \code{|} (or). Only trees where the condition evaluates to TRUE are used in producing estimates. Should NOT be quoted.}
 
   \item{areaDomain}{logical predicates defined in terms of the variables in PLOT and/or COND tables. Used to define the area for which estimates will be produced (e.g. within 1 mile of improved road: \code{RDDISTCD \%in\% c(1:6)}, Hard maple/basswood forest type: \code{FORTYPCD == 805)}. Multiple conditions are combined with \code{&} (and) or \code{|} (or). Only plots within areas where the condition evaluates to TRUE are used in producing estimates. Should NOT be quoted.}
@@ -38,8 +42,6 @@ biomass(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE
   \item{totals}{logical; if TRUE, return population estimates (e.g. total area, total biomass) along with ratio estimates (e.g. mean biomass per acre).}
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations (population totals not returned).}
-
-  \item{SE}{logical; if TRUE, returns estimates with samping error (approx. 5x faster without returning samping errors)}
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }
@@ -51,6 +53,8 @@ Estimation of attributes follows the procedures documented in Bechtold and Patte
 Net volume estimates (\code{NETVOL}) include only the volume of wood in the central stem of a sample tree, from a 1-foot stump to a minimum 4-inch top diameter, or to where the central stem breaks into limbs all of which are greater than 4.0 inches in diameter. Does not include rotten, missing, and form cull portions of the main stem. Saw volume estimates (\code{SAWVOL}) incldue the net volume in the sawlog portion of the tree, from a 1-foot stump to a 9 inches (hardwood) or 7 inches (softwood) top. All volume estimates are reported in cubic feet (cu. ft. / acre). For estimates in board feet, multiply output values by 12.
 
 Biomass (\code{BIO}) and carbon (\code{CARB}) estimates are computed seperately for aboveground (AG) and belowground (BG) stocks, and their totals are the summation of above and belowground stocks. All biomass and carbon estimates are reported in oven-dry mass (short tons). Belowground mass for an individual tree includes modeled estimates for coarse roots (> 0.1"). Above ground mass includes all portions of a tree above the root collar, excluding foliage.
+
+Users may specify alternatives to the 'Temporally Indifferent' method for panel combination using the \code{method} argument. Estimators are currently implemented for the temporally indifferent (TI) method (default, used by EVALIDator), simple moving average (SMA), exponential moving average (EMA), and annual estimation (no panel combination). Users may modify the temporal weighting scheme employed by the exponential moving average using the \code{yrs} argument. See Chapter 5 of Bechtold & Patterson (2005) for more details.
 
 Stratified random sampling techniques are most often employed to compute estimates in recent inventories, although double sampling and simple random sampling may be employed for early inventories. Estimates are adjusted for non-response bias by assuming attributes of non-response plot locations to be equal to the mean of other plots included within thier respective stratum or population.
 

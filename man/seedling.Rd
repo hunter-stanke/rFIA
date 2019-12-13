@@ -10,9 +10,9 @@ Produces seedling (< 1 inch DBH) tree per acre (TPA) estimates from FIA data, al
 
 \usage{
 seedling(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
-         bySpecies = FALSE, landType = "forest", treeDomain = NULL,
-         areaDomain = NULL, totals = FALSE, byPlot = FALSE,
-         SE = TRUE, nCores = 1)
+         bySpecies = FALSE, landType = "forest", method = 'TI',
+         yrs = 5, treeDomain = NULL, areaDomain = NULL,
+         totals = FALSE, byPlot = FALSE, nCores = 1)
 }
 
 \arguments{
@@ -26,8 +26,11 @@ seedling(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
 
   \item{bySpecies}{logical; if TRUE, returns estimates grouped by species.}
 
-
   \item{landType}{character ('forest' or 'timber'); Type of land which estimates will be produced for. Timberland is a subset of forestland (default) which has high site potential and non-reserve status (see details).}
+
+  \item{method}{character ('TI', 'annual', 'SMA', or 'EMA'); Method used for annual panel combination (see details).}
+
+  \item{yrs}{numeric; if \code{method == 'EMA'}, the number of years over which a temporal moving average should be computed (see details).}
 
   \item{treeDomain}{logical predicates defined in terms of the variables in PLOT, SEEDLING, and/or COND tables. Used to define the type of trees for which estimates will be produced (e.g. white pine: \code{SPCD == 129}). Multiple conditions are combined with \code{&} (and) or \code{|} (or). Only trees where the condition evaluates to TRUE are used in producing estimates. Should NOT be quoted.}
 
@@ -36,8 +39,6 @@ seedling(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
   \item{totals}{logical; if TRUE, return population estimates (e.g. total area, total trees) along with ratio estimates (e.g. mean trees per acre).}
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations (population totals not returned).}
-
-  \item{SE}{logical; if TRUE, returns estimates with samping error (approx. 5x faster without returning samping errors)}
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }
