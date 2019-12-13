@@ -1,3 +1,161 @@
+invHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
+
+  ## Selecting the plots for one county
+  db$PLOT <- plts[[x]]
+  ## Carrying out filter across all tables
+  #db <- clipFIA(db, mostRecent = FALSE)
+
+  ## Which grpByNames are in which table? Helps us subset below
+  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
+  grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
+
+  ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'INVASIVE_SAMPLING_STATUS_CD', grpP, 'aD_p', 'sp')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'PROP_BASIS', 'CONDPROP_UNADJ', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
+    left_join(select(db$SUBP_COND, c(PLT_CN, SUBP, CONDID, SUBPCOND_PROP)), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$INVASIVE_SUBPLOT_SPP, c('PLT_CN', 'COVER_PCT', 'VEG_SPCD', 'SUBP', 'CONDID', 'SYMBOL', 'SCIENTIFIC_NAME', 'COMMON_NAME')), by = c("PLT_CN", "CONDID", 'SUBP'))
+  #filter(DIA >= 5)
+
+  ## Comprehensive indicator function
+  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
+
+
+
+  if (byPlot){
+    ## Return proportion of plot area covered by invasive
+    grpBy <- c('YEAR', grpBy, 'PLOT_STATUS_CD')
+    t <- data %>%
+      mutate(YEAR = MEASYEAR) %>%
+      filter(!is.na(SYMBOL)) %>%
+      distinct(PLT_CN, CONDID, SUBP, VEG_SPCD, .keep_all = TRUE) %>%
+      group_by(.dots = grpBy, PLT_CN, SUBP) %>%
+      summarize(cover = sum(COVER_PCT/100 * SUBPCOND_PROP * aDI, na.rm = TRUE)) %>%
+      group_by(PLT_CN, .dots = grpBy) %>%
+      summarize(cover = mean(cover, na.rm = TRUE))
+    a = NULL
+
+  } else {
+    # Compute estimates
+    t <- data %>%
+      distinct(PLT_CN, CONDID, SUBP, VEG_SPCD, .keep_all = TRUE) %>%
+      group_by(.dots = grpBy, PLT_CN, SUBP) %>%
+      summarize(iPlot = sum(COVER_PCT/100 * SUBPCOND_PROP * aDI, na.rm = TRUE),
+                plotIn_INV = ifelse(sum(aDI, na.rm = TRUE) >  0 & first(INVASIVE_SAMPLING_STATUS_CD) == 1, 1,0)) %>%
+      group_by(.dots = grpBy, PLT_CN) %>%
+      summarize(iPlot = mean(iPlot, na.rm = TRUE),
+                plotIn_INV = ifelse(any(plotIn_INV > 0), 1, 0))
+
+    a <- data %>%
+      distinct(PLT_CN, CONDID, .keep_all = TRUE) %>%
+      group_by(.dots = aGrpBy, PLT_CN, PROP_BASIS) %>%
+      summarize(fa = sum(CONDPROP_UNADJ * aDI, na.rm = TRUE),
+                plotIn_AREA = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
+  }
+
+  pltOut <- list(t = t, a = a)
+  return(pltOut)
+
+}
+
+
+
+invHelper2 <- function(x, popState, t, a, grpBy, aGrpBy){
+
+  ## Strata level estimates
+  aStrat <- a %>%
+    ## Rejoin with population tables
+    right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
+    mutate(
+      ## AREA
+      aAdj = case_when(
+        ## When NA, stay NA
+        is.na(PROP_BASIS) ~ NA_real_,
+        ## If the proportion was measured for a macroplot,
+        ## use the macroplot value
+        PROP_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
+        ## Otherwise, use the subpplot value
+        PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
+      fa = fa * aAdj) %>%
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = aGrpBy) %>%
+    summarize(a_t = length(unique(PLT_CN)) / first(P2POINTCNT),
+              aStrat = mean(fa * a_t, na.rm = TRUE),
+              plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE),
+              n = n(),
+              ## We don't want a vector of these values, since they are repeated
+              nh = first(P2POINTCNT),
+              a = first(AREA_USED),
+              w = first(P1POINTCNT) / first(P1PNTCNT_EU),
+              p2eu = first(p2eu),
+              ndif = nh - n,
+              ## Strata level variances
+              av = stratVar(ESTN_METHOD, fa, aStrat, ndif, a, nh))
+  ## Estimation unit
+  aEst <- aStrat %>%
+    group_by(ESTN_UNIT_CN, .dots = aGrpBy) %>%
+    summarize(aEst = unitMean(ESTN_METHOD, a, nh,  w, aStrat),
+              aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, av, aStrat, aEst),
+              plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
+
+
+  ## Strata level estimates
+  tEst <- t %>%
+    ## Rejoin with population tables
+    right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
+    ## Need this for covariance later on
+    left_join(select(a, fa, PLT_CN, PROP_BASIS, aGrpBy[aGrpBy %in% 'YEAR' == FALSE]), by = c('PLT_CN', aGrpBy[aGrpBy %in% 'YEAR' == FALSE])) %>%
+    #Add adjustment factors
+    mutate(
+      ## AREA
+      aAdj = case_when(
+        ## When NA, stay NA
+        is.na(PROP_BASIS) ~ NA_real_,
+        ## If the proportion was measured for a macroplot,
+        ## use the macroplot value
+        PROP_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
+        ## Otherwise, use the subpplot value
+        PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
+      fa = fa * aAdj,
+      iPlot = iPlot * ADJ_FACTOR_SUBP) %>%
+    ## Joining area data so we can compute ratio variances
+    left_join(select(aStrat, aStrat, av, ESTN_UNIT_CN, STRATUM_CN, ESTN_METHOD, aGrpBy), by = c('ESTN_UNIT_CN', 'ESTN_METHOD', 'STRATUM_CN', aGrpBy)) %>%
+    ## Strata level
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
+    summarize(r_t = length(unique(PLT_CN[INVASIVE_SAMPLING_STATUS_CD == 1])) / first(P2POINTCNT),
+              iStrat = mean(iPlot * r_t, na.rm = TRUE),
+              aStrat = first(aStrat),
+              plotIn_INV = sum(plotIn_INV, na.rm = TRUE),
+              n = n(),
+              ## We don't want a vector of these values, since they are repeated
+              nh = first(P2POINTCNT),
+              a = first(AREA_USED),
+              w = first(P1POINTCNT) / first(P1PNTCNT_EU),
+              p2eu = first(p2eu),
+              ndif = nh - n,
+              ## Strata level variances
+              ## Strata level variances
+              iv = stratVar(ESTN_METHOD, iPlot, iStrat, ndif, a, nh),
+              cvStrat_i = stratVar(ESTN_METHOD, iPlot, iStrat, ndif, a, nh, fa, aStrat)) %>%
+    ## Estimation unit
+    left_join(select(aEst, ESTN_UNIT_CN, aEst, aVar, aGrpBy), by = c('ESTN_UNIT_CN', aGrpBy)) %>%
+    group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+    summarize(iEst = unitMean(ESTN_METHOD, a, nh,  w, iStrat),
+              plotIn_INV = sum(plotIn_INV, na.rm = TRUE),
+              iVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, iv, iStrat, iEst),
+              # Unit Covariance
+              cvEst_i = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_i, iStrat, iEst, iTStrat, iTEst))
+
+  out <- list(tEst = tEst, aEst = aEst)
+
+  return(out)
+}
+
+
+
+
+
+
+
+
 invasiveHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
 
   # Update domain indicator for each each column speficed in grpBy

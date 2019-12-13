@@ -9,8 +9,8 @@ Produces estimates of areal coverage of invasive species from the Forest Invento
 
 \usage{
 invasive(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = "forest",
-         areaDomain = NULL, byPlot = FALSE, totals = FALSE, SE = TRUE,
-         nCores = 1)
+         method = 'TI', yrs = 5, areaDomain = NULL, byPlot = FALSE,
+         totals = FALSE, nCores = 1)
 }
 
 \arguments{
@@ -24,19 +24,23 @@ invasive(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = "fore
 
   \item{landType}{character ('forest' or 'timber'); Type of land which estimates will be produced for. Timberland is a subset of forestland (default) which has high site potential and non-reserve status (see details).}
 
+  \item{method}{character ('TI', 'annual', 'SMA', or 'EMA'); Method used for annual panel combination (see details).}
+
+  \item{yrs}{numeric; if \code{method == 'EMA'}, the number of years over which a temporal moving average should be computed (see details).}
+
   \item{areaDomain}{logical predicates defined in terms of the variables in PLOT and/or COND tables. Used to define the area for which estimates will be produced (e.g. within 1 mile of improved road: \code{RDDISTCD \%in\% c(1:6)}, Hard maple/basswood forest type: \code{FORTYPCD == 805)}. Multiple conditions are combined with \code{&} (and) or \code{|} (or). Only plots within areas where the condition evaluates to TRUE are used in producing estimates. Should NOT be quoted.}
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations (population totals not returned).}
 
   \item{totals}{logical; if TRUE, returns population estimates in addition to \% coverage.}
 
-  \item{SE}{logical; if TRUE, returns estimates with samping error (approx. 5x faster without returning samping errors)}
-
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }
 
 \details{
 Estimation of attributes follows the procedures documented in Bechtold and Patterson (2005). Specifically, percent areal coverage is computed using a sample-based ratio-of-means estimator of total invasive coverage area / total land area within the domain of interest. Estimates of areal coverage of individual invasive species should NOT be summed to produce estimates of areal coverage by ALL invasive species, as areal coverage by species is not mutually exclusive (multiple species my occur in the same area). Current FIA data collection protocols do not allow for the unbiased estimation of areal coverage by all invasive species.
+
+Users may specify alternatives to the 'Temporally Indifferent' method for panel combination using the \code{method} argument. Estimators are currently implemented for the temporally indifferent (TI) method (default, used by EVALIDator), simple moving average (SMA), exponential moving average (EMA), and annual estimation (no panel combination). Users may modify the temporal weighting scheme employed by the exponential moving average using the \code{yrs} argument. See Chapter 5 of Bechtold & Patterson (2005) for more details.
 
 Stratified random sampling techniques are most often employed to compute estimates in recent inventories, although double sampling and simple random sampling may be employed for early inventories. Estimates are adjusted for non-response bias by assuming attributes of non-response plot locations to be equal to the mean of other plots included within thier respective stratum or population.
 

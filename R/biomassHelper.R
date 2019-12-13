@@ -121,9 +121,7 @@ bioHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
               p2eu = first(p2eu),
               ndif = nh - n,
               ## Strata level variances
-              av = ifelse(first(ESTN_METHOD == 'simple'),
-                          var(c(fa, numeric(ndif)) * first(a) / nh),
-                          (sum((c(fa, numeric(ndif))^2)) - nh * aStrat^2) / (nh * (nh-1))))
+              av = stratVar(ESTN_METHOD, fa, aStrat, ndif, a, nh))
   ## Estimation unit
   aEst <- aStrat %>%
     group_by(ESTN_UNIT_CN, .dots = aGrpBy) %>%

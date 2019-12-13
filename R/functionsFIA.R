@@ -242,8 +242,8 @@ stratVar <- function(ESTN_METHOD, x, xStrat, ndif, a, nh, y = NULL, yStrat = NUL
   ## Variance
   if (is.null(y)){
     v <- ifelse(first(ESTN_METHOD == 'simple'),
-                var(c(x, numeric(ndif)) * first(a) / nh),
-                (sum(c(x, numeric(ndif))^2, na.rm = TRUE) - sum(nh * xStrat^2,na.rm = TRUE)) / (nh * (nh-1)))
+                var(c(x, as.numeric(ndif)) * first(a) / nh),
+                (sum(c(x, as.numeric(ndif))^2, na.rm = TRUE) - sum(nh * xStrat^2,na.rm = TRUE)) / (nh * (nh-1)))
     ## Covariance
   } else {
     v <- ifelse(first(ESTN_METHOD == 'simple'),
@@ -658,7 +658,7 @@ readFIA <- function(dir,
     cFiles <- c('COND', 'COND_DWM_CALC', 'INVASIVE_SUBPLOT_SPP', 'PLOT', 'POP_ESTN_UNIT',
                 'POP_EVAL', 'POP_EVAL_GRP', 'POP_EVAL_TYP', 'POP_PLOT_STRATUM_ASSGN', 'POP_STRATUM',
                 'SUBPLOT', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_MIDPT', 'TREE_GRM_BEGIN', 'SUBP_COND_CHNG_MTRX',
-                'SEEDLING', 'SURVEY')
+                'SEEDLING', 'SURVEY', 'SUBP_COND')
     if (any(str_sub(files, 3, 3) == '_')){
       files <- files[str_sub(files,4,-5) %in% cFiles]
     } else{
@@ -4682,8 +4682,7 @@ dwm_old <- function(db,
 
 
 # Invasive coverage
-#' @export
-invasive <- function(db,
+invasive_old <- function(db,
                      grpBy = NULL,
                      polys = NULL,
                      returnSpatial = FALSE,
