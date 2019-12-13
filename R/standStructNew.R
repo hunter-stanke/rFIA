@@ -42,9 +42,7 @@ standStructNew <- function(db,
   if (!is.null(polys) & first(first(class(polys))) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
   }
-  if (tidy & returnSpatial & !is.null(polys)){
-    warning('Returning multiple observations for each areal unit. If returnSpatial = TRUE, tidy = FALSE is recommended.')
-  }
+
   if (landType %in% c('timber', 'forest', 'all') == FALSE){
     stop('landType must be one of: "forest", "timber", or "all".')
   }

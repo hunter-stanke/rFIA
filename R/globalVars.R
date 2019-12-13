@@ -114,4 +114,11 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'ONEORTWO', 'VOLCFNET.beg', 'VOLCFNET1', 'VOLCFNET2', 'VOLCSNET.beg', 'VOLCSNET.mid',
                          'VOLCSNET.prev', 'ga', 'se', 'ba', 'baa', 'd', 'vol', 'volA', 'place',
                          'ANN_INVENTORY', 'MANUAL', 'RSCD', 'SEEDLING', 'SEEDLING_SE', 'SEEDLING_TOTAL',
-                         'SEEDLING_TOTAL_full', 'STATENM', 'nPlots_SEEDLING', 'plotIn_SEEDLING'))
+                         'SEEDLING_TOTAL_full', 'STATENM', 'nPlots_SEEDLING', 'plotIn_SEEDLING',
+                         'BIO_SE', 'CARB_SE','MEASYEAR', 'PERC', 'PLOT_BASIS', 'TREECOUNT_CALC', 'UNITCD', 'VOL_SE',
+                         'aD_c', 'bbaVar', 'caaVar', 'cbaVar', 'cvEst_bc', 'cvEst_bd', 'cvEst_bl', 'cvEst_blg',
+                         'cvEst_bmd', 'cvEst_bp', 'cvEst_bsm', 'cvEst_c', 'cvEst_cc', 'cvEst_cd', 'cvEst_cl',
+                         'cvEst_clg', 'cvEst_cmd', 'cvEst_cp', 'cvEst_csm', 'cvEst_v', 'cvEst_vc', 'cvEst_vlg',
+                         'cvEst_vmd', 'cvEst_vp', 'cvEst_vsm', 'cvStrat_eh', 'ehEst', 'ehStrat', 'ehaVar', 'ehv', 'grp',
+                         'landD', 'nPlots_DWM', 'ndif', 'p2eu', 'pltID', 'prev', 'r_t', 'sEst', 'saVar', 'sp', 'state', 'typeD',
+                         'wgt', 'yrPrev'))

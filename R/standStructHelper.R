@@ -113,10 +113,10 @@ ssHelper2 <- function(x, popState, t, grpBy){
               maVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, mav, maStrat, maEst),
               lVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, lv, lStrat, lEst),
               moVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, mov, moStrat, moEst),
-              cvEst_p = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, pv, pStrat, pEst, aStrat, aEst),
-              cvEst_ma = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, mav, maStrat, maEst, aStrat, aEst),
-              cvEst_l = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, lv, lStrat, lEst, aStrat, aEst),
-              cvEst_mo = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, mov, moStrat, moEst, aStrat, aEst),
+              cvEst_p = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_p, pStrat, pEst, aStrat, aEst),
+              cvEst_ma = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_ma, maStrat, maEst, aStrat, aEst),
+              cvEst_l = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_l, lStrat, lEst, aStrat, aEst),
+              cvEst_mo = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_mo, moStrat, moEst, aStrat, aEst),
               plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
 
   out <- list(tEst = tEst)

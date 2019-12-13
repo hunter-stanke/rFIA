@@ -126,9 +126,9 @@ divHelper2 <- function(x, popState, t, grpBy){
               hVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, hv, hStrat, hEst),
               ehVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ehv, ehStrat, ehEst),
               sVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, sv, sStrat, sEst),
-              cvEst_h = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, hv, hStrat, hEst, aStrat, aEst),
-              cvEst_eh = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, ehv, ehStrat, ehEst, aStrat, aEst),
-              cvEst_s = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, sv, sStrat, sEst, aStrat, aEst),
+              cvEst_h = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_h, hStrat, hEst, aStrat, aEst),
+              cvEst_eh = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_eh, ehStrat, ehEst, aStrat, aEst),
+              cvEst_s = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_s, sStrat, sEst, aStrat, aEst),
               plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
 
   out <- list(tEst = tEst)

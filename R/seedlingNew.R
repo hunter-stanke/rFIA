@@ -1,19 +1,19 @@
-diversityNew <- function(db,
-                      grpBy = NULL,
-                      polys = NULL,
-                      returnSpatial = FALSE,
-                      bySizeClass = FALSE,
-                      landType = 'forest',
-                      treeType = 'live',
-                      method = 'TI',
-                      yrs = 5,
-                      stateVar = TPA_UNADJ,
-                      grpVar = SPCD,
-                      treeDomain = NULL,
-                      areaDomain = NULL,
-                      byPlot = FALSE,
-                      totals = FALSE,
-                      nCores = 1) {
+
+seedlingNew <- function(db,
+                   grpBy = NULL,
+                   polys = NULL,
+                   returnSpatial = FALSE,
+                   bySpecies = FALSE,
+                   landType = 'forest',
+                   method = 'TI',
+                   yrs = 5,
+                   treeDomain = NULL,
+                   areaDomain = NULL,
+                   totals = FALSE,
+                   byPlot = FALSE,
+                   nCores = 1) {
+
+
   ## Need a plotCN, and a new ID
   db$PLOT <- db$PLOT %>% mutate(PLT_CN = CN,
                                 pltID = paste(UNITCD, STATECD, COUNTYCD, PLOT, sep = '_'))
@@ -25,18 +25,18 @@ diversityNew <- function(db,
   # Probably cheating, but it works
   if (quo_name(grpBy_quo) != 'NULL'){
     ## Check if column exists
-    allNames <- c(names(db$PLOT), names(db$COND), names(db$TREE))
+    allNames <- c(names(db$PLOT), names(db$COND), names(db$SEEDLING))
 
     if (quo_name(grpBy_quo) %in% allNames){
       # Convert to character
       grpBy <- quo_name(grpBy_quo)
     } else {
       grpName <- quo_name(grpBy_quo)
-      stop(paste('Columns', grpName, 'not found in PLOT, TREE, or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
+      stop(paste('Columns', grpName, 'not found in PLOT, SEEDLING, or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
     }
   }
 
-  reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
+  reqTables <- c('PLOT', 'SEEDLING', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
   ## Some warnings
   if (class(db) != "FIA.Database"){
@@ -52,25 +52,6 @@ diversityNew <- function(db,
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
   }
-  ##### CHECK TO SEE IF STATE VARIABLE AND GROUP VARIABLE EXIST IN TREE
-  # Need to quote all variables for NSE
-  stateVar = enquo(stateVar)
-  grpVar = enquo(grpVar)
-
-  if (quo_name(stateVar) %in% names(db$TREE) == FALSE){
-    stop(paste('Column',quo_name(stateVar), 'not found in TREE table. Did you accidentally quote the variables name? e.g. use stateVar = TPA_UNADJ (correct) instead of grpBy = "TPA_UNADJ". ', collapse = ', '))
-  }
-  if (quo_name(grpVar) %in% names(db$TREE) == FALSE){
-    stop(paste('Column',quo_name(grpVar), 'not found in TREE table. Did you accidentally quote the variables name? e.g. use stateVar = TPA_UNADJ (correct) instead of grpBy = "TPA_UNADJ". ', collapse = ', '))
-  }
-
-  ## If a modifier was given to a variable, handle it (ex. y = TPA_PERC / 100)
-  db$TREE <- db$TREE %>%
-    mutate(state = !!stateVar,
-           grp = !!grpVar)
-
-
-
 
   # I like a unique ID for a plot through time
   if (byPlot) {grpBy <- c('pltID', grpBy)}
@@ -82,6 +63,7 @@ diversityNew <- function(db,
     ## Only want the current plots, no grm
     db$PLOT <- filter(db$PLOT, prev == 0)
   }
+
 
 
   ### AREAL SUMMARY PREP
@@ -155,16 +137,7 @@ diversityNew <- function(db,
   } else if (tolower(landType) == 'timber'){
     db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
   }
-  # Tree Type domain indicator
-  if (tolower(treeType) == 'live'){
-    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1, 1, 0)
-  } else if (tolower(treeType) == 'dead'){
-    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 2 & db$TREE$STANDING_DEAD_CD == 1, 1, 0)
-  } else if (tolower(treeType) == 'gs'){
-    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1 & db$TREE$DIA >= 5 & db$TREE$TREECLCD == 2, 1, 0)
-  } else if (tolower(treeType) == 'all'){
-    db$TREE$typeD <- 1
-  }
+
   # update spatial domain indicator
   if(!is.null(polys)){
     db$PLOT$sp <- ifelse(db$PLOT$pltID %in% pltSF$pltID, 1, 0)
@@ -189,10 +162,10 @@ diversityNew <- function(db,
 
   # Same as above for tree (ex. trees > 20 ft tall)
   treeDomain <- substitute(treeDomain)
-  tD <- eval(treeDomain, db$TREE) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  tD <- eval(treeDomain, db$SEEDLING) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
   if(!is.null(tD)) tD[is.na(tD)] <- 0 # Make NAs 0s. Causes bugs otherwise
   if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
-  db$TREE$tD <- as.numeric(tD)
+  db$SEEDLING$tD <- as.numeric(tD)
 
   ### Snag the EVALIDs that are needed
   db$POP_EVAL<- db$POP_EVAL %>%
@@ -253,6 +226,25 @@ diversityNew <- function(db,
     pops <- rename(pops, YEAR = END_INVYR)
   }
 
+  # ### The population tables
+  # pops <- select(db$POP_EVAL, c('EVALID', 'ESTN_METHOD', 'CN', 'END_INVYR')) %>%
+  #   rename(EVAL_CN = CN) %>%
+  #   left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('EVAL_CN')) %>%
+  #   rename(ESTN_UNIT_CN = CN) %>%
+  #   left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'CN', 'P1POINTCNT', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MICR', "ADJ_FACTOR_MACR")), by = c('ESTN_UNIT_CN')) %>%
+  #   rename(STRATUM_CN = CN) %>%
+  #   left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN', 'INVYR', 'STATECD')), by = 'STRATUM_CN') %>%
+  #   rename(YEAR = END_INVYR) %>%
+  #   mutate_if(is.factor,
+  #             as.character)
+  #
+  # ### Which estimator to use?
+  # if (str_to_upper(method) %in% c('ANNUAL', "SMA")){
+  #   popOrig <- pops
+  #   ## Want to use the year where plots are measured, no repeats
+  #   pops <- filter(pops, YEAR == INVYR)
+  # }
+
   ## Want a count of p2 points / eu, gets screwed up with grouping below
   p2eu <- pops %>%
     distinct(ESTN_UNIT_CN, STRATUM_CN, P2POINTCNT) %>%
@@ -272,14 +264,24 @@ diversityNew <- function(db,
                             `Subsampling units of unequal size` = 'simple')
 
 
-  ## Break into size classes
-  if (bySizeClass){
-    grpBy <- c(grpBy, 'sizeClass')
-    grpByOrig <- c(grpByOrig, 'sizeClass')
-    db$TREE$sizeClass <- makeClasses(db$TREE$DIA, interval = 2)
-    db$TREE <- db$TREE[!is.na(db$TREE$sizeClass),]
+  ## Add species to groups
+  if (bySpecies) {
+    db$TREE <- db$TREE %>%
+      left_join(select(intData$REF_SPECIES_2018, c('SPCD','COMMON_NAME', 'GENUS', 'SPECIES')), by = 'SPCD') %>%
+      mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' ')) %>%
+      mutate_if(is.factor,
+                as.character)
+    grpBy <- c(grpBy, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
+    grpByOrig <- c(grpByOrig, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
   }
 
+
+  # Seperate area grouping names, (ex. TPA red oak in total land area of ingham county, rather than only area where red oak occurs)
+  if (!is.null(polys)){
+    aGrpBy <- c(grpBy[grpBy %in% names(db$PLOT) | grpBy %in% names(db$COND) | grpBy %in% names(pltSF)])
+  } else {
+    aGrpBy <- c(grpBy[grpBy %in% names(db$PLOT) | grpBy %in% names(db$COND)])
+  }
 
   ## Only the necessary plots for EVAL of interest
   db$PLOT <- filter(db$PLOT, PLT_CN %in% pops$PLT_CN)
@@ -297,13 +299,12 @@ diversityNew <- function(db,
         library(stringr)
         library(rFIA)
       })
-      out <- parLapply(cl, X = names(plts), fun = divHelper1, plts, db, grpBy, byPlot)
+      out <- parLapply(cl, X = names(plts), fun = seedHelper1, plts, db, grpBy, aGrpBy, byPlot)
       #stopCluster(cl) # Keep the cluster active for the next run
     } else { # Unix systems
-      out <- mclapply(names(plts), FUN = divHelper1, plts, db, grpBy, byPlot, mc.cores = nCores)
+      out <- mclapply(names(plts), FUN = seedHelper1, plts, db, grpBy, aGrpBy, byPlot, mc.cores = nCores)
     }
   })
-
 
   if (byPlot){
     ## back to dataframes
@@ -321,11 +322,14 @@ diversityNew <- function(db,
   } else {
     ## back to dataframes
     out <- unlist(out, recursive = FALSE)
+    a <- bind_rows(out[names(out) == 'a'])
     t <- bind_rows(out[names(out) == 't'])
 
 
     ## Adding YEAR to groups
     grpBy <- c('YEAR', grpBy)
+    aGrpBy <- c('YEAR', aGrpBy)
+
 
     ## Splitting up by ESTN_UNIT
     popState <- split(pops, as.factor(pops$STATECD))
@@ -340,14 +344,15 @@ diversityNew <- function(db,
         #   library(stringr)
         #   library(rFIA)
         # })
-        out <- parLapply(cl, X = names(popState), fun = divHelper2, popState, t, grpBy)
+        out <- parLapply(cl, X = names(popState), fun = seedHelper2, popState, a, t, grpBy, aGrpBy)
         stopCluster(cl)
       } else { # Unix systems
-        out <- mclapply(names(popState), FUN = divHelper2, popState, t, grpBy, mc.cores = nCores)
+        out <- mclapply(names(popState), FUN = seedHelper2, popState, a, t, grpBy, aGrpBy, mc.cores = nCores)
       }
     })
     ## back to dataframes
     out <- unlist(out, recursive = FALSE)
+    aEst <- bind_rows(out[names(out) == 'aEst'])
     tEst <- bind_rows(out[names(out) == 'tEst'])
 
 
@@ -357,14 +362,21 @@ diversityNew <- function(db,
       if ('STATECD' %in% names(tEst) == FALSE){
         ## Need a STATECD on aEst and tEst to join wgts
         tEst <- left_join(tEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
+        aEst <- left_join(aEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
       }
 
       #### Summarizing to state level here to apply weights by panel
       #### Getting rid of ESTN_UNITS
+      # Area
+      aEst <- aEst %>%
+        group_by(STATECD, .dots = aGrpBy) %>%
+        summarize(aEst = sum(aEst, na.rm = TRUE),
+                  aVar = sum(aVar, na.rm = TRUE),
+                  plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
       # Tree
       tEst <- tEst %>%
         group_by(STATECD, .dots = grpBy) %>%
-        summarize_at(vars(aEst:plotIn_AREA),sum, na.rm = TRUE)
+        summarize_at(vars(tEst:cvEst_tT),sum, na.rm = TRUE)
 
       ## Naming
       popOrig <- mutate(popOrig, YEAR = END_INVYR)
@@ -395,11 +407,19 @@ diversityNew <- function(db,
       }
 
       ### Applying the weights
-      tEst <- left_join(wgts, tEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
-        mutate_at(vars(aEst:sEst), ~(.*wgt)) %>%
-        mutate_at(vars(aVar:cvEst_s), ~(.*(wgt^2))) %>%
+      # Area
+      aEst <- left_join(wgts, aEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
+        mutate_at(vars(aEst), ~(.*wgt)) %>%
+        mutate_at(vars(aVar), ~(.*(wgt^2))) %>%
         group_by(STATECD, .dots = grpBy) %>%
         summarize_at(vars(aEst:plotIn_AREA), sum, na.rm = TRUE)
+
+
+      tEst <- left_join(wgts, tEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
+        mutate_at(vars(tEst:tTEst), ~(.*wgt)) %>%
+        mutate_at(vars(tVar:cvEst_tT), ~(.*(wgt^2))) %>%
+        group_by(STATECD, .dots = grpBy) %>%
+        summarize_at(vars(tEst:cvEst_tT), sum, na.rm = TRUE)
 
     }
 
@@ -407,54 +427,62 @@ diversityNew <- function(db,
 
 
     ##---------------------  TOTALS and RATIOS
-    tOut <- tEst %>%
+    # Area
+    aTotal <- aEst %>%
+      group_by(.dots = aGrpBy) %>%
+      summarize(AREA_TOTAL = sum(aEst, na.rm = TRUE),
+                aVar = sum(aVar, na.rm = TRUE),
+                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
+                nPlots_AREA = sum(plotIn_AREA, na.rm = TRUE))
+    # Tree
+    tTotal <- tEst %>%
       group_by(.dots = grpBy) %>%
-      summarize_all(sum,na.rm = TRUE) %>%
-      mutate(H_a = hEst / aEst,
-             Eh_a = ehEst / aEst,
-             S_a = sEst / aEst,
-             AREA_TOTAL = aEst,
-             ## Ratio variance
-             haVar = (1/AREA_TOTAL^2) * (hVar + (H_a^2 * aVar) - 2 * H_a * cvEst_h),
-             ehaVar = (1/AREA_TOTAL^2) * (ehVar + (Eh_a^2 * aVar) - (2 * Eh_a * cvEst_eh)),
-             saVar = (1/AREA_TOTAL^2) * (sVar + (S_a^2 * aVar) - 2 * S_a * cvEst_s),
-             ## RATIO SE
-             H_a_SE = sqrt(haVar) / H_a * 100,
-             Eh_a_SE = sqrt(ehaVar) / Eh_a * 100,
-             S_a_SE = sqrt(saVar) / S_a * 100,
-             AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
-             nPlots = plotIn_AREA)
+      #left_join(aTotal, by = c(aGrpBy)) %>%
+      summarize(TREE_TOTAL = sum(tEst, na.rm = TRUE),
+                ## Variances
+                treeVar = sum(tVar, na.rm = TRUE),
+                #aVar = first(aVar),
+                cvT = sum(cvEst_t, na.rm = TRUE),
+                ## Sampling Errors
+                TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
+                nPlots_SEEDLING = sum(plotIn_TREE, na.rm = TRUE)) #%>%
+    ## IF using polys, we treat each zone as a unique population
+    if (!is.null(polys)){
+      propGrp <- c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
+    } else {
+      propGrp <- 'YEAR'
+    }
+    ## Hand the proportions
+    tpTotal <- tEst %>%
+      group_by(.dots = propGrp) %>%
+      summarize(TREE_TOTAL_full = sum(tTEst, na.rm = TRUE), ## Need to sum this
+                tTVar = sum(tTVar, na.rm = TRUE),
+                cvTT = sum(cvEst_tT, na.rm = TRUE))
+
+
+    suppressWarnings({
+      ## Bring them together
+      tTotal <- tTotal %>%
+        left_join(aTotal, by = aGrpBy) %>%
+        left_join(tpTotal, by = propGrp) %>%
+        mutate(TPA = TREE_TOTAL / AREA_TOTAL,
+               tpaVar = (1/AREA_TOTAL^2) * (treeVar + (TPA^2 * aVar) - 2 * TPA * cvT),
+               TPA_SE = sqrt(tpaVar) / TPA * 100,
+               TPA_PERC = TREE_TOTAL / (TREE_TOTAL_full) * 100,
+               tpVar = (1/TREE_TOTAL_full^2) * (treeVar + (TPA_PERC^2 * tTVar) - 2 * TPA_PERC * cvTT),
+               TPA_PERC_SE = sqrt(tpVar) / TPA_PERC * 100)
+    })
+
 
     if (totals) {
-      tOut <- tOut %>%
-        select(grpBy, H_a, Eh_a, S_a, AREA_TOTAL, H_a_SE, Eh_a_SE, S_a_SE, AREA_TOTAL_SE, nPlots)
-
+      tOut <- tTotal %>%
+        select(grpBy, TPA, TPA_PERC, TREE_TOTAL, AREA_TOTAL, TPA_SE,
+               TPA_PERC_SE, TREE_SE, AREA_TOTAL_SE, nPlots_SEEDLING, nPlots_AREA)
     } else {
-      tOut <- tOut %>%
-        select(grpBy, H_a, Eh_a, S_a, H_a_SE, Eh_a_SE, S_a_SE, nPlots)
+      tOut <- tTotal %>%
+        select(grpBy, TPA, TPA_PERC,  TPA_SE,
+               TPA_PERC_SE, nPlots_SEEDLING, nPlots_AREA)
     }
-
-    ### UP a few spatial scales
-    ## Which grpByNames are in which table? Helps us subset below
-    grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
-    grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
-    grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
-    ### REALLY DON'T LIKE WORKING WITH FULL TABLES, WORK ON A FIX
-    ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
-    fullArea <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', grpP, 'aD_p', 'sp')) %>%
-      left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
-      left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'grp', 'state', 'SUBP', 'TREE', grpT, 'tD', 'typeD')), by = c('PLT_CN', 'CONDID')) %>%
-      left_join(select(pops, PLT_CN, YEAR), by = 'PLT_CN') %>%
-      mutate(tDI = landD * aD_p * aD_c * tD * typeD * sp) %>%
-      group_by(.dots = grpBy) %>%
-      summarize(H_g = divIndex(grp, state * tDI, index = 'H'),
-                Eh_g = divIndex(grp, state * tDI, index = 'Eh'),
-                S_g = divIndex(grp, state * tDI, index = 'S'))
-
-    tOut <- left_join(tOut, fullArea, by = grpBy) %>%
-      mutate(H_b = H_g - H_a,
-             Eh_b = Eh_g - Eh_a,
-             S_b = S_g - S_a)
 
     # Snag the names
     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
@@ -487,5 +515,4 @@ diversityNew <- function(db,
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) tOut <- unique(tOut)
   return(tOut)
-
 }
