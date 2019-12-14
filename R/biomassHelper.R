@@ -121,6 +121,10 @@ bioHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
               p2eu = first(p2eu),
               ndif = nh - n,
               ## Strata level variances
+              av_correct = ifelse(first(ESTN_METHOD == 'simple'),
+                          var(c(fa, numeric(ndif)) * first(a) / nh),
+                          (sum((c(fa, numeric(ndif))^2), na.rm = TRUE) - nh * aStrat^2) / (nh * (nh-1))),
+              ## Strata level variances
               av = stratVar(ESTN_METHOD, fa, aStrat, ndif, a, nh))
   ## Estimation unit
   aEst <- aStrat %>%
@@ -168,9 +172,9 @@ bioHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
     ## Extra step for variance issues
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy) %>%
     summarize(nvPlot = sum(nvPlot, na.rm = TRUE),
-              svPlot = sum(svPlot = svPlot, na.rm = TRUE),
-              bagPlot = sum(bagPlot = bagPlot, na.rm = TRUE),
-              bbgPlot = sum(bbgPlot = bbgPlot, na.rm = TRUE),
+              svPlot = sum(svPlot, na.rm = TRUE),
+              bagPlot = sum(bagPlot, na.rm = TRUE),
+              bbgPlot = sum(bbgPlot, na.rm = TRUE),
               btPlot = sum(btPlot, na.rm = TRUE),
               cagPlot = sum(cagPlot, na.rm = TRUE),
               cbgPlot = sum(cbgPlot, na.rm = TRUE),

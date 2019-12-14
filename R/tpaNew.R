@@ -79,7 +79,8 @@ tpa <- function(db,
     polys$polyID <- 1:nrow(polys)
 
     # Add shapefile names to grpBy
-    grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
+    #grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
+    grpBy = c(grpBy, 'polyID')
 
     ## Make plot data spatial, projected same as polygon layer
     pltSF <- select(db$PLOT, c('LON', 'LAT', pltID)) %>%
@@ -115,7 +116,7 @@ tpa <- function(db,
     }
     ## Add polygon names to PLOT
     db$PLOT <- db$PLOT %>%
-      left_join(pltSF, by = 'pltID')
+      left_join(select(pltSF, polyID, pltID), by = 'pltID')
 
     # Test if any polygons cross state boundaries w/ different recent inventory years (continued w/in loop)
     if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
@@ -453,25 +454,41 @@ tpa <- function(db,
                 aVar = sum(aVar, na.rm = TRUE),
                 AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
                 nPlots_AREA = sum(plotIn_AREA, na.rm = TRUE))
-    # Tree
+    # # Tree
+    # tTotal <- tEst %>%
+    #   group_by(.dots = grpBy) %>%
+    #   #left_join(aTotal, by = c(aGrpBy)) %>%
+    #   summarize(TREE_TOTAL = sum(tEst, na.rm = TRUE),
+    #             BA_TOTAL = sum(bEst, na.rm = TRUE),
+    #             ## Variances
+    #             treeVar = sum(tVar, na.rm = TRUE),
+    #             baVar = sum(bVar, na.rm = TRUE),
+    #             #aVar = first(aVar),
+    #             cvT = sum(cvEst_t, na.rm = TRUE),
+    #             cvB = sum(cvEst_b, na.rm = TRUE),
+    #             ## Sampling Errors
+    #             TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
+    #             BA_SE = sqrt(baVar) / BA_TOTAL * 100,
+    #             nPlots_TREE = sum(plotIn_TREE, na.rm = TRUE)) #%>%
     tTotal <- tEst %>%
       group_by(.dots = grpBy) %>%
-      #left_join(aTotal, by = c(aGrpBy)) %>%
-      summarize(TREE_TOTAL = sum(tEst, na.rm = TRUE),
-                BA_TOTAL = sum(bEst, na.rm = TRUE),
-                ## Variances
-                treeVar = sum(tVar, na.rm = TRUE),
-                baVar = sum(bVar, na.rm = TRUE),
-                #aVar = first(aVar),
-                cvT = sum(cvEst_t, na.rm = TRUE),
-                cvB = sum(cvEst_b, na.rm = TRUE),
-                ## Sampling Errors
-                TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
-                BA_SE = sqrt(baVar) / BA_TOTAL * 100,
-                nPlots_TREE = sum(plotIn_TREE, na.rm = TRUE)) #%>%
+      summarize_all(sum, na.rm = TRUE) %>%
+      mutate(TREE_TOTAL = tEst,
+            BA_TOTAL = bEst,
+            ## Variances
+            treeVar = tVar,
+            baVar = bVar,
+            #aVar = first(aVar),
+            cvT = cvEst_t,
+            cvB = cvEst_b,
+            ## Sampling Errors
+            TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
+            BA_SE = sqrt(baVar) / BA_TOTAL * 100,
+            nPlots_TREE = plotIn_TREE) %>%
+      select(grpBy, TREE_TOTAL, BA_TOTAL, treeVar, baVar, cvT, cvB, TREE_SE, BA_SE, nPlots_TREE)
     ## IF using polys, we treat each zone as a unique population
     if (!is.null(polys)){
-      propGrp <- c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
+      propGrp <- c('polyID', grpBy)
     } else {
       propGrp <- 'YEAR'
     }
@@ -519,28 +536,22 @@ tpa <- function(db,
     # Snag the names
     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
 
-
-    # Return a spatial object
-    if (!is.null(polys) & returnSpatial) {
-      suppressMessages({suppressWarnings({tOut <- left_join(polys, tOut) %>%
-        select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
-        filter(!is.na(polyID))})})
-    } else if (!is.null(polys) & returnSpatial == FALSE){
-      tOut <- select(tOut, c('YEAR', grpByOrig, tNames, everything())) %>%
-        filter(!is.na(polyID))
-    }
   }
 
-
-
-  ## For spatial plots
-  if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
-
   ## Pretty output
-  tOut <- drop_na(tOut, grpBy) %>%
+  tOut <- drop_na(tOut, grpByOrig) %>%
     arrange(YEAR) %>%
     as_tibble()
 
+  # Return a spatial object
+  if (!is.null(polys)) {
+    suppressMessages({suppressWarnings({tOut <- left_join(tOut, polys) %>%
+      select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
+      filter(!is.na(polyID))})})
+  }
+
+  ## For spatial plots
+  if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
 
   ## Above converts to tibble
   if (returnSpatial) tOut <- st_sf(tOut)

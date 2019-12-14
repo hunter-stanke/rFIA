@@ -190,7 +190,8 @@ tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
               #aVar = (sum(forArea^2) - sum(P2POINTCNT * aStrat^2)) / (P2POINTCNT * (P2POINTCNT-1)),
               tv = ifelse(first(ESTN_METHOD == 'simple'),
                           var(c(tPlot, numeric(ndif)) * first(a) / nh),
-                          (sum(c(tPlot, numeric(ndif))^2) - sum(nh * tStrat^2)) / (nh * (nh-1))), # Stratified and double cases
+                          (sum(c(tPlot, numeric(ndif))^2, na.rm = TRUE) - sum(nh * tStrat^2, na.rm = TRUE)) / (nh * (nh-1))), # Stratified and double cases
+              tv = stratVar(ESTN_METHOD, tPlot, tStrat, ndif, a, nh),
               bv = ifelse(first(ESTN_METHOD == 'simple'),
                           var(c(tPlot, numeric(ndif))* first(a) / nh),
                           (sum(c(bPlot, numeric(ndif))^2) - sum(nh * bStrat^2)) / (nh * (nh-1))),
@@ -204,6 +205,8 @@ tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
               cvStrat_t = ifelse(first(ESTN_METHOD == 'simple'),
                                  cov(fa,tPlot),
                                  (sum(fa*tPlot, na.rm = TRUE) - sum(nh * aStrat *tStrat)) / (nh * (nh-1))), # Stratified and double cases
+              cvStrat_t = stratVar(ESTN_METHOD, tPlot, tStrat, ndif, a, nh, fa, aStrat),
+
               cvStrat_b = ifelse(first(ESTN_METHOD == 'simple'),
                                  cov(fa,bPlot),
                                  (sum(fa*bPlot, na.rm = TRUE) - sum(nh * aStrat *bStrat)) / (nh * (nh-1))),

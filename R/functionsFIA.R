@@ -237,13 +237,12 @@ grmAdj <- function(subtyp, adjMicr, adjSubp, adjMacr) {
 #   }
 #
 # }
-
 stratVar <- function(ESTN_METHOD, x, xStrat, ndif, a, nh, y = NULL, yStrat = NULL){
   ## Variance
   if (is.null(y)){
     v <- ifelse(first(ESTN_METHOD == 'simple'),
-                var(c(x, as.numeric(ndif)) * first(a) / nh),
-                (sum(c(x, as.numeric(ndif))^2, na.rm = TRUE) - sum(nh * xStrat^2,na.rm = TRUE)) / (nh * (nh-1)))
+                var(c(x, numeric(ndif)) * first(a) / nh),
+                (sum((c(x, numeric(ndif))^2), na.rm = TRUE) - nh * xStrat^2) / (nh * (nh-1)))
     ## Covariance
   } else {
     v <- ifelse(first(ESTN_METHOD == 'simple'),
@@ -732,8 +731,8 @@ getFIA <- function(states,
   }
 
   ## If dir is not specified, hold in a temporary directory
-  if (is.null(dir)){tempDir <- tempdir()}
-
+  #if (is.null(dir)){tempDir <- tempdir()}
+  tempDir <- tempdir()
   ## Some warnings up front
   ## Do not try to merge ENTIRE with other states
   if (length(states) > 1 & any(str_detect(str_to_upper(states), 'ENTIRE'))){
@@ -779,6 +778,10 @@ getFIA <- function(states,
 
 Did you accidentally include the state abbreviation in front of the table name? e.g. tables = "AL_PLOT" (wrong) instead of tables = "PLOT" (correct).'))
   }
+
+  ### I'm not very smart and like specify the name twice sometimes,
+  ### --> making the function smarter than me
+  states <- unique(states)
 
   ## If individual tables are specified, then just grab those .csvs, otherwise download the .zip file, extract and read with fread. Should be quite a bit quicker.
   if (!is.null(tables)){
