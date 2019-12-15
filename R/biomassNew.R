@@ -78,7 +78,8 @@ biomass <- function(db,
     polys$polyID <- 1:nrow(polys)
 
     # Add shapefile names to grpBy
-    grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
+    #grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
+    grpBy = c(grpBy, 'polyID')
 
     ## Make plot data spatial, projected same as polygon layer
     pltSF <- select(db$PLOT, c('LON', 'LAT', pltID)) %>%
@@ -114,7 +115,7 @@ biomass <- function(db,
     }
     ## Add polygon names to PLOT
     db$PLOT <- db$PLOT %>%
-      left_join(pltSF, by = 'pltID')
+      left_join(select(pltSF, polyID, pltID), by = 'pltID')
 
     # Test if any polygons cross state boundaries w/ different recent inventory years (continued w/in loop)
     if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
@@ -543,26 +544,21 @@ biomass <- function(db,
     # Snag the names
     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
 
-    # Return a spatial object
-    if (!is.null(polys) & returnSpatial) {
-      suppressMessages({suppressWarnings({tOut <- left_join(polys, tOut) %>%
-        select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
-        filter(!is.na(polyID))})})
-    } else if (!is.null(polys) & returnSpatial == FALSE){
-      tOut <- select(tOut, c('YEAR', grpByOrig, tNames, everything())) %>%
-        filter(!is.na(polyID))
-    }
   }
-
-
-  ## For spatial plots
-  if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
-
   ## Pretty output
-  tOut <- drop_na(tOut, grpBy) %>%
+  tOut <- drop_na(tOut, grpByOrig) %>%
     arrange(YEAR) %>%
     as_tibble()
 
+  # Return a spatial object
+  if (!is.null(polys)) {
+    suppressMessages({suppressWarnings({tOut <- left_join(tOut, polys) %>%
+      select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
+      filter(!is.na(polyID))})})
+  }
+
+  ## For spatial plots
+  if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
 
   ## Above converts to tibble
   if (returnSpatial) tOut <- st_sf(tOut)
