@@ -307,8 +307,6 @@ biomass <- function(db,
   ## Merging state and county codes
   plts <- split(db$PLOT, as.factor(paste(db$PLOT$COUNTYCD, db$PLOT$STATECD, sep = '_')))
 
-
-
   suppressWarnings({
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
@@ -446,7 +444,13 @@ biomass <- function(db,
     # Area
     aTotal <- aEst %>%
       group_by(.dots = aGrpBy) %>%
-      summarize_all(sum,na.rm = TRUE)
+      summarize(aEst = sum(aEst, na.rm = TRUE),
+                aVar = sum(aVar, na.rm = TRUE),
+                #AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
+                plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
+    # aTotal <- aEst %>%
+    #   group_by(.dots = aGrpBy) %>%
+    #   summarize_all(sum,na.rm = TRUE)
       # summarize(AREA_TOTAL = sum(aEst, na.rm = TRUE),
       #           aVar = sum(aVar, na.rm = TRUE),
       #           AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
