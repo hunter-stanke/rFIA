@@ -5,7 +5,7 @@ standStruct <- function(db,
                           returnSpatial = FALSE,
                           landType = 'forest',
                           method = 'TI',
-                          yrs = 5,
+                          lambda = .94,
                           areaDomain = NULL,
                           byPlot = FALSE,
                           totals = FALSE,
@@ -339,20 +339,47 @@ standStruct <- function(db,
           distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
           select(YEAR, INVYR, STATECD, wgt)
 
+        #### ----- Linear MOVING AVERAGE
+      } else if (str_to_upper(method) == 'LMA'){
+        wgts <- popOrig %>%
+          group_by(YEAR, STATECD) %>%
+          summarize(n = length(unique(INVYR)),
+                    minyr = min(INVYR, na.rm = TRUE)) %>%
+          ## Expand it out again
+          right_join(popOrig, by = c('YEAR', 'STATECD')) %>%
+          distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
+          mutate(wgt = YEAR - minyr / sum(1:n, na.rm = TRUE)) %>%
+          select(YEAR, INVYR, STATECD, wgt)
+
 
         #### ----- EXPONENTIAL MOVING AVERAGE
       } else if (str_to_upper(method) == 'EMA'){
-        ## Assuming a uniform weighting scheme
-        popOrig <- mutate(popOrig, YEAR = END_INVYR)
         wgts <- popOrig %>%
           distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
-          select(YEAR, INVYR, STATECD) %>%
-          mutate(yrs = yrs,
-                 l = 2 / (1 + yrs),
-                 yrPrev = YEAR - INVYR,
-                 wgt = l^yrPrev *(1-l))
-      }
+          select(YEAR, INVYR, STATECD)
+        if (length(lambda) < 2){
+          ## Weights based on temporal window
+          wgts <- wgts %>%
+            mutate(lambda = lambda,
+                   l = lambda,
+                   yrPrev = YEAR - INVYR,
+                   wgt = l^yrPrev *(1-l))
+        } else {
+          grpBy <- c('lambda', grpBy)
+          #aGrpBy <- c('lambda', aGrpBy)
+          ## Duplicate weights for each level of lambda
+          yrWgts <- list()
+          for (i in 1:length(unique(lambda))) {
+            yrWgts[[i]] <- mutate(wgts, lambda = lambda[i])
+          }
+          wgts <- bind_rows(yrWgts) %>%
+            mutate(l = lambda,
+                   #l = 2 / (1 + lambda),
+                   yrPrev = YEAR - INVYR,
+                   wgt = l^yrPrev *(1-l))
+        }
 
+      }
       ### Applying the weights
       # Area
       tEst <- left_join(wgts, tEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%

@@ -8,7 +8,7 @@ Produces estimates of total area (acreage) from FIA data. Estimates can be produ
 \usage{
 area(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
      byLandType = FALSE, landType = 'forest',  method = 'TI',
-     yrs = 5, treeDomain = NULL, areaDomain = NULL,
+     lambda = .94, treeDomain = NULL, areaDomain = NULL,
      totals = FALSE, byPlot = FALSE, nCores = 1)
 }
 %- maybe also 'usage' for other objects documented here.
@@ -25,9 +25,9 @@ area(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
 
   \item{landType}{character ("forest", "non-forest", "census water", "non-census water", "water", or "all"); Type of land which estimates will be produced for. Timberland is a subset of forestland (default) which has high site potential and non-reserve status (see details).}
 
-  \item{method}{character ('TI', 'annual', 'SMA', or 'EMA'); Method used for annual panel combination (see details).}
+  \item{method}{character; Method used for annual panel combination (see details). One of: 'TI' (temporally indifferent), 'annual' (annual panels), 'SMA' (simple moving average), 'LMA' (linear moving average), or 'EMA' (exponential moving average)}
 
-  \item{yrs}{numeric; if \code{method == 'EMA'}, the number of years over which a temporal moving average should be computed (see details).}
+  \item{lambda}{numeric (0,1); if \code{method == 'EMA'}, the decay parameter used to define weighting scheme for annual panels. Low values place higher weight on more recent panels, and vice versa. Specify a vector of values to compute estimates using mulitple wieghting schemes, and use \code{plotFIA} with \code{grp} set to \code{lambda} to produce moving average ribbon plots.}
 
   \item{treeDomain}{logical predicates defined in terms of the variables in PLOT, TREE, and/or COND tables. Used to define the type of trees for which estimates will be produced (e.g. DBH greater than 20 inches: \code{DIA > 20}, Dominant/Co-dominant crowns only: \code{CCLCD \%in\% c(2,3))}. Multiple conditions are combined with \code{&} (and) or \code{|} (or). Only trees where the condition evaluates to TRUE are used in producing estimates. Should NOT be quoted.}
 

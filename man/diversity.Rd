@@ -8,7 +8,7 @@ Produces estimates of diversity from FIA data. Returns shannon's index, shannon'
 
 \usage{
 diversity(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySizeClass = FALSE,
-          landType = 'forest', treeType = 'live', method = 'TI', yrs = 5,
+          landType = 'forest', treeType = 'live', method = 'TI', lambda = .94,
           stateVar = TPA_UNADJ, grpVar = SPCD, treeDomain = NULL,
           areaDomain = NULL, byPlot = FALSE, totals = FALSE, nCores = 1)
 }
@@ -28,9 +28,9 @@ diversity(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySizeClass = F
 
   \item{treeType}{character ('all', 'live', 'dead', or 'gs'); Type of tree which estimates will be produced for. All (default) includes all stems, live and dead, greater than 1 in. DBH. Live/Dead includes all stems greater than 1 in. DBH which are live or dead (leaning less than 45 degrees), respectively. GS (growing-stock) includes live stems greater than 5 in. DBH which contain at least one 8 ft merchantable log.}
 
-  \item{method}{character ('TI', 'annual', 'SMA', or 'EMA'); Method used for annual panel combination (see details).}
+  \item{method}{character; Method used for annual panel combination (see details). One of: 'TI' (temporally indifferent), 'annual' (annual panels), 'SMA' (simple moving average), 'LMA' (linear moving average), or 'EMA' (exponential moving average)}
 
-  \item{yrs}{numeric; if \code{method == 'EMA'}, the number of years over which a temporal moving average should be computed (see details).}
+  \item{lambda}{numeric (0,1); if \code{method == 'EMA'}, the decay parameter used to define weighting scheme for annual panels. Low values place higher weight on more recent panels, and vice versa. Specify a vector of values to compute estimates using mulitple wieghting schemes, and use \code{plotFIA} with \code{grp} set to \code{lambda} to produce moving average ribbon plots.}
 
   \item{stateVar}{variable from TREE table to use as state variable (NOT quoted). Default, \code{TPA_UNADJ}. Try, \code{DRYBIO_AG} for aboveground biomass, \code{pi*(DIA/2)^2} for basal area, or others.}
 

@@ -8,7 +8,7 @@ biomass <- function(db,
                        landType = 'forest',
                        treeType = 'live',
                        method = 'TI',
-                       yrs = 5,
+                       lambda = .94,
                        treeDomain = NULL,
                        areaDomain = NULL,
                        totals = FALSE,
@@ -78,8 +78,7 @@ biomass <- function(db,
     polys$polyID <- 1:nrow(polys)
 
     # Add shapefile names to grpBy
-    #grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
-    grpBy = c(grpBy, 'polyID')
+    grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
 
     ## Make plot data spatial, projected same as polygon layer
     pltSF <- select(db$PLOT, c('LON', 'LAT', pltID)) %>%
@@ -115,7 +114,7 @@ biomass <- function(db,
     }
     ## Add polygon names to PLOT
     db$PLOT <- db$PLOT %>%
-      left_join(select(pltSF, polyID, pltID), by = 'pltID')
+      left_join(pltSF, by = 'pltID')
 
     # Test if any polygons cross state boundaries w/ different recent inventory years (continued w/in loop)
     if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
@@ -410,18 +409,46 @@ biomass <- function(db,
           distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
           select(YEAR, INVYR, STATECD, wgt)
 
+        #### ----- Linear MOVING AVERAGE
+      } else if (str_to_upper(method) == 'LMA'){
+        wgts <- popOrig %>%
+          group_by(YEAR, STATECD) %>%
+          summarize(n = length(unique(INVYR)),
+                    minyr = min(INVYR, na.rm = TRUE)) %>%
+          ## Expand it out again
+          right_join(popOrig, by = c('YEAR', 'STATECD')) %>%
+          distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
+          mutate(wgt = YEAR - minyr / sum(1:n, na.rm = TRUE)) %>%
+          select(YEAR, INVYR, STATECD, wgt)
+
 
         #### ----- EXPONENTIAL MOVING AVERAGE
       } else if (str_to_upper(method) == 'EMA'){
-        ## Assuming a uniform weighting scheme
-        popOrig <- mutate(popOrig, YEAR = END_INVYR)
         wgts <- popOrig %>%
           distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
-          select(YEAR, INVYR, STATECD) %>%
-          mutate(yrs = yrs,
-                 l = 2 / (1 + yrs),
-                 yrPrev = YEAR - INVYR,
-                 wgt = l^yrPrev *(1-l))
+          select(YEAR, INVYR, STATECD)
+        if (length(lambda) < 2){
+          ## Weights based on temporal window
+          wgts <- wgts %>%
+            mutate(lambda = lambda,
+                   l = lambda,
+                   yrPrev = YEAR - INVYR,
+                   wgt = l^yrPrev *(1-l))
+        } else {
+          grpBy <- c('lambda', grpBy)
+          aGrpBy <- c('lambda', aGrpBy)
+          ## Duplicate weights for each level of lambda
+          yrWgts <- list()
+          for (i in 1:length(unique(lambda))) {
+            yrWgts[[i]] <- mutate(wgts, lambda = lambda[i])
+          }
+          wgts <- bind_rows(yrWgts) %>%
+            mutate(l = lambda,
+                   #l = 2 / (1 + lambda),
+                   yrPrev = YEAR - INVYR,
+                   wgt = l^yrPrev *(1-l))
+        }
+
       }
 
       ### Applying the weights
@@ -443,18 +470,18 @@ biomass <- function(db,
 
     ##---------------------  TOTALS and RATIOS
     # Area
-    aTotal <- aEst %>%
-      group_by(.dots = aGrpBy) %>%
-      summarize(aEst = sum(aEst, na.rm = TRUE),
-                aVar = sum(aVar, na.rm = TRUE),
-                #AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
-                plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
     # aTotal <- aEst %>%
     #   group_by(.dots = aGrpBy) %>%
-    #   summarize_all(sum,na.rm = TRUE)
-      # summarize(AREA_TOTAL = sum(aEst, na.rm = TRUE),
-      #           aVar = sum(aVar, na.rm = TRUE),
-      #           AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
+    #   summarize(aEst = sum(aEst, na.rm = TRUE),
+    #             aVar = sum(aVar, na.rm = TRUE),
+    #             #AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
+    #             plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
+    aTotal <- aEst %>%
+      group_by(.dots = aGrpBy) %>%
+      summarize_all(sum,na.rm = TRUE)
+    # summarize(AREA_TOTAL = sum(aEst, na.rm = TRUE),
+    #           aVar = sum(aVar, na.rm = TRUE),
+    #           AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
       #           nPlots_AREA = sum(plotIn_AREA, na.rm = TRUE))
     # Tree
     tTotal <- tEst %>%
@@ -544,21 +571,26 @@ biomass <- function(db,
     # Snag the names
     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
 
+    # Return a spatial object
+    if (!is.null(polys) & returnSpatial) {
+      suppressMessages({suppressWarnings({tOut <- left_join(polys, tOut) %>%
+        select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
+        filter(!is.na(polyID))})})
+    } else if (!is.null(polys) & returnSpatial == FALSE){
+      tOut <- select(tOut, c('YEAR', grpByOrig, tNames, everything())) %>%
+        filter(!is.na(polyID))
+    }
   }
-  ## Pretty output
-  tOut <- drop_na(tOut, grpByOrig) %>%
-    arrange(YEAR) %>%
-    as_tibble()
 
-  # Return a spatial object
-  if (!is.null(polys)) {
-    suppressMessages({suppressWarnings({tOut <- left_join(tOut, polys) %>%
-      select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
-      filter(!is.na(polyID))})})
-  }
 
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
+
+  ## Pretty output
+  tOut <- drop_na(tOut, grpBy) %>%
+    arrange(YEAR) %>%
+    as_tibble()
+
 
   ## Above converts to tibble
   if (returnSpatial) tOut <- st_sf(tOut)

@@ -8,7 +8,7 @@ tpa <- function(db,
                        landType = 'forest',
                        treeType = 'live',
                        method = 'TI',
-                       yrs = 5,
+                       lambda = .94,
                        treeDomain = NULL,
                        areaDomain = NULL,
                        totals = FALSE,
@@ -203,7 +203,7 @@ tpa <- function(db,
               as.character)
 
   ### Which estimator to use?
-  if (str_to_upper(method) %in% c('ANNUAL', "SMA", 'EMA')){
+  if (str_to_upper(method) %in% c('ANNUAL', "SMA", 'EMA', 'LMA')){
     ## Keep an original
     popOrig <- pops
     ## Want to use the year where plots are measured, no repeats
@@ -377,7 +377,7 @@ tpa <- function(db,
 
 
     ##### ----------------- MOVING AVERAGES
-    if (str_to_upper(method) %in% c("SMA", 'EMA')){
+    if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){
       ## Need a STATECD on aEst and tEst to join wgts
       if ('STATECD' %in% names(tEst) == FALSE){
         ## Need a STATECD on aEst and tEst to join wgts
@@ -412,18 +412,46 @@ tpa <- function(db,
           distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
           select(YEAR, INVYR, STATECD, wgt)
 
+        #### ----- Linear MOVING AVERAGE
+      } else if (str_to_upper(method) == 'LMA'){
+        wgts <- popOrig %>%
+          group_by(YEAR, STATECD) %>%
+          summarize(n = length(unique(INVYR)),
+                    minyr = min(INVYR, na.rm = TRUE)) %>%
+          ## Expand it out again
+          right_join(popOrig, by = c('YEAR', 'STATECD')) %>%
+          distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
+          mutate(wgt = YEAR - minyr / sum(1:n, na.rm = TRUE)) %>%
+          select(YEAR, INVYR, STATECD, wgt)
+
 
       #### ----- EXPONENTIAL MOVING AVERAGE
       } else if (str_to_upper(method) == 'EMA'){
-        ## Assuming a uniform weighting scheme
-        popOrig <- mutate(popOrig, YEAR = END_INVYR)
         wgts <- popOrig %>%
           distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
-          select(YEAR, INVYR, STATECD) %>%
-          mutate(yrs = yrs,
-                 l = 2 / (1 + yrs),
-                 yrPrev = YEAR - INVYR,
-                 wgt = l^yrPrev *(1-l))
+          select(YEAR, INVYR, STATECD)
+        if (length(lambda) < 2){
+          ## Weights based on temporal window
+        wgts <- wgts %>%
+            mutate(lambda = lambda,
+                   l = lambda,
+                   yrPrev = YEAR - INVYR,
+                   wgt = l^yrPrev *(1-l))
+        } else {
+          grpBy <- c('lambda', grpBy)
+          aGrpBy <- c('lambda', aGrpBy)
+          ## Duplicate weights for each level of lambda
+          yrWgts <- list()
+          for (i in 1:length(unique(lambda))) {
+            yrWgts[[i]] <- mutate(wgts, lambda = lambda[i])
+          }
+          wgts <- bind_rows(yrWgts) %>%
+            mutate(l = lambda,
+                   #l = 2 / (1 + lambda),
+                   yrPrev = YEAR - INVYR,
+                   wgt = l^yrPrev *(1-l))
+        }
+
       }
 
       ### Applying the weights
