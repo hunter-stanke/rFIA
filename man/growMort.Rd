@@ -9,8 +9,8 @@ Produces estimates of annual regeneration, recruitment, natural mortality, and h
 \usage{
 growMort(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE,
          bySizeClass = FALSE, landType = 'forest', treeType = 'all',
-         treeDomain = NULL, areaDomain = NULL, totals = FALSE, byPlot = FALSE,
-         SE = TRUE, nCores = 1)
+         method = 'TI', lambda = .94, stateVar = 'TPA', treeDomain = NULL,
+         areaDomain = NULL, totals = FALSE, byPlot = FALSE, nCores = 1)
 }
 
 \arguments{
@@ -30,6 +30,12 @@ growMort(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALS
 
   \item{treeType}{character ('all', 'live', 'dead', or 'gs'); Type of tree which estimates will be produced for. All (default) includes all stems, live and dead, greater than 1 in. DBH. Live/Dead includes all stems greater than 1 in. DBH which are live or dead (leaning less than 45 degrees), respectively. GS (growing-stock) includes live stems greater than 5 in. DBH which contain at least one 8 ft merchantable log.}
 
+    \item{method}{character; Method used for annual panel combination (see details). One of: 'TI' (temporally indifferent), 'annual' (annual panels), 'SMA' (simple moving average), 'LMA' (linear moving average), or 'EMA' (exponential moving average)}
+
+  \item{lambda}{numeric (0,1); if \code{method == 'EMA'}, the decay parameter used to define weighting scheme for annual panels. Low values place higher weight on more recent panels, and vice versa. Specify a vector of values to compute estimates using mulitple wieghting schemes, and use \code{plotFIA} with \code{grp} set to \code{lambda} to produce moving average ribbon plots.}
+
+  \item{stateVar}{character; State variable for reporting GRM estimates. One of: TPA, BAA, BIO_AG, BIO_BG, BIO, CARB_AG, CARB_BG, CARB, NETVOL, SAWVOL.}
+
   \item{treeDomain}{logical predicates defined in terms of the variables in PLOT, TREE, and/or COND tables. Used to define the type of trees for which estimates will be produced (e.g. DBH greater than 20 inches: \code{DIA > 20}, Dominant/Co-dominant crowns only: \code{CCLCD \%in\% c(2,3))}. Multiple conditions are combined with \code{&} (and) or \code{|} (or). Only trees where the condition evaluates to TRUE are used in producing estimates. Should NOT be quoted.}
 
   \item{areaDomain}{logical predicates defined in terms of the variables in PLOT and/or COND tables. Used to define the area for which estimates will be produced (e.g. within 1 mile of improved road: \code{RDDISTCD \%in\% c(1:6)}, Hard maple/basswood forest type: \code{FORTYPCD == 805)}. Multiple conditions are combined with \code{&} (and) or \code{|} (or). Only plots within areas where the condition evaluates to TRUE are used in producing estimates. Should NOT be quoted.}
@@ -37,8 +43,6 @@ growMort(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALS
   \item{totals}{logical; if TRUE, return population estimates (e.g. total area, total mortality) along with ratio estimates (e.g. mean mortality trees per acre).}
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations (population totals not returned).}
-
-  \item{SE}{logical; if TRUE, returns estimates with samping error (approx. 5x faster without returning samping errors)}
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }

@@ -122,4 +122,7 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'cvEst_vmd', 'cvEst_vp', 'cvEst_vsm', 'cvStrat_eh', 'ehEst', 'ehStrat', 'ehaVar', 'ehv', 'grp',
                          'landD', 'nPlots_DWM', 'ndif', 'p2eu', 'pltID', 'prev', 'r_t', 'sEst', 'saVar', 'sp', 'state', 'typeD',
                          'wgt', 'yrPrev', 'INV_AREA_TOTAL', 'SUBPCOND_PROP', 'cover', 'cvEst_i', 'cvStrat_i', 'iTEst', 'iTStrat',
-                         'plotIn_INV', 'minyr'))
+                         'plotIn_INV', 'minyr', "TPARECR_UNADJ", 'aDI_ga', 'cvEst_hp', 'cvEst_mp', 'cvEst_rp', 'cvStrat_hp', 'cvStrat_mp',
+                         'cvStrat_rp', 'fa_ga', 'hPlot_ga', 'hpVar', 'mPlot_ga', 'mpVar', 'plotIn_ga', 'rPlot_ga',
+                         'rpVar', 'tDI_ga', 'tPlot_ga'
+))

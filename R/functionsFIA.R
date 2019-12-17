@@ -2655,8 +2655,7 @@ tpa_old <- function(db,
 
 
 # Growth and Mortality
-#' @export
-growMort <- function(db,
+growMort_old <- function(db,
                      grpBy = NULL,
                      polys = NULL,
                      returnSpatial = FALSE,
@@ -2950,7 +2949,7 @@ growMort <- function(db,
       left_join(select(db_clip$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
       left_join(select(db_clip$PLOT, c('PLT_CN', 'PREV_PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'REMPER', grpP, 'sp', 'aD_p')), by = 'PLT_CN') %>%
       left_join(select(db_clip$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID','landD', 'aD_c', grpC)), by = 'PLT_CN') %>%
-      left_join(select(db_clip$TREE, c('TRE_CN', 'PREV_TRE_CN', 'TREE', 'PLT_CN', 'CONDID', 'PREVCOND', 'SPCD', grpT, 'typeD', 'tD')), by = c('PLT_CN', 'CONDID')) %>% ## ISSUE MAY BE HERE, SEE EVALIDATOR CODE
+      left_join(select(db_clip$TREE, c('TRE_CN', 'PREV_TRE_CN', 'TREE', 'SUBP', 'PLT_CN', 'CONDID', 'PREVCOND', 'SPCD', grpT, 'typeD', 'tD')), by = c('PLT_CN', 'CONDID')) %>% ## ISSUE MAY BE HERE, SEE EVALIDATOR CODE
       # GRM
       left_join(select(db_clip$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT')), by = c('TRE_CN')) %>%
       mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
@@ -2981,7 +2980,7 @@ growMort <- function(db,
 
       # Previous attributes
       data <- data %>%
-        left_join(select(db_clip$SUBP_COND_CHNG_MTRX, SUBP:SUBPTYP_PROP_CHNG), by = c('PLT_CN', 'CONDID'), suffix = c('', '.subp')) %>%
+        left_join(select(db_clip$SUBP_COND_CHNG_MTRX, SUBP:SUBPTYP_PROP_CHNG), by = c('PLT_CN', 'CONDID', 'SUBP'), suffix = c('', '.subp')) %>%
         left_join(select(db_clip$COND, PLT_CN, CONDID, COND_STATUS_CD), by = c('PREV_PLT_CN.subp' = 'PLT_CN', 'PREVCOND.subp' = 'CONDID'), suffix = c('', '.chng')) %>%
         left_join(select(db_clip$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
         left_join(select(db_clip$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
