@@ -571,26 +571,37 @@ biomass <- function(db,
     # Snag the names
     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
 
-    # Return a spatial object
-    if (!is.null(polys) & returnSpatial) {
-      suppressMessages({suppressWarnings({tOut <- left_join(polys, tOut) %>%
+  }
+
+  ## Pretty output
+  tOut <- drop_na(tOut, grpByOrig) %>%
+    arrange(YEAR) %>%
+    as_tibble()
+
+
+  # Return a spatial object
+  if (!is.null(polys)) {
+    ## We don't like missing polygons through time, this makes them NA instead
+    combos <- select(tOut, grpBy) %>%
+      distinct() %>%
+      mutate_all(as.factor) %>%
+      group_by(.dots = grpBy, .drop = FALSE) %>%
+      summarize() %>%
+      ungroup() %>%
+      mutate_all(as.character)
+
+    combos <- matchColClasses(tOut, combos)
+    tOut <- left_join(combos, tOut, by = grpBy)
+
+    suppressMessages({suppressWarnings({
+      tOut <- left_join(tOut, polys) %>%
         select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
         filter(!is.na(polyID))})})
-    } else if (!is.null(polys) & returnSpatial == FALSE){
-      tOut <- select(tOut, c('YEAR', grpByOrig, tNames, everything())) %>%
-        filter(!is.na(polyID))
-    }
   }
 
 
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
-
-  ## Pretty output
-  tOut <- drop_na(tOut, grpBy) %>%
-    arrange(YEAR) %>%
-    as_tibble()
-
 
   ## Above converts to tibble
   if (returnSpatial) tOut <- st_sf(tOut)

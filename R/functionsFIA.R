@@ -4,6 +4,19 @@
   #packageStartupMessage('Download FIA Data Here: https://apps.fs.usda.gov/fia/datamart/datamart.html')
 }
 
+matchColClasses <- function(df1, df2) {
+  df1 <- as.data.frame(df1)
+  df2 <- as.data.frame(df2)
+
+  sharedColNames <- names(df1)[names(df1) %in% names(df2)]
+  sharedColTypes <- sapply(df1[,sharedColNames], class)
+
+  for (n in 1:length(sharedColNames)) {
+    class(df2[, sharedColNames[n]]) <- sharedColTypes[n]
+  }
+
+  return(df2)
+}
 
 ################ PREVIOUS FUNCTIONS ######################
 #### SHANNON'S EVENESS INDEX (H)
