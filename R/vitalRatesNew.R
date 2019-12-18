@@ -74,6 +74,8 @@ vitalRates <- function(db,
     stop(paste('Growth & Mortality Estimates unavailable for: ', as.character(fancyName), sep = ''))
   }
 
+  db <- db[names(db) %in% reqTables]
+
 
   # I like a unique ID for a plot through time
   if (byPlot) {grpBy <- c('pltID', grpBy)}
