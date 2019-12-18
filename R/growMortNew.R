@@ -255,7 +255,7 @@ growMort <- function(db,
   db$POP_EVAL<- db$POP_EVAL %>%
     select('CN', 'END_INVYR', 'EVALID', 'ESTN_METHOD', 'GROWTH_ACCT') %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP %in% c('EXPGROW', 'EXPMORT', 'EXPREMV', 'EXPCURR')) %>%
+    filter(EVAL_TYP %in% c('EXPGROW', 'EXPMORT', 'EXPREMV')) %>%
     filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
     distinct(END_INVYR, EVALID, .keep_all = TRUE)# %>%
   #group_by(END_INVYR) %>%
@@ -622,7 +622,7 @@ growMort <- function(db,
   tOut <- tOut %>%
     ungroup() %>%
     mutate_if(is.factor, as.character) %>%
-    drop_na(grpByOrig) %>%
+    drop_na(grpBy) %>%
     arrange(YEAR) %>%
     as_tibble()
 
@@ -641,7 +641,7 @@ growMort <- function(db,
     }
 
     suppressMessages({suppressWarnings({
-      tOut <- left_join(tOut, polys) %>%
+      tOut <- left_join(tOut, polys, by = 'polyID') %>%
         select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
         filter(!is.na(polyID))})})
 
