@@ -472,17 +472,27 @@ standStruct <- function(db,
     } # End byPlot
 
   ## Pretty output
-  tOut <- drop_na(tOut, grpByOrig) %>%
+  tOut <- tOut %>%
+    ungroup() %>%
+    mutate_if(is.factor, as.character) %>%
+    drop_na(grpByOrig) %>%
     arrange(YEAR) %>%
     as_tibble()
 
   # Return a spatial object
   if (!is.null(polys)) {
-    ### NO IMPLICIT NA
-    grpSym <- syms(grpBy)
-    combos <- tOut %>%
-      expand(!!!grpSym)
-    tOut <- left_join(combos, tOut, by = grpBy)
+    ## NO IMPLICIT NA
+    nospGrp <- unique(grpBy[grpBy %in% c('SPCD', 'SYMBOL', 'COMMON_NAME', 'SCIENTIFIC_NAME') == FALSE])
+    nospSym <- syms(nospGrp)
+    tOut <- complete(tOut, !!!nospSym)
+    ## If species, we don't want unique combos of variables related to same species
+    ## but we do want NAs in polys where species are present
+    if (length(nospGrp) < length(grpBy)){
+      spGrp <- unique(grpBy[grpBy %in% c('SPCD', 'SYMBOL', 'COMMON_NAME', 'SCIENTIFIC_NAME')])
+      spSym <- syms(spGrp)
+      tOut <- complete(tOut, nesting(!!!nospSym))
+    }
+
     suppressMessages({suppressWarnings({tOut <- left_join(tOut, polys) %>%
       select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
       filter(!is.na(polyID))})})

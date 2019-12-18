@@ -78,7 +78,7 @@ biomass <- function(db,
     polys$polyID <- 1:nrow(polys)
 
     # Add shapefile names to grpBy
-    grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
+    grpBy = c(grpBy, 'polyID')
 
     ## Make plot data spatial, projected same as polygon layer
     pltSF <- select(db$PLOT, c('LON', 'LAT', pltID)) %>%
@@ -574,19 +574,27 @@ biomass <- function(db,
   }
 
   ## Pretty output
-  tOut <- drop_na(tOut, grpByOrig) %>%
+  tOut <- tOut %>%
+    ungroup() %>%
+    mutate_if(is.factor, as.character) %>%
+    drop_na(grpByOrig) %>%
     arrange(YEAR) %>%
     as_tibble()
 
 
   # Return a spatial object
   if (!is.null(polys)) {
-    ### NO IMPLICIT NA
-    tempGrp <- unique(grpBy[grpBy %in% c('COMMON_NAME', 'SCIENTIFIC_NAME') == FALSE])
-    grpSym <- syms(tempGrp)
-    combos <- tOut %>%
-      expand(!!!grpSym)
-    tOut <- left_join(combos, tOut, by = tempGrp)
+    ## NO IMPLICIT NA
+    nospGrp <- unique(grpBy[grpBy %in% c('SPCD', 'SYMBOL', 'COMMON_NAME', 'SCIENTIFIC_NAME') == FALSE])
+    nospSym <- syms(nospGrp)
+    tOut <- complete(tOut, !!!nospSym)
+    ## If species, we don't want unique combos of variables related to same species
+    ## but we do want NAs in polys where species are present
+    if (length(nospGrp) < length(grpBy)){
+      spGrp <- unique(grpBy[grpBy %in% c('SPCD', 'SYMBOL', 'COMMON_NAME', 'SCIENTIFIC_NAME')])
+      spSym <- syms(spGrp)
+      tOut <- complete(tOut, nesting(!!!nospSym))
+    }
 
     suppressMessages({suppressWarnings({
       tOut <- left_join(tOut, polys) %>%
