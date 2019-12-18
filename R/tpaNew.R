@@ -575,7 +575,7 @@ tpa <- function(db,
   # Return a spatial object
   if (!is.null(polys)) {
     ### NO IMPLICIT NA
-    grpSym <- syms(grpBy)
+    grpSym <- syms(unique(grpBy[grpBy %in% c('COMMON_NAME', 'SCIENTIFIC_NAME') == FALSE]))
     combos <- tOut %>%
       expand(!!!grpSym)
 
