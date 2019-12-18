@@ -474,16 +474,10 @@ invasive <- function(db,
 
   # Return a spatial object
   if (!is.null(polys)) {
-    ## We don't like missing polygons through time, this makes them NA instead
-    combos <- select(tOut, grpBy) %>%
-      distinct() %>%
-      mutate_all(as.factor) %>%
-      group_by(.dots = grpBy, .drop = FALSE) %>%
-      summarize() %>%
-      ungroup() %>%
-      mutate_all(as.character)
-
-    combos <- matchColClasses(tOut, combos)
+    ### NO IMPLICIT NA
+    grpSym <- syms(grpBy)
+    combos <- tOut %>%
+      expand(!!!grpSym)
     tOut <- left_join(combos, tOut, by = grpBy)
     suppressMessages({suppressWarnings({tOut <- left_join(tOut, polys) %>%
       select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
