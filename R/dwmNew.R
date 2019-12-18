@@ -601,7 +601,7 @@ dwm <- function(db,
   tOut <- tOut %>%
     ungroup() %>%
     mutate_if(is.factor, as.character) %>%
-    drop_na(grpByOrig) %>%
+    drop_na(grpBy) %>%
     arrange(YEAR) %>%
     as_tibble()
 
