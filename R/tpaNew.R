@@ -590,6 +590,9 @@ tpa <- function(db,
       tOut <- left_join(tOut, polys) %>%
       select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
       filter(!is.na(polyID))})})
+
+    ## Makes it horrible to work with as a dataframe
+    if (returnSpatial == FALSE) tOut <- select(tOut, -c(geometry))
   }
 
   ## For spatial plots

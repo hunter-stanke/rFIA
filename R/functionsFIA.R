@@ -3198,8 +3198,7 @@ growMort_old <- function(db,
 }
 
 # Growth Rates
-#' @export
-vitalRates <- function(db,
+vitalRates_old <- function(db,
                        grpBy = NULL,
                        polys = NULL,
                        returnSpatial = FALSE,

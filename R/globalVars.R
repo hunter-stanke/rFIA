@@ -124,5 +124,8 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'wgt', 'yrPrev', 'INV_AREA_TOTAL', 'SUBPCOND_PROP', 'cover', 'cvEst_i', 'cvStrat_i', 'iTEst', 'iTStrat',
                          'plotIn_INV', 'minyr', "TPARECR_UNADJ", 'aDI_ga', 'cvEst_hp', 'cvEst_mp', 'cvEst_rp', 'cvStrat_hp', 'cvStrat_mp',
                          'cvStrat_rp', 'fa_ga', 'hPlot_ga', 'hpVar', 'mPlot_ga', 'mpVar', 'plotIn_ga', 'rPlot_ga',
-                         'rpVar', 'tDI_ga', 'tPlot_ga'
+                         'rpVar', 'tDI_ga', 'tPlot_ga', 'BAA_TOTAL_SE', 'BA_GROW_AC', 'BA_GROW_AC_SE', 'BA_TOTAL_SE', 'BIOA_TOTAL',
+                         'BIOA_TOTAL_SE', 'DIA_TOTAL_SE', 'NETVOLA_TOTAL', 'NETVOLA_TOTAL_SE',
+                         'NETVOL_TOTAL_SE', 'PLOT_STATUS_CD', 'bioAEst', 'bioAStrat', 'bioAVar', 'bioAgVar',
+                         'bioAv', 'cvEst_bioA', 'cvStrat_bioA', 'tDI_ga_r', 'tDI_r'
 ))

@@ -220,7 +220,7 @@ diversity <- function(db,
               as.character)
 
   ### Which estimator to use?
-  if (str_to_upper(method) %in% c('ANNUAL', "SMA", 'EMA')){
+  if (str_to_upper(method) %in% c('ANNUAL', "SMA", 'EMA', 'LMA')){
     ## Keep an original
     popOrig <- pops
     ## Want to use the year where plots are measured, no repeats
@@ -354,7 +354,7 @@ diversity <- function(db,
 
 
     ##### ----------------- MOVING AVERAGES
-    if (str_to_upper(method) %in% c("SMA", 'EMA')){
+    if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){
       ## Need a STATECD on aEst and tEst to join wgts
       if ('STATECD' %in% names(tEst) == FALSE){
         ## Need a STATECD on aEst and tEst to join wgts
@@ -512,6 +512,9 @@ diversity <- function(db,
     suppressMessages({suppressWarnings({tOut <- left_join(tOut, polys) %>%
       select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
       filter(!is.na(polyID))})})
+
+    ## Makes it horrible to work with as a dataframe
+    if (returnSpatial == FALSE) tOut <- select(tOut, -c(geometry))
   }
 
   ## For spatial plots

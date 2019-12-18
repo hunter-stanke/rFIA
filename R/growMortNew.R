@@ -254,7 +254,7 @@ growMort <- function(db,
   db$POP_EVAL<- db$POP_EVAL %>%
     select('CN', 'END_INVYR', 'EVALID', 'ESTN_METHOD', 'GROWTH_ACCT') %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP %in% c('EXPGROW', 'EXPMORT', 'EXPREMV')) %>%
+    filter(EVAL_TYP %in% c('EXPGROW', 'EXPMORT', 'EXPREMV', 'EXPCURR')) %>%
     filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
     distinct(END_INVYR, EVALID, .keep_all = TRUE)# %>%
   #group_by(END_INVYR) %>%
@@ -263,7 +263,7 @@ growMort <- function(db,
   ## Make an annual panel ID, associated with an INVYR
 
   ### The population tables
-  pops <- select(db$POP_EVAL, c('EVALID', 'ESTN_METHOD', 'CN', 'GROWTH_ACCT', 'END_INVYR')) %>%
+  pops <- select(db$POP_EVAL, c('EVALID', 'ESTN_METHOD', 'CN', 'GROWTH_ACCT', 'END_INVYR', 'EVAL_TYP')) %>%
     rename(EVAL_CN = CN) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('EVAL_CN')) %>%
     rename(ESTN_UNIT_CN = CN) %>%
@@ -274,7 +274,7 @@ growMort <- function(db,
               as.character)
 
   ### Which estimator to use?
-  if (str_to_upper(method) %in% c('ANNUAL', "SMA", 'EMA')){
+  if (str_to_upper(method) %in% c('ANNUAL', "SMA", 'EMA', 'LMA')){
     ## Keep an original
     popOrig <- pops
     ## Want to use the year where plots are measured, no repeats
@@ -432,7 +432,7 @@ growMort <- function(db,
 
 
     ##### ----------------- MOVING AVERAGES
-    if (str_to_upper(method) %in% c("SMA", 'EMA')){
+    if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){
       ## Need a STATECD on aEst and tEst to join wgts
       if ('STATECD' %in% names(tEst) == FALSE){
         ## Need a STATECD on aEst and tEst to join wgts
@@ -536,7 +536,8 @@ growMort <- function(db,
     #             plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
     aTotal <- aEst %>%
       group_by(.dots = aGrpBy) %>%
-      summarize_all(sum,na.rm = TRUE)
+      summarize_all(sum,na.rm = TRUE) #%>%
+      #mutate()
     # summarize(AREA_TOTAL = sum(aEst, na.rm = TRUE),
     #           aVar = sum(aVar, na.rm = TRUE),
     #           AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
@@ -640,6 +641,9 @@ growMort <- function(db,
       tOut <- left_join(tOut, polys) %>%
         select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
         filter(!is.na(polyID))})})
+
+    ## Makes it horrible to work with as a dataframe
+    if (returnSpatial == FALSE) tOut <- select(tOut, -c(geometry))
   }
 
 

@@ -50,9 +50,13 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
   ## Comprehensive indicator function -- w/ growth accounting
   data$aDI_ga <- data$landD * data$aD_p * data$aD_c * data$sp * data$aChng
   data$tDI_ga <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev * data$tChng
+  data$tDI_ga_r <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp #* data$tChng
+
   ## Comprehensive indicator function
   data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
   data$tDI <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev
+  data$tDI_r <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
+
 
 
   if (byPlot){
@@ -95,10 +99,11 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
 
     ### Compute total TREES in domain of interest
     t <- data %>%
+      distinct(PLT_CN, TRE_CN, COMPONENT, .keep_all = TRUE) %>%
       # Compute estimates at plot level
       group_by(PLT_CN, SUBPTYP_GRM, .dots = grpBy) %>%
       summarize(tPlot_ga = sum(TPAGROW_UNADJ * tDI_ga, na.rm = TRUE),
-                rPlot_ga = sum(TPARECR_UNADJ * tDI_ga, na.rm = TRUE),
+                rPlot_ga = sum(TPARECR_UNADJ * tDI_ga_r, na.rm = TRUE),
                 mPlot_ga = sum(TPAMORT_UNADJ * tDI_ga, na.rm = TRUE),
                 hPlot_ga = sum(TPAREMV_UNADJ * tDI_ga, na.rm = TRUE),
                 plotIn_t_ga = ifelse(tPlot_ga >  0, 1,0),
@@ -107,7 +112,7 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
                 plotIn_h_ga = ifelse(hPlot_ga >  0, 1,0),
                 ## No growth accoutning
                 tPlot = sum(TPAGROW_UNADJ * tDI, na.rm = TRUE),
-                rPlot = sum(TPARECR_UNADJ * tDI, na.rm = TRUE),
+                rPlot = sum(TPARECR_UNADJ * tDI_r, na.rm = TRUE),
                 mPlot = sum(TPAMORT_UNADJ * tDI, na.rm = TRUE),
                 hPlot = sum(TPAREMV_UNADJ * tDI, na.rm = TRUE),
                 plotIn_t = ifelse(tPlot >  0, 1,0),
@@ -132,6 +137,8 @@ gmHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
   aStrat <- a %>%
     ## Rejoin with population tables
     right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
+    filter(EVAL_TYP %in% c('EXPGROW', 'EXPMORT', 'EXPREMV')) %>%
+    #filter(EVAL_TYP %in% c('EXPCURR')) %>%
     mutate(
       ## AREA
       aAdj = case_when(
@@ -160,10 +167,6 @@ gmHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
               p2eu = first(p2eu),
               ndif = nh - n,
               ## Strata level variances
-              av_correct = ifelse(first(ESTN_METHOD == 'simple'),
-                                  var(c(fa, numeric(ndif)) * first(a) / nh),
-                                  (sum((c(fa, numeric(ndif))^2), na.rm = TRUE) - nh * aStrat^2) / (nh * (nh-1))),
-              ## Strata level variances
               av = stratVar(ESTN_METHOD, fa, aStrat, ndif, a, nh))
   ## Estimation unit
   aEst <- aStrat %>%
@@ -178,6 +181,7 @@ gmHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
   tEst <- t %>%
     ## Rejoin with population tables
     right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
+    filter(EVAL_TYP %in% c('EXPGROW', 'EXPMORT', 'EXPREMV')) %>%
     ## Need this for covariance later on
     left_join(select(a, fa, fa_ga, PLT_CN, PROP_BASIS, aGrpBy[aGrpBy %in% 'YEAR' == FALSE]), by = c('PLT_CN', aGrpBy[aGrpBy %in% 'YEAR' == FALSE])) %>%
     #Add adjustment factors
