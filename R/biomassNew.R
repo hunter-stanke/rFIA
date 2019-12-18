@@ -582,10 +582,11 @@ biomass <- function(db,
   # Return a spatial object
   if (!is.null(polys)) {
     ### NO IMPLICIT NA
-    grpSym <- syms(unique(grpBy[grpBy %in% c('COMMON_NAME', 'SCIENTIFIC_NAME') == FALSE]))
+    tempGrp <- unique(grpBy[grpBy %in% c('COMMON_NAME', 'SCIENTIFIC_NAME') == FALSE])
+    grpSym <- syms(tempGrp)
     combos <- tOut %>%
       expand(!!!grpSym)
-    tOut <- left_join(combos, tOut, by = grpBy)
+    tOut <- left_join(combos, tOut, by = tempGrp)
 
     suppressMessages({suppressWarnings({
       tOut <- left_join(tOut, polys) %>%
