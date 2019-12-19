@@ -150,24 +150,34 @@ growMort <- function(db,
   ### HANDLE THE STATE VARIABLE, only applying to the midpoint table for consistency
   if (str_to_upper(stateVar) == 'TPA'){
    db$TREE_GRM_MIDPT$state <- 1
+   db$TREE$state_recr <- 1
   } else if (str_to_upper(stateVar) == 'BAA'){
     db$TREE_GRM_MIDPT$state <- basalArea(db$TREE_GRM_MIDPT$DIA)
+    db$TREE$state_recr <- basalArea(db$TREE$DIA)
   } else if (str_to_upper(stateVar) == 'SAWVOL'){
     db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$VOLCSNET
+    db$TREE$state_recr <- db$TREE$VOLCSNET
   } else if (str_to_upper(stateVar) == 'NETVOL'){
     db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$VOLCFNET
+    db$TREE$state_recr <- db$TREE_$VOLCFNET
   } else if (str_to_upper(stateVar) == 'BIO_AG'){
     db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$DRYBIO_AG
+    db$TREE$state_recr <- db$TREE$DRYBIO_AG
   } else if (str_to_upper(stateVar) == 'BIO_BG'){
     db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$DRYBIO_BG
+    db$TREE$state_recr <- db$TREE$DRYBIO_BG
   } else if (str_to_upper(stateVar) == 'BIO'){
     db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$DRYBIO_BG + db$TREE_GRM_MIDPT$DRYBIO_AG
+    db$TREE$state_recr <- db$TREE$DRYBIO_BG + db$TREE$DRYBIO_AG
   } else if (str_to_upper(stateVar) == 'CARB_AG'){
     db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$DRYCARB_AG * .5
+    db$TREE$state_recr <- db$TREE$DRYCARB_AG * .5
   } else if (str_to_upper(stateVar) == 'CARB_BG'){
     db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$DRYCARB_BG * .5
+    db$TREE$state_recr <- db$TREE$DRYCARB_BG * .5
   } else if (str_to_upper(stateVar) == 'CARB'){
     db$TREE_GRM_MIDPT$state <- (db$TREE_GRM_MIDPT$DRYCARB_BG + db$TREE_GRM_MIDPT$DRYCARB_AG) * .5
+    db$TREE$state_recr <- (db$TREE$DRYCARB_BG + db$TREE$DRYCARB_AG) * .5
   } else {
     stop(paste('Method not known for stateVar:', stateVar))
   }
@@ -185,7 +195,11 @@ growMort <- function(db,
                                       TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_AL_FOREST,
                                       TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_AL_FOREST,
                                       SUBPTYP_GRM = SUBP_SUBPTYP_GRM_AL_FOREST,
-                                      COMPONENT = SUBP_COMPONENT_AL_FOREST)
+                                      COMPONENT = SUBP_COMPONENT_AL_FOREST) %>%
+        mutate(TPARECR_UNADJ = case_when(
+          is.na(COMPONENT) ~ NA_real_,
+          COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2') ~ TPAGROW_UNADJ,
+          TRUE ~ 0))
 
     } else if (tolower(treeType) == 'gs'){
       db$TREE$typeD <- ifelse(db$TREE$DIA >= 5, 1, 0)
@@ -194,7 +208,11 @@ growMort <- function(db,
                                       TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_GS_FOREST,
                                       TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_GS_FOREST,
                                       SUBPTYP_GRM = SUBP_SUBPTYP_GRM_GS_FOREST,
-                                      COMPONENT = SUBP_COMPONENT_GS_FOREST)
+                                      COMPONENT = SUBP_COMPONENT_GS_FOREST)%>%
+        mutate(TPARECR_UNADJ = case_when(
+          is.na(COMPONENT) ~ NA_real_,
+          COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2') ~ TPAGROW_UNADJ,
+          TRUE ~ 0))
     }
   } else if (tolower(landType) == 'timber'){
     db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
@@ -207,7 +225,11 @@ growMort <- function(db,
                                       TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_AL_TIMBER,
                                       TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_AL_TIMBER,
                                       SUBPTYP_GRM = SUBP_SUBPTYP_GRM_AL_TIMBER,
-                                      COMPONENT = SUBP_COMPONENT_AL_TIMBER)
+                                      COMPONENT = SUBP_COMPONENT_AL_TIMBER)%>%
+        mutate(TPARECR_UNADJ = case_when(
+          is.na(COMPONENT) ~ NA_real_,
+          COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2') ~ TPAGROW_UNADJ,
+          TRUE ~ 0))
 
     } else if (tolower(treeType) == 'gs'){
       db$TREE$typeD <- ifelse(db$TREE$DIA >= 5, 1, 0)
@@ -216,7 +238,11 @@ growMort <- function(db,
                                       TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_GS_TIMBER,
                                       TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_GS_TIMBER,
                                       SUBPTYP_GRM = SUBP_SUBPTYP_GRM_GS_TIMBER,
-                                      COMPONENT = SUBP_COMPONENT_GS_TIMBER)
+                                      COMPONENT = SUBP_COMPONENT_GS_TIMBER)%>%
+        mutate(TPARECR_UNADJ = case_when(
+          is.na(COMPONENT) ~ NA_real_,
+          COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2') ~ TPAGROW_UNADJ,
+          TRUE ~ 0))
     }
   }
 
@@ -251,14 +277,21 @@ growMort <- function(db,
   db$TREE$tD <- as.numeric(tD)
 
 
+  ## What years are growth accounting years --> not all filled in
+  ga <- db$POP_EVAL %>%
+    group_by(END_INVYR) %>%
+    summarize(ga = if_else(any(GROWTH_ACCT == 'Y'), 1, 0))
+
+
   ### Snag the EVALIDs that are needed
-  db$POP_EVAL<- db$POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID', 'ESTN_METHOD', 'GROWTH_ACCT') %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+  db$POP_EVAL  <- db$POP_EVAL %>%
+    left_join(ga, by = 'END_INVYR') %>%
+    select('CN', 'END_INVYR', 'EVALID', 'ESTN_METHOD', 'GROWTH_ACCT', 'ga') %>%
+    left_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
     filter(EVAL_TYP %in% c('EXPGROW', 'EXPMORT', 'EXPREMV')) %>%
     filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
     distinct(END_INVYR, EVALID, .keep_all = TRUE)# %>%
-  #group_by(END_INVYR) %>%
+    #group_by(END_INVYR) %>%
   #summarise(id = list(EVALID)
 
   ## Make an annual panel ID, associated with an INVYR
@@ -477,8 +510,13 @@ growMort <- function(db,
           ## Expand it out again
           right_join(popOrig, by = c('YEAR', 'STATECD')) %>%
           distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
-          mutate(wgt = YEAR - minyr / sum(1:n, na.rm = TRUE)) %>%
-          select(YEAR, INVYR, STATECD, wgt)
+          ungroup() %>%
+          mutate(diffYear = (INVYR - minyr) + 1)
+        ## Having trouble with dplyr here, hacky
+        wgts$id <- 1:nrow(wgts)
+        wgts <- wgts %>%
+          group_by(YEAR, INVYR, STATECD, id) %>%
+          summarize(wgt = diffYear / sum(1:n, na.rm = TRUE))
 
 
         #### ----- EXPONENTIAL MOVING AVERAGE

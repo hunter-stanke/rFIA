@@ -1068,10 +1068,10 @@ clipFIA <- function(db,
     # Join appropriate tables and filter out specified EVALIDs
     tempData <- select(db$PLOT, CN, PREV_PLT_CN) %>%
       mutate(PLT_CN = CN) %>%
-      inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID')), by = 'PLT_CN') %>%
+      left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID')), by = 'PLT_CN') %>%
       #inner_join(select(POP_ESTN_UNIT, c('EVAL_GRP_CN', 'EVALID')), by = 'EVAL_GRP_CN') %>%
       filter(EVALID %in% evalid)
-    # Extract plots which relate to specified EVALID (previouy for change estimation)
+    # Extract plots which relate to specified EVALID (previous for change estimation)
     PPLOT <- db$PLOT[db$PLOT$CN %in% tempData$PREV_PLT_CN,]
     db$PLOT <- db$PLOT[db$PLOT$CN %in% tempData$PLT_CN,]
   }

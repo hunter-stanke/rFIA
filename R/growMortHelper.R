@@ -17,8 +17,8 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD')), by = c('PLT_CN', 'CONDID')) %>%
-    left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT')), by = c('TRE_CN')) %>%
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'state_recr')), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPARECR_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT')), by = c('TRE_CN')) %>%
     left_join(select(db$TREE_GRM_MIDPT, c('TRE_CN', 'DIA', 'state')), by = c('TRE_CN'), suffix = c('', '.mid')) %>%
     left_join(select(db$SUBP_COND_CHNG_MTRX, SUBP:SUBPTYP_PROP_CHNG), by = c('PLT_CN', 'CONDID'), suffix = c('', '.subp')) %>%
     left_join(select(db$COND, PLT_CN, CONDID, COND_STATUS_CD), by = c('PREV_PLT_CN.subp' = 'PLT_CN', 'PREVCOND.subp' = 'CONDID'), suffix = c('', '.chng')) %>%
@@ -29,12 +29,13 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
               as.character) %>%
     mutate(SUBPTYP_PROP_CHNG = SUBPTYP_PROP_CHNG * .25,
            TPAGROW_UNADJ = TPAGROW_UNADJ * state,
-           TPAMORT_UNADJ = TPAMORT_UNADJ * state,
            TPAREMV_UNADJ = TPAREMV_UNADJ * state,
-           TPARECR_UNADJ = case_when(
-             is.na(COMPONENT) ~ NA_real_,
-             COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2') ~ TPAGROW_UNADJ / REMPER,
-             TRUE ~ 0),
+           TPARECR_UNADJ = TPARECR_UNADJ * state_recr / REMPER,
+    # mutate(SUBPTYP_PROP_CHNG = SUBPTYP_PROP_CHNG * .25,
+    #        TPAGROW_UNADJ = TPAGROW_UNADJ,
+    #        TPAMORT_UNADJ1 = TPAMORT_UNADJ,
+    #        TPAREMV_UNADJ = TPAREMV_UNADJ,
+    #        TPARECR_UNADJ = TPARECR_UNADJ / REMPER,
            aChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.chng == 1 & !is.null(CONDPROP_UNADJ), 1, 0),
            tChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.prev == 1, 1, 0),
            test = if_else(COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2'), 1, 0))
@@ -137,7 +138,7 @@ gmHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
   aStrat <- a %>%
     ## Rejoin with population tables
     right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
-    filter(EVAL_TYP %in% c('EXPGROW', 'EXPMORT', 'EXPREMV')) %>%
+    filter(EVAL_TYP %in% c('EXPGROW')) %>%
     #filter(EVAL_TYP %in% c('EXPCURR')) %>%
     mutate(
       ## AREA
@@ -182,6 +183,7 @@ gmHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
     ## Rejoin with population tables
     right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
     filter(EVAL_TYP %in% c('EXPGROW', 'EXPMORT', 'EXPREMV')) %>%
+    #filter(EVAL_TYP %in% c('EXPGROW')) %>%
     ## Need this for covariance later on
     left_join(select(a, fa, fa_ga, PLT_CN, PROP_BASIS, aGrpBy[aGrpBy %in% 'YEAR' == FALSE]), by = c('PLT_CN', aGrpBy[aGrpBy %in% 'YEAR' == FALSE])) %>%
     #Add adjustment factors

@@ -418,8 +418,13 @@ biomass <- function(db,
           ## Expand it out again
           right_join(popOrig, by = c('YEAR', 'STATECD')) %>%
           distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
-          mutate(wgt = YEAR - minyr / sum(1:n, na.rm = TRUE)) %>%
-          select(YEAR, INVYR, STATECD, wgt)
+          ungroup() %>%
+          mutate(diffYear = (INVYR - minyr) + 1)
+        ## Having trouble with dplyr here, hacky
+        wgts$id <- 1:nrow(wgts)
+        wgts <- wgts %>%
+          group_by(YEAR, INVYR, STATECD, id) %>%
+          summarize(wgt = diffYear / sum(1:n, na.rm = TRUE))
 
 
         #### ----- EXPONENTIAL MOVING AVERAGE
