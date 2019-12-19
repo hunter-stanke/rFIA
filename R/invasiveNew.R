@@ -347,19 +347,25 @@ invasive <- function(db,
 
     ##### ----------------- MOVING AVERAGES
     if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){
+      ## Need a STATECD on aEst and tEst to join wgts
       if ('STATECD' %in% names(tEst) == FALSE){
         ## Need a STATECD on aEst and tEst to join wgts
         tEst <- left_join(tEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
+        aEst <- left_join(aEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
       }
-
-
 
       #### Summarizing to state level here to apply weights by panel
       #### Getting rid of ESTN_UNITS
+      # Area
+      aEst <- aEst %>%
+        group_by(STATECD, .dots = aGrpBy) %>%
+        summarize(aEst = sum(aEst, na.rm = TRUE),
+                  aVar = sum(aVar, na.rm = TRUE),
+                  plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
       # Tree
       tEst <- tEst %>%
         group_by(STATECD, .dots = grpBy) %>%
-        summarize_at(vars(aEst:plotIn_AREA),sum, na.rm = TRUE)
+        summarize_at(vars(iEst:cvEst_i),sum, na.rm = TRUE)
 
       ## Naming
       popOrig <- mutate(popOrig, YEAR = END_INVYR)
@@ -419,11 +425,19 @@ invasive <- function(db,
 
       ### Applying the weights
       # Area
-      tEst <- left_join(wgts, tEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
-        mutate_at(vars(aEst:iEst), ~(.*wgt)) %>%
-        mutate_at(vars(aVar:cvEst_i), ~(.*(wgt^2))) %>%
-        group_by(STATECD, .dots = grpBy) %>%
+      aEst <- left_join(wgts, aEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
+        mutate_at(vars(aEst), ~(.*wgt)) %>%
+        mutate_at(vars(aVar), ~(.*(wgt^2))) %>%
+        group_by(STATECD, .dots = aGrpBy) %>%
         summarize_at(vars(aEst:plotIn_AREA), sum, na.rm = TRUE)
+
+      ### Applying the weights
+      # Area
+      tEst <- left_join(wgts, tEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
+        mutate_at(vars(iEst), ~(.*wgt)) %>%
+        mutate_at(vars(iVar:cvEst_i), ~(.*(wgt^2))) %>%
+        group_by(STATECD, .dots = grpBy) %>%
+        summarize_at(vars(iEst:cvEst_i), sum, na.rm = TRUE)
     }
 
     suppressWarnings({

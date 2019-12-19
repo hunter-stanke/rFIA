@@ -459,7 +459,7 @@ tpa <- function(db,
       aEst <- left_join(wgts, aEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
         mutate_at(vars(aEst), ~(.*wgt)) %>%
         mutate_at(vars(aVar), ~(.*(wgt^2))) %>%
-        group_by(STATECD, .dots = grpBy) %>%
+        group_by(STATECD, .dots = aGrpBy) %>%
         summarize_at(vars(aEst:plotIn_AREA), sum, na.rm = TRUE)
 
 
