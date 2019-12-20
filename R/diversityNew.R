@@ -478,16 +478,6 @@ diversity <- function(db,
                nPlots = plotIn_AREA)
     })
 
-
-    if (totals) {
-      tOut <- tOut %>%
-        select(grpBy, H_a, Eh_a, S_a, AREA_TOTAL, H_a_SE, Eh_a_SE, S_a_SE, AREA_TOTAL_SE, nPlots)
-
-    } else {
-      tOut <- tOut %>%
-        select(grpBy, H_a, Eh_a, S_a, H_a_SE, Eh_a_SE, S_a_SE, nPlots)
-    }
-
     ### UP a few spatial scales
     ## Which grpByNames are in which table? Helps us subset below
     grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
@@ -509,6 +499,15 @@ diversity <- function(db,
       mutate(H_b = H_g - H_a,
              Eh_b = Eh_g - Eh_a,
              S_b = S_g - S_a)
+
+    if (totals) {
+      tOut <- tOut %>%
+        select(grpBy, H_a, Eh_a, S_a, AREA_TOTAL, H_a_SE, Eh_a_SE, S_a_SE, AREA_TOTAL_SE, nPlots)
+
+    } else {
+      tOut <- tOut %>%
+        select(grpBy, H_a, Eh_a, S_a, H_a_SE, Eh_a_SE, S_a_SE, nPlots)
+    }
 
     # Snag the names
     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
