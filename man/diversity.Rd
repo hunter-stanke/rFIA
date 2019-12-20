@@ -8,7 +8,7 @@ Produces estimates of diversity from FIA data. Returns shannon's index, shannon'
 
 \usage{
 diversity(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySizeClass = FALSE,
-          landType = 'forest', treeType = 'live', method = 'TI', lambda = .94,
+          landType = 'forest', treeType = 'live', method = 'TI', lambda = .5,
           stateVar = TPA_UNADJ, grpVar = SPCD, treeDomain = NULL,
           areaDomain = NULL, byPlot = FALSE, totals = FALSE, nCores = 1)
 }

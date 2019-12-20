@@ -10,7 +10,7 @@ Estimates the stand structural stage distribution of an area of forest/ timberla
 
 \usage{
 standStruct(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
-            landType = 'forest', method = 'TI', lambda = .94,
+            landType = 'forest', method = 'TI', lambda = .5,
             areaDomain = NULL, byPlot = FALSE, totals = FALSE,
             tidy = TRUE, nCores = 1)
 }

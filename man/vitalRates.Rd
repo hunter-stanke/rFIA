@@ -9,7 +9,7 @@ Computes estimates of average annual DBH, basal area, height, and net volume gro
 \usage{
 vitalRates(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE,
          bySizeClass = FALSE, landType = 'forest', treeType = 'live',
-         method = 'TI', lambda = .94, treeDomain = NULL,
+         method = 'TI', lambda = .5, treeDomain = NULL,
          areaDomain = NULL, totals = FALSE, byPlot = FALSE, nCores = 1)
 }
 

@@ -5,7 +5,7 @@ standStruct <- function(db,
                           returnSpatial = FALSE,
                           landType = 'forest',
                           method = 'TI',
-                          lambda = .94,
+                          lambda = .5,
                           areaDomain = NULL,
                           byPlot = FALSE,
                           totals = FALSE,
@@ -50,6 +50,9 @@ standStruct <- function(db,
   if (any(reqTables %in% names(db) == FALSE)){
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '), 'not found in object db.'))
+  }
+  if (str_to_upper(method) %in% c('TI', 'SMA', 'LMA', 'EMA', 'ANNUAL') == FALSE) {
+    warning(paste('Method', method, 'unknown. Defaulting to Temporally Indifferent (TI).'))
   }
 
   # I like a unique ID for a plot through time
@@ -124,7 +127,8 @@ standStruct <- function(db,
     }
 
     ## TO RETURN SPATIAL PLOTS
-  } else if (byPlot & returnSpatial){
+  }
+  if (byPlot & returnSpatial){
     grpBy <- c(grpBy, 'LON', 'LAT')
   } # END AREAL
 
@@ -184,13 +188,11 @@ standStruct <- function(db,
               as.character)
 
   ### Which estimator to use?
-  if (str_to_upper(method) %in% c('ANNUAL', "SMA", 'EMA', 'LMA')){
-    ## Keep an original
-    popOrig <- pops
+  if (str_to_upper(method) %in% c('ANNUAL')){
     ## Want to use the year where plots are measured, no repeats
     ## Breaking this up into pre and post reporting becuase
     ## Estimation units get weird on us otherwise
-    #pops <- distinct(pops, INVYR, PLT_CN, .keep_all = TRUE)
+    popOrig <- pops
     pops <- pops %>%
       group_by(STATECD) %>%
       filter(END_INVYR == INVYR) %>%
@@ -202,31 +204,33 @@ standStruct <- function(db,
       distinct(PLT_CN, .keep_all = TRUE) %>%
       ungroup()
 
-    pops <- bind_rows(pops, prePops)
-
-    ## P2POINTCNT column is NOT consistent for annnual estimates, plots
-    ## within individual strata and est units are related to different INVYRs
-    p2 <- pops %>%
-      group_by(STRATUM_CN, INVYR) %>%
-      summarize(P2POINTCNT = length(unique(PLT_CN)))
-    ## Rejoin
-    pops <- pops %>%
-      mutate(YEAR = INVYR) %>%
-      select(-c(P2POINTCNT)) %>%
-      left_join(p2, by = c('STRATUM_CN', 'YEAR' = 'INVYR'))
+    pops <- bind_rows(pops, prePops) %>%
+      mutate(YEAR = INVYR)
 
   } else {     # Otherwise temporally indifferent
     pops <- rename(pops, YEAR = END_INVYR)
   }
 
+  ## P2POINTCNT column is NOT consistent for annnual estimates, plots
+  ## within individual strata and est units are related to different INVYRs
+  p2_INVYR <- pops %>%
+    group_by(ESTN_UNIT_CN, STRATUM_CN, INVYR) %>%
+    summarize(P2POINTCNT_INVYR = length(unique(PLT_CN)))
   ## Want a count of p2 points / eu, gets screwed up with grouping below
+  p2eu_INVYR <- p2_INVYR %>%
+    distinct(ESTN_UNIT_CN, STRATUM_CN, INVYR, .keep_all = TRUE) %>%
+    group_by(ESTN_UNIT_CN, INVYR) %>%
+    summarize(p2eu_INVYR = sum(P2POINTCNT_INVYR, na.rm = TRUE))
   p2eu <- pops %>%
-    distinct(ESTN_UNIT_CN, STRATUM_CN, P2POINTCNT) %>%
+    distinct(ESTN_UNIT_CN, STRATUM_CN, .keep_all = TRUE) %>%
     group_by(ESTN_UNIT_CN) %>%
     summarize(p2eu = sum(P2POINTCNT, na.rm = TRUE))
 
   ## Rejoin
-  pops <- left_join(pops, p2eu, by = 'ESTN_UNIT_CN')
+  pops <- pops %>%
+    left_join(p2_INVYR, by = c('ESTN_UNIT_CN', 'STRATUM_CN', 'INVYR')) %>%
+    left_join(p2eu_INVYR, by = c('ESTN_UNIT_CN', 'INVYR')) %>%
+    left_join(p2eu, by = 'ESTN_UNIT_CN')
 
 
   ## Recode a few of the estimation methods to make things easier below
@@ -272,6 +276,7 @@ standStruct <- function(db,
         filter(!is.na(LAT) & !is.na(LON)) %>%
         st_as_sf(coords = c('LON', 'LAT'),
                  crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+      grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
 
     }
     ## Population estimation
@@ -297,10 +302,10 @@ standStruct <- function(db,
         #   library(stringr)
         #   library(rFIA)
         # })
-        out <- parLapply(cl, X = names(popState), fun = ssHelper2, popState, t, grpBy)
+        out <- parLapply(cl, X = names(popState), fun = ssHelper2, popState, t, grpBy, method)
         stopCluster(cl)
       } else { # Unix systems
-        out <- mclapply(names(popState), FUN = ssHelper2, popState, t, grpBy, mc.cores = nCores)
+        out <- mclapply(names(popState), FUN = ssHelper2, popState, t, grpBy, method, mc.cores = nCores)
       }
     })
     ## back to dataframes
@@ -311,59 +316,62 @@ standStruct <- function(db,
 
     ##### ----------------- MOVING AVERAGES
     if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){
-      if ('STATECD' %in% names(tEst) == FALSE){
-        ## Need a STATECD on aEst and tEst to join wgts
-        tEst <- left_join(tEst, select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN'))
-      }
-
-
-
-      #### Summarizing to state level here to apply weights by panel
-      #### Getting rid of ESTN_UNITS
-      # Tree
-      tEst <- tEst %>%
-        group_by(STATECD, .dots = grpBy) %>%
-        summarize_at(vars(aEst:plotIn_AREA),sum, na.rm = TRUE)
-
-      ## Naming
-      popOrig <- mutate(popOrig, YEAR = END_INVYR)
-
       ### ---- SIMPLE MOVING AVERAGE
       if (str_to_upper(method) == 'SMA'){
         ## Assuming a uniform weighting scheme
-        wgts <- popOrig %>%
-          group_by(YEAR, STATECD) %>%
-          summarize(wgt = 1 / length(unique(INVYR))) %>%
-          ## Expand it out again
-          right_join(popOrig, by = c('YEAR', 'STATECD')) %>%
-          distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
-          select(YEAR, INVYR, STATECD, wgt)
+        wgts <- pops %>%
+          group_by(ESTN_UNIT_CN) %>%
+          summarize(wgt = 1 / length(unique(INVYR)))
+
+        #aEst <- left_join(aEst, wgts, by = 'ESTN_UNIT_CN')
+        tEst <- left_join(tEst, wgts, by = 'ESTN_UNIT_CN')
 
         #### ----- Linear MOVING AVERAGE
       } else if (str_to_upper(method) == 'LMA'){
-        wgts <- popOrig %>%
-          group_by(YEAR, STATECD) %>%
-          summarize(n = length(unique(INVYR)),
-                    minyr = min(INVYR, na.rm = TRUE)) %>%
-          ## Expand it out again
-          right_join(popOrig, by = c('YEAR', 'STATECD')) %>%
-          distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
-          mutate(wgt = YEAR - minyr / sum(1:n, na.rm = TRUE)) %>%
-          select(YEAR, INVYR, STATECD, wgt)
+        wgts <- pops %>%
+          distinct(YEAR, ESTN_UNIT_CN, INVYR, .keep_all = TRUE) %>%
+          arrange(YEAR, ESTN_UNIT_CN, INVYR) %>%
+          group_by(as.factor(YEAR), as.factor(ESTN_UNIT_CN)) %>%
+          mutate(rank = min_rank(INVYR))
 
+        ## Want a number of INVYRs per EU
+        neu <- wgts %>%
+          group_by(ESTN_UNIT_CN) %>%
+          summarize(n = sum(rank, na.rm = TRUE))
+
+        ## Rejoining and computing wgts
+        wgts <- wgts %>%
+          left_join(neu, by = 'ESTN_UNIT_CN') %>%
+          mutate(wgt = rank / n) %>%
+          ungroup() %>%
+          select(ESTN_UNIT_CN, INVYR, wgt)
+
+        #aEst <- left_join(aEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
+        tEst <- left_join(tEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
 
         #### ----- EXPONENTIAL MOVING AVERAGE
       } else if (str_to_upper(method) == 'EMA'){
-        wgts <- popOrig %>%
-          distinct(YEAR, INVYR, STATECD, .keep_all = TRUE) %>%
-          select(YEAR, INVYR, STATECD)
+        wgts <- pops %>%
+          distinct(YEAR, ESTN_UNIT_CN, INVYR, .keep_all = TRUE) %>%
+          arrange(YEAR, ESTN_UNIT_CN, INVYR) %>%
+          group_by(as.factor(YEAR), as.factor(ESTN_UNIT_CN)) %>%
+          mutate(rank = min_rank(INVYR))
+
+
         if (length(lambda) < 2){
-          ## Weights based on temporal window
+          ## Want sum of weighitng functions
+          neu <- wgts %>%
+            mutate(l = lambda) %>%
+            group_by(ESTN_UNIT_CN) %>%
+            summarize(l = first(lambda),
+                      sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
+
+          ## Rejoining and computing wgts
           wgts <- wgts %>%
-            mutate(lambda = lambda,
-                   l = lambda,
-                   yrPrev = YEAR - INVYR,
-                   wgt = l^yrPrev *(1-l))
+            left_join(neu, by = 'ESTN_UNIT_CN') %>%
+            mutate(wgt = l*(1-l)^(1-rank) / sumwgt) %>%
+            ungroup() %>%
+            select(ESTN_UNIT_CN, INVYR, wgt)
         } else {
           grpBy <- c('lambda', grpBy)
           #aGrpBy <- c('lambda', aGrpBy)
@@ -372,20 +380,31 @@ standStruct <- function(db,
           for (i in 1:length(unique(lambda))) {
             yrWgts[[i]] <- mutate(wgts, lambda = lambda[i])
           }
-          wgts <- bind_rows(yrWgts) %>%
-            mutate(l = lambda,
-                   #l = 2 / (1 + lambda),
-                   yrPrev = YEAR - INVYR,
-                   wgt = l^yrPrev *(1-l))
+          wgts <- bind_rows(yrWgts)
+          ## Want sum of weighitng functions
+          neu <- wgts %>%
+            group_by(lambda, ESTN_UNIT_CN) %>%
+            summarize(l = first(lambda),
+                      sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
+
+          ## Rejoining and computing wgts
+          wgts <- wgts %>%
+            left_join(neu, by = c('lambda', 'ESTN_UNIT_CN')) %>%
+            mutate(wgt = l*(1-l)^(1-rank) / sumwgt) %>%
+            ungroup() %>%
+            select(lambda, ESTN_UNIT_CN, INVYR, wgt)
         }
+
+        #aEst <- left_join(aEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
+        tEst <- left_join(tEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
 
       }
       ### Applying the weights
       # Area
-      tEst <- left_join(wgts, tEst, by = c('INVYR' = 'YEAR', 'STATECD')) %>%
+      tEst <- tEst %>%
         mutate_at(vars(aEst:moEst), ~(.*wgt)) %>%
         mutate_at(vars(aVar:cvEst_mo), ~(.*(wgt^2))) %>%
-        group_by(STATECD, .dots = grpBy) %>%
+        group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
         summarize_at(vars(aEst:plotIn_AREA), sum, na.rm = TRUE)
     }
 
@@ -480,7 +499,7 @@ standStruct <- function(db,
     as_tibble()
 
   # Return a spatial object
-  if (!is.null(polys)) {
+  if (!is.null(polys) & byPlot == FALSE) {
     ## NO IMPLICIT NA
     nospGrp <- unique(grpBy[grpBy %in% c('SPCD', 'SYMBOL', 'COMMON_NAME', 'SCIENTIFIC_NAME') == FALSE])
     nospSym <- syms(nospGrp)
@@ -499,6 +518,9 @@ standStruct <- function(db,
 
     ## Makes it horrible to work with as a dataframe
     if (returnSpatial == FALSE) tOut <- select(tOut, -c(geometry))
+  } else if (!is.null(polys) & byPlot){
+    polys <- as.data.frame(polys)
+    tOut <- left_join(tOut, select(polys, -c(geometry)), by = 'polyID')
   }
 
   ## For spatial plots

@@ -9,7 +9,7 @@ Produces estimates of annual regeneration, recruitment, natural mortality, and h
 \usage{
 growMort(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE,
          bySizeClass = FALSE, landType = 'forest', treeType = 'all',
-         method = 'TI', lambda = .94, stateVar = 'TPA', treeDomain = NULL,
+         method = 'TI', lambda = .5, stateVar = 'TPA', treeDomain = NULL,
          areaDomain = NULL, totals = FALSE, byPlot = FALSE, nCores = 1)
 }
 

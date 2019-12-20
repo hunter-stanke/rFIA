@@ -10,7 +10,7 @@ Produces estimates of down woody material stocks on a per acre basis from the Fo
 
 \usage{
 dwm(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = 'forest',
-    method = 'TI', lambda = .94, areaDomain = NULL, byPlot = FALSE, totals = FALSE,
+    method = 'TI', lambda = .5, areaDomain = NULL, byPlot = FALSE, totals = FALSE,
     tidy = TRUE, nCores = 1)
 }
 

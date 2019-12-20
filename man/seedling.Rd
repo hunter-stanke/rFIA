@@ -11,7 +11,7 @@ Produces seedling (< 1 inch DBH) tree per acre (TPA) estimates from FIA data, al
 \usage{
 seedling(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
          bySpecies = FALSE, landType = "forest", method = 'TI',
-         lambda = .94, treeDomain = NULL, areaDomain = NULL,
+         lambda = .5, treeDomain = NULL, areaDomain = NULL,
          totals = FALSE, byPlot = FALSE, nCores = 1)
 }
 
