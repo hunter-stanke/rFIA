@@ -10,7 +10,7 @@ Produces tree per acre (TPA) and basal area per acre (BAA) estimates from FIA da
 \usage{
 tpa(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE,
     bySizeClass = FALSE, landType = 'forest', treeType = 'live',
-     method = 'TI', lambda = .94, treeDomain = NULL, areaDomain = NULL,
+     method = 'TI', lambda = .5, treeDomain = NULL, areaDomain = NULL,
      totals = FALSE, byPlot = FALSE, nCores = 1)
 }
 

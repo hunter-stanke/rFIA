@@ -28,7 +28,9 @@ ssHelper1 <- function(x, plts, db, grpBy, byPlot){
       distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
       group_by(.dots = grpBy, PLT_CN) %>%
       summarize(stage = structHelper(DIA, CCLCD),
-                nStems = length(which(tDI == 1)))
+                nStems = length(which(tDI == 1))) %>%
+      ungroup() %>%
+      mutate_if(is.factor, as.character)
 
   } else {
     # Compute estimates
@@ -54,7 +56,16 @@ ssHelper1 <- function(x, plts, db, grpBy, byPlot){
 
 
 
-ssHelper2 <- function(x, popState, t, grpBy){
+ssHelper2 <- function(x, popState, t, grpBy, method){
+
+  ## DOES NOT MODIFY OUTSIDE ENVIRONMENT
+  if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
+    grpBy <- c(grpBy, 'INVYR')
+    #aGrpBy <- c(aGrpBy, 'INVYR')
+    popState[[x]]$P2POINTCNT <- popState[[x]]$P2POINTCNT_INVYR
+    popState[[x]]$p2eu <- popState[[x]]$p2eu_INVYR
+
+  }
 
   ## Strata level estimates
   tEst <- t %>%

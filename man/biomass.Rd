@@ -10,7 +10,7 @@ Produces estimates of volume, biomass, and carbon on a per acre basis from FIA d
 \usage{
 biomass(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE,
         bySizeClass = FALSE, landType = 'forest', treeType = 'live',
-        method = 'TI', lambda = .94, treeDomain = NULL, areaDomain = NULL,
+        method = 'TI', lambda = .5, treeDomain = NULL, areaDomain = NULL,
         totals = FALSE, byPlot = FALSE, nCores = 1)
 }
 

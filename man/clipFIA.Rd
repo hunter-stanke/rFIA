@@ -8,7 +8,7 @@ Performs space-time queries on Forest Inventory and Analysis Database (FIADB). S
 
 \usage{
 clipFIA(db, mostRecent = TRUE, mask = NULL, matchEval = FALSE,
-        evalid = NULL, designCD = NULL)
+        evalid = NULL, designCD = NULL, nCores = 1)
 }
 
 \arguments{
@@ -23,6 +23,8 @@ clipFIA(db, mostRecent = TRUE, mask = NULL, matchEval = FALSE,
   \item{evalid}{character; unique value which identifies an inventory year and inventory type for a state. If you would like to subset data for an inventory year other than the most recent, use \code{\link{findEVALID}} to look locate this value (see Examples below).}
 
   \item{designCD}{character vector; plot designs to include. Default includes standard national plot design with other similar sampling designs. See FIA Database User Guide Appendix 1 for descriptions of plot designs (see References).}
+
+  \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }
 
 \details{

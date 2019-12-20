@@ -1,19 +1,24 @@
+
 #' @export
-biomass <- function(db,
-                       grpBy = NULL,
-                       polys = NULL,
-                       returnSpatial = FALSE,
-                       bySpecies = FALSE,
-                       bySizeClass = FALSE,
-                       landType = 'forest',
-                       treeType = 'live',
-                       method = 'TI',
-                       lambda = .5,
-                       treeDomain = NULL,
-                       areaDomain = NULL,
-                       totals = FALSE,
-                       byPlot = FALSE,
-                       nCores = 1) {
+growMort <- function(db,
+                     grpBy = NULL,
+                     polys = NULL,
+                     returnSpatial = FALSE,
+                     bySpecies = FALSE,
+                     bySizeClass = FALSE,
+                     landType = 'forest',
+                     treeType = 'all',
+                     method = 'TI',
+                     lambda = .5,
+                     stateVar = 'TPA',
+                     treeDomain = NULL,
+                     areaDomain = NULL,
+                     totals = FALSE,
+                     byPlot = FALSE,
+                     nCores = 1) {
+
+  ## Need a plotCN
+  db$TREE <- db[['TREE']] %>% mutate(TRE_CN = CN)
   ## Need a plotCN, and a new ID
   db$PLOT <- db$PLOT %>% mutate(PLT_CN = CN,
                                 pltID = paste(UNITCD, STATECD, COUNTYCD, PLOT, sep = '_'))
@@ -46,7 +51,8 @@ biomass <- function(db,
     }
   }
 
-  reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
+  reqTables <- c('PLOT', 'TREE', 'TREE_GRM_COMPONENT', 'COND',
+                 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
   ## Some warnings
   if (class(db) != "FIA.Database"){
@@ -66,19 +72,27 @@ biomass <- function(db,
     warning(paste('Method', method, 'unknown. Defaulting to Temporally Indifferent (TI).'))
   }
 
+  ## No EXP_GROW available for Western States, make sure we warn that values will be returned as 0
+  # These states do not allow temporal queries. Things are extremely weird with their eval groups
+  noGrow <- c(02,03,04,07,08,11,14,15,16, 23, 30, 32, 35,43,49, 78)
+  if(any(unique(db$PLOT$STATECD) %in% noGrow)){
+    vState <- unique(db$PLOT$STATECD[db$PLOT$STATECD %in% noGrow])
+    fancyName <- unique(intData$EVAL_GRP$STATE[intData$EVAL_GRP$STATECD %in% vState])
+    warning(paste('Recruitment data unavailable for: ', toString(fancyName) , '. Returning 0 for all recruitment estimates which include these states.', sep = ''))
+  }
+  # These states do not allow change estimates.
+  if(any(unique(db$PLOT$STATECD) %in% c(69, 72, 78, 15, 02))){
+    vState <- unique(db$PLOT$STATECD[db$PLOT$STATECD %in% c(69, 72, 78, 15, 02)])
+    fancyName <- unique(intData$EVAL_GRP$STATE[intData$EVAL_GRP$STATECD %in% vState])
+    stop(paste('Growth & Mortality Estimates unavailable for: ', paste(as.character(fancyName), collapse = ', '), sep = ''))
+  }
+
+
 
   # I like a unique ID for a plot through time
   if (byPlot) {grpBy <- c('pltID', grpBy)}
   # Save original grpBy for pretty return with spatial objects
   grpByOrig <- grpBy
-
-  ## IF the object was clipped
-  if ('prev' %in% names(db$PLOT)){
-    ## Only want the current plots, no grm
-    db$PLOT <- filter(db$PLOT, prev == 0)
-  }
-
-
 
   ### AREAL SUMMARY PREP
   if(!is.null(polys)) {
@@ -91,6 +105,7 @@ biomass <- function(db,
     polys$polyID <- 1:nrow(polys)
 
     # Add shapefile names to grpBy
+    #grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
     grpBy = c(grpBy, 'polyID')
 
     ## Make plot data spatial, projected same as polygon layer
@@ -145,23 +160,107 @@ biomass <- function(db,
     grpBy <- c(grpBy, 'LON', 'LAT')
   } # END AREAL
 
+
+  ### HANDLE THE STATE VARIABLE, only applying to the midpoint table for consistency
+  if (str_to_upper(stateVar) == 'TPA'){
+   db$TREE_GRM_MIDPT$state <- 1
+   db$TREE$state_recr <- 1
+  } else if (str_to_upper(stateVar) == 'BAA'){
+    db$TREE_GRM_MIDPT$state <- basalArea(db$TREE_GRM_MIDPT$DIA)
+    db$TREE$state_recr <- basalArea(db$TREE$DIA)
+  } else if (str_to_upper(stateVar) == 'SAWVOL'){
+    db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$VOLCSNET
+    db$TREE$state_recr <- db$TREE$VOLCSNET
+  } else if (str_to_upper(stateVar) == 'NETVOL'){
+    db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$VOLCFNET
+    db$TREE$state_recr <- db$TREE$VOLCFNET
+  } else if (str_to_upper(stateVar) == 'BIO_AG'){
+    db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$DRYBIO_AG
+    db$TREE$state_recr <- db$TREE$DRYBIO_AG
+  } else if (str_to_upper(stateVar) == 'BIO_BG'){
+    db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$DRYBIO_BG
+    db$TREE$state_recr <- db$TREE$DRYBIO_BG
+  } else if (str_to_upper(stateVar) == 'BIO'){
+    db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$DRYBIO_BG + db$TREE_GRM_MIDPT$DRYBIO_AG
+    db$TREE$state_recr <- db$TREE$DRYBIO_BG + db$TREE$DRYBIO_AG
+  } else if (str_to_upper(stateVar) == 'CARB_AG'){
+    db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$DRYBIO_AG * .5
+    db$TREE$state_recr <- db$TREE$DRYBIO_AG * .5
+  } else if (str_to_upper(stateVar) == 'CARB_BG'){
+    db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$DRYBIO_BG * .5
+    db$TREE$state_recr <- db$TREE$DRYBIO_BG * .5
+  } else if (str_to_upper(stateVar) == 'CARB'){
+    db$TREE_GRM_MIDPT$state <- (db$TREE_GRM_MIDPT$DRYBIO_AG + db$TREE_GRM_MIDPT$DRYBIO_BG) * .5
+    db$TREE$state_recr <- (db$TREE$DRYBIO_AG + db$TREE$DRYBIO_BG) * .5
+  } else {
+    stop(paste0('Method not known for stateVar: ', stateVar, '. Please choose one of: TPA, SAWVOL, NETVOL, BIO_AG, BIO_BG, BIO, CARB_AG, CARB_BG, or CARB.' ))
+  }
+
   ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
   # Land type domain indicator
   if (tolower(landType) == 'forest'){
     db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1, 1, 0)
+    # Tree Type domain indicator
+    if (tolower(treeType) == 'all'){
+      db$TREE$typeD <- 1
+      ## Rename some variables in grm
+      db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
+                                      TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_AL_FOREST,
+                                      TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_AL_FOREST,
+                                      TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_AL_FOREST,
+                                      SUBPTYP_GRM = SUBP_SUBPTYP_GRM_AL_FOREST,
+                                      COMPONENT = SUBP_COMPONENT_AL_FOREST) %>%
+        mutate(TPARECR_UNADJ = case_when(
+          is.na(COMPONENT) ~ NA_real_,
+          COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2') ~ TPAGROW_UNADJ,
+          TRUE ~ 0))
+
+    } else if (tolower(treeType) == 'gs'){
+      db$TREE$typeD <- ifelse(db$TREE$DIA >= 5, 1, 0)
+      db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
+                                      TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_GS_FOREST,
+                                      TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_GS_FOREST,
+                                      TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_GS_FOREST,
+                                      SUBPTYP_GRM = SUBP_SUBPTYP_GRM_GS_FOREST,
+                                      COMPONENT = SUBP_COMPONENT_GS_FOREST)%>%
+        mutate(TPARECR_UNADJ = case_when(
+          is.na(COMPONENT) ~ NA_real_,
+          COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2') ~ TPAGROW_UNADJ,
+          TRUE ~ 0))
+    }
   } else if (tolower(landType) == 'timber'){
     db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
+    # Tree Type domain indicator
+    if (tolower(treeType) == 'all'){
+      db$TREE$typeD <- 1
+      ## Rename some variables in grm
+      db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
+                                      TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_AL_TIMBER,
+                                      TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_AL_TIMBER,
+                                      TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_AL_TIMBER,
+                                      SUBPTYP_GRM = SUBP_SUBPTYP_GRM_AL_TIMBER,
+                                      COMPONENT = SUBP_COMPONENT_AL_TIMBER)%>%
+        mutate(TPARECR_UNADJ = case_when(
+          is.na(COMPONENT) ~ NA_real_,
+          COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2') ~ TPAGROW_UNADJ,
+          TRUE ~ 0))
+
+    } else if (tolower(treeType) == 'gs'){
+      db$TREE$typeD <- ifelse(db$TREE$DIA >= 5, 1, 0)
+      db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
+                                      TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_GS_TIMBER,
+                                      TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_GS_TIMBER,
+                                      TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_GS_TIMBER,
+                                      SUBPTYP_GRM = SUBP_SUBPTYP_GRM_GS_TIMBER,
+                                      COMPONENT = SUBP_COMPONENT_GS_TIMBER)%>%
+        mutate(TPARECR_UNADJ = case_when(
+          is.na(COMPONENT) ~ NA_real_,
+          COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2') ~ TPAGROW_UNADJ,
+          TRUE ~ 0))
+    }
   }
-  # Tree Type domain indicator
-  if (tolower(treeType) == 'live'){
-    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1, 1, 0)
-  } else if (tolower(treeType) == 'dead'){
-    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 2 & db$TREE$STANDING_DEAD_CD == 1, 1, 0)
-  } else if (tolower(treeType) == 'gs'){
-    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1 & db$TREE$DIA >= 5 & db$TREE$TREECLCD == 2, 1, 0)
-  } else if (tolower(treeType) == 'all'){
-    db$TREE$typeD <- 1
-  }
+
+
   # update spatial domain indicator
   if(!is.null(polys)){
     db$PLOT$sp <- ifelse(db$PLOT$pltID %in% pltSF$pltID, 1, 0)
@@ -191,20 +290,28 @@ biomass <- function(db,
   if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
   db$TREE$tD <- as.numeric(tD)
 
+
+  ## What years are growth accounting years --> not all filled in
+  ga <- db$POP_EVAL %>%
+    group_by(END_INVYR) %>%
+    summarize(ga = if_else(any(GROWTH_ACCT == 'Y'), 1, 0))
+
+
   ### Snag the EVALIDs that are needed
-  db$POP_EVAL<- db$POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID', 'ESTN_METHOD') %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+  db$POP_EVAL  <- db$POP_EVAL %>%
+    left_join(ga, by = 'END_INVYR') %>%
+    select('CN', 'END_INVYR', 'EVALID', 'ESTN_METHOD', 'GROWTH_ACCT', 'ga') %>%
+    left_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+    filter(EVAL_TYP %in% c('EXPGROW', 'EXPMORT', 'EXPREMV')) %>%
     filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
     distinct(END_INVYR, EVALID, .keep_all = TRUE)# %>%
-  #group_by(END_INVYR) %>%
+    #group_by(END_INVYR) %>%
   #summarise(id = list(EVALID)
 
   ## Make an annual panel ID, associated with an INVYR
 
   ### The population tables
-  pops <- select(db$POP_EVAL, c('EVALID', 'ESTN_METHOD', 'CN', 'END_INVYR')) %>%
+  pops <- select(db$POP_EVAL, c('EVALID', 'ESTN_METHOD', 'CN', 'GROWTH_ACCT', 'END_INVYR', 'EVAL_TYP')) %>%
     rename(EVAL_CN = CN) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('EVAL_CN')) %>%
     rename(ESTN_UNIT_CN = CN) %>%
@@ -311,12 +418,13 @@ biomass <- function(db,
         library(stringr)
         library(rFIA)
       })
-      out <- parLapply(cl, X = names(plts), fun = bioHelper1, plts, db, grpBy, aGrpBy, byPlot)
+      out <- parLapply(cl, X = names(plts), fun = gmHelper1, plts, db, grpBy, aGrpBy, byPlot)
       #stopCluster(cl) # Keep the cluster active for the next run
     } else { # Unix systems
-      out <- mclapply(names(plts), FUN = bioHelper1, plts, db, grpBy, aGrpBy, byPlot, mc.cores = nCores)
+      out <- mclapply(names(plts), FUN = gmHelper1, plts, db, grpBy, aGrpBy, byPlot, mc.cores = nCores)
     }
   })
+
 
   if (byPlot){
     ## back to dataframes
@@ -329,6 +437,9 @@ biomass <- function(db,
         st_as_sf(coords = c('LON', 'LAT'),
                  crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
       grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
+
+      ## Modify some names if a different state variable was given
+      names(tOut) <- str_replace(names(tOut), 'TPA', paste(stateVar, 'ACRE', sep = '_'))
 
     }
     ## Population estimation
@@ -357,10 +468,10 @@ biomass <- function(db,
         #   library(stringr)
         #   library(rFIA)
         # })
-        out <- parLapply(cl, X = names(popState), fun = bioHelper2, popState, a, t, grpBy, aGrpBy, method)
+        out <- parLapply(cl, X = names(popState), fun = gmHelper2, popState, a, t, grpBy, aGrpBy, method)
         stopCluster(cl)
       } else { # Unix systems
-        out <- mclapply(names(popState), FUN = bioHelper2, popState, a, t, grpBy, aGrpBy, method, mc.cores = nCores)
+        out <- mclapply(names(popState), FUN = gmHelper2, popState, a, t, grpBy, aGrpBy, method, mc.cores = nCores)
       }
     })
     ## back to dataframes
@@ -465,10 +576,10 @@ biomass <- function(db,
 
 
       tEst <- tEst %>%
-        mutate_at(vars(nvEst:ctEst), ~(.*wgt)) %>%
-        mutate_at(vars(nvVar:cvEst_ct), ~(.*(wgt^2))) %>%
+        mutate_at(vars(tEst:hEst), ~(.*wgt)) %>%
+        mutate_at(vars(tVar:cvEst_hp), ~(.*(wgt^2))) %>%
         group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
-        summarize_at(vars(nvEst:plotIn_TREE), sum, na.rm = TRUE)
+        summarize_at(vars(tEst:plotIn_h), sum, na.rm = TRUE)
 
     }
 
@@ -482,11 +593,12 @@ biomass <- function(db,
     #             plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
     aTotal <- aEst %>%
       group_by(.dots = aGrpBy) %>%
-      summarize_all(sum,na.rm = TRUE)
+      summarize_all(sum,na.rm = TRUE) #%>%
+      #mutate()
     # summarize(AREA_TOTAL = sum(aEst, na.rm = TRUE),
     #           aVar = sum(aVar, na.rm = TRUE),
     #           AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
-      #           nPlots_AREA = sum(plotIn_AREA, na.rm = TRUE))
+    #           nPlots_AREA = sum(plotIn_AREA, na.rm = TRUE))
     # Tree
     tTotal <- tEst %>%
       group_by(.dots = grpBy) %>%
@@ -498,79 +610,64 @@ biomass <- function(db,
       tOut <- tTotal %>%
         left_join(aTotal, by = aGrpBy) %>%
         # Renaming, computing ratios, and SE
-        mutate(AREA_TOTAL = aEst,
-               NETVOL_TOTAL = nvEst,
-               SAWVOL_TOTAL = svEst,
-               BIO_AG_TOTAL = bagEst,
-               BIO_BG_TOTAL = bbgEst,
-               BIO_TOTAL = btEst,
-               CARB_AG_TOTAL = cagEst,
-               CARB_BG_TOTAL = cbgEst,
-               CARB_TOTAL = ctEst,
-               ## Ratios
-               NETVOL_ACRE = NETVOL_TOTAL / AREA_TOTAL,
-               SAWVOL_ACRE = SAWVOL_TOTAL / AREA_TOTAL,
-               BIO_AG_ACRE = BIO_AG_TOTAL / AREA_TOTAL,
-               BIO_BG_ACRE = BIO_BG_TOTAL / AREA_TOTAL,
-               BIO_ACRE = BIO_TOTAL / AREA_TOTAL,
-               CARB_AG_ACRE = CARB_AG_TOTAL / AREA_TOTAL,
-               CARB_BG_ACRE = CARB_BG_TOTAL / AREA_TOTAL,
-               CARB_ACRE = CARB_TOTAL / AREA_TOTAL,
+        mutate(TREE_TOTAL = tEst,
+               RECR_TOTAL = rEst,
+               MORT_TOTAL = mEst,
+               REMV_TOTAL = hEst,
+               AREA_TOTAL = aEst,
+               RECR_TPA = RECR_TOTAL / AREA_TOTAL,
+               MORT_TPA = MORT_TOTAL / AREA_TOTAL,
+               REMV_TPA = REMV_TOTAL / AREA_TOTAL,
+               RECR_PERC = RECR_TOTAL / TREE_TOTAL * 100,
+               MORT_PERC = MORT_TOTAL / TREE_TOTAL * 100,
+               REMV_PERC = REMV_TOTAL / TREE_TOTAL * 100,
                ## Ratio Var
-               nvaVar = (1/AREA_TOTAL^2) * (nvVar + (NETVOL_ACRE^2 * aVar) - 2 * NETVOL_ACRE * cvEst_nv),
-               svaVar = (1/AREA_TOTAL^2) * (svVar + (SAWVOL_ACRE^2 * aVar) - 2 * SAWVOL_ACRE * cvEst_sv),
-               baaVar = (1/AREA_TOTAL^2) * (bagVar + (BIO_AG_ACRE^2 * aVar) - 2 * BIO_AG_ACRE * cvEst_bag),
-               bbaVar = (1/AREA_TOTAL^2) * (bbgVar + (BIO_BG_ACRE^2 * aVar) - 2 * BIO_BG_ACRE * cvEst_bbg),
-               btaVar = (1/AREA_TOTAL^2) * (btVar + (BIO_ACRE^2 * aVar) - 2 * BIO_ACRE * cvEst_bt),
-               caaVar = (1/AREA_TOTAL^2) * (cagVar + (CARB_AG_ACRE^2 * aVar) - 2 * CARB_AG_ACRE * cvEst_cag),
-               cbaVar = (1/AREA_TOTAL^2) * (bbgVar + (CARB_BG_ACRE^2 * aVar) - 2 * CARB_BG_ACRE * cvEst_bbg),
-               ctaVar = (1/AREA_TOTAL^2) * (ctVar + (CARB_ACRE^2 * aVar) - 2 * CARB_ACRE * cvEst_ct),
+               raVar = (1/AREA_TOTAL^2) * (rVar + (RECR_TPA^2 * aVar) - 2 * RECR_TPA * cvEst_r),
+               maVar = (1/AREA_TOTAL^2) * (mVar + (MORT_TPA^2 * aVar) - 2 * MORT_TPA * cvEst_m),
+               haVar = (1/AREA_TOTAL^2) * (hVar + (REMV_TPA^2 * aVar) - 2 * REMV_TPA * cvEst_h),
+               rpVar = (1/TREE_TOTAL^2) * (rVar + (RECR_PERC^2 * tVar) - 2 * RECR_PERC * cvEst_rp),
+               mpVar = (1/TREE_TOTAL^2) * (mVar + (MORT_PERC^2 * tVar) - 2 * MORT_PERC * cvEst_mp),
+               hpVar = (1/TREE_TOTAL^2) * (hVar + (REMV_PERC^2 * tVar) - 2 * REMV_PERC * cvEst_hp),
                ## SE RATIO
-               NETVOL_ACRE_SE = sqrt(nvaVar) / NETVOL_ACRE *100,
-               SAWVOL_ACRE_SE = sqrt(svaVar) / SAWVOL_ACRE *100,
-               BIO_AG_ACRE_SE = sqrt(baaVar) / BIO_AG_ACRE *100,
-               BIO_BG_ACRE_SE = sqrt(bbaVar) / BIO_BG_ACRE *100,
-               BIO_ACRE_SE = sqrt(btaVar) / BIO_ACRE * 100,
-               CARB_AG_ACRE_SE = sqrt(caaVar) / CARB_AG_ACRE *100,
-               CARB_BG_ACRE_SE = sqrt(cbaVar) / CARB_BG_ACRE *100,
-               CARB_ACRE_SE = sqrt(ctaVar) / CARB_ACRE *100,
+               RECR_TPA_SE = sqrt(raVar) / RECR_TPA * 100,
+               MORT_TPA_SE = sqrt(maVar) / MORT_TPA * 100,
+               REMV_TPA_SE = sqrt(haVar) / REMV_TPA * 100,
+               RECR_PERC_SE = sqrt(rpVar) / RECR_PERC * 100,
+               MORT_PERC_SE = sqrt(mpVar) / MORT_PERC * 100,
+               REMV_PERC_SE = sqrt(hpVar) / REMV_PERC * 100,
                ## SE TOTAL
                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL *100,
-               NETVOL_TOTAL_SE = sqrt(nvVar) / NETVOL_TOTAL *100,
-               SAWVOL_TOTAL_SE = sqrt(svVar) / SAWVOL_TOTAL *100,
-               BIO_AG_TOTAL_SE = sqrt(bagVar) / BIO_AG_TOTAL *100,
-               BIO_BG_TOTAL_SE = sqrt(bbgVar) / BIO_BG_TOTAL *100,
-               BIO_TOTAL_SE = sqrt(btVar) / BIO_TOTAL *100,
-               CARB_AG_TOTAL_SE = sqrt(cagVar) / CARB_AG_TOTAL *100,
-               CARB_BG_TOTAL_SE = sqrt(cbgVar) / CARB_BG_TOTAL *100,
-               CARB_TOTAL_SE = sqrt(ctVar) / CARB_TOTAL *100,
+               TREE_TOTAL_SE = sqrt(tVar) / TREE_TOTAL *100,
+               RECR_TOTAL_SE = sqrt(rVar) / RECR_TOTAL *100,
+               MORT_TOTAL_SE = sqrt(mVar) / MORT_TOTAL *100,
+               REMV_TOTAL_SE = sqrt(hVar) / REMV_TOTAL *100,
                ## nPlots
-               nPlots_TREE = plotIn_TREE,
+               # Non-zero plots
+               nPlots_TREE = plotIn_t,
+               nPlots_RECR = plotIn_r,
+               nPlots_MORT = plotIn_m,
+               nPlots_REMV = plotIn_h,
                nPlots_AREA = plotIn_AREA)
     })
 
-
+    # Make some columns go away
     if (totals) {
-
       tOut <- tOut %>%
-        select(grpBy, "NETVOL_ACRE","SAWVOL_ACRE","BIO_AG_ACRE","BIO_BG_ACRE",
-               "BIO_ACRE","CARB_AG_ACRE","CARB_BG_ACRE","CARB_ACRE","NETVOL_TOTAL",
-               "SAWVOL_TOTAL","BIO_AG_TOTAL","BIO_BG_TOTAL","BIO_TOTAL","CARB_AG_TOTAL",
-               "CARB_BG_TOTAL","CARB_TOTAL", "AREA_TOTAL","NETVOL_ACRE_SE",
-               "SAWVOL_ACRE_SE","BIO_AG_ACRE_SE", "BIO_BG_ACRE_SE", "BIO_ACRE_SE",
-               "CARB_AG_ACRE_SE","CARB_BG_ACRE_SE","CARB_ACRE_SE","NETVOL_TOTAL_SE",
-               "SAWVOL_TOTAL_SE",  "BIO_AG_TOTAL_SE",  "BIO_BG_TOTAL_SE",
-               "BIO_TOTAL_SE", "CARB_AG_TOTAL_SE", "CARB_BG_TOTAL_SE", "CARB_TOTAL_SE",
-               "AREA_TOTAL_SE","nPlots_TREE","nPlots_AREA")
-
+        select(grpBy, RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC,
+               TREE_TOTAL, RECR_TOTAL, MORT_TOTAL, REMV_TOTAL, AREA_TOTAL,
+               RECR_TPA_SE, MORT_TPA_SE, REMV_TPA_SE, RECR_PERC_SE, MORT_PERC_SE, REMV_PERC_SE,
+               TREE_TOTAL_SE, RECR_TOTAL_SE, MORT_TOTAL_SE, REMV_TOTAL_SE, AREA_TOTAL_SE,
+               nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV, nPlots_AREA)
     } else {
       tOut <- tOut %>%
-        select(grpBy, "NETVOL_ACRE","SAWVOL_ACRE","BIO_AG_ACRE","BIO_BG_ACRE",
-               "BIO_ACRE","CARB_AG_ACRE","CARB_BG_ACRE","CARB_ACRE","NETVOL_ACRE_SE",
-               "SAWVOL_ACRE_SE","BIO_AG_ACRE_SE", "BIO_BG_ACRE_SE", "BIO_ACRE_SE",
-               "CARB_AG_ACRE_SE","CARB_BG_ACRE_SE","CARB_ACRE_SE","nPlots_TREE",
-               "nPlots_AREA")
+        select(grpBy, RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC,
+               RECR_TPA_SE, MORT_TPA_SE, REMV_TPA_SE, RECR_PERC_SE, MORT_PERC_SE, REMV_PERC_SE,
+               nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV,nPlots_AREA)
     }
+
+
+    ## Modify some names if a different state variable was given
+    names(tOut) <- str_replace(names(tOut), 'TPA', paste(stateVar, 'ACRE', sep = '_'))
 
     # Snag the names
     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
@@ -584,7 +681,6 @@ biomass <- function(db,
     drop_na(grpBy) %>%
     arrange(YEAR) %>%
     as_tibble()
-
 
   # Return a spatial object
   if (!is.null(polys) & byPlot == FALSE) {
@@ -601,7 +697,7 @@ biomass <- function(db,
     }
 
     suppressMessages({suppressWarnings({
-      tOut <- left_join(tOut, polys) %>%
+      tOut <- left_join(tOut, polys, by = 'polyID') %>%
         select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
         filter(!is.na(polyID))})})
 
@@ -622,13 +718,6 @@ biomass <- function(db,
   if (byPlot) tOut <- unique(tOut)
   return(tOut)
 }
-
-
-
-
-
-
-
 
 
 

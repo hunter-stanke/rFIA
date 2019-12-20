@@ -92,7 +92,16 @@ bioHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
 
 
 
-bioHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
+bioHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
+
+  ## DOES NOT MODIFY OUTSIDE ENVIRONMENT
+  if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
+    grpBy <- c(grpBy, 'INVYR')
+    aGrpBy <- c(aGrpBy, 'INVYR')
+    popState[[x]]$P2POINTCNT <- popState[[x]]$P2POINTCNT_INVYR
+    popState[[x]]$p2eu <- popState[[x]]$p2eu_INVYR
+
+  }
 
   ## Strata level estimates
   aStrat <- a %>%
@@ -140,7 +149,7 @@ bioHelper2 <- function(x, popState, a, t, grpBy, aGrpBy){
     ## Rejoin with population tables
     right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
     ## Need this for covariance later on
-    left_join(select(a, fa, PLT_CN, PROP_BASIS, aGrpBy[aGrpBy %in% 'YEAR' == FALSE]), by = c('PLT_CN', aGrpBy[aGrpBy %in% 'YEAR' == FALSE])) %>%
+    left_join(select(a, fa, PLT_CN, PROP_BASIS, aGrpBy[aGrpBy %in% c('YEAR', 'INVYR') == FALSE]), by = c('PLT_CN', aGrpBy[aGrpBy %in% c('YEAR', 'INVYR') == FALSE])) %>%
     #Add adjustment factors
     mutate(tAdj = case_when(
         ## When NA, stay NA

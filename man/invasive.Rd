@@ -9,7 +9,7 @@ Produces estimates of areal coverage of invasive species from the Forest Invento
 
 \usage{
 invasive(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = "forest",
-         method = 'TI', lambda = .94, areaDomain = NULL, byPlot = FALSE,
+         method = 'TI', lambda = .5, areaDomain = NULL, byPlot = FALSE,
          totals = FALSE, nCores = 1)
 }
 

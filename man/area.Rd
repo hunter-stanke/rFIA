@@ -8,7 +8,7 @@ Produces estimates of total area (acreage) from FIA data. Estimates can be produ
 \usage{
 area(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
      byLandType = FALSE, landType = 'forest',  method = 'TI',
-     lambda = .94, treeDomain = NULL, areaDomain = NULL,
+     lambda = .5, treeDomain = NULL, areaDomain = NULL,
      totals = FALSE, byPlot = FALSE, nCores = 1)
 }
 %- maybe also 'usage' for other objects documented here.

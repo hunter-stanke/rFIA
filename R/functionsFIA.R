@@ -4,6 +4,19 @@
   #packageStartupMessage('Download FIA Data Here: https://apps.fs.usda.gov/fia/datamart/datamart.html')
 }
 
+matchColClasses <- function(df1, df2) {
+  df1 <- as.data.frame(df1)
+  df2 <- as.data.frame(df2)
+
+  sharedColNames <- names(df1)[names(df1) %in% names(df2)]
+  sharedColTypes <- sapply(df1[,sharedColNames], class)
+
+  for (n in 1:length(sharedColNames)) {
+    class(df2[, sharedColNames[n]]) <- sharedColTypes[n]
+  }
+
+  return(df2)
+}
 
 ################ PREVIOUS FUNCTIONS ######################
 #### SHANNON'S EVENESS INDEX (H)
@@ -816,6 +829,8 @@ Did you accidentally include the state abbreviation in front of the table name? 
       if(is.null(dir)){
         unzip(temp, exdir = tempDir)
         file <- fread(paste0(tempDir, '/', newName), showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores)
+        ## Unlinking the directory is bad news, so just delete the file from tempdir
+        file.remove(paste0(tempDir, '/', newName))
       } else {
         #download.file(urls[n], paste0(dir, tblNames[n]))
         unzip(temp, exdir = str_sub(dir, 1, -2))
@@ -862,7 +877,6 @@ Did you accidentally include the state abbreviation in front of the table name? 
     }
     # NEW CLASS NAME FOR FIA DATABASE OBJECTS
     #outTables <- lapply(outTables, as.data.frame)
-    unlink(tempDir, recursive = TRUE)
     class(outTables) <- 'FIA.Database'
     #### DOWNLOADING THE WHOLE ZIP FILE
   } else {
@@ -877,6 +891,7 @@ Did you accidentally include the state abbreviation in front of the table name? 
       temp <- paste0(tempDir, '/', states[i],'.zip') #tempfile()
       ## Make the URL
       url <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', states[i],'.zip')
+      #newName <- paste0(str_sub(url, 1, -4), 'csv')
       ## Download as temporary file
       download.file(url, temp)
       ## Extract
@@ -1030,7 +1045,8 @@ clipFIA <- function(db,
                     mask = NULL,
                     matchEval = FALSE,
                     evalid = NULL,
-                    designCD = NULL) {
+                    designCD = NULL,
+                    nCores = 1) {
 
   ## Some warnings
   if (class(db) != "FIA.Database"){
@@ -1054,10 +1070,10 @@ clipFIA <- function(db,
     # Join appropriate tables and filter out specified EVALIDs
     tempData <- select(db$PLOT, CN, PREV_PLT_CN) %>%
       mutate(PLT_CN = CN) %>%
-      inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID')), by = 'PLT_CN') %>%
+      left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID')), by = 'PLT_CN') %>%
       #inner_join(select(POP_ESTN_UNIT, c('EVAL_GRP_CN', 'EVALID')), by = 'EVAL_GRP_CN') %>%
       filter(EVALID %in% evalid)
-    # Extract plots which relate to specified EVALID (previouy for change estimation)
+    # Extract plots which relate to specified EVALID (previous for change estimation)
     PPLOT <- db$PLOT[db$PLOT$CN %in% tempData$PREV_PLT_CN,]
     db$PLOT <- db$PLOT[db$PLOT$CN %in% tempData$PLT_CN,]
   }
@@ -1111,94 +1127,104 @@ clipFIA <- function(db,
   ##  plot data is avaliable for any intersecting ESTN_UNIT, we can cut back on memory requirements and still
   ##  produce valid estimates
    if (!is.null(mask)){
-     # # Convert polygons to an sf object
-     # mask <- mask %>%
-     #   as('sf') %>%
-     #   mutate(polyID = 1:nrow(mask))
-     # ## Make plot data spatial, projected same as polygon layer
-     # pltSF <- select(db$PLOT, c('LON', 'LAT', pltID)) %>%
-     #   filter(!is.na(LAT) & !is.na(LON)) %>%
-     #   distinct(pltID, .keep_all = TRUE)
-     # coordinates(pltSF) <- ~LON+LAT
-     # proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-     # pltSF <- as(pltSF, 'sf') %>%
-     #   st_transform(crs = st_crs(mask)$proj4string)
-     #
-     # ## Split up mask
-     # polyList <- split(mask, as.factor(mask$polyID))
-     #
-     # suppressMessages({suppressWarnings({
-     #   ## Intersect it
-     #   out <- lapply(names(polyList), FUN = areal_par, pltSF, polyList)
-     # })})
-     #
-     #
-     #
-     # pltSF <- bind_rows(out) %>%
-     #   left_join(select(db$PLOT, PLT_CN, PREV_PLT_CN, pltID), by = 'pltID')
-     #
-     # PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PREV_PLT_CN)
-     # db$PLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PLT_CN)
 
-     ###OLD
+
      # Convert polygons to an sf object
      mask <- mask %>%
-       as('sf')
-
+       as('sf') %>%
+       mutate(polyID = 1:nrow(mask))
      ## Make plot data spatial, projected same as polygon layer
-     pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
+     pltSF <- select(db$PLOT, c('LON', 'LAT', pltID)) %>%
+       filter(!is.na(LAT) & !is.na(LON)) %>%
+       distinct(pltID, .keep_all = TRUE)
      coordinates(pltSF) <- ~LON+LAT
      proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
      pltSF <- as(pltSF, 'sf') %>%
        st_transform(crs = st_crs(mask)$proj4string)
 
-     # Intersect plot with polygons
-     mask$polyID <- 1:nrow(mask)
-     suppressMessages({suppressWarnings({
-       pltSF <- st_intersection(pltSF, mask) %>%
-         as.data.frame() %>%
-         select(-c('geometry')) # removes artifact of SF object
+     ## Split up polys
+     polyList <- split(mask, as.factor(mask$polyID))
+     suppressWarnings({suppressMessages({
+       ## Compute estimates in parallel -- Clusters in windows, forking otherwise
+       if (Sys.info()['sysname'] == 'Windows'){
+         cl <- makeCluster(nCores)
+         clusterEvalQ(cl, {
+           library(dplyr)
+           library(stringr)
+           library(rFIA)
+         })
+         out <- parLapply(cl, X = names(polyList), fun = areal_par, pltSF, polyList)
+         #stopCluster(cl) # Keep the cluster active for the next run
+       } else { # Unix systems
+         out <- mclapply(names(polyList), FUN = areal_par, pltSF, polyList, mc.cores = nCores)
+       }
      })})
 
-     # Identify the estimation units to which plots within the mask belong to
-     estUnits <- pltSF %>%
-       inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'STRATUM_CN')), by = 'PLT_CN') %>%
-       inner_join(select(db$POP_STRATUM, c('CN', 'ESTN_UNIT_CN')), by = c('STRATUM_CN' = 'CN')) %>%
-       group_by(ESTN_UNIT_CN) %>%
-       summarize()
+     pltSF <- bind_rows(out) %>%
+       left_join(select(db$PLOT, PLT_CN, PREV_PLT_CN, pltID), by = 'pltID')
 
-     # Identify all the plots which fall inside the above estimation units
-     plts <- select(db$PLOT, PLT_CN, PREV_PLT_CN) %>%
-       inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'STRATUM_CN')), by = 'PLT_CN') %>%
-       inner_join(select(db$POP_STRATUM, c('CN', 'ESTN_UNIT_CN')), by = c('STRATUM_CN' = 'CN')) %>%
-       filter(ESTN_UNIT_CN %in% estUnits$ESTN_UNIT_CN) %>%
-       group_by(PLT_CN, PREV_PLT_CN) %>%
-       summarize()
+     PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PREV_PLT_CN)
+     db$PLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PLT_CN)
 
-     # Clip out the above plots from the full database, will reduce size by a shit pile
-     PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% plts$PREV_PLT_CN)
-     db$PLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% plts$PLT_CN)
-
-    ## IF ozone is specified, do a seperate intersection (PLOTs not colocated w/ veg PLOTs)
-    if (!is.null(db$OZONE_PLOT)) {
-      # Seperate spatial object
-      ozoneSP <- db$OZONE_PLOT
-
-      ## Make PLOT data spatial, projected same as mask layer
-      coordinates(ozoneSP) <- ~LON+LAT
-      proj4string(ozoneSP) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-      ozoneSP <- spTransform(ozoneSP, CRSobj = proj4string(mask))
-
-      ## Spatial query (keep only PLOTs that fall within shell)
-      db$OZONE_PLOT <- ozoneSP[mask,]
-
-      ## Add coordinates back in to dataframe
-      coords <- st_coordinates(db$OZONE_PLOT)
-      db$OZONE_PLOT <- db$OZONE_PLOT %>%
-        data.frame() %>%
-        mutate(LAT = coords[,2]) %>%
-        mutate(LON = coords[,1])
-    }
+    #  ###OLD
+    #  # Convert polygons to an sf object
+    #  mask <- mask %>%
+    #    as('sf')
+    #
+    #  ## Make plot data spatial, projected same as polygon layer
+    #  pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
+    #  coordinates(pltSF) <- ~LON+LAT
+    #  proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+    #  pltSF <- as(pltSF, 'sf') %>%
+    #    st_transform(crs = st_crs(mask)$proj4string)
+    #
+    #  # Intersect plot with polygons
+    #  mask$polyID <- 1:nrow(mask)
+    #  suppressMessages({suppressWarnings({
+    #    pltSF <- st_intersection(pltSF, mask) %>%
+    #      as.data.frame() %>%
+    #      select(-c('geometry')) # removes artifact of SF object
+    #  })})
+    #
+    #  # Identify the estimation units to which plots within the mask belong to
+    #  estUnits <- pltSF %>%
+    #    inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'STRATUM_CN')), by = 'PLT_CN') %>%
+    #    inner_join(select(db$POP_STRATUM, c('CN', 'ESTN_UNIT_CN')), by = c('STRATUM_CN' = 'CN')) %>%
+    #    group_by(ESTN_UNIT_CN) %>%
+    #    summarize()
+    #
+    #  # Identify all the plots which fall inside the above estimation units
+    #  plts <- select(db$PLOT, PLT_CN, PREV_PLT_CN) %>%
+    #    inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'STRATUM_CN')), by = 'PLT_CN') %>%
+    #    inner_join(select(db$POP_STRATUM, c('CN', 'ESTN_UNIT_CN')), by = c('STRATUM_CN' = 'CN')) %>%
+    #    filter(ESTN_UNIT_CN %in% estUnits$ESTN_UNIT_CN) %>%
+    #    group_by(PLT_CN, PREV_PLT_CN) %>%
+    #    summarize()
+    #
+    #  # Clip out the above plots from the full database, will reduce size by a shit pile
+    #  PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% plts$PREV_PLT_CN)
+    #  db$PLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% plts$PLT_CN)
+    #
+    # ## IF ozone is specified, do a seperate intersection (PLOTs not colocated w/ veg PLOTs)
+    # if (!is.null(db$OZONE_PLOT)) {
+    #   # Seperate spatial object
+    #   ozoneSP <- db$OZONE_PLOT
+    #
+    #   ## Make PLOT data spatial, projected same as mask layer
+    #   coordinates(ozoneSP) <- ~LON+LAT
+    #   proj4string(ozoneSP) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+    #   ozoneSP <- spTransform(ozoneSP, CRSobj = proj4string(mask))
+    #
+    #   ## Spatial query (keep only PLOTs that fall within shell)
+    #   db$OZONE_PLOT <- ozoneSP[mask,]
+    #
+    #   ## Add coordinates back in to dataframe
+    #   coords <- st_coordinates(db$OZONE_PLOT)
+    #   db$OZONE_PLOT <- db$OZONE_PLOT %>%
+    #     data.frame() %>%
+    #     mutate(LAT = coords[,2]) %>%
+    #     mutate(LON = coords[,1])
+    # }
    }
 
   ## IF no spatial or temporal clip was specified, make PPLOT NULL
@@ -1225,6 +1251,325 @@ clipFIA <- function(db,
 
       } else if (!is.null(db$OZONE_PLOT) & name == 'OZONE_PLOT'){
           clippedData[['OZONE_PLOT']] <- db$OZONE_PLOT
+
+      } else if (name == 'TREE' | name == 'COND'){ # Need previous attributes
+        clipTable <- table[table$PLT_CN %in% c(db$PLOT$CN, PPLOT$PLT_CN),]
+        clippedData[[name]] <- clipTable
+
+      } else if ('PLT_CN' %in% colnames(table) & str_detect(name, 'OZONE') == FALSE){
+        clipTable <- table[table$PLT_CN %in% db$PLOT$CN,]
+        clippedData[[name]] <- clipTable
+
+      } else if ('PLT_CN' %in% colnames(table) & !is.null(db$OZONE_PLOT) & str_detect(name, 'OZONE')){
+        clipTable <- table[table$PLT_CN %in% db$OZONE_PLOT$CN,]
+        clippedData[[name]] <- clipTable
+
+      } else if ('CTY_CN' %in% colnames(table)){
+        clipTable <- table[table$CTY_CN %in% db$PLOT$CTY_CN,]
+        clippedData[[name]] <- clipTable
+
+      } else if('SRV_CN' %in% colnames(table)){
+        clipTable <- table[table$SRV_CN %in% db$PLOT$SRV_CN,]
+        clippedData[[name]] <- clipTable
+
+      } else if(name == 'PLOTGEOM'){
+        clipTable <- table[table$CN %in% db$PLOT$CN,]
+        clippedData[[name]] <- clipTable
+
+      } else if(name == 'SNAP'){
+        clipTable <- table[table$CN %in% db$PLOT$CN,]
+        clippedData[[name]] <- clipTable
+
+      } else{ # IF it doesn't connect in a way described above, return the whole thing
+        clippedData[[name]] <- table
+      }
+    }
+
+
+    # Cascade spatial query for all other tables (indirectly related to PLOT)
+    if ("TREE_REGIONAL_BIOMASS" %in% tableNames & 'TREE' %in% names(clippedData)){
+      clippedData[["TREE_REGIONAL_BIOMASS"]] <- db$TREE_REGIONAL_BIOMASS %>%
+        filter(TRE_CN %in% clippedData$TREE$CN)
+    }
+    # Deal with the POP Tables
+    if(!is.null(evalid) | mostRecent){ # User specified EVALIDs
+      # Links only to POP_EVAL
+      if ('POP_EVAL' %in% tableNames){
+        clippedData[['POP_EVAL']] <- db$POP_EVAL %>%
+          filter(EVALID %in% evalid)
+        if("POP_EVAL_GRP" %in% tableNames){
+          clippedData[["POP_EVAL_GRP"]] <- db$POP_EVAL_GRP %>%
+            filter(CN %in% clippedData$POP_EVAL$EVAL_GRP_CN)
+        }
+        if("POP_EVAL_ATTRIBUTE" %in% tableNames){
+          clippedData[["POP_EVAL_ATTRIBUTE"]] <- db$POP_EVAL_ATTRIBUTE %>%
+            filter(EVAL_CN %in% clippedData$POP_EVAL$CN)
+        }
+        if('POP_EVAL_TYP' %in% tableNames){
+          clippedData[['POP_EVAL_TYP']] <- db$POP_EVAL_TYP %>%
+            filter(EVAL_CN %in% clippedData$POP_EVAL$CN)
+        }
+      }
+      # Links to both POP_EVAL & PLOT
+      if ('POP_ESTN_UNIT' %in% tableNames){
+        clippedData[['POP_ESTN_UNIT']] <- db$POP_ESTN_UNIT %>%
+          filter(EVALID %in% evalid)
+      }
+      if ('POP_STRATUM' %in% tableNames){
+        clippedData[['POP_STRATUM']] <- db$POP_STRATUM %>%
+          filter(EVALID %in% evalid)
+      }
+      if ("POP_PLOT_STRATUM_ASSGN" %in% names(clippedData)){ # Should already be in here becuase contains PLT_CN
+        clippedData[["POP_PLOT_STRATUM_ASSGN"]] <- clippedData[["POP_PLOT_STRATUM_ASSGN"]] %>%
+          filter(EVALID %in% evalid)
+      }
+
+      # User did not specify evalids or most recent
+    } else {
+      if ("POP_PLOT_STRATUM_ASSGN_STRATUM_ASSGN" %in% names(clippedData) & 'POP_STRATUM' %in% tableNames){
+        # Estimation units
+        units <- otherTables$POP_STRATUM %>%
+          filter(CN %in% clippedData$POP_PLOT_STRATUM_ASSGN$STRATUM_CN) %>%
+          select(ESTN_UNIT_CN) %>%
+          distinct(ESTN_UNIT_CN)
+        # Returns all strata for an estimation unit in which plot falls
+        clippedData[['POP_STRATUM']] <- otherTables$POP_STRATUM %>%
+          filter(ESTN_UNIT_CN %in% units$ESTN_UNIT_CN)
+        if ("POP_ESTN_UNIT" %in% tableNames){
+          clippedData[['POP_ESTN_UNIT']] <- db$POP_ESTN_UNIT %>%
+            filter(CN %in% units$ESTN_UNIT_CN)
+        }
+      }
+      if ("POP_PLOT_STRATUM_ASSGN" %in% names(clippedData) & 'POP_EVAL' %in% tableNames){
+        clippedData[['POP_EVAL']] <- db$POP_EVAL %>%
+          filter(EVALID %in% clippedData$POP_PLOT_STRATUM_ASSGN$EVALID)
+        if("POP_EVAL_GRP" %in% tableNames){
+          clippedData[["POP_EVAL_GRP"]] <- db$POP_EVAL_GRP %>%
+            filter(CN %in% clippedData$POP_EVAL$EVAL_GRP_CN)
+        }
+        if("POP_EVAL_ATTRIBUTE" %in% tableNames){
+          clippedData[["POP_EVAL_ATTRIBUTE"]] <- db$POP_EVAL_ATTRIBUTE %>%
+            filter(EVAL_CN %in% clippedData$POP_EVAL$CN)
+        }
+        if('POP_EVAL_TYP' %in% tableNames){
+          clippedData[['POP_EVAL_TYP']] <- db$POP_EVAL_TYP %>%
+            filter(EVAL_CN %in% clippedData$POP_EVAL$CN)
+        }
+      }
+    }
+    # User didn't specify other tables, skip above and just return plot
+  } else if (is.null(otherTables) & is.null(db$OZONE_PLOT)){
+    clippedData <- db$PLOT
+  } else if (is.null(otherTables) & !is.null(db$OZONE_PLOT)){
+    clippedData <- list(db$PLOT, db$OZONE_PLOT)
+  }
+
+  if (mostRecent) clippedData$mostRecent <- TRUE
+
+  class(clippedData) <- 'FIA.Database'
+  return(clippedData)
+}
+
+clipFIA_old <- function(db,
+                    mostRecent = TRUE,
+                    mask = NULL,
+                    matchEval = FALSE,
+                    evalid = NULL,
+                    designCD = NULL) {
+
+  ## Some warnings
+  if (class(db) != "FIA.Database"){
+    stop('db must be of class "FIA.Databse". Use readFIA() to load your FIA data.')
+  }
+  if (!is.null(mask) & first(class(mask)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
+    stop('mask must be spatial polygons object of class sp or sf. ')
+  }
+
+  ################### ADD UNIQUE ID TO PLOTS #############################
+  db$PLOT <- db$PLOT %>%
+    mutate(PLT_CN = CN) %>%
+    #mutate(date = ymd(paste(MEASYEAR, MEASMON, MEASDAY, sep = '-'))) %>%
+    mutate(pltID = paste(UNITCD, STATECD, COUNTYCD, PLOT, sep = '_')) # Make a unique ID for each plot, irrespective of time
+
+  if (!is.null(designCD)) db$PLOT <- filter(db$PLOT, DESIGNCD == any(as.integer(designCD)))
+
+
+  ######### IF USER SPECIES EVALID (OR MOST RECENT), EXTRACT APPROPRIATE PLOTS ##########
+  if (!is.null(evalid)){
+    # Join appropriate tables and filter out specified EVALIDs
+    tempData <- select(db$PLOT, CN, PREV_PLT_CN) %>%
+      mutate(PLT_CN = CN) %>%
+      inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID')), by = 'PLT_CN') %>%
+      #inner_join(select(POP_ESTN_UNIT, c('EVAL_GRP_CN', 'EVALID')), by = 'EVAL_GRP_CN') %>%
+      filter(EVALID %in% evalid)
+    # Extract plots which relate to specified EVALID (previouy for change estimation)
+    PPLOT <- db$PLOT[db$PLOT$CN %in% tempData$PREV_PLT_CN,]
+    db$PLOT <- db$PLOT[db$PLOT$CN %in% tempData$PLT_CN,]
+  }
+
+  ## Locate the most recent EVALID and subset plots
+  if (mostRecent){
+    suppressWarnings({
+      tempData <- select(db$PLOT, CN, PREV_PLT_CN) %>%
+        mutate(PLT_CN = CN) %>%
+        left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN', 'EVALID')), by = c('PLT_CN'))
+
+
+      ## Most recent evals by
+      mrids <- findEVALID(db, mostRecent = TRUE)
+
+      tempData <- tempData %>%
+        filter(EVALID %in% mrids)
+    })
+
+    # Extract appropriate PLOTS
+    PPLOT <- db$PLOT[db$PLOT$CN %in% tempData$PREV_PLT_CN,]
+    db$PLOT <- db$PLOT[db$PLOT$CN %in% tempData$PLT_CN,]
+    #test = db$PLOT <- db$PLOT[db$PLOT$CN %in% tempData$PLT_CN,]
+
+    # Write out evalids sot aht we don't have to repeat above later
+    evalid <- unique(tempData$EVALID)
+
+    ## If not most recent, but still want matching evals, go for it.
+  } else if (matchEval){
+    ### Keeping only years where all states represented are reported for
+    if (length(unique(db$POP_EVAL$STATECD)) > 1){
+      # Counting number of states measured by year, remove years which don't include all states
+      numStates <- db$POP_EVAL %>%
+        group_by(END_INVYR, STATECD) %>%
+        summarize() %>%
+        group_by(END_INVYR) %>%
+        summarize(n = n()) %>%
+        filter(n == length(unique(db$POP_EVAL$STATECD)))
+
+      db$POP_EVAL <- db$POP_EVAL %>%
+        filter(END_INVYR %in% numStates$END_INVYR)
+    }
+
+  }
+
+
+  ##########################  SPATIAL-TEMPORAL INTERSECTION ######################################
+  ## Oringally did this based solely on PLT_CN, but this method will not work when we try to compute variance
+  ##  estimates for a region, because estimates are computed at ESTN_UNIT level. Now the spatial functionality
+  ##  of clipFIA is primarily intended to reduce the amount of data which must be held in RAM. As long as all
+  ##  plot data is avaliable for any intersecting ESTN_UNIT, we can cut back on memory requirements and still
+  ##  produce valid estimates
+  if (!is.null(mask)){
+    # # Convert polygons to an sf object
+    # mask <- mask %>%
+    #   as('sf') %>%
+    #   mutate(polyID = 1:nrow(mask))
+    # ## Make plot data spatial, projected same as polygon layer
+    # pltSF <- select(db$PLOT, c('LON', 'LAT', pltID)) %>%
+    #   filter(!is.na(LAT) & !is.na(LON)) %>%
+    #   distinct(pltID, .keep_all = TRUE)
+    # coordinates(pltSF) <- ~LON+LAT
+    # proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+    # pltSF <- as(pltSF, 'sf') %>%
+    #   st_transform(crs = st_crs(mask)$proj4string)
+    #
+    # ## Split up mask
+    # polyList <- split(mask, as.factor(mask$polyID))
+    #
+    # suppressMessages({suppressWarnings({
+    #   ## Intersect it
+    #   out <- lapply(names(polyList), FUN = areal_par, pltSF, polyList)
+    # })})
+    #
+    #
+    #
+    # pltSF <- bind_rows(out) %>%
+    #   left_join(select(db$PLOT, PLT_CN, PREV_PLT_CN, pltID), by = 'pltID')
+    #
+    # PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PREV_PLT_CN)
+    # db$PLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PLT_CN)
+
+    ###OLD
+    # Convert polygons to an sf object
+    mask <- mask %>%
+      as('sf')
+
+    ## Make plot data spatial, projected same as polygon layer
+    pltSF <- select(db$PLOT, c('PLT_CN', 'LON', 'LAT'))
+    coordinates(pltSF) <- ~LON+LAT
+    proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+    pltSF <- as(pltSF, 'sf') %>%
+      st_transform(crs = st_crs(mask)$proj4string)
+
+    # Intersect plot with polygons
+    mask$polyID <- 1:nrow(mask)
+    suppressMessages({suppressWarnings({
+      pltSF <- st_intersection(pltSF, mask) %>%
+        as.data.frame() %>%
+        select(-c('geometry')) # removes artifact of SF object
+    })})
+
+    # Identify the estimation units to which plots within the mask belong to
+    estUnits <- pltSF %>%
+      inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'STRATUM_CN')), by = 'PLT_CN') %>%
+      inner_join(select(db$POP_STRATUM, c('CN', 'ESTN_UNIT_CN')), by = c('STRATUM_CN' = 'CN')) %>%
+      group_by(ESTN_UNIT_CN) %>%
+      summarize()
+
+    # Identify all the plots which fall inside the above estimation units
+    plts <- select(db$PLOT, PLT_CN, PREV_PLT_CN) %>%
+      inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'STRATUM_CN')), by = 'PLT_CN') %>%
+      inner_join(select(db$POP_STRATUM, c('CN', 'ESTN_UNIT_CN')), by = c('STRATUM_CN' = 'CN')) %>%
+      filter(ESTN_UNIT_CN %in% estUnits$ESTN_UNIT_CN) %>%
+      group_by(PLT_CN, PREV_PLT_CN) %>%
+      summarize()
+
+    # Clip out the above plots from the full database, will reduce size by a shit pile
+    PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% plts$PREV_PLT_CN)
+    db$PLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% plts$PLT_CN)
+
+    ## IF ozone is specified, do a seperate intersection (PLOTs not colocated w/ veg PLOTs)
+    if (!is.null(db$OZONE_PLOT)) {
+      # Seperate spatial object
+      ozoneSP <- db$OZONE_PLOT
+
+      ## Make PLOT data spatial, projected same as mask layer
+      coordinates(ozoneSP) <- ~LON+LAT
+      proj4string(ozoneSP) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+      ozoneSP <- spTransform(ozoneSP, CRSobj = proj4string(mask))
+
+      ## Spatial query (keep only PLOTs that fall within shell)
+      db$OZONE_PLOT <- ozoneSP[mask,]
+
+      ## Add coordinates back in to dataframe
+      coords <- st_coordinates(db$OZONE_PLOT)
+      db$OZONE_PLOT <- db$OZONE_PLOT %>%
+        data.frame() %>%
+        mutate(LAT = coords[,2]) %>%
+        mutate(LON = coords[,1])
+    }
+  }
+
+  ## IF no spatial or temporal clip was specified, make PPLOT NULL
+  if (mostRecent == FALSE & is.null(evalid) & is.null(mask)) PPLOT <- NULL
+
+  #################  APPLY  QUERY TO REMAINING TABLES  ###########################
+  ## User gives object names and not list object
+  otherTables <- db
+
+  if (is.list(otherTables)){
+    tableNames <- names(otherTables)
+    clippedData <- list()
+
+    # Query for all tables directly related to PLOT
+    for (i in 1:length(otherTables)){
+      # Pull the object with the name listed from the global environment
+      table <- otherTables[[i]]
+      name <- tableNames[i]
+
+      if (name == "PLOT"){
+        db$PLOT$prev = 0
+        if(nrow(PPLOT) > 0) PPLOT$prev = 1
+        clippedData[['PLOT']] <- rbind(db$PLOT, PPLOT)
+
+      } else if (!is.null(db$OZONE_PLOT) & name == 'OZONE_PLOT'){
+        clippedData[['OZONE_PLOT']] <- db$OZONE_PLOT
 
       } else if (name == 'TREE' | name == 'COND'){ # Need previous attributes
         clipTable <- table[table$PLT_CN %in% c(db$PLOT$CN, PPLOT$PLT_CN),]
@@ -2642,8 +2987,7 @@ tpa_old <- function(db,
 
 
 # Growth and Mortality
-#' @export
-growMort <- function(db,
+growMort_old <- function(db,
                      grpBy = NULL,
                      polys = NULL,
                      returnSpatial = FALSE,
@@ -2937,7 +3281,7 @@ growMort <- function(db,
       left_join(select(db_clip$POP_EVAL_TYP, c('EVAL_TYP', 'EVAL_CN')), by = c('EVAL_CN')) %>%
       left_join(select(db_clip$PLOT, c('PLT_CN', 'PREV_PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'REMPER', grpP, 'sp', 'aD_p')), by = 'PLT_CN') %>%
       left_join(select(db_clip$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID','landD', 'aD_c', grpC)), by = 'PLT_CN') %>%
-      left_join(select(db_clip$TREE, c('TRE_CN', 'PREV_TRE_CN', 'TREE', 'PLT_CN', 'CONDID', 'PREVCOND', 'SPCD', grpT, 'typeD', 'tD')), by = c('PLT_CN', 'CONDID')) %>% ## ISSUE MAY BE HERE, SEE EVALIDATOR CODE
+      left_join(select(db_clip$TREE, c('TRE_CN', 'PREV_TRE_CN', 'TREE', 'SUBP', 'PLT_CN', 'CONDID', 'PREVCOND', 'SPCD', grpT, 'typeD', 'tD')), by = c('PLT_CN', 'CONDID')) %>% ## ISSUE MAY BE HERE, SEE EVALIDATOR CODE
       # GRM
       left_join(select(db_clip$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT')), by = c('TRE_CN')) %>%
       mutate(aAdj = ifelse(PROP_BASIS == 'SUBP', ADJ_FACTOR_SUBP, ADJ_FACTOR_MACR)) %>%
@@ -2968,7 +3312,7 @@ growMort <- function(db,
 
       # Previous attributes
       data <- data %>%
-        left_join(select(db_clip$SUBP_COND_CHNG_MTRX, SUBP:SUBPTYP_PROP_CHNG), by = c('PLT_CN', 'CONDID'), suffix = c('', '.subp')) %>%
+        left_join(select(db_clip$SUBP_COND_CHNG_MTRX, SUBP:SUBPTYP_PROP_CHNG), by = c('PLT_CN', 'CONDID', 'SUBP'), suffix = c('', '.subp')) %>%
         left_join(select(db_clip$COND, PLT_CN, CONDID, COND_STATUS_CD), by = c('PREV_PLT_CN.subp' = 'PLT_CN', 'PREVCOND.subp' = 'CONDID'), suffix = c('', '.chng')) %>%
         left_join(select(db_clip$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
         left_join(select(db_clip$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
@@ -3186,8 +3530,7 @@ growMort <- function(db,
 }
 
 # Growth Rates
-#' @export
-vitalRates <- function(db,
+vitalRates_old <- function(db,
                        grpBy = NULL,
                        polys = NULL,
                        returnSpatial = FALSE,
@@ -4222,9 +4565,9 @@ dwm_old <- function(db,
       error = function(cnd) {
         return(0)
       },
-      plt_quo[1,] %>% # Just the first row
-        inner_join(db$COND, by = 'PLT_CN') %>%
-        inner_join(db$TREE, by = 'PLT_CN') %>%
+      plt_quo[1000,] %>% # Just the first row
+        left_join(select(db$COND, PLT_CN, names(db$COND)[names(db$COND) %in% names(db$PLOT) == FALSE]), by = 'PLT_CN') %>%
+        inner_join(select(db$TREE, PLT_CN, names(db$TREE)[names(db$TREE) %in% c(names(db$PLOT), names(db$COND)) == FALSE]), by = 'PLT_CN') %>%
         select(!!grpBy_quo)
     )
 
