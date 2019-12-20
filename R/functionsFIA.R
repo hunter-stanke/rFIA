@@ -829,6 +829,8 @@ Did you accidentally include the state abbreviation in front of the table name? 
       if(is.null(dir)){
         unzip(temp, exdir = tempDir)
         file <- fread(paste0(tempDir, '/', newName), showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores)
+        ## Unlinking the directory is bad news, so just delete the file from tempdir
+        file.remove(paste0(tempDir, '/', newName))
       } else {
         #download.file(urls[n], paste0(dir, tblNames[n]))
         unzip(temp, exdir = str_sub(dir, 1, -2))
@@ -875,7 +877,6 @@ Did you accidentally include the state abbreviation in front of the table name? 
     }
     # NEW CLASS NAME FOR FIA DATABASE OBJECTS
     #outTables <- lapply(outTables, as.data.frame)
-    unlink(tempDir, recursive = TRUE)
     class(outTables) <- 'FIA.Database'
     #### DOWNLOADING THE WHOLE ZIP FILE
   } else {
@@ -890,6 +891,7 @@ Did you accidentally include the state abbreviation in front of the table name? 
       temp <- paste0(tempDir, '/', states[i],'.zip') #tempfile()
       ## Make the URL
       url <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', states[i],'.zip')
+      #newName <- paste0(str_sub(url, 1, -4), 'csv')
       ## Download as temporary file
       download.file(url, temp)
       ## Extract
