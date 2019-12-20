@@ -1,9 +1,9 @@
 #' @export
 plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet = FALSE,
                     n.max = NULL, plot.title = NULL, y.lab = NULL, x.lab = NULL,
-                    legend.title = NULL, legend.labs = waiver(), color.option = 'viridis',
-                    line.color = "gray30", line.width =1, min.year = 2005,
-                    direction = 1, alpha = .9, transform = "identity",
+                    legend.title = NULL, legend.labs = waiver(), limits = c(NA, NA),
+                    color.option = 'viridis', line.color = "gray30", line.width =1,
+                    min.year = 2005, direction = 1, alpha = .9, transform = "identity",
                     text.size = 1, text.font = '', lab.width = 1, legend.height = 1,
                     legend.width = 1, device = 'png', savePath = NULL, fileName = NULL) {
 
@@ -88,7 +88,7 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet
           ggplot() +
           geom_sf(aes(colour = yVar)) +
           labs(colour = ifelse(is.null(legend.title), str_wrap(quo_name(y_quo), width = 10 * lab.width), str_wrap(legend.title, width = 10 * lab.width))) +
-          scale_colour_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform) +
+          scale_colour_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform, limits = limits) +
           #scale_fill_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform) +
           theme_minimal() +
           ggtitle(plot.title)+
@@ -125,7 +125,7 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet
         ggplot() +
         geom_sf(aes(fill = yVar), colour = line.color, lwd = line.width) +
         labs(fill = ifelse(is.null(legend.title), str_wrap(quo_name(y_quo), width = 10 * lab.width), str_wrap(legend.title, width = 10 * lab.width))) +
-        scale_fill_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform) +
+        scale_fill_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform, limits = limits) +
         theme_minimal() +
         ggtitle(plot.title)+
         theme(#axis.text = element_blank(),
