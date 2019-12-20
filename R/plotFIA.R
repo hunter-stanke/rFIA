@@ -201,7 +201,7 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet
           labs(colour = ifelse(is.null(legend.title), '', str_wrap(legend.title, width = 10 * lab.width))) +
           theme_bw() +
           ggtitle(plot.title) +
-          xlab(ifelse(is.null(x.lab), quo_name(y_quo), x.lab)) +
+          xlab(ifelse(is.null(x.lab), quo_name(x_quo), x.lab)) +
           ylab(ifelse(is.null(y.lab), quo_name(y_quo), y.lab)) +
           ylim(0, max(data$yVar) * 1.4) +
           theme(axis.text = element_text(size = 11 * text.size, family = text.font),
