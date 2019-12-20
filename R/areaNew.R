@@ -17,21 +17,30 @@ area <- function(db,
   db$PLOT <- db$PLOT %>% mutate(PLT_CN = CN,
                                 pltID = paste(UNITCD, STATECD, COUNTYCD, PLOT, sep = '_'))
 
-  ## Converting names given in grpBy to character vector (NSE to standard)
   ##  don't have to change original code
   grpBy_quo <- enquo(grpBy)
 
   # Probably cheating, but it works
   if (quo_name(grpBy_quo) != 'NULL'){
-    ## Check if column exists
-    allNames <- c(names(db$PLOT), names(db$COND), names(db$TREE))
+    ## Have to join tables to run select with this object type
+    plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
+    ## We want a unique error message here to tell us when columns are not present in data
+    d_quo <- tryCatch(
+      error = function(cnd) {
+        return(0)
+      },
+      plt_quo[10,] %>% # Just the first row
+        left_join(select(db$COND, PLT_CN, names(db$COND)[names(db$COND) %in% names(db$PLOT) == FALSE]), by = 'PLT_CN') %>%
+        select(!!grpBy_quo)
+    )
 
-    if (quo_name(grpBy_quo) %in% allNames){
-      # Convert to character
-      grpBy <- quo_name(grpBy_quo)
-    } else {
+    # If column doesnt exist, just returns 0, not a dataframe
+    if (is.null(nrow(d_quo))){
       grpName <- quo_name(grpBy_quo)
-      stop(paste('Columns', grpName, 'not found in PLOT, TREE, or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
+      stop(paste('Columns', grpName, 'not found in PLOT or COND tables. Did you accidentally quote the variables names? e.g. use grpBy = ECOSUBCD (correct) instead of grpBy = "ECOSUBCD". ', collapse = ', '))
+    } else {
+      # Convert to character
+      grpBy <- names(d_quo)
     }
   }
 

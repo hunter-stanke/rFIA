@@ -4565,9 +4565,9 @@ dwm_old <- function(db,
       error = function(cnd) {
         return(0)
       },
-      plt_quo[1,] %>% # Just the first row
-        inner_join(db$COND, by = 'PLT_CN') %>%
-        inner_join(db$TREE, by = 'PLT_CN') %>%
+      plt_quo[1000,] %>% # Just the first row
+        left_join(select(db$COND, PLT_CN, names(db$COND)[names(db$COND) %in% names(db$PLOT) == FALSE]), by = 'PLT_CN') %>%
+        inner_join(select(db$TREE, PLT_CN, names(db$TREE)[names(db$TREE) %in% c(names(db$PLOT), names(db$COND)) == FALSE]), by = 'PLT_CN') %>%
         select(!!grpBy_quo)
     )
 
