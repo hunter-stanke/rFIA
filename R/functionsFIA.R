@@ -1117,7 +1117,7 @@ clipFIA <- function(db,
         filter(END_INVYR %in% numStates$END_INVYR)
     }
 
-  }
+    }
 
 
   ##########################  SPATIAL-TEMPORAL INTERSECTION ######################################
@@ -1246,7 +1246,8 @@ clipFIA <- function(db,
 
       if (name == "PLOT"){
         db$PLOT$prev = 0
-        if(nrow(PPLOT) > 0) PPLOT$prev = 1
+        #if(nrow(PPLOT) > 0) PPLOT$prev = 1
+        if(!is.null(PPLOT) > 0) PPLOT$prev = 1
         clippedData[['PLOT']] <- rbind(db$PLOT, PPLOT)
 
       } else if (!is.null(db$OZONE_PLOT) & name == 'OZONE_PLOT'){
