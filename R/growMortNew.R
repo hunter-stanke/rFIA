@@ -674,6 +674,9 @@ growMort <- function(db,
 
   }
 
+  ## Modify some names if a different state variable was given
+  names(tOut) <- str_replace(names(tOut), 'TPA', paste(stateVar, 'ACRE', sep = '_'))
+
   ## Pretty output
   tOut <- tOut %>%
     ungroup() %>%
