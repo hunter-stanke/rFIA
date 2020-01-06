@@ -7,7 +7,7 @@ Default behavior for non-spatial summaries produces time-series plots, and for s
 
 \usage{
 plotFIA(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet = FALSE,
-        n.max = NULL, plot.title = NULL, y.lab = NULL, x.lab = NULL,
+        se = FALSE,n.max = NULL, plot.title = NULL, y.lab = NULL, x.lab = NULL,
         legend.title = NULL, legend.labs = waiver(), limits = c(NA, NA),
         color.option = 'viridis', line.color = "gray30", line.width =1,
         min.year = 2005, direction = 1, alpha = .9, transform = "identity",
@@ -27,6 +27,8 @@ plotFIA(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet = FALSE,
   \item{animate}{logical; if TRUE, produces temporally animated plots.}
 
   \item{facet}{logical; if TRUE, produces temporally grouped plots (stationary).}
+
+    \item{se}{logical; if TRUE, plots error bars along with estimates. All error bars represent 68\% confidence.}
 
   \item{n.max}{numeric; maximum number of groups to plot. If positive, will plot the top \code{n} groups with respect to \code{y}, and if negative, will plot the bottom \code{n}. Not meaningful for spatial summaries.}
 

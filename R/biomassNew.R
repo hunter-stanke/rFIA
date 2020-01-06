@@ -284,7 +284,7 @@ biomass <- function(db,
   if (bySizeClass){
     grpBy <- c(grpBy, 'sizeClass')
     grpByOrig <- c(grpByOrig, 'sizeClass')
-    db$TREE$sizeClass <- makeClasses(db$TREE$DIA, interval = 2)
+    db$TREE$sizeClass <- makeClasses(db$TREE$DIA, interval = 2, numLabs = TRUE)
     db$TREE <- db$TREE[!is.na(db$TREE$sizeClass),]
   }
 

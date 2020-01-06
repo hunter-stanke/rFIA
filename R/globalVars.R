@@ -128,5 +128,5 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'BIOA_TOTAL_SE', 'DIA_TOTAL_SE', 'NETVOLA_TOTAL', 'NETVOLA_TOTAL_SE',
                          'NETVOL_TOTAL_SE', 'PLOT_STATUS_CD', 'bioAEst', 'bioAStrat', 'bioAVar', 'bioAgVar',
                          'bioAv', 'cvEst_bioA', 'cvStrat_bioA', 'tDI_ga_r', 'tDI_r', 'polys', 'diffYear', 'state_recr',
-                         'P2POINTCNT_INVYR', 'sumwgt'
+                         'P2POINTCNT_INVYR', 'sumwgt', 'seVar'
 ))
