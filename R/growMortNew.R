@@ -667,7 +667,7 @@ growMort <- function(db,
 
 
     ## Modify some names if a different state variable was given
-    names(tOut) <- str_replace(names(tOut), 'TPA', paste(stateVar, 'ACRE', sep = '_'))
+    #names(tOut) <- str_replace(names(tOut), 'TPA', paste(stateVar, 'ACRE', sep = '_'))
 
     # Snag the names
     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
