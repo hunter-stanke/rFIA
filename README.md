@@ -36,9 +36,6 @@ errors produced by EVALIDator. Current development is focused on the
 implementation of spatially-enabled model-assisted estimators to improve
 population, change, and ratio estimates.
 
-You can download subsets of the FIA Database at the FIA Datamart:
-<https://apps.fs.usda.gov/fia/datamart/CSV/datamart_csv.html>
-
 <br>
 
 ## Installation
@@ -73,6 +70,7 @@ devtools::install_github('hunter-stanke/rFIA')
 | `invasive`      | Estimate areal coverage of invasive species                        |
 | `plotFIA`       | Produce static & animated plots of spatial FIA summaries           |
 | `readFIA`       | Load FIA database into R environment                               |
+| `seedling`      | Estimate seedling abundance (TPA)                                  |
 | `standStruct`   | Estimate forest structural stage distributions                     |
 | `tpa`           | Estimate abundance of standing trees (TPA & BAA)                   |
 | `vitalRates`    | Estimate live tree growth rates                                    |
@@ -143,16 +141,18 @@ data("fiaRI")
 fiaRI_MR <- clipFIA(fiaRI, mostRecent = TRUE) ## subset the most recent data
 tpaRI_MR <- tpa(fiaRI_MR)
 head(tpaRI_MR)
-#>   YEAR      TPA      BAA TPA_PERC BAA_PERC   TPA_SE   BAA_SE TPA_PERC_SE
-#> 1 2018 426.7119 122.1143 93.22791   93.677 6.631549 3.057083     7.61641
-#>   BAA_PERC_SE nPlots_TREE nPlots_AREA
-#> 1    4.477168         126         127
+#> # A tibble: 1 x 11
+#>    YEAR   TPA   BAA TPA_PERC BAA_PERC TPA_SE BAA_SE TPA_PERC_SE BAA_PERC_SE
+#>   <int> <dbl> <dbl>    <dbl>    <dbl>  <dbl>  <dbl>       <dbl>       <dbl>
+#> 1  2018  427.  122.     93.2     93.7   6.63   3.06        7.62        4.48
+#> # … with 2 more variables: nPlots_TREE <dbl>, nPlots_AREA <dbl>
 
 ## All Inventory Years Available (i.e., returns a time series)
 tpaRI <- tpa(fiaRI)
 
 ## Time Series plot
-plotFIA(tpaRI, BAA, plot.title = 'Basal area per acre in Rhode Island over time')
+plotFIA(tpaRI, BAA, se = TRUE,
+        plot.title = 'Basal area per acre in Rhode Island over time')
 ```
 
 <img src="man/figures/README-unnamed-chunk-4-1.png" width="100%" />
@@ -164,38 +164,35 @@ class?**
 ## Group estimates by species
 tpaRI_species <- tpa(fiaRI_MR, bySpecies = TRUE)
 head(tpaRI_species, n = 3)
-#>   YEAR SPCD          COMMON_NAME        SCIENTIFIC_NAME        TPA
-#> 1 2018   12           balsam fir         Abies balsamea 0.08732464
-#> 2 2018   43 Atlantic white-cedar Chamaecyparis thyoides 0.24652918
-#> 3 2018   68     eastern redcedar   Juniperus virginiana 1.13812339
-#>          BAA   TPA_PERC   BAA_PERC    TPA_SE    BAA_SE TPA_PERC_SE
-#> 1 0.02945721 0.01907867 0.02259738 114.02897 114.02897    7.700936
-#> 2 0.17960008 0.05386163 0.13777578  59.08447  55.97810    7.638942
-#> 3 0.13844250 0.24865690 0.10620276  64.77184  67.45948    7.643501
-#>   BAA_PERC_SE nPlots_TREE nPlots_AREA
-#> 1    4.619978           1         127
-#> 2    4.511914           3         127
-#> 3    4.527460           5         127
+#> # A tibble: 3 x 14
+#>    YEAR  SPCD COMMON_NAME SCIENTIFIC_NAME    TPA    BAA TPA_PERC BAA_PERC
+#>   <int> <int> <chr>       <chr>            <dbl>  <dbl>    <dbl>    <dbl>
+#> 1  2018    12 balsam fir  Abies balsamea  0.0873 0.0295   0.0191   0.0226
+#> 2  2018    43 Atlantic w… Chamaecyparis … 0.247  0.180    0.0539   0.138 
+#> 3  2018    68 eastern re… Juniperus virg… 1.14   0.138    0.249    0.106 
+#> # … with 6 more variables: TPA_SE <dbl>, BAA_SE <dbl>, TPA_PERC_SE <dbl>,
+#> #   BAA_PERC_SE <dbl>, nPlots_TREE <dbl>, nPlots_AREA <dbl>
 
 ## Group estimates by size class
 ## NOTE: Default 2-inch size classes, but you can make your own using makeClasses()
 tpaRI_sizeClass <- tpa(fiaRI_MR, bySizeClass = TRUE)
 head(tpaRI_sizeClass, n = 3)
-#>   YEAR sizeClass       TPA      BAA TPA_PERC BAA_PERC    TPA_SE    BAA_SE
-#> 1 2018     [1,3) 200.04626 3.703843 43.68492 3.004808  9.350683  9.599735
-#> 2 2018     [3,5)  67.04905 5.636636 14.64177 4.572821 12.110857 12.699784
-#> 3 2018     [5,7)  44.10363 8.579190  9.63109 6.960020  5.338930  5.392966
-#>   TPA_PERC_SE BAA_PERC_SE nPlots_TREE nPlots_AREA
-#> 1    4.464367    1.978547          76         126
-#> 2    4.465090    1.980327          46         126
-#> 3    4.463748    1.976972         115         126
+#> # A tibble: 3 x 12
+#>    YEAR sizeClass   TPA   BAA TPA_PERC BAA_PERC TPA_SE BAA_SE TPA_PERC_SE
+#>   <int>     <dbl> <dbl> <dbl>    <dbl>    <dbl>  <dbl>  <dbl>       <dbl>
+#> 1  2018         1 188.   3.57     41.0     2.74  13.0   12.8         6.39
+#> 2  2018         3  68.6  5.76     15.0     4.42  15.1   15.8         6.39
+#> 3  2018         5  46.5  9.06     10.2     6.95   6.51   6.57        6.38
+#> # … with 3 more variables: BAA_PERC_SE <dbl>, nPlots_TREE <dbl>,
+#> #   nPlots_AREA <dbl>
 
 ## Group by species and size class, and plot the distribution 
 ##  for the most recent inventory year
 tpaRI_spsc <- tpa(fiaRI_MR, bySpecies = TRUE, bySizeClass = TRUE)
 plotFIA(tpaRI_spsc, BAA, grp = COMMON_NAME, x = sizeClass,
         plot.title = 'Size-class distributions of BAA by species', 
-        x.lab = '', text.size = .64, n.max = 5) # Only want the top 5 species, try n.max = -5 for bottom 5
+        x.lab = 'Size Class (inches)', text.size = .75,
+        n.max = 5) # Only want the top 5 species, try n.max = -5 for bottom 5
 ```
 
 <img src="man/figures/README-unnamed-chunk-5-1.png" width="100%" />
@@ -218,12 +215,13 @@ tpaRI_own <- tpa(fiaRI_MR,
                      treeDomain = DIA > 12 & CCLCD %in% c(1,2),
                      areaDomain = PHYSCLCD %in% c(20:29))
 head(tpaRI_own)
-#>   YEAR OWNGRPCD       TPA      BAA TPA_PERC BAA_PERC   TPA_SE   BAA_SE
-#> 1 2018       30 0.8482522 3.567751      100      100 58.95933 59.06494
-#> 2 2018       40 1.4920940 3.992055      100      100 25.69191 27.70682
-#>   TPA_PERC_SE BAA_PERC_SE nPlots_TREE nPlots_AREA
-#> 1    60.69603    60.74652           3          38
-#> 2    26.85686    28.61007          12          82
+#> # A tibble: 2 x 12
+#>    YEAR OWNGRPCD   TPA   BAA TPA_PERC BAA_PERC TPA_SE BAA_SE TPA_PERC_SE
+#>   <int>    <int> <dbl> <dbl>    <dbl>    <dbl>  <dbl>  <dbl>       <dbl>
+#> 1  2018       30 0.848  3.57     20.8     29.3   59.0   59.1        24.7
+#> 2  2018       40 1.49   3.99     79.2     70.7   25.7   27.7        24.7
+#> # … with 3 more variables: BAA_PERC_SE <dbl>, nPlots_TREE <dbl>,
+#> #   nPlots_AREA <dbl>
 ```
 
 **What if I want to produce estimates within my own population
