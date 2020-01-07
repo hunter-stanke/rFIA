@@ -192,18 +192,23 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet
       }
     }
 
+    ylim = if_else(any(data$yVar < 0), min(data$yVar,na.rm = TRUE) * 1.4, 0)
+
     # Simple time series
     if (quo_name(grp_quo) == 'NULL'){
       map <- data %>%
-        ggplot(aes(x = xVar, y = yVar)) +
+        select(yVar, xVar) %>%
+        ungroup() %>%
+        ggplot(aes(x = xVar, y = yVar, group = 1), group = 1) +
         #geom_ribbon(aes(x = xVar, ymin = (yVar * ))) +
         geom_line(aes(group = 1), color = line.color, lwd = line.width) +
+        #geom_line(color = line.color, lwd = line.width) +
         theme_bw() +
         ggtitle(plot.title) +
         xlab(ifelse(is.null(x.lab), quo_name(x_quo), x.lab)) +
         ylab(ifelse(is.null(y.lab), quo_name(y_quo), y.lab)) +
         #scale_y_continuous(limits = c(0, NA), expand = c(0,0))
-        ylim(0, max(data$yVar) * 1.4) +
+        ylim(ylim, max(data$yVar) * 1.4) +
         theme(axis.text = element_text(size = 11 * text.size, family = text.font),
               axis.title = element_text(size = 15 * text.size, family = text.font),
               plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font))
@@ -225,7 +230,7 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet
         ggtitle(plot.title) +
         xlab(ifelse(is.null(x.lab), quo_name(x_quo), x.lab)) +
         ylab(ifelse(is.null(y.lab), quo_name(y_quo), y.lab)) +
-        ylim(0, max(data$yVar) * 1.4) +
+        ylim(ylim, max(data$yVar) * 1.4) +
         theme(axis.text = element_text(size = 11 * text.size, family = text.font),
               axis.title = element_text(size = 15 * text.size, family = text.font),
               plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),

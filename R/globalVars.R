@@ -128,5 +128,12 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'BIOA_TOTAL_SE', 'DIA_TOTAL_SE', 'NETVOLA_TOTAL', 'NETVOLA_TOTAL_SE',
                          'NETVOL_TOTAL_SE', 'PLOT_STATUS_CD', 'bioAEst', 'bioAStrat', 'bioAVar', 'bioAgVar',
                          'bioAv', 'cvEst_bioA', 'cvStrat_bioA', 'tDI_ga_r', 'tDI_r', 'polys', 'diffYear', 'state_recr',
-                         'P2POINTCNT_INVYR', 'sumwgt', 'seVar'
+                         'P2POINTCNT_INVYR', 'sumwgt', 'seVar',
+                         'BAA_RATE', 'BAA_RATE_SE', 'BAA_RATE_ga', 'BAA_ga', 'DIA_BEGIN', 'DIA_END', 'HARV_BAA',
+                         'HARV_RATE', 'HARV_RATE_SE', 'HARV_RATE_ga', 'LAMBDA', 'LAMBDA_SE', 'LAMBDA_ga', 'M',
+                         'MORT_BAA', 'MORT_RATE', 'MORT_RATE_SE', 'MORT_RATE_ga', 'MORT_TPA_ga', 'M_ga', 'P1',
+                         'PREV_BAA', 'PREV_BAA_ga', 'PREV_TPA', 'PREV_TPA_ga', 'Q1', 'RECR_RATE', 'RECR_RATE_SE',
+                         'RECR_RATE_ga', 'RECR_TPA_ga', 'REMV_TPA_ga', 'S1', 'STATUSCD', 'STATUSCD.prev',
+                         'SUST_INDEX', 'SUST_INDEX_SE', 'TPA_UNADJ.prev', 'cvEst_q', 'cvStrat_q', 'lPlot', 'nLive',
+                         'nStems', 'qEst', 'qStrat', 'qVar', 'qv', 'x_ga', 'y', 'y_ga'
 ))

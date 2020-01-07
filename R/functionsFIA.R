@@ -4,6 +4,23 @@
   #packageStartupMessage('Download FIA Data Here: https://apps.fs.usda.gov/fia/datamart/datamart.html')
 }
 
+projectPnts <- function(x, y, slope, yint){
+  P = data.frame(x, y)
+  P$m <- slope
+  P$n <- yint
+  ## Perp Points
+  P$x1 = P$x + -slope
+  P$y1 = P$y + 1
+  ## Perp Line
+  P$m1 = (P$y1-P$y)/(P$x1-P$x)
+  P$n1 = P$y - P$m1*P$x
+  ## Line intersection
+  P$x=(P$n1-P$n)/(P$m-P$m1)
+  P$y=P$m*P$x+P$n
+
+  return(P)
+}
+
 matchColClasses <- function(df1, df2) {
   df1 <- as.data.frame(df1)
   df2 <- as.data.frame(df2)
