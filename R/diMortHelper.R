@@ -18,6 +18,304 @@ diMortHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, minLive){
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
     left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD')), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPARECR_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT', DIA_BEGIN, DIA_END, DIA_MIDPT)), by = c('TRE_CN')) %>%
+    left_join(select(db$TREE_GRM_MIDPT, c('TRE_CN', 'DIA')), by = c('TRE_CN'), suffix = c('', '.mid')) %>%
+    left_join(select(db$SUBP_COND_CHNG_MTRX, SUBP:SUBPTYP_PROP_CHNG), by = c('PLT_CN', 'CONDID'), suffix = c('', '.subp')) %>%
+    left_join(select(db$COND, PLT_CN, CONDID, COND_STATUS_CD), by = c('PREV_PLT_CN.subp' = 'PLT_CN', 'PREVCOND.subp' = 'CONDID'), suffix = c('', '.chng')) %>%
+    left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
+    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
+    mutate_if(is.factor,
+              as.character) %>%
+    mutate(SUBPTYP_PROP_CHNG = SUBPTYP_PROP_CHNG * .25,
+           TPAGROW_UNADJ = TPAGROW_UNADJ, ## NEEDS TO BE PREVIOUS
+           TPAREMV_UNADJ = TPAREMV_UNADJ,
+           TPAMORT_UNADJ = TPAMORT_UNADJ,
+           TPARECR_UNADJ = TPARECR_UNADJ / REMPER,
+           aChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.chng == 1 & !is.null(CONDPROP_UNADJ), 1, 0),
+           tChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.prev == 1, 1, 0))
+
+  # If previous attributes are unavailable for trees, default to current (otherwise we get NAs for early inventories)
+  data$tD.prev <- ifelse(is.na(data$tD.prev), data$tD, data$tD.prev)
+  data$typeD.prev <- ifelse(is.na(data$typeD.prev), data$typeD, data$typeD.prev)
+  data$landD.prev <- ifelse(is.na(data$landD.prev), data$landD, data$landD.prev)
+  data$aD_p.prev <- ifelse(is.na(data$aD_p.prev), data$aD_p, data$aD_p.prev)
+  data$aD_c.prev <- ifelse(is.na(data$aD_c.prev), data$aD_c, data$aD_c.prev)
+  data$sp.prev <- ifelse(is.na(data$sp.prev), data$sp, data$sp.prev)
+
+  ## Comprehensive indicator function -- w/ growth accounting
+  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp * data$aChng
+  data$tDI <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev * data$tChng
+  data$tDI_r <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp #* data$tChng
+
+  # ## Comprehensive indicator function
+  # data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
+  # data$tDI <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev
+  # data$tDI_r <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
+
+
+
+  if (byPlot){
+    grpBy <- c('YEAR', grpBy, 'PLOT_STATUS_CD')
+    t <- data %>%
+      mutate(YEAR = MEASYEAR) %>%
+      distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
+      # Compute estimates at plot level
+      group_by(.dots = grpBy, PLT_CN) %>%
+      summarize(nLive = length(which(TPAGROW_UNADJ > 0 | TPAMORT_UNADJ > 0 | TPAREMV_UNADJ > 0)) - length(which(TPARECR_UNADJ > 0)),
+                REMPER = first(REMPER),
+                ## ANNUAL RATES
+                RECR_TPA = if_else(nLive >= minLive, sum(TPARECR_UNADJ * tDI_r, na.rm = TRUE), 0),
+                MORT_TPA = if_else(nLive >= minLive, sum(TPAMORT_UNADJ * tDI, na.rm = TRUE), 0),
+                REMV_TPA = if_else(nLive >= minLive, sum(TPAREMV_UNADJ * tDI, na.rm = TRUE), 0),
+                CHNG_TPA = RECR_TPA - MORT_TPA - REMV_TPA,
+                ## PREVIOUS TPA
+                PREV_TPA = if_else(nLive >= minLive, sum(TPAGROW_UNADJ * tDI, na.rm = TRUE) - RECR_TPA*REMPER + MORT_TPA*REMPER + REMV_TPA*REMPER, 0),
+                ## ANNUAL RATES
+                RECR_BAA = if_else(nLive >= minLive, sum(TPARECR_UNADJ * tDI_r * basalArea(DIA_END), na.rm = TRUE), 0),
+                MORT_BAA = if_else(nLive >= minLive, sum(TPAMORT_UNADJ * tDI * basalArea(DIA_END), na.rm = TRUE), 0),
+                REMV_BAA = if_else(nLive >= minLive, sum(TPAREMV_UNADJ * tDI * basalArea(DIA_MIDPT), na.rm = TRUE), 0),
+                CHNG_BAA = RECR_BAA - MORT_BAA - REMV_BAA,
+                ## PREVIOUS BAA
+                ## For previous BAA, we use DIA_BEGIN to eliminate recruitment
+                ## Have to add HARV and MORT back though becuase not included in GROW
+                PREV_HARV_BAA = if_else(nLive >= minLive, sum(TPAREMV_UNADJ * tDI * basalArea(DIA_BEGIN) * REMPER, na.rm = TRUE), 0),
+                PREV_MORT_BAA = if_else(nLive >= minLive, sum(TPAMORT_UNADJ * tDI * basalArea(DIA_BEGIN) * REMPER, na.rm = TRUE), 0),
+                PREV_BAA = if_else(nLive >= minLive, sum(TPAGROW_UNADJ * tDI * basalArea(DIA_BEGIN), na.rm = TRUE)+ PREV_HARV_BAA + PREV_MORT_BAA, 0),
+                ## OUTPUT RATES
+                TPA_RATE = CHNG_TPA / PREV_TPA,
+                BAA_RATE = CHNG_BAA / PREV_BAA,
+                x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
+                y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
+                M = sqrt(x^2 + y^2),
+                SUST_INDEX = if_else(x < 0, -M, M),
+                nStems = length(which(tDI == 1))) %>%
+      ungroup() %>%
+      select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, nLive, nStems)
+
+    a = NULL
+
+  } else {
+    ### Plot-level estimates -- growth accounting
+    a <- data %>%
+      ## Will be lots of trees here, so CONDPROP listed multiple times
+      ## Adding PROP_BASIS so we can handle adjustment factors at strata level
+      distinct(PLT_CN, SUBP, CONDID, .keep_all = TRUE) %>%
+      group_by(PLT_CN, PROP_BASIS, .dots = aGrpBy) %>%
+      summarize(fa = sum(SUBPTYP_PROP_CHNG * aDI, na.rm = TRUE),
+                plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
+    # ### Plot-level estimates
+    # a <- data %>%
+    #   ## Will be lots of trees here, so CONDPROP listed multiple times
+    #   ## Adding PROP_BASIS so we can handle adjustment factors at strata level
+    #   distinct(PLT_CN, CONDID, .keep_all = TRUE) %>%
+    #   group_by(PLT_CN, PROP_BASIS, .dots = aGrpBy) %>%
+    #   summarize(fa = sum(CONDPROP_UNADJ * aDI, na.rm = TRUE),
+    #             plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0)) %>%
+    #   left_join(select(a_ga, PLT_CN, PROP_BASIS, aGrpBy, fa_ga, plotIn_ga), by = c('PLT_CN', 'PROP_BASIS', aGrpBy))
+
+
+    ### Compute total TREES in domain of interest
+    t <- data %>%
+      distinct(PLT_CN, TRE_CN, COMPONENT, .keep_all = TRUE) %>%
+      # Compute estimates at plot level
+      group_by(PLT_CN, SUBPTYP_GRM, .dots = grpBy) %>%
+      summarize(nLive = length(which(TPAGROW_UNADJ > 0 | TPAMORT_UNADJ > 0 | TPAREMV_UNADJ > 0)) - length(which(TPARECR_UNADJ > 0)),
+                REMPER = first(REMPER),
+                ## ANNUAL RATES
+                RECR_TPA = if_else(nLive >= minLive, sum(TPARECR_UNADJ * tDI_r, na.rm = TRUE), 0),
+                MORT_TPA = if_else(nLive >= minLive, sum(TPAMORT_UNADJ * tDI, na.rm = TRUE), 0),
+                REMV_TPA = if_else(nLive >= minLive, sum(TPAREMV_UNADJ * tDI, na.rm = TRUE), 0),
+                CHNG_TPA = RECR_TPA - MORT_TPA - REMV_TPA,
+                ## PREVIOUS TPA
+                PREV_TPA = if_else(nLive >= minLive, sum(TPAGROW_UNADJ * tDI, na.rm = TRUE) - RECR_TPA*REMPER + MORT_TPA*REMPER + REMV_TPA*REMPER, 0),
+                ## ANNUAL RATES
+                RECR_BAA = if_else(nLive >= minLive, sum(TPARECR_UNADJ * tDI_r * basalArea(DIA_END), na.rm = TRUE), 0),
+                MORT_BAA = if_else(nLive >= minLive, sum(TPAMORT_UNADJ * tDI * basalArea(DIA_END), na.rm = TRUE), 0),
+                REMV_BAA = if_else(nLive >= minLive, sum(TPAREMV_UNADJ * tDI * basalArea(DIA_MIDPT), na.rm = TRUE), 0),
+                CHNG_BAA = RECR_BAA - MORT_BAA - REMV_BAA,
+                ## PREVIOUS BAA
+                ## For previous BAA, we use DIA_BEGIN to eliminate recruitment
+                ## Have to add HARV and MORT back though becuase not included in GROW
+                PREV_HARV_BAA = if_else(nLive >= minLive, sum(TPAREMV_UNADJ * tDI * basalArea(DIA_BEGIN) * REMPER, na.rm = TRUE), 0),
+                PREV_MORT_BAA = if_else(nLive >= minLive, sum(TPAMORT_UNADJ * tDI * basalArea(DIA_BEGIN) * REMPER, na.rm = TRUE), 0),
+                PREV_BAA = if_else(nLive >= minLive, sum(TPAGROW_UNADJ * tDI * basalArea(DIA_BEGIN), na.rm = TRUE)+ PREV_HARV_BAA + PREV_MORT_BAA, 0),
+                plotIn = if_else(sum(tDI) > 0, 1, 0))
+  }
+
+  pltOut <- list(a = a, t = t)
+  return(pltOut)
+
+}
+
+diMortHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
+
+  ## DOES NOT MODIFY OUTSIDE ENVIRONMENT
+  if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
+    grpBy <- c(grpBy, 'INVYR')
+    aGrpBy <- c(aGrpBy, 'INVYR')
+    popState[[x]]$P2POINTCNT <- popState[[x]]$P2POINTCNT_INVYR
+    popState[[x]]$p2eu <- popState[[x]]$p2eu_INVYR
+
+  }
+
+  ## Strata level estimates
+  aStrat <- a %>%
+    ## Rejoin with population tables
+    right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
+    filter(EVAL_TYP %in% c('EXPGROW')) %>%
+    #filter(EVAL_TYP %in% c('EXPCURR')) %>%
+    mutate(
+      ## AREA
+      aAdj = case_when(
+        ## When NA, stay NA
+        is.na(PROP_BASIS) ~ NA_real_,
+        ## If the proportion was measured for a macroplot,
+        ## use the macroplot value
+        PROP_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
+        ## Otherwise, use the subpplot value
+        PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
+      fa = fa * aAdj) %>%
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = aGrpBy) %>%
+    summarize(a_t = length(unique(PLT_CN)) / first(P2POINTCNT),
+              aStrat = mean(fa * a_t, na.rm = TRUE),
+              plotIn_AREA = sum(plotIn, na.rm = TRUE),
+              n = n(),
+              ## We don't want a vector of these values, since they are repeated
+              nh = first(P2POINTCNT),
+              a = first(AREA_USED),
+              w = first(P1POINTCNT) / first(P1PNTCNT_EU),
+              p2eu = first(p2eu),
+              ndif = nh - n,
+              ## Strata level variances
+              av = stratVar(ESTN_METHOD, fa, aStrat, ndif, a, nh))
+  ## Estimation unit
+  aEst <- aStrat %>%
+    group_by(ESTN_UNIT_CN, .dots = aGrpBy) %>%
+    summarize(aEst = unitMean(ESTN_METHOD, a, nh,  w, aStrat),
+              aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, av, aStrat, aEst),
+              plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
+
+  ######## ------------------ TREE ESTIMATES + CV
+
+  ## Strata level estimates
+  tEst <- t %>%
+    ## Rejoin with population tables
+    right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
+    filter(EVAL_TYP %in% c('EXPGROW', 'EXPMORT', 'EXPREMV')) %>%
+    #filter(EVAL_TYP %in% c('EXPGROW')) %>%
+    ## Need this for covariance later on
+    left_join(select(a, fa, PLT_CN, PROP_BASIS, aGrpBy[aGrpBy %in% c('YEAR', 'INVYR') == FALSE]), by = c('PLT_CN', aGrpBy[aGrpBy %in% c('YEAR', 'INVYR') == FALSE])) %>%
+    #Add adjustment factors
+    mutate(tAdj = case_when(
+      ## When NA, stay NA
+      is.na(SUBPTYP_GRM) ~ NA_real_,
+      ## If the proportion was measured for a macroplot,
+      ## use the macroplot value
+      SUBPTYP_GRM == 0 ~ 0,
+      SUBPTYP_GRM == 1 ~ as.numeric(ADJ_FACTOR_SUBP),
+      SUBPTYP_GRM == 2 ~ as.numeric(ADJ_FACTOR_MICR),
+      SUBPTYP_GRM == 3 ~ as.numeric(ADJ_FACTOR_MACR)),
+      ## AREA
+      aAdj = case_when(
+        ## When NA, stay NA
+        is.na(PROP_BASIS) ~ NA_real_,
+        ## If the proportion was measured for a macroplot,
+        ## use the macroplot value
+        PROP_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
+        ## Otherwise, use the subpplot value
+        PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
+      fa = fa * aAdj,
+      ct = CHNG_TPA * tAdj,
+      cb = CHNG_BAA * tAdj,
+      pt = PREV_TPA * tAdj,
+      pb = PREV_BAA * tAdj) %>%
+    ## Extra step for variance issues
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy) %>%
+    summarize(ctPlot = sum(ct, na.rm = TRUE),
+              cbPlot = sum(cb, na.rm = TRUE),
+              ptPlot = sum(pt, na.rm = TRUE),
+              pbPlot = sum(pb, na.rm = TRUE),
+              fa = first(fa),
+              plotIn_t = ifelse(sum(plotIn >  0, na.rm = TRUE), 1,0),
+              nh = first(P2POINTCNT),
+              p2eu = first(p2eu),
+              a = first(AREA_USED),
+              w = first(P1POINTCNT) / first(P1PNTCNT_EU)) %>%
+    ## Joining area data so we can compute ratio variances
+    left_join(select(aStrat, aStrat, av, ESTN_UNIT_CN, STRATUM_CN, ESTN_METHOD, aGrpBy), by = c('ESTN_UNIT_CN', 'ESTN_METHOD', 'STRATUM_CN', aGrpBy)) %>%
+    ## Strata level
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
+    summarize(r_t = length(unique(PLT_CN)) / first(nh),
+              ctStrat = mean(ctPlot * r_t, na.rm = TRUE),
+              cbStrat = mean(cbPlot * r_t, na.rm = TRUE),
+              ptStrat = mean(ptPlot * r_t, na.rm = TRUE),
+              pbStrat = mean(pbPlot * r_t, na.rm = TRUE),
+              aStrat = first(aStrat),
+              plotIn_t = sum(plotIn_t, na.rm = TRUE),
+              n = n(),
+              ## We don't want a vector of these values, since they are repeated
+              nh = first(nh),
+              a = first(a),
+              w = first(w),
+              p2eu = first(p2eu),
+              ndif = nh - n,
+              # ## Strata level variances
+              ctv = stratVar(ESTN_METHOD, ctPlot, ctStrat, ndif, a, nh),
+              cbv = stratVar(ESTN_METHOD, cbPlot, cbStrat, ndif, a, nh),
+              ptv = stratVar(ESTN_METHOD, ptPlot, ptStrat, ndif, a, nh),
+              pbv = stratVar(ESTN_METHOD, pbPlot, pbStrat, ndif, a, nh),
+              # Strata level covariances
+              cvStrat_ct = stratVar(ESTN_METHOD, ctPlot, ctStrat, ndif, a, nh, ptPlot, ptStrat),
+              cvStrat_cb = stratVar(ESTN_METHOD, cbPlot, cbStrat, ndif, a, nh, pbPlot, pbStrat)
+    ) %>%
+
+    ## Estimation unit
+    left_join(select(aEst, ESTN_UNIT_CN, aEst, aVar, aGrpBy), by = c('ESTN_UNIT_CN', aGrpBy)) %>%
+    group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+    summarize(ctEst = unitMean(ESTN_METHOD, a, nh, w, ctStrat),
+              cbEst = unitMean(ESTN_METHOD, a, nh, w, cbStrat),
+              ptEst = unitMean(ESTN_METHOD, a, nh, w, ptStrat),
+              pbEst = unitMean(ESTN_METHOD, a, nh, w, pbStrat),
+
+              # Estimation of unit variance
+              ctVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ctv, ctStrat, ctEst),
+              cbVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, cbv, cbStrat, cbEst),
+              ptVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ptv, ptStrat, ptEst),
+              pbVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, pbv, pbStrat, pbEst),
+
+              ## Covariances
+              cvEst_ct = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_ct, ctStrat, ctEst, ptStrat, ptEst),
+              cvEst_cb = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_cb, cbStrat, cbEst, pbStrat, pbEst),
+              plotIn_t = sum(plotIn_t, na.rm = TRUE))
+
+  out <- list(tEst = tEst, aEst = aEst)
+
+  return(out)
+}
+
+
+
+diMortHelper1_old1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, minLive){
+
+  ## Selecting the plots for one county
+  db$PLOT <- plts[[x]]
+  ## Carrying out filter across all tables
+  #db <- clipFIA(db, mostRecent = FALSE)
+
+  # Only subplots from cond change matrix
+  db$SUBP_COND_CHNG_MTRX <- filter(db$SUBP_COND_CHNG_MTRX, SUBPTYP == 1)
+
+
+  ## Which grpByNames are in which table? Helps us subset below
+  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
+  grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
+  grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
+
+  ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD')), by = c('PLT_CN', 'CONDID')) %>%
     left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPARECR_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT', DIA_BEGIN, DIA_END)), by = c('TRE_CN')) %>%
     left_join(select(db$TREE_GRM_MIDPT, c('TRE_CN', 'DIA')), by = c('TRE_CN'), suffix = c('', '.mid')) %>%
     left_join(select(db$SUBP_COND_CHNG_MTRX, SUBP:SUBPTYP_PROP_CHNG), by = c('PLT_CN', 'CONDID'), suffix = c('', '.subp')) %>%
@@ -164,7 +462,7 @@ diMortHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, minLive){
 
 }
 
-diMortHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
+diMortHelper2_old1 <- function(x, popState, a, t, grpBy, aGrpBy, method){
 
   ## DOES NOT MODIFY OUTSIDE ENVIRONMENT
   if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
@@ -352,10 +650,6 @@ diMortHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
 
   return(out)
 }
-
-
-
-
 
 diMortHelper1_old <- function(x, plts, db, grpBy, byPlot, minLive){
 

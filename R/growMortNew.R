@@ -665,17 +665,20 @@ growMort <- function(db,
                nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV,nPlots_AREA)
     }
 
-
-    ## Modify some names if a different state variable was given
-    #names(tOut) <- str_replace(names(tOut), 'TPA', paste(stateVar, 'ACRE', sep = '_'))
-
     # Snag the names
     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
+    ## Modify some names if a different state variable was given
+    #names(tOut) <- str_replace(names(tOut), 'TPA', paste(stateVar, 'ACRE', sep = '_'))
 
   }
 
   ## Modify some names if a different state variable was given
-  names(tOut) <- str_replace(names(tOut), 'TPA', paste(stateVar, 'ACRE', sep = '_'))
+  if (stateVar != 'TPA') names(tOut) <- str_replace(names(tOut), 'TPA', paste(stateVar, 'ACRE', sep = '_'))
+
+  # Snag the names
+  tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
+  ## Modify some names if a different state variable was given
+  #names(tOut) <- str_replace(names(tOut), 'TPA', paste(stateVar, 'ACRE', sep = '_'))
 
   ## Pretty output
   tOut <- tOut %>%

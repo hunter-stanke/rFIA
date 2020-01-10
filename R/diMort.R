@@ -536,10 +536,10 @@ diMort <- function(db,
 
 
       tEst <- tEst %>%
-        mutate_at(vars(sEst:bEst), ~(.*wgt)) %>%
-        mutate_at(vars(sVar:cvEst_b), ~(.*(wgt^2))) %>%
+        mutate_at(vars(ctEst:pbEst), ~(.*wgt)) %>%
+        mutate_at(vars(ctVar:cvEst_cb), ~(.*(wgt^2))) %>%
         group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
-        summarize_at(vars(sEst:plotIn_t), sum, na.rm = TRUE)
+        summarize_at(vars(ctEst:plotIn_t), sum, na.rm = TRUE)
 
     }
 
@@ -571,41 +571,73 @@ diMort <- function(db,
         left_join(aTotal, by = aGrpBy) %>%
         group_by(.dots = grpBy) %>%
         summarize_all(sum,na.rm = TRUE) %>%
-        mutate(MORT_RATE = mEst / aEst,
-               HARV_RATE = hEst / aEst,
-               RECR_RATE = rEst / aEst,
-               LAMBDA = lEst / aEst,
-               BAA_RATE = bEst / aEst,
-               SUST_INDEX = sEst / aEst,
+        mutate(CHNG_TPA = ctEst,
+               CHNG_BAA = cbEst,
+               PREV_TPA = ptEst,
+               PREV_BAA = pbEst,
+               TPA_RATE = ctEst / ptEst,
+               BAA_RATE = cbEst / pbEst,
+               x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
+               y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
+               M = sqrt(x^2 + y^2),
+               SUST_INDEX = if_else(x < 0, -M, M),
                AREA_TOTAL = aEst,
-               ## Ratio variance
-               mVar = (1/AREA_TOTAL^2) * (mVar + (MORT_RATE^2 * aVar) - 2 * MORT_RATE * cvEst_m),
-               rVar = (1/AREA_TOTAL^2) * (rVar + (RECR_RATE^2 * aVar) - 2 * RECR_RATE * cvEst_r),
-               hVar = (1/AREA_TOTAL^2) * (hVar + (HARV_RATE^2 * aVar) - 2 * HARV_RATE * cvEst_h),
-               lVar = (1/AREA_TOTAL^2) * (lVar + (LAMBDA^2 * aVar) - 2 * LAMBDA * cvEst_l),
-               bVar = (1/AREA_TOTAL^2) * (bVar + (BAA_RATE^2 * aVar) - 2 * BAA_RATE * cvEst_b),
-               sVar = (1/AREA_TOTAL^2) * (sVar + (SUST_INDEX^2 * aVar) - 2 * SUST_INDEX * cvEst_s),
-               ## RATIO SE
-               MORT_RATE_SE = sqrt(mVar) / MORT_RATE,
-               RECR_RATE_SE = sqrt(rVar) / RECR_RATE,
-               HARV_RATE_SE = sqrt(hVar) / RECR_RATE,
-               LAMBDA_SE = sqrt(lVar) / abs(LAMBDA),
-               BAA_RATE_SE = sqrt(bVar) / abs(BAA_RATE),
-               SUST_INDEX_SE = sqrt(sVar) / abs(SUST_INDEX),
+               ## TOTAL SE
+               CHNG_TPA_SE = sqrt(ctVar) / ctEst,
+               CHNG_BAA_SE = sqrt(cbVar) / cbEst,
+               PREV_TPA_SE = sqrt(ptVar) / ptEst,
+               PREV_BAA_SE = sqrt(pbVar) / pbEst,
                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
+               ## Ratio variance
+               ctVar = (1/PREV_TPA^2) * (ctVar + (TPA_RATE^2 * ptVar) - 2 * TPA_RATE * cvEst_ct),
+               cbVar = (1/PREV_BAA^2) * (cbVar + (BAA_RATE^2 * pbVar) - 2 * BAA_RATE * cvEst_cb),
+               ## RATIO SE
+               TPA_RATE_SE = sqrt(ctVar) / TPA_RATE,
+               BAA_RATE_SE = sqrt(cbVar) / BAA_RATE,
                nPlots = plotIn_t)
     })
 
+    # suppressWarnings({
+    #   tOut <- tTotal %>%
+    #     left_join(aTotal, by = aGrpBy) %>%
+    #     group_by(.dots = grpBy) %>%
+    #     summarize_all(sum,na.rm = TRUE) %>%
+    #     mutate(MORT_RATE = mEst / aEst,
+    #            HARV_RATE = hEst / aEst,
+    #            RECR_RATE = rEst / aEst,
+    #            LAMBDA = lEst / aEst,
+    #            BAA_RATE = bEst / aEst,
+    #            SUST_INDEX = sEst / aEst,
+    #            AREA_TOTAL = aEst,
+    #            ## Ratio variance
+    #            mVar = (1/AREA_TOTAL^2) * (mVar + (MORT_RATE^2 * aVar) - 2 * MORT_RATE * cvEst_m),
+    #            rVar = (1/AREA_TOTAL^2) * (rVar + (RECR_RATE^2 * aVar) - 2 * RECR_RATE * cvEst_r),
+    #            hVar = (1/AREA_TOTAL^2) * (hVar + (HARV_RATE^2 * aVar) - 2 * HARV_RATE * cvEst_h),
+    #            lVar = (1/AREA_TOTAL^2) * (lVar + (LAMBDA^2 * aVar) - 2 * LAMBDA * cvEst_l),
+    #            bVar = (1/AREA_TOTAL^2) * (bVar + (BAA_RATE^2 * aVar) - 2 * BAA_RATE * cvEst_b),
+    #            sVar = (1/AREA_TOTAL^2) * (sVar + (SUST_INDEX^2 * aVar) - 2 * SUST_INDEX * cvEst_s),
+    #            ## RATIO SE
+    #            MORT_RATE_SE = sqrt(mVar) / MORT_RATE,
+    #            RECR_RATE_SE = sqrt(rVar) / RECR_RATE,
+    #            HARV_RATE_SE = sqrt(hVar) / RECR_RATE,
+    #            LAMBDA_SE = sqrt(lVar) / abs(LAMBDA),
+    #            BAA_RATE_SE = sqrt(bVar) / abs(BAA_RATE),
+    #            SUST_INDEX_SE = sqrt(sVar) / abs(SUST_INDEX),
+    #            AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
+    #            nPlots = plotIn_t)
+    # })
+
+
     if (totals) {
       tOut <- tOut %>%
-        select(grpBy, SUST_INDEX, LAMBDA, BAA_RATE, MORT_RATE, HARV_RATE, RECR_RATE, AREA_TOTAL,
-               SUST_INDEX_SE, LAMBDA_SE, BAA_RATE_SE, MORT_RATE_SE, HARV_RATE_SE, RECR_RATE_SE, AREA_TOTAL_SE,
+        select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, CHNG_TPA, CHNG_BAA, PREV_TPA, PREV_BAA, AREA_TOTAL,
+               TPA_RATE_SE, BAA_RATE_SE, CHNG_TPA_SE, CHNG_BAA_SE, PREV_TPA_SE, PREV_BAA_SE, AREA_TOTAL_SE,
                nPlots)
 
     } else {
       tOut <- tOut %>%
-        select(grpBy, SUST_INDEX, LAMBDA, BAA_RATE, MORT_RATE, RECR_RATE, HARV_RATE,
-               SUST_INDEX_SE, LAMBDA_SE, BAA_RATE_SE, MORT_RATE_SE, HARV_RATE_SE, RECR_RATE_SE,
+        select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE,
+               TPA_RATE_SE, BAA_RATE_SE,
                nPlots)
     }
 
