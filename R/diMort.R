@@ -583,17 +583,17 @@ diMort <- function(db,
                SUST_INDEX = if_else(x < 0, -M, M),
                AREA_TOTAL = aEst,
                ## TOTAL SE
-               CHNG_TPA_SE = sqrt(ctVar) / ctEst,
-               CHNG_BAA_SE = sqrt(cbVar) / cbEst,
-               PREV_TPA_SE = sqrt(ptVar) / ptEst,
-               PREV_BAA_SE = sqrt(pbVar) / pbEst,
+               CHNG_TPA_SE = sqrt(ctVar) / abs(ctEst) * 100,
+               CHNG_BAA_SE = sqrt(cbVar) / abs(cbEst) * 100,
+               PREV_TPA_SE = sqrt(ptVar) / abs(ptEst) * 100,
+               PREV_BAA_SE = sqrt(pbVar) / abs(pbEst) * 100,
                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
                ## Ratio variance
                ctVar = (1/PREV_TPA^2) * (ctVar + (TPA_RATE^2 * ptVar) - 2 * TPA_RATE * cvEst_ct),
                cbVar = (1/PREV_BAA^2) * (cbVar + (BAA_RATE^2 * pbVar) - 2 * BAA_RATE * cvEst_cb),
                ## RATIO SE
-               TPA_RATE_SE = sqrt(ctVar) / TPA_RATE,
-               BAA_RATE_SE = sqrt(cbVar) / BAA_RATE,
+               TPA_RATE_SE = sqrt(ctVar) / abs(TPA_RATE) * 100,
+               BAA_RATE_SE = sqrt(cbVar) / abs(BAA_RATE) * 100,
                nPlots = plotIn_t)
     })
 
@@ -1179,11 +1179,11 @@ diMort_old <-  function(db,
                bVar = (1/AREA_TOTAL^2) * (bVar + (BAA_RATE^2 * aVar) - 2 * BAA_RATE * cvEst_b),
                mVar = (1/AREA_TOTAL^2) * (mVar + (SUST_INDEX^2 * aVar) - 2 * SUST_INDEX * cvEst_m),
                ## RATIO SE
-               MORT_RATE_SE = sqrt(qVar) / MORT_RATE,
-               RECR_RATE_SE = sqrt(pVar) / RECR_RATE,
-               LAMBDA_SE = sqrt(sVar) / abs(LAMBDA),
-               BAA_RATE_SE = sqrt(bVar) / abs(BAA_RATE),
-               SUST_INDEX_SE = sqrt(mVar) / SUST_INDEX,
+               MORT_RATE_SE = sqrt(qVar) / MORT_RATE* 100,
+               RECR_RATE_SE = sqrt(pVar) / abs(RECR_RATE)* 100,
+               LAMBDA_SE = sqrt(sVar) / abs(LAMBDA)* 100,
+               BAA_RATE_SE = sqrt(bVar) / abs(BAA_RATE)* 100,
+               SUST_INDEX_SE = sqrt(mVar) / abs(SUST_INDEX)* 100,
                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
                nPlots = plotIn_AREA)
     })

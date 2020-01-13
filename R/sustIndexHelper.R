@@ -1,4 +1,4 @@
-sustIndexHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, minLive){
+sustIndexHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
 
   ## Selecting the plots for one county
   db$PLOT <- plts[[x]]
@@ -15,41 +15,44 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, minLive){
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp')) %>%
-    filter(!is.na(REMPER) & !is.na(PREV_PLT_CN)) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp', 'DESIGNCD')) %>%
+    filter(!is.na(REMPER) & !is.na(PREV_PLT_CN) & DESIGNCD == 1) %>%
+
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
     left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'TPA_UNADJ', 'DIA')), by = c('PLT_CN', 'CONDID')) %>%
-    left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
+    #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', DIA_BEGIN, DIA_END)), by = c('TRE_CN')) %>%
+
+    left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p', 'DESIGNCD', 'PLOT_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('2', '1')) %>%
     left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'TPA_UNADJ', 'DIA')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
+    #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
+
     mutate_if(is.factor,
               as.character)
 
-  # If previous attributes are unavailable for trees, default to current (otherwise we get NAs for early inventories)
-  data$tD1 <- ifelse(is.na(data$tD1), data$tD2, data$tD1)
-  data$typeD1 <- ifelse(is.na(data$typeD1), data$typeD2, data$typeD1)
-  data$landD1 <- ifelse(is.na(data$landD1), data$landD2, data$landD1)
-  data$aD_p1 <- ifelse(is.na(data$aD_p1), data$aD_p2, data$aD_p1)
-  data$aD_c1 <- ifelse(is.na(data$aD_c1), data$aD_c2, data$aD_c1)
-  data$sp1 <- ifelse(is.na(data$sp1), data$sp2, data$sp1)
-
   ## Comprehensive indicator function -- w/ growth accounting
-  data$aDI <- data$landD2 * data$aD_p2 * data$aD_c2 * data$sp2
-  data$tDI <- data$landD1 * data$aD_p1 * data$aD_c1 * data$tD1 * data$typeD2 * data$sp1 #* if_else(!is.na(data$PREV_PLT_CN), 1, 0)
+  data$tDI2 <- data$landD2 * data$aD_p2 * data$aD_c2 * data$tD2 * data$typeD2 * data$sp2 *
+    if_else(data$PLOT_STATUS_CD1 == 1 & data$PLOT_STATUS_CD2 == 1, 1, 0)
+  data$tDI1 <- data$landD1 * data$aD_p1 * data$aD_c1 * data$tD1 * data$typeD1 * data$sp1 *
+    if_else(data$PLOT_STATUS_CD1 == 1 & data$PLOT_STATUS_CD2 == 1, 1, 0)
 
   ## PREVIOUS and CURRENT attributes
   data <- data %>%
-    mutate(BAA1 = basalArea(DIA1) * TPA_UNADJ1,
+    mutate(TPA_UNADJ1 = TPA_UNADJ1,
+           TPA_UNADJ2 = TPA_UNADJ2,
+           BAA1 = basalArea(DIA1) * TPA_UNADJ1,
            BAA2 = basalArea(DIA2) * TPA_UNADJ2) #%>%
-    #filter(!is.na(PREV_PLT_CN))
 
   ## Just what we need
   data <- data %>%
-    select(PLT_CN, TRE_CN, SUBP, CONDID, TREE, aDI, tDI,
-           PLOT_STATUS_CD, MEASYEAR, MACRO_BREAKPOINT_DIA, REMPER,
+    select(PLT_CN, TRE_CN, SUBP, CONDID, TREE,
+          MEASYEAR, MACRO_BREAKPOINT_DIA, REMPER, PLOT_STATUS_CD1, PLOT_STATUS_CD2,
            one_of(str_c(grpP,1), str_c(grpC,1), str_c(grpT,1),
            str_c(grpP,2), str_c(grpC,2), str_c(grpT,2)),
+          tDI1, tDI2, #SUBPTYP_GRM1, SUBPTYP_GRM2,
            DIA1, DIA2, BAA1, BAA2, TPA_UNADJ1, TPA_UNADJ2) %>%
+    mutate(BAA1 = -(BAA1),
+           TPA_UNADJ1 = -(TPA_UNADJ1)) %>%
     ## Rearrange previous values as observations
     pivot_longer(cols = -c(PLT_CN:REMPER),
                  names_to = c(".value", 'ONEORTWO'),
@@ -67,6 +70,37 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, minLive){
 
   if (byPlot){
     grpBy <- c('YEAR', grpBy, 'PLOT_STATUS_CD')
+    # tAll <- data %>%
+    #   mutate(YEAR = MEASYEAR) %>%
+    #   distinct(PLT_CN, PREV_PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
+    #   # Compute estimates at plot level
+    #   group_by(.dots = grpBy, PLT_CN, PREV_PLT_CN, REMPER) %>%
+    #   summarize(TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE),
+    #             BAA = sum(DIA * tDI, na.rm = TRUE),
+    #             nStems = length(which(tDI == 1)))
+    #
+    # t <- tAll %>%
+    #   filter(!is.na(PREV_PLT_CN), !is.na(REMPER)) #%>%
+    # t <- t %>%
+    #   ## FULL JOIN MAKES SURE MISSING VALUES BECOME ZERO
+    #   full_join(filter(tAll, PLT_CN %in% t$PLT_CN == FALSE),
+    #             by = c('PREV_PLT_CN' = 'PLT_CN', grpBy[grpBy %in% c('YEAR', 'pltID', 'PLOT_STATUS_CD') == FALSE]),
+    #             suffix = c('_CURR', '_PREV')) #%>%
+    #   mutate(YEAR = YEAR_CURR) %>%
+    #   group_by(.dots = grpBy, PLT_CN) %>%
+    #   summarize(CURR_TPA = if_else(nStems_PREV > minLive, TPA_CURR, 0),
+    #             CURR_BAA = if_else(nStems_PREV > minLive, BAA_CURR, 0),
+    #             PREV_TPA = if_else(nStems_PREV > minLive, TPA_PREV, 0),
+    #             PREV_BAA = if_else(nStems_PREV > minLive, BAA_PREV, 0),
+    #             CHNG_TPA = (CURR_TPA - PREV_TPA)  / REMPER_CURR,
+    #             CHNG_BAA = (CURR_BAA - PREV_BAA)  / REMPER_CURR,
+    #             TPA_RATE = CHNG_TPA / PREV_TPA,
+    #             BAA_RATE = CHNG_BAA / PREV_BAA,
+    #             x = rFIA:::projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
+    #             y = rFIA:::projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
+    #             M = sqrt(x^2 + y^2),
+    #             SUST_INDEX = if_else(x < 0, -M, M)) #%>%
+    #   select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, PREV_TPA, CURR_TPA, PREV_BAA, CURR_BAA, nStems_PREV, nStems_CURR)
     t <- data %>%
       mutate(YEAR = MEASYEAR) %>%
       distinct(PLT_CN, SUBP, TREE, ONEORTWO, .keep_all = TRUE) %>%
@@ -74,12 +108,10 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, minLive){
       group_by(.dots = grpBy, PLT_CN) %>%
       summarize(nLive = length(which(tDI[ONEORTWO == 1] > 0)), ## Number of live trees in domain of interest at previous measurement
                 REMPER = first(REMPER),
-                PREV_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0) / REMPER,
-                CURR_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ[ONEORTWO == 2] * tDI[ONEORTWO == 2], na.rm = TRUE), 0) / REMPER,
-                CHNG_TPA = CURR_TPA - PREV_TPA,
-                PREV_BAA = if_else(nLive >= minLive, sum(BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0) / REMPER,
-                CURR_BAA = if_else(nLive >= minLive, sum(BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2], na.rm = TRUE), 0) / REMPER,
-                CHNG_BAA = CURR_BAA - PREV_BAA,
+                PREV_TPA = if_else(nLive >= minLive, sum(-TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
+                PREV_BAA = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
+                CHNG_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ * tDI, na.rm = TRUE), 0) / REMPER,
+                CHNG_BAA = if_else(nLive >= minLive, sum(BAA * tDI, na.rm = TRUE), 0) / REMPER,
                 TPA_RATE = CHNG_TPA / PREV_TPA,
                 BAA_RATE = CHNG_BAA / PREV_BAA,
                 x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
@@ -88,7 +120,47 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, minLive){
                 SUST_INDEX = if_else(x < 0, -M, M),
                 nStems = length(which(tDI == 1))) %>%
       ungroup() %>%
-      select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, PREV_TPA, CURR_TPA, PREV_BAA, CURR_BAA, nStems, nLive)
+      select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, PREV_TPA, PREV_BAA, nStems, nLive)
+
+
+      #           PREV_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ1 * tDI1, na.rm = TRUE), 0),
+      #           CURR_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ2 * tDI2, na.rm = TRUE), 0),
+      #           CHNG_TPA = (CURR_TPA - PREV_TPA) / REMPER,
+      #           PREV_BAA = if_else(nLive >= minLive, sum(BAA1 * tDI1, na.rm = TRUE), 0),
+      #           CURR_BAA = if_else(nLive >= minLive, sum(BAA2 * tDI2, na.rm = TRUE), 0),
+      #           CHNG_BAA = (CURR_BAA - PREV_BAA) / REMPER,
+      #           TPA_RATE = CHNG_TPA / PREV_TPA,
+      #           BAA_RATE = CHNG_BAA / PREV_BAA,
+      #           x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
+      #           y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
+      #           M = sqrt(x^2 + y^2),
+      #           SUST_INDEX = if_else(x < 0, -M, M),
+      #           nStems = length(which(tDI == 1))) %>%
+      # ungroup() %>%
+      # select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, PREV_TPA, CURR_TPA, PREV_BAA, CURR_BAA, nStems, nLive)
+
+    # t <- data %>%
+    #   mutate(YEAR = MEASYEAR) %>%
+    #   distinct(PLT_CN, SUBP, TREE, ONEORTWO, .keep_all = TRUE) %>%
+    #   # Compute estimates at plot level
+    #   group_by(.dots = grpBy, PLT_CN) %>%
+    #   summarize(nLive = length(which(tDI[ONEORTWO == 1] > 0)), ## Number of live trees in domain of interest at previous measurement
+    #             REMPER = first(REMPER),
+    #             PREV_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
+    #             CURR_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ[ONEORTWO == 2] * tDI[ONEORTWO == 2], na.rm = TRUE), 0),
+    #             CHNG_TPA = (CURR_TPA - PREV_TPA) / REMPER,
+    #             PREV_BAA = if_else(nLive >= minLive, sum(BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
+    #             CURR_BAA = if_else(nLive >= minLive, sum(BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2], na.rm = TRUE), 0),
+    #             CHNG_BAA = (CURR_BAA - PREV_BAA) / REMPER,
+    #             TPA_RATE = CHNG_TPA / PREV_TPA,
+    #             BAA_RATE = CHNG_BAA / PREV_BAA,
+    #             x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
+    #             y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
+    #             M = sqrt(x^2 + y^2),
+    #             SUST_INDEX = if_else(x < 0, -M, M),
+    #             nStems = length(which(tDI == 1))) %>%
+    #   ungroup() %>%
+    #   select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, PREV_TPA, CURR_TPA, PREV_BAA, CURR_BAA, nStems, nLive)
 
     a = NULL
 
@@ -119,10 +191,10 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, minLive){
       group_by(PLT_CN, PLOT_BASIS, .dots = grpBy) %>%
       summarize(nLive = length(which(tDI[ONEORTWO == 1] > 0)), ## Number of live trees in domain of interest at previous measurement
                 REMPER = first(REMPER),
-                PREV_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0) / REMPER,
-                CURR_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ[ONEORTWO == 2] * tDI[ONEORTWO == 2], na.rm = TRUE), 0) / REMPER,
-                PREV_BAA = if_else(nLive >= minLive, sum(BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0) / REMPER,
-                CURR_BAA = if_else(nLive >= minLive, sum(BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2], na.rm = TRUE), 0) / REMPER,
+                PREV_TPA = if_else(nLive >= minLive, sum(-TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
+                PREV_BAA = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
+                CHNG_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ * tDI, na.rm = TRUE), 0),
+                CHNG_BAA = if_else(nLive >= minLive, sum(BAA * tDI, na.rm = TRUE), 0),
                 plotIn = if_else(sum(tDI) > 0, 1, 0))
   }
 
@@ -146,25 +218,40 @@ sustIndexHelper2 <- function(x, popState, t, grpBy, method){
   ## Strata level estimates
   tEst <- t %>%
     ## Rejoin with population tables
-    right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
+    right_join(select(popState[[x]], -c(STATECD, REMPER)), by = 'PLT_CN') %>%
     ## Need this for covariance later on
     #Add adjustment factors
-    mutate(tAdj = case_when(
-      ## When NA, stay NA
-      is.na(PLOT_BASIS) ~ NA_real_,
-      ## If the proportion was measured for a macroplot,
-      ## use the macroplot value
-      PLOT_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
-      ## Otherwise, use the subpplot value
-      PLOT_BASIS == 'SUBP' ~ as.numeric(ADJ_FACTOR_SUBP),
-      PLOT_BASIS == 'MICR' ~ as.numeric(ADJ_FACTOR_MICR)),
-      ct = CURR_TPA * tAdj,
-      cb = CURR_BAA * tAdj,
+    #Add adjustment factors
+    # mutate(tAdj = case_when(
+    #   ## When NA, stay NA
+    #   is.na(SUBPTYP_GRM) ~ NA_real_,
+    #   ## If the proportion was measured for a macroplot,
+    #   ## use the macroplot value
+    #   SUBPTYP_GRM == 0 ~ 0,
+    #   SUBPTYP_GRM == 1 ~ as.numeric(ADJ_FACTOR_SUBP),
+    #   SUBPTYP_GRM == 2 ~ as.numeric(ADJ_FACTOR_MICR),
+    #   SUBPTYP_GRM == 3 ~ as.numeric(ADJ_FACTOR_MACR)),
+    #   ct = CHNG_TPA * tAdj,
+    #   cb = CHNG_BAA * tAdj,
+    #   pt = PREV_TPA * tAdj,
+    #   pb = PREV_BAA * tAdj) %>%
+  #Add adjustment factors
+  mutate(tAdj = case_when(
+    ## When NA, stay NA
+    is.na(PLOT_BASIS) ~ NA_real_,
+    ## If the proportion was measured for a macroplot,
+    ## use the macroplot value
+    PLOT_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
+    ## Otherwise, use the subpplot value
+    PLOT_BASIS == 'SUBP' ~ as.numeric(ADJ_FACTOR_SUBP),
+    PLOT_BASIS == 'MICR' ~ as.numeric(ADJ_FACTOR_MICR)),
+      ct = CHNG_TPA * tAdj,
+      cb = CHNG_BAA * tAdj,
       pt = PREV_TPA * tAdj,
       pb = PREV_BAA * tAdj) %>%
     ## Computing change
-    mutate(ct = ct - pt,
-           cb = cb - pb) %>%
+    mutate(ct = (ct) / REMPER,
+           cb = (cb) / REMPER) %>%
     ## Extra step for variance issues
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy) %>%
     summarize(ctPlot = sum(ct, na.rm = TRUE),
@@ -207,6 +294,7 @@ sustIndexHelper2 <- function(x, popState, t, grpBy, method){
               cbEst = unitMean(ESTN_METHOD, a, nh, w, cbStrat),
               ptEst = unitMean(ESTN_METHOD, a, nh, w, ptStrat),
               pbEst = unitMean(ESTN_METHOD, a, nh, w, pbStrat),
+              nh = first(nh),
               # Estimation of unit variance
               ctVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ctv, ctStrat, ctEst),
               cbVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, cbv, cbStrat, cbEst),
