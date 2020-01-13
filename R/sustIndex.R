@@ -11,7 +11,7 @@ sustIndex <- function(db,
                       lambda = .5,
                       treeDomain = NULL,
                       areaDomain = NULL,
-                      totals = FALSE,
+                      totals = TRUE,
                       byPlot = FALSE,
                       nCores = 1) {
 
@@ -612,7 +612,17 @@ sustIndex <- function(db,
                  BAA_RATE > 0 & BAA_RATE - BAA_RATE_INT > 0 ~ 'Expand',
                  TRUE ~ 'Stable'
                )
-               )
+               ) %>%
+        mutate(SI_STATUS = case_when(
+          TPA_STATUS == 'Expand' & BAA_STATUS == 'Expand' ~ 'Expand',
+          TPA_STATUS == 'Expand' & BAA_STATUS == 'Stable' ~ 'Marginal Expand',
+          TPA_STATUS == 'Stable' & BAA_STATUS == 'Expand' ~ 'Marginal Expand',
+          TPA_STATUS == 'Stable' & BAA_STATUS == 'Stable' ~ 'Stable',
+          TPA_STATUS == 'Stable' & BAA_STATUS == 'Decline' ~ 'Marginal Decline',
+          TPA_STATUS == 'Decline' & BAA_STATUS == 'Stable' ~ 'Marginal Decline',
+          TPA_STATUS == 'Decline' & BAA_STATUS == 'Decline' ~ 'Decline',
+          TRUE ~ 'Opposing Signals'
+        ))
     })
 
 
@@ -620,14 +630,14 @@ sustIndex <- function(db,
     if (totals) {
       tOut <- tOut %>%
         select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, TPA_RATE_INT, BAA_RATE_INT,
-               TPA_STATUS, BAA_STATUS, CHNG_TPA, CHNG_BAA, PREV_TPA, PREV_BAA,
+               TPA_STATUS, SI_STATUS, BAA_STATUS, CHNG_TPA, CHNG_BAA, PREV_TPA, PREV_BAA,
                TPA_RATE_SE, BAA_RATE_SE, CHNG_TPA_SE, CHNG_BAA_SE, PREV_TPA_SE, PREV_BAA_SE,
                nPlots)
 
     } else {
       tOut <- tOut %>%
         select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE,TPA_RATE_INT, BAA_RATE_INT,
-               TPA_STATUS, BAA_STATUS,
+               SI_STATUS, TPA_STATUS, BAA_STATUS,
                TPA_RATE_SE, BAA_RATE_SE,
                nPlots)
     }
