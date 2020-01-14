@@ -515,7 +515,7 @@ sustIndex <- function(db,
             select(ESTN_UNIT_CN, INVYR, wgt)
         } else {
           grpBy <- c('lambda', grpBy)
-          aGrpBy <- c('lambda', aGrpBy)
+          #aGrpBy <- c('lambda', aGrpBy)
           ## Duplicate weights for each level of lambda
           yrWgts <- list()
           for (i in 1:length(unique(lambda))) {
