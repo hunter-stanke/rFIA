@@ -261,7 +261,7 @@ seedling <- function(db,
 
   ## Add species to groups
   if (bySpecies) {
-    db$TREE <- db$TREE %>%
+    db$SEEDLING <- db$SEEDLING %>%
       left_join(select(intData$REF_SPECIES_2018, c('SPCD','COMMON_NAME', 'GENUS', 'SPECIES')), by = 'SPCD') %>%
       mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' ')) %>%
       mutate_if(is.factor,
@@ -479,7 +479,7 @@ seedling <- function(db,
                 nPlots_SEEDLING = sum(plotIn_TREE, na.rm = TRUE)) #%>%
     ## IF using polys, we treat each zone as a unique population
     if (!is.null(polys)){
-      propGrp <- c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
+      propGrp <- c('polyID', grpBy)
     } else {
       propGrp <- 'YEAR'
     }

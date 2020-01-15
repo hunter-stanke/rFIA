@@ -96,6 +96,60 @@ plotSI <- function(data, y = NULL, grp = NULL, x = NULL, style = 'cleveland', an
            grpVar = !!grp_quo,
            yVar = !!y_quo)
 
+  if ('sf' %in% class(data)) {
+
+    if (class(data$yVar) == 'numeric'){
+      # Make the spatial map
+      map <- data %>%
+        ggplot() +
+        geom_sf(aes(fill = yVar), colour = line.color, lwd = line.width) +
+        labs(fill = ifelse(is.null(legend.title), str_wrap(quo_name(y_quo), width = 10 * lab.width), str_wrap(legend.title, width = 10 * lab.width))) +
+        scale_fill_viridis_c(alpha = alpha, option = color.option, direction = direction, trans = transform, limits = limits) +
+        theme_minimal() +
+        ggtitle(plot.title)+
+        theme(#axis.text = element_blank(),
+          legend.title = element_text(size = 14 * text.size, face = 'bold.italic', family = text.font),
+          legend.text = element_text(size = 11 * text.size, face = 'italic', family = text.font),
+          plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),
+          legend.key.height = unit(2.2 * legend.height, "cm"),
+          legend.key.width  = unit(1 * legend.width, "cm"))
+    } else {
+      # Make the spatial map
+      map <- data %>%
+        mutate(yVar = factor(data$SI_STATUS, ordered = TRUE, levels = c('Expand', 'Marginal Expand', 'Stable', 'Marginal Decline', 'Decline', 'Opposing Signals'))) %>%
+        ggplot() +
+        geom_sf(aes(fill = yVar), colour = line.color, lwd = line.width) +
+        labs(fill = ifelse(is.null(legend.title), str_wrap(quo_name(y_quo), width = 10 * lab.width), str_wrap(legend.title, width = 10 * lab.width))) +
+        scale_fill_viridis_d(alpha = alpha, option = color.option, direction = direction) +
+        theme_minimal() +
+        ggtitle(plot.title)+
+        theme(#axis.text = element_blank(),
+          legend.title = element_text(size = 14 * text.size, face = 'bold.italic', family = text.font),
+          legend.text = element_text(size = 11 * text.size, face = 'italic', family = text.font),
+          plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),
+          legend.key.height = unit(2.2 * legend.height, "cm"),
+          legend.key.width  = unit(1 * legend.width, "cm"))
+    }
+
+
+    ## Animate if they want to
+    if (animate){
+      map <- map +
+        transition_manual(YEAR) +
+        labs(title = 'Year: {current_frame}')
+    } else if(facet){
+      map <- map + facet_wrap(~YEAR) +
+        theme(strip.text = element_text(size = 12 * text.size, family = text.font),
+              strip.background = element_rect(fill = 'gray'),
+              panel.background = element_rect(color = 'black'))
+    }
+
+    return(map)
+  }
+
+
+
+
 
   ## If they want a subset of the groups
   if (!is.null(n.max) & quo_name(grp_quo) != 'NULL'){
@@ -187,9 +241,18 @@ plotSI <- function(data, y = NULL, grp = NULL, x = NULL, style = 'cleveland', an
       warning('Style unknown. Defaulting to Cleveland Dot Plot.')
     }
 
+    if (class(data$grpVar) != 'numeric'){
+      data <- data %>%
+        mutate(grpVar = factor(data$grpVar, levels = unique(data$grpVar[order(data$yVar)])),
+        )
+    } else {
+      data <- data %>%
+        mutate(grpVar = factor(data$grpVar, levels = unique(data$grpVar[order(data$grpVar)])),
+        )
+    }
+
     plt <- data %>%
-      mutate(grpVar = factor(data$grpVar, levels = unique(data$grpVar[order(data$yVar)])),
-             SI_STATUS = factor(data$SI_STATUS, ordered = TRUE, levels = c('Expand', 'Marginal Expand', 'Stable', 'Marginal Decline', 'Decline', 'Opposing Signals'))) %>%
+      mutate(SI_STATUS = factor(data$SI_STATUS, ordered = TRUE, levels = c('Expand', 'Marginal Expand', 'Stable', 'Marginal Decline', 'Decline', 'Opposing Signals'))) %>%
       ggplot(aes(x = yVar, y = grpVar)) +
         geom_vline(xintercept = 0, alpha = .67, colour = 'grey', linetype = 'dashed')+
         geom_segment(aes(yend=grpVar), xend=0, colour = 'grey50') +
