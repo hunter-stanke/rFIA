@@ -147,7 +147,7 @@ growMort <- function(db,
     # Test if any polygons cross state boundaries w/ different recent inventory years (continued w/in loop)
     if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
       mergeYears <- pltSF %>%
-        right_join(select(db$PLOT, PLT_CN, pltID), by = pltID) %>%
+        right_join(select(db$PLOT, PLT_CN, pltID), by = 'pltID') %>%
         inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
         inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
@@ -453,7 +453,6 @@ growMort <- function(db,
     ## Adding YEAR to groups
     grpBy <- c('YEAR', grpBy)
     aGrpBy <- c('YEAR', aGrpBy)
-
 
     ## Splitting up by ESTN_UNIT
     popState <- split(pops, as.factor(pops$STATECD))

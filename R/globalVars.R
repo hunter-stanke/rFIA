@@ -135,5 +135,12 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'PREV_BAA', 'PREV_BAA_ga', 'PREV_TPA', 'PREV_TPA_ga', 'Q1', 'RECR_RATE', 'RECR_RATE_SE',
                          'RECR_RATE_ga', 'RECR_TPA_ga', 'REMV_TPA_ga', 'S1', 'STATUSCD', 'STATUSCD.prev',
                          'SUST_INDEX', 'SUST_INDEX_SE', 'TPA_UNADJ.prev', 'cvEst_q', 'cvStrat_q', 'lPlot', 'nLive',
-                         'nStems', 'qEst', 'qStrat', 'qVar', 'qv', 'x_ga', 'y', 'y_ga'
+                         'nStems', 'qEst', 'qStrat', 'qVar', 'qv', 'x_ga', 'y', 'y_ga',
+                         'BAA1', 'BAA2', 'BAA_RATE_INT', 'BAA_STATUS', 'CHNG_BAA','CHNG_BAA_SE', 'CHNG_TPA',
+                         'CHNG_TPA_SE', 'DIA_MIDPT', 'M_TPA', 'PLOT_STATUS_CD1', 'PLOT_STATUS_CD2', 'PREVDIA',
+                         'PREV_BAA_SE', 'PREV_HARV_BAA', 'PREV_MORT_BAA', 'PREV_TPA_SE', 'PREV_TRE_CN',
+                         'RECR_BAA', 'REMV_BAA', 'R_TPA', 'SI_STATUS', 'TPA_RATE', 'TPA_RATE_INT', 'TPA_RATE_SE',
+                         'TPA_STATUS', 'TPA_UNADJ1', 'TPA_UNADJ2', 'T_TPA', 'cb', 'cbPlot', 'cbStrat', 'cbVar', 'cbv', 'ct',
+                         'cvEst_cb', 'cvStrat_cb', 'pb', 'pbEst', 'pbPlot', 'pbStrat', 'pbVar', 'pbv', 'pt', 'ptEst', 'ptPlot',
+                         'ptStrat', 'ptVar', 'ptv', 'tDI1', 'tDI2'
 ))

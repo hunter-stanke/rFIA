@@ -7,7 +7,7 @@ sustIndex <- function(db,
                       landType = 'forest',
                       treeType = 'live',
                       minLive = 0,
-                      method = 'TI',
+                      method = 'annual',
                       lambda = .5,
                       treeDomain = NULL,
                       areaDomain = NULL,
@@ -145,7 +145,7 @@ sustIndex <- function(db,
     # Test if any polygons cross state boundaries w/ different recent inventory years (continued w/in loop)
     if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
       mergeYears <- pltSF %>%
-        right_join(select(db$PLOT, PLT_CN, pltID), by = pltID) %>%
+        right_join(select(db$PLOT, PLT_CN, pltID), by = 'pltID') %>%
         inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
         inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
         group_by(polyID) %>%
@@ -621,7 +621,8 @@ sustIndex <- function(db,
           TPA_STATUS == 'Stable' & BAA_STATUS == 'Decline' ~ 'Marginal Decline',
           TPA_STATUS == 'Decline' & BAA_STATUS == 'Stable' ~ 'Marginal Decline',
           TPA_STATUS == 'Decline' & BAA_STATUS == 'Decline' ~ 'Decline',
-          TRUE ~ 'Opposing Signals'
+          TPA_STATUS != BAA_STATUS & SUST_INDEX < 0  ~ 'Marginal Decline',
+          TRUE ~ 'Marginal Expand'
         ))
     })
 

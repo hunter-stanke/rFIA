@@ -46,8 +46,6 @@ vitalRates(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FA
 }
 
 \details{
-A known issue in FIA's EVALIDator causes a mismatch between \code{rFIA} and EVALIDator estimates of tree growth. Estimates output by \code{rFIA} have been compared against updated estimates produced with EVALIDator (not yet publicly available), and tend to differ by approximately +/- 1\%. Current development seeks to identify the cause of this remaining discrepancy.
-
 Estimation of attributes follows the procedures documented in Bechtold and Patterson (2005). Average annual diameter, basal area, height, and net volume growth of a stem is computed using a sample-based ratio of means estimator of total diameter (basal area, height, net volume) growth / total trees, and average annual basal area and net volume growth per acre is computed as total basal area (net volume) growth / total area. All estimates are returned as average annual rates. Only conditions which were forest in time 1 and in time 2 are included in estimates (excluding converted stands). Only stems 5 inches DBH or greater are included in estimates.
 
 As estimates are of net growth rates, they may attain a negative value. Negative growth estimates most likely indicate a substantial change in an attribute of the tree or area between time 1 and time 2, which caused the attribute to decrease. Implementation of the growth accounting method allows us to more accurately representshifts in forest attributes (biomass) between classified groups (size classes) over time.
