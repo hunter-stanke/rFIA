@@ -551,8 +551,8 @@ sustIndex <- function(db,
 
 
       tEst <- tEst %>%
-        mutate_at(vars(ctEst:pbEst), ~(.*wgt)) %>%
-        mutate_at(vars(ctVar:cvEst_cb), ~(.*(wgt^2))) %>%
+        mutate_at(vars(ctEst:silvEst), ~(.*wgt)) %>%
+        mutate_at(vars(ctVar:cvEst_silv), ~(.*(wgt^2))) %>%
         group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
         summarize_at(vars(ctEst:plotIn_t), sum, na.rm = TRUE)
 
@@ -576,6 +576,14 @@ sustIndex <- function(db,
                PREV_BAA = pbEst,
                TPA_RATE = ctEst / ptEst,
                BAA_RATE = cbEst / pbEst,
+               INSECT_RATE = bugEst / pbEst,
+               DISEASE_RATE = diseaseEst / pbEst,
+               FIRE_RATE = fireEst / pbEst,
+               ANIMAL_RATE = animalEst / pbEst,
+               WEATHER_RATE = weatherEst / pbEst,
+               VEG_RATE = vegEst / pbEst,
+               UNKNOWN_RATE = unEst / pbEst,
+               SILV_RATE = silvEst / pbEst,
                x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
                y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
                M = sqrt(x^2 + y^2),
@@ -588,13 +596,25 @@ sustIndex <- function(db,
                ## Ratio variance
                ctVar = (1/PREV_TPA^2) * (ctVar + (TPA_RATE^2 * ptVar) - 2 * TPA_RATE * cvEst_ct),
                cbVar = (1/PREV_BAA^2) * (cbVar + (BAA_RATE^2 * pbVar) - 2 * BAA_RATE * cvEst_cb),
-               ## Projected variance
-               #x = projectPnts(ctVar, cbVar, 1, 0)$x,
-               #y = projectPnts(ctVar, cbVar, 1, 0)$y,
-               #Mvar = sqrt(x^2 + y^2),
+               bugVar = (1/PREV_BAA^2) * (bugVar + (INSECT_RATE^2 * pbVar) - 2 * INSECT_RATE * cvEst_bug),
+               diseaseVar = (1/PREV_BAA^2) * (diseaseVar + (DISEASE_RATE^2 * pbVar) - 2 * DISEASE_RATE * cvEst_disease),
+               fireVar = (1/PREV_BAA^2) * (fireVar + (FIRE_RATE^2 * pbVar) - 2 * FIRE_RATE * cvEst_fire),
+               animalVar = (1/PREV_BAA^2) * (animalVar + (ANIMAL_RATE^2 * pbVar) - 2 * ANIMAL_RATE * cvEst_animal),
+               weatherVar = (1/PREV_BAA^2) * (weatherVar + (WEATHER_RATE^2 * pbVar) - 2 * WEATHER_RATE * cvEst_weather),
+               vegVar = (1/PREV_BAA^2) * (vegVar + (VEG_RATE^2 * pbVar) - 2 * VEG_RATE * cvEst_veg),
+               unVar = (1/PREV_BAA^2) * (unVar + (UNKNOWN_RATE^2 * pbVar) - 2 * UNKNOWN_RATE * cvEst_un),
+               silvVar = (1/PREV_BAA^2) * (silvVar + (SILV_RATE^2 * pbVar) - 2 * SILV_RATE * cvEst_silv),
                ## RATIO SE
                TPA_RATE_SE = sqrt(ctVar) / abs(TPA_RATE) * 100,
                BAA_RATE_SE = sqrt(cbVar) / abs(BAA_RATE) * 100,
+               INSECT_RATE_SE = sqrt(bugVar) / abs(INSECT_RATE) * 100,
+               DISEASE_RATE_SE = sqrt(diseaseVar) / abs(DISEASE_RATE) * 100,
+               FIRE_RATE_SE = sqrt(fireVar) / abs(FIRE_RATE) * 100,
+               ANIMAL_RATE_SE = sqrt(animalVar) / abs(ANIMAL_RATE) * 100,
+               WEATHER_RATE_SE = sqrt(weatherVar) / abs(WEATHER_RATE) * 100,
+               VEG_RATE_SE = sqrt(vegVar) / abs(VEG_RATE) * 100,
+               UNKNOWN_RATE_SE = sqrt(unVar) / abs(UNKNOWN_RATE) * 100,
+               SILV_RATE_SE = sqrt(silvVar) / abs(SILV_RATE) * 100,
                #SUST_INDEX_SE = sqrt(Mvar) / abs(SUST_INDEX) * 100,
                nPlots = plotIn_t,
                nTotal = nh,
@@ -632,14 +652,18 @@ sustIndex <- function(db,
       tOut <- tOut %>%
         select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, TPA_RATE_INT, BAA_RATE_INT,
                TPA_STATUS, SI_STATUS, BAA_STATUS, CHNG_TPA, CHNG_BAA, PREV_TPA, PREV_BAA,
+               INSECT_RATE, DISEASE_RATE, FIRE_RATE, ANIMAL_RATE, WEATHER_RATE, VEG_RATE, UNKNOWN_RATE, SILV_RATE,
                TPA_RATE_SE, BAA_RATE_SE, CHNG_TPA_SE, CHNG_BAA_SE, PREV_TPA_SE, PREV_BAA_SE,
+               INSECT_RATE_SE, DISEASE_RATE_SE, FIRE_RATE_SE, ANIMAL_RATE_SE, WEATHER_RATE_SE, VEG_RATE_SE, UNKNOWN_RATE_SE, SILV_RATE_SE,
                nPlots)
 
     } else {
       tOut <- tOut %>%
         select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE,TPA_RATE_INT, BAA_RATE_INT,
                SI_STATUS, TPA_STATUS, BAA_STATUS,
+               INSECT_RATE, DISEASE_RATE, FIRE_RATE, ANIMAL_RATE, WEATHER_RATE, VEG_RATE, UNKNOWN_RATE, SILV_RATE,
                TPA_RATE_SE, BAA_RATE_SE,
+               INSECT_RATE_SE, DISEASE_RATE_SE, FIRE_RATE_SE, ANIMAL_RATE_SE, WEATHER_RATE_SE, VEG_RATE_SE, UNKNOWN_RATE_SE, SILV_RATE_SE,
                nPlots)
     }
 

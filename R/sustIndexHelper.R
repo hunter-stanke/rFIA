@@ -19,7 +19,8 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
     filter(!is.na(REMPER) & !is.na(PREV_PLT_CN) & DESIGNCD == 1) %>%
 
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'TPA_UNADJ', 'DIA')), by = c('PLT_CN', 'CONDID')) %>%
+    ## AGENTCD at remeasurement, died during the measurement interval
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'TPA_UNADJ', 'DIA', 'AGENTCD')), by = c('PLT_CN', 'CONDID')) %>%
     #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', DIA_BEGIN, DIA_END)), by = c('TRE_CN')) %>%
 
     left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p', 'DESIGNCD', 'PLOT_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
@@ -31,22 +32,33 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
               as.character)
 
   ## Comprehensive indicator function -- w/ growth accounting
-  data$tDI2 <- data$landD2 * data$aD_p2 * data$aD_c2 * data$tD2 * data$typeD2 * data$sp2 *
-    if_else(data$PLOT_STATUS_CD1 == 1 & data$PLOT_STATUS_CD2 == 1, 1, 0)
-  data$tDI1 <- data$landD1 * data$aD_p1 * data$aD_c1 * data$tD1 * data$typeD1 * data$sp1 *
-    if_else(data$PLOT_STATUS_CD1 == 1 & data$PLOT_STATUS_CD2 == 1, 1, 0)
+  data$tDI2 <- data$landD2 * data$aD_p2 * data$aD_c2 * data$tD2 * data$typeD2 * data$sp2 #*
+    #if_else(data$PLOT_STATUS_CD1 == 1 & data$PLOT_STATUS_CD2 == 1, 1, 0)
+  data$tDI1 <- data$landD1 * data$aD_p1 * data$aD_c1 * data$tD1 * data$typeD1 * data$sp1 #*
+    #if_else(data$PLOT_STATUS_CD1 == 1 & data$PLOT_STATUS_CD2 == 1, 1, 0)
 
   ## PREVIOUS and CURRENT attributes
   data <- data %>%
     mutate(TPA_UNADJ1 = TPA_UNADJ1,
            TPA_UNADJ2 = TPA_UNADJ2,
            BAA1 = basalArea(DIA1) * TPA_UNADJ1,
-           BAA2 = basalArea(DIA2) * TPA_UNADJ2) #%>%
+           BAA2 = basalArea(DIA2) * TPA_UNADJ2,
+           BUG = if_else(AGENTCD == 10, 1, 0),
+           DISEASE = if_else(AGENTCD == 20, 1, 0),
+           FIRE = if_else(AGENTCD == 30, 1, 0),
+           ANIMAL = if_else(AGENTCD == 40, 1, 0),
+           WEATHER = if_else(AGENTCD == 50, 1, 0),
+           VEG = if_else(AGENTCD == 60, 1, 0),
+           UNKNOWN = if_else(AGENTCD == 70, 1, 0),
+           SILV = if_else(AGENTCD == 80, 1, 0),
+           ) #%>%
 
   ## Just what we need
   data <- data %>%
     select(PLT_CN, TRE_CN, SUBP, CONDID, TREE,
-          MEASYEAR, MACRO_BREAKPOINT_DIA, REMPER, PLOT_STATUS_CD1, PLOT_STATUS_CD2,
+          MEASYEAR, MACRO_BREAKPOINT_DIA,
+          BUG, DISEASE, FIRE, ANIMAL, WEATHER, VEG, UNKNOWN, SILV,
+          REMPER, PLOT_STATUS_CD1, PLOT_STATUS_CD2,
            one_of(str_c(grpP,1), str_c(grpC,1), str_c(grpT,1),
            str_c(grpP,2), str_c(grpC,2), str_c(grpT,2)),
           tDI1, tDI2, #SUBPTYP_GRM1, SUBPTYP_GRM2,
@@ -114,13 +126,24 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 CHNG_BAA = if_else(nLive >= minLive, sum(BAA * tDI, na.rm = TRUE), 0) / REMPER,
                 TPA_RATE = CHNG_TPA / PREV_TPA,
                 BAA_RATE = CHNG_BAA / PREV_BAA,
+                ## Disturbances
+                BUG_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & BUG == 1] * tDI[ONEORTWO == 1 & BUG == 1], na.rm = TRUE), 0) / PREV_BAA,
+                DISEASE_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & DISEASE == 1] * tDI[ONEORTWO == 1 & DISEASE == 1], na.rm = TRUE), 0) / PREV_BAA,
+                FIRE_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & FIRE == 1] * tDI[ONEORTWO == 1 & FIRE == 1], na.rm = TRUE), 0) / PREV_BAA,
+                ANIMAL_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & ANIMAL == 1] * tDI[ONEORTWO == 1 & ANIMAL == 1], na.rm = TRUE), 0) / PREV_BAA,
+                WEATHER_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & WEATHER == 1] * tDI[ONEORTWO == 1 & WEATHER == 1], na.rm = TRUE), 0) / PREV_BAA,
+                VEG_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & VEG == 1] * tDI[ONEORTWO == 1 & VEG == 1], na.rm = TRUE), 0) / PREV_BAA,
+                UNKNOWN_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & UNKNOWN == 1] * tDI[ONEORTWO == 1 & UNKNOWN == 1], na.rm = TRUE), 0) / PREV_BAA,
+                SILV_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & SILV == 1] * tDI[ONEORTWO == 1 & SILV == 1], na.rm = TRUE), 0) / PREV_BAA,
                 x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
                 y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
                 M = sqrt(x^2 + y^2),
                 SUST_INDEX = if_else(x < 0, -M, M),
                 nStems = length(which(tDI == 1))) %>%
       ungroup() %>%
-      select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, PREV_TPA, PREV_BAA, nStems, nLive)
+      select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, PREV_TPA, PREV_BAA, BUG_RATE,
+             DISEASE_RATE, FIRE_RATE, ANIMAL_RATE, WEATHER_RATE, VEG_RATE,
+             UNKNOWN_RATE, SILV_RATE, nStems, nLive)
 
 
       #           PREV_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ1 * tDI1, na.rm = TRUE), 0),
@@ -195,6 +218,15 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 PREV_BAA = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
                 CHNG_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ * tDI, na.rm = TRUE), 0),
                 CHNG_BAA = if_else(nLive >= minLive, sum(BAA * tDI, na.rm = TRUE), 0),
+                ## Disturbances
+                BUG_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & BUG == 1] * tDI[ONEORTWO == 1 & BUG == 1], na.rm = TRUE), 0),
+                DISEASE_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & DISEASE == 1] * tDI[ONEORTWO == 1 & DISEASE == 1], na.rm = TRUE), 0),
+                FIRE_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & FIRE == 1] * tDI[ONEORTWO == 1 & FIRE == 1], na.rm = TRUE), 0),
+                ANIMAL_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & ANIMAL == 1] * tDI[ONEORTWO == 1 & ANIMAL == 1], na.rm = TRUE), 0),
+                WEATHER_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & WEATHER == 1] * tDI[ONEORTWO == 1 & WEATHER == 1], na.rm = TRUE), 0),
+                VEG_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & VEG == 1] * tDI[ONEORTWO == 1 & VEG == 1], na.rm = TRUE), 0),
+                UNKNOWN_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & UNKNOWN == 1] * tDI[ONEORTWO == 1 & UNKNOWN == 1], na.rm = TRUE), 0),
+                SILV_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & SILV == 1] * tDI[ONEORTWO == 1 & SILV == 1], na.rm = TRUE), 0),
                 plotIn = if_else(sum(tDI) > 0, 1, 0))
   }
 
@@ -248,7 +280,16 @@ sustIndexHelper2 <- function(x, popState, t, grpBy, method){
       ct = CHNG_TPA * tAdj,
       cb = CHNG_BAA * tAdj,
       pt = PREV_TPA * tAdj,
-      pb = PREV_BAA * tAdj) %>%
+      pb = PREV_BAA * tAdj,
+      bug = BUG_RATE * tAdj / REMPER,
+      disease = DISEASE_RATE * tAdj / REMPER,
+      fire = FIRE_RATE * tAdj / REMPER,
+      animal = ANIMAL_RATE * tAdj / REMPER,
+      weather = WEATHER_RATE * tAdj / REMPER,
+      veg = VEG_RATE * tAdj / REMPER,
+      unknown = UNKNOWN_RATE * tAdj / REMPER,
+      silv = SILV_RATE * tAdj / REMPER,
+    ) %>%
     ## Computing change
     mutate(ct = (ct) / REMPER,
            cb = (cb) / REMPER) %>%
@@ -258,6 +299,14 @@ sustIndexHelper2 <- function(x, popState, t, grpBy, method){
               cbPlot = sum(cb, na.rm = TRUE),
               ptPlot = sum(pt, na.rm = TRUE),
               pbPlot = sum(pb, na.rm = TRUE),
+              bugPlot = sum(bug, na.rm = TRUE),
+              diseasePlot = sum(disease, na.rm = TRUE),
+              firePlot = sum(fire, na.rm = TRUE),
+              animalPlot = sum(animal, na.rm = TRUE),
+              weatherPlot = sum(weather, na.rm = TRUE),
+              vegPlot = sum(veg, na.rm = TRUE),
+              unPlot = sum(unknown, na.rm = TRUE),
+              silvPlot = sum(silv, na.rm = TRUE),
               plotIn_t = ifelse(sum(plotIn >  0, na.rm = TRUE), 1,0),
               nh = first(P2POINTCNT),
               p2eu = first(p2eu),
@@ -270,6 +319,15 @@ sustIndexHelper2 <- function(x, popState, t, grpBy, method){
               cbStrat = mean(cbPlot * r_t, na.rm = TRUE),
               ptStrat = mean(ptPlot * r_t, na.rm = TRUE),
               pbStrat = mean(pbPlot * r_t, na.rm = TRUE),
+              bugStrat = mean(bugPlot * r_t, na.rm = TRUE),
+              diseaseStrat = mean(diseasePlot * r_t, na.rm = TRUE),
+              fireStrat = mean(firePlot * r_t, na.rm = TRUE),
+              animalStrat = mean(animalPlot * r_t, na.rm = TRUE),
+              weatherStrat = mean(weatherPlot * r_t, na.rm = TRUE),
+              vegStrat = mean(vegPlot * r_t, na.rm = TRUE),
+              unStrat = mean(unPlot * r_t, na.rm = TRUE),
+              silvStrat = mean(silvPlot * r_t, na.rm = TRUE),
+
               plotIn_t = sum(plotIn_t, na.rm = TRUE),
               n = n(),
               ## We don't want a vector of these values, since they are repeated
@@ -283,9 +341,27 @@ sustIndexHelper2 <- function(x, popState, t, grpBy, method){
               cbv = stratVar(ESTN_METHOD, cbPlot, cbStrat, ndif, a, nh),
               ptv = stratVar(ESTN_METHOD, ptPlot, ptStrat, ndif, a, nh),
               pbv = stratVar(ESTN_METHOD, pbPlot, pbStrat, ndif, a, nh),
+              bugv = stratVar(ESTN_METHOD, bugPlot, bugStrat, ndif, a, nh),
+              diseasev = stratVar(ESTN_METHOD, diseasePlot, diseaseStrat, ndif, a, nh),
+              firev = stratVar(ESTN_METHOD, firePlot, fireStrat, ndif, a, nh),
+              animalv = stratVar(ESTN_METHOD, animalPlot, animalStrat, ndif, a, nh),
+              weatherv = stratVar(ESTN_METHOD, weatherPlot, weatherStrat, ndif, a, nh),
+              vegv = stratVar(ESTN_METHOD, vegPlot, vegStrat, ndif, a, nh),
+              unv = stratVar(ESTN_METHOD, unPlot, unStrat, ndif, a, nh),
+              silvv = stratVar(ESTN_METHOD, silvPlot, silvStrat, ndif, a, nh),
+
               # Strata level covariances
               cvStrat_ct = stratVar(ESTN_METHOD, ctPlot, ctStrat, ndif, a, nh, ptPlot, ptStrat),
-              cvStrat_cb = stratVar(ESTN_METHOD, cbPlot, cbStrat, ndif, a, nh, pbPlot, pbStrat)
+              cvStrat_cb = stratVar(ESTN_METHOD, cbPlot, cbStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_bug = stratVar(ESTN_METHOD, bugPlot, bugStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_disease = stratVar(ESTN_METHOD, diseasePlot, diseaseStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_fire = stratVar(ESTN_METHOD, firePlot, fireStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_animal = stratVar(ESTN_METHOD, animalPlot, animalStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_weather = stratVar(ESTN_METHOD, weatherPlot, weatherStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_veg = stratVar(ESTN_METHOD, vegPlot, vegStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_un = stratVar(ESTN_METHOD, unPlot, unStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_silv = stratVar(ESTN_METHOD, silvPlot, silvStrat, ndif, a, nh, pbPlot, pbStrat),
+
     ) %>%
 
     ## Estimation unit
@@ -294,15 +370,39 @@ sustIndexHelper2 <- function(x, popState, t, grpBy, method){
               cbEst = unitMean(ESTN_METHOD, a, nh, w, cbStrat),
               ptEst = unitMean(ESTN_METHOD, a, nh, w, ptStrat),
               pbEst = unitMean(ESTN_METHOD, a, nh, w, pbStrat),
+              bugEst = unitMean(ESTN_METHOD, a, nh, w, bugStrat),
+              diseaseEst = unitMean(ESTN_METHOD, a, nh, w, diseaseStrat),
+              fireEst = unitMean(ESTN_METHOD, a, nh, w, fireStrat),
+              animalEst = unitMean(ESTN_METHOD, a, nh, w, animalStrat),
+              weatherEst = unitMean(ESTN_METHOD, a, nh, w, weatherStrat),
+              vegEst = unitMean(ESTN_METHOD, a, nh, w, vegStrat),
+              unEst = unitMean(ESTN_METHOD, a, nh, w, unStrat),
+              silvEst = unitMean(ESTN_METHOD, a, nh, w, silvStrat),
               nh = first(nh),
               # Estimation of unit variance
               ctVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ctv, ctStrat, ctEst),
               cbVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, cbv, cbStrat, cbEst),
               ptVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ptv, ptStrat, ptEst),
               pbVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, pbv, pbStrat, pbEst),
+              bugVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bugv, bugStrat, bugEst),
+              diseaseVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, diseasev, diseaseStrat, diseaseEst),
+              fireVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, firev, fireStrat, fireEst),
+              animalVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, animalv, animalStrat, animalEst),
+              weatherVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, weatherv, weatherStrat, weatherEst),
+              vegVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, vegv, vegStrat, vegEst),
+              unVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, unv, unStrat, unEst),
+              silvVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, silvv, silvStrat, silvEst),
               ## Covariances
               cvEst_ct = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_ct, ctStrat, ctEst, ptStrat, ptEst),
               cvEst_cb = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_cb, cbStrat, cbEst, pbStrat, pbEst),
+              cvEst_bug = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_bug, bugStrat, bugEst, pbStrat, pbEst),
+              cvEst_disease = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_disease, diseaseStrat, diseaseEst, pbStrat, pbEst),
+              cvEst_fire = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_fire, fireStrat, fireEst, pbStrat, pbEst),
+              cvEst_animal = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_animal, animalStrat, animalEst, pbStrat, pbEst),
+              cvEst_weather = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_weather, weatherStrat, weatherEst, pbStrat, pbEst),
+              cvEst_veg = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_veg, vegStrat, vegEst, pbStrat, pbEst),
+              cvEst_un = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_un, unStrat, unEst, pbStrat, pbEst),
+              cvEst_silv = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_silv, silvStrat, silvEst, pbStrat, pbEst),
               plotIn_t = sum(plotIn_t, na.rm = TRUE))
 
   out <- list(tEst = tEst, aEst = NULL)
