@@ -758,6 +758,8 @@ getFIA <- function(states,
       dir.create(dir)
       message(paste('Creating directory:', dir))
     }
+
+    message(paste0('Saving to ', dir, '. NOTE: modifying FIA tables in Excel may corrupt csv files.'))
   }
 
   ## If dir is not specified, hold in a temporary directory
@@ -961,6 +963,7 @@ writeFIA <- function(db,
     if(!dir.exists(dir)) {
       stop(paste('Directory', dir, 'does not exist. Cannot create new directory.'))
     }
+    message(paste0('Saving to ', dir, '. NOTE: modifying FIA tables in Excel may corrupt csv files.'))
   }
 
   tableNames <- names(db)

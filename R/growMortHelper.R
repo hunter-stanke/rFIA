@@ -114,10 +114,10 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
       distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
       # Compute estimates at plot level
       group_by(.dots = grpBy, PLT_CN) %>%
-      summarize(TOTAL_TPA = sum(TPAGROW_UNADJ * tDI, na.rm = TRUE),
-                RECR_TPA = sum(TPARECR_UNADJ * tDI, na.rm = TRUE),
+      summarize(RECR_TPA = sum(TPARECR_UNADJ * tDI, na.rm = TRUE),
                 MORT_TPA = sum(TPAMORT_UNADJ * tDI, na.rm = TRUE),
                 REMV_TPA = sum(TPAREMV_UNADJ * tDI, na.rm = TRUE),
+                TOTAL_TPA = sum(TPAGROW_UNADJ * tDI, na.rm = TRUE) + MORT_TPA + REMV_TPA - RECR_TPA,
                 RECR_PERC = RECR_TPA / TOTAL_TPA * 100,
                 MORT_PERC = MORT_TPA / TOTAL_TPA * 100,
                 REMV_PERC = REMV_TPA / TOTAL_TPA * 100,
@@ -150,19 +150,19 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
       distinct(PLT_CN, TRE_CN, COMPONENT, .keep_all = TRUE) %>%
       # Compute estimates at plot level
       group_by(PLT_CN, SUBPTYP_GRM, .dots = grpBy) %>%
-      summarize(tPlot_ga = sum(TPAGROW_UNADJ * tDI_ga, na.rm = TRUE),
-                rPlot_ga = sum(TPARECR_UNADJ * tDI_ga_r, na.rm = TRUE),
+      summarize(rPlot_ga = sum(TPARECR_UNADJ * tDI_ga_r, na.rm = TRUE),
                 mPlot_ga = sum(TPAMORT_UNADJ * tDI_ga, na.rm = TRUE),
                 hPlot_ga = sum(TPAREMV_UNADJ * tDI_ga, na.rm = TRUE),
+                tPlot_ga = sum(TPAGROW_UNADJ * tDI_ga, na.rm = TRUE) + mPlot_ga + hPlot_ga - rPlot_ga,
                 plotIn_t_ga = ifelse(tPlot_ga >  0, 1,0),
                 plotIn_r_ga = ifelse(rPlot_ga >  0, 1,0),
                 plotIn_m_ga = ifelse(mPlot_ga > 0, 1,0),
                 plotIn_h_ga = ifelse(hPlot_ga >  0, 1,0),
                 ## No growth accoutning
-                tPlot = sum(TPAGROW_UNADJ * tDI, na.rm = TRUE),
                 rPlot = sum(TPARECR_UNADJ * tDI_r, na.rm = TRUE),
                 mPlot = sum(TPAMORT_UNADJ * tDI, na.rm = TRUE),
                 hPlot = sum(TPAREMV_UNADJ * tDI, na.rm = TRUE),
+                tPlot = sum(TPAGROW_UNADJ * tDI, na.rm = TRUE) + mPlot + hPlot - rPlot,
                 plotIn_t = ifelse(tPlot >  0, 1,0),
                 plotIn_r = ifelse(rPlot >  0, 1,0),
                 plotIn_m = ifelse(mPlot > 0, 1,0),
