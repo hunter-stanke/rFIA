@@ -20,7 +20,7 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
 
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
     ## AGENTCD at remeasurement, died during the measurement interval
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'TPA_UNADJ', 'DIA', 'AGENTCD')), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'TPA_UNADJ', 'DIA', 'AGENTCD', 'MORTYR')), by = c('PLT_CN', 'CONDID')) %>%
     #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', DIA_BEGIN, DIA_END)), by = c('TRE_CN')) %>%
 
     left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p', 'DESIGNCD', 'PLOT_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
@@ -57,7 +57,7 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
   data <- data %>%
     select(PLT_CN, TRE_CN, SUBP, CONDID, TREE,
           MEASYEAR, MACRO_BREAKPOINT_DIA,
-          BUG, DISEASE, FIRE, ANIMAL, WEATHER, VEG, UNKNOWN, SILV,
+          BUG, DISEASE, FIRE, ANIMAL, WEATHER, VEG, UNKNOWN, SILV, MORTYR,
           REMPER, PLOT_STATUS_CD1, PLOT_STATUS_CD2,
            one_of(str_c(grpP,1), str_c(grpC,1), str_c(grpT,1),
            str_c(grpP,2), str_c(grpC,2), str_c(grpT,2)),
@@ -214,6 +214,7 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
       group_by(PLT_CN, PLOT_BASIS, .dots = grpBy) %>%
       summarize(nLive = length(which(tDI[ONEORTWO == 1] > 0)), ## Number of live trees in domain of interest at previous measurement
                 REMPER = first(REMPER),
+                MEASYEAR = first(MEASYEAR),
                 PREV_TPA = if_else(nLive >= minLive, sum(-TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
                 PREV_BAA = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
                 CHNG_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ * tDI, na.rm = TRUE), 0),
@@ -227,6 +228,15 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 VEG_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & VEG == 1] * tDI[ONEORTWO == 1 & VEG == 1], na.rm = TRUE), 0),
                 UNKNOWN_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & UNKNOWN == 1] * tDI[ONEORTWO == 1 & UNKNOWN == 1], na.rm = TRUE), 0),
                 SILV_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & SILV == 1] * tDI[ONEORTWO == 1 & SILV == 1], na.rm = TRUE), 0),
+                BUG_YEAR = if_else(nLive >= minLive, mean(-MORTYR[BUG == 1] * tDI[BUG == 1], na.rm = TRUE), 0),
+                DISEASE_YEAR = if_else(nLive >= minLive, mean(-MORTYR[DISEASE == 1] * tDI[DISEASE == 1], na.rm = TRUE), 0),
+                FIRE_YEAR = if_else(nLive >= minLive, mean(-MORTYR[FIRE == 1] * tDI[FIRE == 1], na.rm = TRUE), 0),
+                ANIMAL_YEAR = if_else(nLive >= minLive, mean(-MORTYR[ANIMAL == 1] * tDI[ANIMAL == 1], na.rm = TRUE), 0),
+                WEATHER_YEAR = if_else(nLive >= minLive, mean(-MORTYR[WEATHER == 1] * tDI[WEATHER == 1], na.rm = TRUE), 0),
+                VEG_YEAR = if_else(nLive >= minLive, mean(-MORTYR[VEG == 1] * tDI[VEG == 1], na.rm = TRUE), 0),
+                UNKNOWN_YEAR = if_else(nLive >= minLive, mean(-MORTYR[UNKNOWN == 1] * tDI[UNKNOWN == 1], na.rm = TRUE), 0),
+                SILV_YEAR = if_else(nLive >= minLive, mean(-MORTYR[SILV == 1] * tDI[SILV == 1], na.rm = TRUE), 0),
+
                 plotIn = if_else(sum(tDI) > 0, 1, 0))
   }
 
@@ -281,14 +291,31 @@ sustIndexHelper2 <- function(x, popState, t, grpBy, method){
       cb = CHNG_BAA * tAdj,
       pt = PREV_TPA * tAdj,
       pb = PREV_BAA * tAdj,
-      bug = BUG_RATE * tAdj / REMPER,
-      disease = DISEASE_RATE * tAdj / REMPER,
-      fire = FIRE_RATE * tAdj / REMPER,
-      animal = ANIMAL_RATE * tAdj / REMPER,
-      weather = WEATHER_RATE * tAdj / REMPER,
-      veg = VEG_RATE * tAdj / REMPER,
-      unknown = UNKNOWN_RATE * tAdj / REMPER,
-      silv = SILV_RATE * tAdj / REMPER,
+    ## Adjusted for time since disturbance
+      # bug = BUG_RATE * tAdj / (MEASYEAR - BUG_YEAR),
+      # disease = DISEASE_RATE * tAdj / (MEASYEAR - DISEASE_YEAR),
+      # fire = FIRE_RATE * tAdj / (MEASYEAR - FIRE_YEAR),
+      # animal = ANIMAL_RATE * tAdj / (MEASYEAR - ANIMAL_YEAR),
+      # weather = WEATHER_RATE * tAdj / (MEASYEAR - WEATHER_YEAR),
+      # veg = VEG_RATE * tAdj / (MEASYEAR - VEG_YEAR),
+      # unknown = UNKNOWN_RATE * tAdj / (MEASYEAR - UNKNOWN_YEAR),
+      # silv = SILV_RATE * tAdj / (MEASYEAR - SILV_YEAR)
+    # bug = BUG_RATE * tAdj / (REMPER - (MEASYEAR - BUG_YEAR)),
+    # disease = DISEASE_RATE * tAdj / (REMPER - (MEASYEAR - DISEASE_YEAR)),
+    # fire = FIRE_RATE * tAdj / (REMPER - (MEASYEAR - FIRE_YEAR)),
+    # animal = ANIMAL_RATE * tAdj / (REMPER - (MEASYEAR - ANIMAL_YEAR)),
+    # weather = WEATHER_RATE * tAdj / (REMPER - (MEASYEAR - WEATHER_YEAR)),
+    # veg = VEG_RATE * tAdj / (REMPER - (MEASYEAR - VEG_YEAR)),
+    # unknown = UNKNOWN_RATE * tAdj / (REMPER - (MEASYEAR - UNKNOWN_YEAR)),
+    # silv = SILV_RATE * tAdj / (REMPER - (MEASYEAR - SILV_YEAR))
+    bug = BUG_RATE * tAdj / REMPER,
+    disease = DISEASE_RATE * tAdj / REMPER,
+    fire = FIRE_RATE * tAdj / REMPER,
+    animal = ANIMAL_RATE * tAdj / REMPER,
+    weather = WEATHER_RATE * tAdj / REMPER,
+    veg = VEG_RATE * tAdj / REMPER,
+    unknown = UNKNOWN_RATE * tAdj / REMPER,
+    silv = SILV_RATE * tAdj / REMPER
     ) %>%
     ## Computing change
     mutate(ct = (ct) / REMPER,

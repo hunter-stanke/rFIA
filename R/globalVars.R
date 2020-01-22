@@ -142,5 +142,19 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'RECR_BAA', 'REMV_BAA', 'R_TPA', 'SI_STATUS', 'TPA_RATE', 'TPA_RATE_INT', 'TPA_RATE_SE',
                          'TPA_STATUS', 'TPA_UNADJ1', 'TPA_UNADJ2', 'T_TPA', 'cb', 'cbPlot', 'cbStrat', 'cbVar', 'cbv', 'ct',
                          'cvEst_cb', 'cvStrat_cb', 'pb', 'pbEst', 'pbPlot', 'pbStrat', 'pbVar', 'pbv', 'pt', 'ptEst', 'ptPlot',
-                         'ptStrat', 'ptVar', 'ptv', 'tDI1', 'tDI2'
+                         'ptStrat', 'ptVar', 'ptv', 'tDI1', 'tDI2', 'AGENTCD', 'ANIMAL', 'ANIMAL_RATE', 'ANIMAL_RATE_SE',
+                         'BUG', 'BUG_RATE', 'DISEASE',
+                         'DISEASE_RATE', 'DISEASE_RATE_SE', 'FIRE', 'FIRE_RATE', 'FIRE_RATE_SE', 'INSECT_RATE',
+                         'INSECT_RATE_SE', 'MORTYR', 'SILV', 'SILV_RATE', 'SILV_RATE_SE', 'UNKNOWN',
+                         'UNKNOWN_RATE', 'UNKNOWN_RATE_SE', 'VEG', 'VEG_RATE', 'VEG_RATE_SE', 'WEATHER',
+                         'WEATHER_RATE', 'WEATHER_RATE_SE', 'animal', 'animalEst', 'animalPlot', 'animalStrat',
+                         'animalVar', 'animalv', 'bug', 'bugEst', 'bugPlot', 'bugStrat', 'bugVar', 'bugv',
+                         'cvEst_animal', 'cvEst_bug', 'cvEst_disease', 'cvEst_fire', 'cvEst_silv', 'cvEst_un',
+                         'cvEst_veg', 'cvEst_weather', 'cvStrat_animal', 'cvStrat_bug', 'cvStrat_disease',
+                         'cvStrat_fire', 'cvStrat_silv', 'cvStrat_un', 'cvStrat_veg', 'cvStrat_weather',
+                         'disease', 'diseaseEst', 'diseasePlot', 'diseaseStrat', 'diseaseVar', 'diseasev', 'fire',
+                         'fireEst', 'firePlot', 'fireStrat', 'fireVar', 'firev', 'silv', 'silvEst', 'silvPlot',
+                         'silvStrat', 'silvVar', 'silvv', 'unEst', 'unPlot', 'unStrat', 'unVar', 'unknown', 'unv', 'veg',
+                         'vegEst', 'vegPlot', 'vegStrat', 'vegVar', 'vegv', 'weather', 'weatherEst', 'weatherPlot',
+                         'weatherStrat', 'weatherVar', 'weatherv'
 ))
