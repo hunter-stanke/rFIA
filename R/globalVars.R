@@ -156,5 +156,11 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'fireEst', 'firePlot', 'fireStrat', 'fireVar', 'firev', 'silv', 'silvEst', 'silvPlot',
                          'silvStrat', 'silvVar', 'silvv', 'unEst', 'unPlot', 'unStrat', 'unVar', 'unknown', 'unv', 'veg',
                          'vegEst', 'vegPlot', 'vegStrat', 'vegVar', 'vegv', 'weather', 'weatherEst', 'weatherPlot',
-                         'weatherStrat', 'weatherVar', 'weatherv'
+                         'weatherStrat', 'weatherVar', 'weatherv',   'ALL_SEV', 'ALL_SEV_SE', 'DROUGHT_SEV', 'DROUGHT_SEV_SE', 'GROW_ALL_SEV',
+                         'GROW_ALL_SEV_SE', 'GROW_DROUGHT_SEV', 'GROW_DROUGHT_SEV_SE', 'GROW_WET_SEV',
+                         'GROW_WET_SEV_SE', 'WET_SEV', 'WET_SEV_SE', 'all_sev', 'cvEst_a', 'cvEst_gd', 'cvEst_gw',
+                         'cvEst_w', 'cvStrat_a', 'cvStrat_gd', 'cvStrat_gw', 'cvStrat_w', 'drought_sev', 'faEst',
+                         'faStrat', 'faVar', 'fav', 'gdEst', 'gdStrat', 'gdVar', 'gdv', 'grow_all_sev',
+                         'grow_drought_sev', 'grow_wet_sev', 'gwEst', 'gwStrat', 'gwVar', 'gwv', 'wEst', 'wStrat',
+                         'wVar', 'wet_sev', 'wv'
 ))
