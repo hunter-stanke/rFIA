@@ -141,7 +141,7 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 SUST_INDEX = if_else(x < 0, -M, M),
                 nStems = length(which(tDI == 1))) %>%
       ungroup() %>%
-      select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, PREV_TPA, PREV_BAA, BUG_RATE,
+      select(PLT_CN, grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, PREV_TPA, PREV_BAA, BUG_RATE,
              DISEASE_RATE, FIRE_RATE, ANIMAL_RATE, WEATHER_RATE, VEG_RATE,
              UNKNOWN_RATE, SILV_RATE, nStems, nLive)
 
