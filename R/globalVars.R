@@ -163,5 +163,15 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'faStrat', 'faVar', 'fav', 'gdEst', 'gdStrat', 'gdVar', 'gdv', 'grow_all_sev',
                          'grow_drought_sev', 'grow_wet_sev', 'gwEst', 'gwStrat', 'gwVar', 'gwv', 'wEst', 'wStrat',
                          'wVar', 'wet_sev', 'wv', 'MORT', 'STATUSCD1', 'STATUSCD2', 'cvEst_mort', 'cvStrat_mort', 'mort', 'mortEst',
-                         'mortPlot', 'mortStrat', 'mortVar', 'mortv'
+                         'mortPlot', 'mortStrat', 'mortVar', 'mortv',
+                         'GROW_TMAX_ANOM', 'GROW_TMAX_ANOM_SE', 'GROW_TMEAN_ANOM', 'GROW_TMEAN_ANOM_SE',
+                         'GROW_VPD_ANOM', 'GROW_VPD_ANOM_SE', 'TMAX_ANOM', 'TMAX_ANOM_SE', 'TMEAN_ANOM',
+                         'TMEAN_ANOM_SE', 'VPD_ANOM', 'VPD_ANOM_SE', 'cvEst_gtmax', 'cvEst_gtmean',
+                         'cvEst_gvpd', 'cvEst_tmax', 'cvEst_tmean', 'cvEst_vpd', 'cvStrat_gtmax',
+                         'cvStrat_gtmean', 'cvStrat_gvpd', 'cvStrat_tmax', 'cvStrat_tmean', 'cvStrat_vpd',
+                         'grow_tmax_anom', 'grow_tmean_anom', 'grow_vpd_anom', 'gtmaxEst', 'gtmaxStrat',
+                         'gtmaxVar', 'gtmaxv', 'gtmeanEst', 'gtmeanStrat', 'gtmeanVar', 'gtmeanv', 'gvpdEst',
+                         'gvpdStrat', 'gvpdVar', 'gvpdv', 'tmaxEst', 'tmaxStrat', 'tmaxVar', 'tmax_anom', 'tmaxv',
+                         'tmeanEst', 'tmeanStrat', 'tmeanVar', 'tmean_anom', 'tmeanv', 'vpdEst', 'vpdStrat', 'vpdVar',
+                         'vpd_anom', 'vpdv'
 ))
