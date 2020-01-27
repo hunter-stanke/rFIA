@@ -162,5 +162,6 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'cvEst_w', 'cvStrat_a', 'cvStrat_gd', 'cvStrat_gw', 'cvStrat_w', 'drought_sev', 'faEst',
                          'faStrat', 'faVar', 'fav', 'gdEst', 'gdStrat', 'gdVar', 'gdv', 'grow_all_sev',
                          'grow_drought_sev', 'grow_wet_sev', 'gwEst', 'gwStrat', 'gwVar', 'gwv', 'wEst', 'wStrat',
-                         'wVar', 'wet_sev', 'wv'
+                         'wVar', 'wet_sev', 'wv', 'MORT', 'STATUSCD1', 'STATUSCD2', 'cvEst_mort', 'cvStrat_mort', 'mort', 'mortEst',
+                         'mortPlot', 'mortStrat', 'mortVar', 'mortv'
 ))

@@ -74,7 +74,7 @@ growMort <- function(db,
 
   ## No EXP_GROW available for Western States, make sure we warn that values will be returned as 0
   # These states do not allow temporal queries. Things are extremely weird with their eval groups
-  noGrow <- c(02,03,04,07,08,11,14,15,16, 23, 30, 32, 35,43,49, 78)
+  noGrow <- c(02,03,04,07,08,11,14,15,16, 30, 32, 35,43,49, 78)
   if(any(unique(db$PLOT$STATECD) %in% noGrow)){
     vState <- unique(db$PLOT$STATECD[db$PLOT$STATECD %in% noGrow])
     fancyName <- unique(intData$EVAL_GRP$STATE[intData$EVAL_GRP$STATECD %in% vState])

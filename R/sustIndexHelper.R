@@ -14,6 +14,9 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
   grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
 
+  ## Making a treeID
+  db$TREE$treID <- paste(db$TREE$SUBP, db$TREE$TREE, sep = '_')
+
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp', 'DESIGNCD')) %>%
     filter(!is.na(REMPER) & !is.na(PREV_PLT_CN) & DESIGNCD == 1) %>%
@@ -25,7 +28,7 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
 
     left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p', 'DESIGNCD', 'PLOT_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('2', '1')) %>%
-    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'TPA_UNADJ', 'DIA')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
+    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'TPA_UNADJ', 'DIA', 'treID')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
     #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
 
     mutate_if(is.factor,
@@ -51,13 +54,16 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
            VEG = if_else(AGENTCD == 60, 1, 0),
            UNKNOWN = if_else(AGENTCD == 70, 1, 0),
            SILV = if_else(AGENTCD == 80, 1, 0),
+           MORT = if_else(STATUSCD1 == 1 & STATUSCD2 == 2, 1, 0)
+           #HARV = if_else(STATUSCD1 == 1 & STATUSCD2 == 3, 1, 0),
+           #RECR = if_else(paste0(SUBP, '_', TREE) %in% treID)
            ) #%>%
 
   ## Just what we need
   data <- data %>%
     select(PLT_CN, TRE_CN, SUBP, CONDID, TREE,
           MEASYEAR, MACRO_BREAKPOINT_DIA,
-          BUG, DISEASE, FIRE, ANIMAL, WEATHER, VEG, UNKNOWN, SILV, MORTYR,
+          BUG, DISEASE, FIRE, ANIMAL, WEATHER, VEG, UNKNOWN, SILV, MORTYR, MORT,
           REMPER, PLOT_STATUS_CD1, PLOT_STATUS_CD2,
            one_of(str_c(grpP,1), str_c(grpC,1), str_c(grpT,1),
            str_c(grpP,2), str_c(grpC,2), str_c(grpT,2)),
@@ -135,6 +141,7 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 VEG_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & VEG == 1] * tDI[ONEORTWO == 1 & VEG == 1], na.rm = TRUE), 0) / PREV_BAA,
                 UNKNOWN_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & UNKNOWN == 1] * tDI[ONEORTWO == 1 & UNKNOWN == 1], na.rm = TRUE), 0) / PREV_BAA,
                 SILV_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & SILV == 1] * tDI[ONEORTWO == 1 & SILV == 1], na.rm = TRUE), 0) / PREV_BAA,
+                #MORT_RATE = if_else(nLive >= minLive, sum(-TPA_UNADJ[ONEORTWO == 1 & MORT == 1] * tDI[ONEORTWO == 1 & MORT == 1], na.rm = TRUE), 0) / PREV_TPA,
                 x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
                 y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
                 M = sqrt(x^2 + y^2),
@@ -228,15 +235,15 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 VEG_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & VEG == 1] * tDI[ONEORTWO == 1 & VEG == 1], na.rm = TRUE), 0),
                 UNKNOWN_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & UNKNOWN == 1] * tDI[ONEORTWO == 1 & UNKNOWN == 1], na.rm = TRUE), 0),
                 SILV_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & SILV == 1] * tDI[ONEORTWO == 1 & SILV == 1], na.rm = TRUE), 0),
-                BUG_YEAR = if_else(nLive >= minLive, mean(-MORTYR[BUG == 1] * tDI[BUG == 1], na.rm = TRUE), 0),
-                DISEASE_YEAR = if_else(nLive >= minLive, mean(-MORTYR[DISEASE == 1] * tDI[DISEASE == 1], na.rm = TRUE), 0),
-                FIRE_YEAR = if_else(nLive >= minLive, mean(-MORTYR[FIRE == 1] * tDI[FIRE == 1], na.rm = TRUE), 0),
-                ANIMAL_YEAR = if_else(nLive >= minLive, mean(-MORTYR[ANIMAL == 1] * tDI[ANIMAL == 1], na.rm = TRUE), 0),
-                WEATHER_YEAR = if_else(nLive >= minLive, mean(-MORTYR[WEATHER == 1] * tDI[WEATHER == 1], na.rm = TRUE), 0),
-                VEG_YEAR = if_else(nLive >= minLive, mean(-MORTYR[VEG == 1] * tDI[VEG == 1], na.rm = TRUE), 0),
-                UNKNOWN_YEAR = if_else(nLive >= minLive, mean(-MORTYR[UNKNOWN == 1] * tDI[UNKNOWN == 1], na.rm = TRUE), 0),
-                SILV_YEAR = if_else(nLive >= minLive, mean(-MORTYR[SILV == 1] * tDI[SILV == 1], na.rm = TRUE), 0),
-
+                #BUG_YEAR = if_else(nLive >= minLive, mean(-MORTYR[BUG == 1] * tDI[BUG == 1], na.rm = TRUE), 0),
+                #DISEASE_YEAR = if_else(nLive >= minLive, mean(-MORTYR[DISEASE == 1] * tDI[DISEASE == 1], na.rm = TRUE), 0),
+                #FIRE_YEAR = if_else(nLive >= minLive, mean(-MORTYR[FIRE == 1] * tDI[FIRE == 1], na.rm = TRUE), 0),
+                #ANIMAL_YEAR = if_else(nLive >= minLive, mean(-MORTYR[ANIMAL == 1] * tDI[ANIMAL == 1], na.rm = TRUE), 0),
+                #WEATHER_YEAR = if_else(nLive >= minLive, mean(-MORTYR[WEATHER == 1] * tDI[WEATHER == 1], na.rm = TRUE), 0),
+                #VEG_YEAR = if_else(nLive >= minLive, mean(-MORTYR[VEG == 1] * tDI[VEG == 1], na.rm = TRUE), 0),
+                #UNKNOWN_YEAR = if_else(nLive >= minLive, mean(-MORTYR[UNKNOWN == 1] * tDI[UNKNOWN == 1], na.rm = TRUE), 0),
+                #SILV_YEAR = if_else(nLive >= minLive, mean(-MORTYR[SILV == 1] * tDI[SILV == 1], na.rm = TRUE), 0),
+                #MORT_RATE = if_else(nLive >= minLive, sum(-TPA_UNADJ[ONEORTWO == 1 & MORT == 1] * tDI[ONEORTWO == 1 & MORT == 1], na.rm = TRUE), 0),
                 plotIn = if_else(sum(tDI) > 0, 1, 0))
   }
 
@@ -315,7 +322,8 @@ sustIndexHelper2 <- function(x, popState, t, grpBy, method){
     weather = WEATHER_RATE * tAdj / REMPER,
     veg = VEG_RATE * tAdj / REMPER,
     unknown = UNKNOWN_RATE * tAdj / REMPER,
-    silv = SILV_RATE * tAdj / REMPER
+    silv = SILV_RATE * tAdj / REMPER,
+    #mort = MORT_RATE * tAdj / REMPER,
     ) %>%
     ## Computing change
     mutate(ct = (ct) / REMPER,
@@ -453,6 +461,9 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
   grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
 
+  ## Making a treeID
+ # db$TREE$treID <- paste(db$TREE$SUBP, db$TREE$TREE, sep = '_')
+
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR',
                             'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp', 'DESIGNCD',
@@ -461,12 +472,12 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
 
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
     ## AGENTCD at remeasurement, died during the measurement interval
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'TPA_UNADJ', 'DIA', 'AGENTCD', 'MORTYR')), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'TPA_UNADJ', 'DIA', 'AGENTCD', 'MORTYR', 'STATUSCD')), by = c('PLT_CN', 'CONDID')) %>%
     #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', DIA_BEGIN, DIA_END)), by = c('TRE_CN')) %>%
 
     left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p', 'DESIGNCD', 'PLOT_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('2', '1')) %>%
-    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'TPA_UNADJ', 'DIA')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
+    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'TPA_UNADJ', 'DIA', 'STATUSCD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
     #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
 
     mutate_if(is.factor,
@@ -492,13 +503,14 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
            VEG = if_else(AGENTCD == 60, 1, 0),
            UNKNOWN = if_else(AGENTCD == 70, 1, 0),
            SILV = if_else(AGENTCD == 80, 1, 0),
+           MORT = if_else(STATUSCD1 == 1 & STATUSCD2 == 2, 1, 0)
     ) #%>%
 
   ## Just what we need
   data <- data %>%
     select(PLT_CN, TRE_CN, SUBP, CONDID, TREE, CONDPROP_UNADJ,
            MEASYEAR, MACRO_BREAKPOINT_DIA, PROP_BASIS,
-           BUG, DISEASE, FIRE, ANIMAL, WEATHER, VEG, UNKNOWN, SILV, MORTYR,
+           BUG, DISEASE, FIRE, ANIMAL, WEATHER, VEG, UNKNOWN, SILV, MORTYR, MORT,
            drought_sev, wet_sev, all_sev, grow_drought_sev, grow_wet_sev, grow_all_sev,
            REMPER, PLOT_STATUS_CD1, PLOT_STATUS_CD2,
            one_of(str_c(grpP,1), str_c(grpC,1), str_c(grpT,1),
@@ -547,6 +559,7 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 VEG_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & VEG == 1] * tDI[ONEORTWO == 1 & VEG == 1], na.rm = TRUE), 0) / PREV_BAA,
                 UNKNOWN_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & UNKNOWN == 1] * tDI[ONEORTWO == 1 & UNKNOWN == 1], na.rm = TRUE), 0) / PREV_BAA,
                 SILV_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & SILV == 1] * tDI[ONEORTWO == 1 & SILV == 1], na.rm = TRUE), 0) / PREV_BAA,
+                MORT_RATE = if_else(nLive >= minLive, sum(-TPA_UNADJ[ONEORTWO == 1 & MORT == 1] * tDI[ONEORTWO == 1 & MORT == 1], na.rm = TRUE), 0) / PREV_TPA,
                 DROUGHT_SEV = first(drought_sev),
                 WET_SEV = first(wet_sev),
                 ALL_SEV = first(all_sev),
@@ -559,7 +572,7 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 SUST_INDEX = if_else(x < 0, -M, M),
                 nStems = length(which(tDI == 1))) %>%
       ungroup() %>%
-      select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, BUG_RATE,
+      select(grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, MORT_RATE, BUG_RATE,
              DISEASE_RATE, FIRE_RATE, ANIMAL_RATE, WEATHER_RATE, VEG_RATE,
              UNKNOWN_RATE, SILV_RATE, DROUGHT_SEV, WET_SEV, ALL_SEV,
              GROW_DROUGHT_SEV, GROW_WET_SEV, GROW_ALL_SEV,
@@ -620,14 +633,15 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 VEG_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & VEG == 1] * tDI[ONEORTWO == 1 & VEG == 1], na.rm = TRUE), 0),
                 UNKNOWN_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & UNKNOWN == 1] * tDI[ONEORTWO == 1 & UNKNOWN == 1], na.rm = TRUE), 0),
                 SILV_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & SILV == 1] * tDI[ONEORTWO == 1 & SILV == 1], na.rm = TRUE), 0),
-                BUG_YEAR = if_else(nLive >= minLive, mean(-MORTYR[BUG == 1] * tDI[BUG == 1], na.rm = TRUE), 0),
-                DISEASE_YEAR = if_else(nLive >= minLive, mean(-MORTYR[DISEASE == 1] * tDI[DISEASE == 1], na.rm = TRUE), 0),
-                FIRE_YEAR = if_else(nLive >= minLive, mean(-MORTYR[FIRE == 1] * tDI[FIRE == 1], na.rm = TRUE), 0),
-                ANIMAL_YEAR = if_else(nLive >= minLive, mean(-MORTYR[ANIMAL == 1] * tDI[ANIMAL == 1], na.rm = TRUE), 0),
-                WEATHER_YEAR = if_else(nLive >= minLive, mean(-MORTYR[WEATHER == 1] * tDI[WEATHER == 1], na.rm = TRUE), 0),
-                VEG_YEAR = if_else(nLive >= minLive, mean(-MORTYR[VEG == 1] * tDI[VEG == 1], na.rm = TRUE), 0),
-                UNKNOWN_YEAR = if_else(nLive >= minLive, mean(-MORTYR[UNKNOWN == 1] * tDI[UNKNOWN == 1], na.rm = TRUE), 0),
-                SILV_YEAR = if_else(nLive >= minLive, mean(-MORTYR[SILV == 1] * tDI[SILV == 1], na.rm = TRUE), 0),
+                #BUG_YEAR = if_else(nLive >= minLive, mean(-MORTYR[BUG == 1] * tDI[BUG == 1], na.rm = TRUE), 0),
+                #DISEASE_YEAR = if_else(nLive >= minLive, mean(-MORTYR[DISEASE == 1] * tDI[DISEASE == 1], na.rm = TRUE), 0),
+                #FIRE_YEAR = if_else(nLive >= minLive, mean(-MORTYR[FIRE == 1] * tDI[FIRE == 1], na.rm = TRUE), 0),
+                #ANIMAL_YEAR = if_else(nLive >= minLive, mean(-MORTYR[ANIMAL == 1] * tDI[ANIMAL == 1], na.rm = TRUE), 0),
+                #WEATHER_YEAR = if_else(nLive >= minLive, mean(-MORTYR[WEATHER == 1] * tDI[WEATHER == 1], na.rm = TRUE), 0),
+                #VEG_YEAR = if_else(nLive >= minLive, mean(-MORTYR[VEG == 1] * tDI[VEG == 1], na.rm = TRUE), 0),
+                #UNKNOWN_YEAR = if_else(nLive >= minLive, mean(-MORTYR[UNKNOWN == 1] * tDI[UNKNOWN == 1], na.rm = TRUE), 0),
+                #SILV_YEAR = if_else(nLive >= minLive, mean(-MORTYR[SILV == 1] * tDI[SILV == 1], na.rm = TRUE), 0),
+                MORT_RATE = if_else(nLive >= minLive, sum(-TPA_UNADJ[ONEORTWO == 1 & MORT == 1] * tDI[ONEORTWO == 1 & MORT == 1], na.rm = TRUE), 0),
                 plotIn = if_else(sum(tDI) > 0, 1, 0)) #%>%
       #left_join()
   }
@@ -712,7 +726,8 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
     weather = WEATHER_RATE * tAdj / REMPER,
     veg = VEG_RATE * tAdj / REMPER,
     unknown = UNKNOWN_RATE * tAdj / REMPER,
-    silv = SILV_RATE * tAdj / REMPER
+    silv = SILV_RATE * tAdj / REMPER,
+    mort = MORT_RATE * tAdj / REMPER
   ) %>%
     ## Computing change
     mutate(ct = (ct) / REMPER,
@@ -731,6 +746,7 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               vegPlot = sum(veg, na.rm = TRUE),
               unPlot = sum(unknown, na.rm = TRUE),
               silvPlot = sum(silv, na.rm = TRUE),
+              mortPlot = sum(mort, na.rm = TRUE),
               plotIn_t = ifelse(sum(plotIn >  0, na.rm = TRUE), 1,0),
               nh = first(P2POINTCNT),
               p2eu = first(p2eu),
@@ -759,6 +775,7 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               gdStrat = mean(GROW_DROUGHT_SEV * r_t, na.rm = TRUE),
               gwStrat = mean(GROW_WET_SEV * r_t, na.rm = TRUE),
               gaStrat = mean(GROW_ALL_SEV * r_t, na.rm = TRUE),
+              mortStrat = mean(mortPlot * r_t, na.rm = TRUE),
               plotIn_t = sum(plotIn_t, na.rm = TRUE),
               n = n(),
               ## We don't want a vector of these values, since they are repeated
@@ -787,6 +804,7 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               gdv = stratVar(ESTN_METHOD, GROW_DROUGHT_SEV, gdStrat, ndif, a, nh),
               gwv = stratVar(ESTN_METHOD, GROW_WET_SEV, gwStrat, ndif, a, nh),
               gav = stratVar(ESTN_METHOD, GROW_ALL_SEV, gaStrat, ndif, a, nh),
+              mortv = stratVar(ESTN_METHOD, mortPlot, mortStrat, ndif, a, nh),
 
               # Strata level covariances
               cvStrat_ct = stratVar(ESTN_METHOD, ctPlot, ctStrat, ndif, a, nh, ptPlot, ptStrat),
@@ -805,6 +823,8 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               cvStrat_gd = stratVar(ESTN_METHOD, GROW_DROUGHT_SEV, gdStrat, ndif, a, nh, fa, faStrat),
               cvStrat_gw = stratVar(ESTN_METHOD, GROW_WET_SEV, gwStrat, ndif, a, nh, fa, faStrat),
               cvStrat_ga = stratVar(ESTN_METHOD, GROW_ALL_SEV, gaStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_mort = stratVar(ESTN_METHOD, mortPlot, mortStrat, ndif, a, nh, ptPlot, ptStrat),
+
 
     ) %>%
 
@@ -822,6 +842,7 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               vegEst = unitMean(ESTN_METHOD, a, nh, w, vegStrat),
               unEst = unitMean(ESTN_METHOD, a, nh, w, unStrat),
               silvEst = unitMean(ESTN_METHOD, a, nh, w, silvStrat),
+              mortEst =  unitMean(ESTN_METHOD, a, nh, w, mortStrat),
               faEst = unitMean(ESTN_METHOD, a, nh, w, faStrat),
               dEst = unitMean(ESTN_METHOD, a, nh, w, dStrat),
               wEst = unitMean(ESTN_METHOD, a, nh, w, wStrat),
@@ -829,7 +850,7 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               gdEst = unitMean(ESTN_METHOD, a, nh, w, gdStrat),
               gwEst = unitMean(ESTN_METHOD, a, nh, w, gwStrat),
               gaEst = unitMean(ESTN_METHOD, a, nh, w, gaStrat),
-
+              mortEst =  unitMean(ESTN_METHOD, a, nh, w, mortStrat),
               nh = first(nh),
               # Estimation of unit variance
               ctVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ctv, ctStrat, ctEst),
@@ -851,6 +872,7 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               gdVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, gdv, gdStrat, gdEst),
               gwVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, gwv, gwStrat, gwEst),
               gaVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, gav, gaStrat, gaEst),
+              mortVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, mortv, mortStrat, mortEst),
 
               ## Covariances
               cvEst_ct = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_ct, ctStrat, ctEst, ptStrat, ptEst),
@@ -863,6 +885,7 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               cvEst_veg = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_veg, vegStrat, vegEst, pbStrat, pbEst),
               cvEst_un = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_un, unStrat, unEst, pbStrat, pbEst),
               cvEst_silv = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_silv, silvStrat, silvEst, pbStrat, pbEst),
+              cvEst_mort = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_mort, mortStrat, mortEst, ptStrat, ptEst),
 
               cvEst_d = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_d, dStrat, dEst, faStrat, faEst),
               cvEst_w = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_w, wStrat, wEst, faStrat, faEst),
