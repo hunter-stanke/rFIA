@@ -173,5 +173,7 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'gtmaxVar', 'gtmaxv', 'gtmeanEst', 'gtmeanStrat', 'gtmeanVar', 'gtmeanv', 'gvpdEst',
                          'gvpdStrat', 'gvpdVar', 'gvpdv', 'tmaxEst', 'tmaxStrat', 'tmaxVar', 'tmax_anom', 'tmaxv',
                          'tmeanEst', 'tmeanStrat', 'tmeanVar', 'tmean_anom', 'tmeanv', 'vpdEst', 'vpdStrat', 'vpdVar',
-                         'vpd_anom', 'vpdv'
+                         'vpd_anom', 'vpdv', 'CURR_BAA', 'CURR_TPA', 'SUST_INDEX_INT', 'cvEst_si', 'cvStrat_si', 'siEst', 'siPlot',
+                         'siStrat', 'siVar', 'siv'
+
 ))
