@@ -295,8 +295,8 @@ sustIndex <- function(db,
     rename(STRATUM_CN = CN) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN', 'INVYR', 'STATECD')), by = 'STRATUM_CN') %>%
     ## Join on REMPER PLOTS
-    left_join(select(db$PLOT, PLT_CN, REMPER, PREV_PLT_CN, DESIGNCD), by = 'PLT_CN') %>%
-    filter(!is.na(REMPER) & !is.na(PREV_PLT_CN) & DESIGNCD == 1) %>%
+    left_join(select(db$PLOT, PLT_CN, REMPER, PREV_PLT_CN, DESIGNCD, PLOT_STATUS_CD), by = 'PLT_CN') %>%
+    filter(!is.na(REMPER) & !is.na(PREV_PLT_CN) & DESIGNCD == 1 & PLOT_STATUS_CD != 3) %>%
     mutate_if(is.factor,
               as.character)
 
@@ -383,7 +383,10 @@ sustIndex <- function(db,
   # }
 
   ## Only the necessary plots for EVAL of interest
-  #db$PLOT <- filter(db$PLOT, PLT_CN %in% pops$PLT_CN)
+  db$PLOT <- filter(db$PLOT, PLT_CN %in% pops$PLT_CN | PLT_CN %in% pops$PREV_PLT_CN)
+
+  ## Reduce the memory load for others
+  db <- clipFIA(db, mostRecent = FALSE)
 
   ## Merging state and county codes
   plts <- split(db$PLOT, as.factor(paste(db$PLOT$COUNTYCD, db$PLOT$STATECD, sep = '_')))
@@ -956,8 +959,8 @@ si <- function(db,
     rename(STRATUM_CN = CN) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN', 'INVYR', 'STATECD')), by = 'STRATUM_CN') %>%
     ## Join on REMPER PLOTS
-    left_join(select(db$PLOT, PLT_CN, REMPER, PREV_PLT_CN, DESIGNCD), by = 'PLT_CN') %>%
-    filter(!is.na(REMPER) & !is.na(PREV_PLT_CN) & DESIGNCD == 1) %>%
+    left_join(select(db$PLOT, PLT_CN, REMPER, PREV_PLT_CN, DESIGNCD, PLOT_STATUS_CD), by = 'PLT_CN') %>%
+    filter(!is.na(REMPER) & !is.na(PREV_PLT_CN) & DESIGNCD == 1 & PLOT_STATUS_CD != 3) %>%
     mutate_if(is.factor,
               as.character)
 
@@ -1035,6 +1038,19 @@ si <- function(db,
     db$TREE <- db$TREE[!is.na(db$TREE$sizeClass),]
   }
 
+
+  # # Seperate area grouping names, (ex. TPA red oak in total land area of ingham county, rather than only area where red oak occurs)
+  # if (!is.null(polys)){
+  #   aGrpBy <- c(grpBy[grpBy %in% names(db$PLOT) | grpBy %in% names(db$COND) | grpBy %in% names(pltSF)])
+  # } else {
+  #   aGrpBy <- c(grpBy[grpBy %in% names(db$PLOT) | grpBy %in% names(db$COND)])
+  # }
+
+  ## Only the necessary plots for EVAL of interest
+  db$PLOT <- filter(db$PLOT, PLT_CN %in% pops$PLT_CN | PLT_CN %in% pops$PREV_PLT_CN)
+
+  ## Reduce the memory load for others
+  db <- clipFIA(db, mostRecent = FALSE)
 
   ## Merging state and county codes
   plts <- split(db$PLOT, as.factor(paste(db$PLOT$COUNTYCD, db$PLOT$STATECD, sep = '_')))
