@@ -491,12 +491,19 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
   ## Comprehensive indicator function -- w/ growth accounting
   data$tDI2 <- data$landD2 * data$aD_p2 * data$aD_c2 * data$tD2 * data$typeD2 * data$sp2 *
     if_else(data$PLOT_STATUS_CD1 == 1 & data$PLOT_STATUS_CD2 == 1, 1, 0) *
-    if_else(data$STATUSCD2 == 1, 1, 0)  *
-    if_else(data$STATUSCD1 == 0 | data$STATUSCD2 == 0, 0, 1)
+    if_else(data$STATUSCD2 == 1, 1, 0) *
+    ## If it is NA, then it is a recruit, otherwise, make sure it was not
+    ## flagged incorrectly previously
+    if_else(is.na(data$STATUSCD1), 1, if_else(data$STATUSCD1 == 0 | data$STATUSCD2 == 0, 0, 1))
+
   data$tDI1 <- data$landD1 * data$aD_p1 * data$aD_c1 * data$tD1 * data$typeD1 * data$sp1 *
     if_else(data$PLOT_STATUS_CD1 == 1 & data$PLOT_STATUS_CD2 == 1, 1, 0) *
     if_else(data$STATUSCD1 == 1, 1, 0) *
-    if_else(data$STATUSCD1 == 0 | data$STATUSCD2 == 0, 0, 1)
+    if_else(is.na(data$STATUSCD1), NA_real_, if_else(data$STATUSCD1 == 0 | data$STATUSCD2 == 0, 0, 1))
+
+    ## Doesn't allow recruitment to happen, becuase no previous status
+    ## Adjust later, after the pivot
+    #if_else(data$STATUSCD1 == 0 | data$STATUSCD2 == 0, 0, 1)
 
   ## PREVIOUS and CURRENT attributes
   data <- data %>%
@@ -545,7 +552,8 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
       ## When DIA is greater than 5", use subplot value
       DIA >= 5 & is.na(MACRO_BREAKPOINT_DIA) ~ 'SUBP',
       DIA >= 5 & DIA < MACRO_BREAKPOINT_DIA ~ 'SUBP',
-      DIA >= MACRO_BREAKPOINT_DIA ~ 'MACR'))
+      DIA >= MACRO_BREAKPOINT_DIA ~ 'MACR')) #%>%
+    #mutate(tDI = tDI * if_else())
 
 
   if (byPlot){
@@ -558,8 +566,8 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
       group_by(.dots = grpBy, PLT_CN, PREV_PLT_CN) %>%
       summarize(nLive = length(which(tDI[ONEORTWO == 1] > 0)), ## Number of live trees in domain of interest at previous measurement
                 REMPER = first(REMPER),
-                PREV_TPA = if_else(nLive >= minLive, sum(-TPA_UNADJ[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE), 0),
-                PREV_BAA = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE), 0),
+                PREV_TPA = if_else(nLive >= minLive, sum(-TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
+                PREV_BAA = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
                 CHNG_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE), 0),
                 CHNG_BAA = if_else(nLive >= minLive, sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE), 0),
                 CURR_TPA = PREV_TPA + CHNG_TPA,
