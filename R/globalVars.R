@@ -174,6 +174,13 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'gvpdStrat', 'gvpdVar', 'gvpdv', 'tmaxEst', 'tmaxStrat', 'tmaxVar', 'tmax_anom', 'tmaxv',
                          'tmeanEst', 'tmeanStrat', 'tmeanVar', 'tmean_anom', 'tmeanv', 'vpdEst', 'vpdStrat', 'vpdVar',
                          'vpd_anom', 'vpdv', 'CURR_BAA', 'CURR_TPA', 'SUST_INDEX_INT', 'cvEst_si', 'cvStrat_si', 'siEst', 'siPlot',
-                         'siStrat', 'siVar', 'siv'
+                         'siStrat', 'siVar', 'siv', 'BAA_CHNG_PERC', 'BAA_MORT', 'BAA_MORT_SE', 'BAA_RECR', 'BAA_RECR_SE', 'ELEV ELEV_SE',
+                         'SI', 'SI_INT', 'SI_SE', 'SURV', 'TPA_CHNG_PERC', 'TPA_MORT', 'TPA_MORT_SE', 'TPA_RECR',
+                         'TPA_RECR_SE', 'bgrow', 'bgrowEst', 'bgrowStrat', 'bgrowVar', 'bgrowv', 'bmort', 'bmortEst',
+                         'bmortStrat', 'bmortVar', 'bmortv', 'brecr', 'brecrEst', 'brecrStrat', 'brecrVar', 'brecrv',
+                         'cvEst_bgrow', 'cvEst_bmort', 'cvEst_brecr', 'cvEst_elev', 'cvEst_tmort',
+                         'cvEst_trecr', 'cvStrat_bgrow', 'cvStrat_bmort', 'cvStrat_brecr', 'cvStrat_elev',
+                         'cvStrat_tmort', 'cvStrat_trecr', 'elevEst', 'elevStrat', 'elevVar', 'elevv', 'tmort',
+                         'tmortEst', 'tmortStrat', 'tmortVar', 'tmortv', 'trecr', 'trecrEst', 'trecrStrat'
 
 ))
