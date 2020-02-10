@@ -481,8 +481,8 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
     #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', DIA_BEGIN, DIA_END)), by = c('TRE_CN')) %>%
 
     left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p', 'DESIGNCD', 'PLOT_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('2', '1')) %>%
-    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'TPA_UNADJ', 'DIA', 'STATUSCD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD', 'ALSTK')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('2', '1')) %>%
+    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'TPA_UNADJ', 'DIA', 'STATUSCD', SPCD, htClass)), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
     #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
 
     mutate_if(is.factor,
@@ -529,11 +529,14 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
            #DISTURB = if_else()
     ) #%>%
 
+
+
   ## Just what we need
   data <- data %>%
     select(PLT_CN, PREV_PLT_CN, TRE_CN, SUBP, CONDID, TREE, CONDPROP_UNADJ,
            MEASYEAR, MACRO_BREAKPOINT_DIA, PROP_BASIS,
-           BUG, DISEASE, FIRE, ANIMAL, WEATHER, VEG, UNKNOWN, SILV, MORTYR, MORT, SURV, ELEV,
+           BUG, DISEASE, FIRE, ANIMAL, WEATHER, VEG, UNKNOWN, SILV, MORTYR, MORT, SURV, ELEV, ALSTK,
+           htClass, SPCD,
            drought_sev, wet_sev, all_sev, grow_drought_sev, grow_wet_sev, grow_all_sev,
            tmean_anom, tmax_anom, vpd_anom, grow_tmean_anom, grow_tmax_anom, grow_vpd_anom,
            REMPER, PLOT_STATUS_CD1, PLOT_STATUS_CD2,
@@ -603,12 +606,17 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 GROW_WET_SEV = first(grow_wet_sev),
                 GROW_ALL_SEV = first(grow_all_sev),
                 x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
-                y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
-                M = sqrt(x^2 + y^2),
-                SUST_INDEX = if_else(x < 0, -M, M),
+                M = sqrt(x^2 + x^2),
+                SI = if_else(x < 0, -M, M),
+                H_struct = divIndex(htClass[ONEORTWO == 1], -BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'H'),
+                Eh_struct = divIndex(htClass[ONEORTWO == 1], -BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'Eh'),
+                S_struct = divIndex(htClass[ONEORTWO == 1], -BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'S'),
+                H_species = divIndex(SPCD[ONEORTWO == 1], -TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'H'),
+                Eh_species = divIndex(SPCD[ONEORTWO == 1], -TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'Eh'),
+                S_species = divIndex(SPCD[ONEORTWO == 1], -TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'S'),
                 nStems = length(which(tDI == 1))) %>%
       ungroup() %>%
-      select(PLT_CN, PREV_PLT_CN, grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, MORT_RATE, BAA_CHNG_PERC, TPA_CHNG_PERC,
+      select(PLT_CN, PREV_PLT_CN, grpBy, SI, TPA_RATE, BAA_RATE, MORT_RATE, BAA_CHNG_PERC, TPA_CHNG_PERC,
              PREV_TPA, PREV_BAA, CHNG_TPA, CHNG_BAA, CURR_TPA, CURR_BAA,
              INSECT_RATE,
              DISEASE_RATE, FIRE_RATE, ANIMAL_RATE, WEATHER_RATE, VEG_RATE,
@@ -616,7 +624,8 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
              VPD_ANOM, TMAX_ANOM, TMEAN_ANOM,
              GROW_VPD_ANOM, GROW_TMAX_ANOM, GROW_TMEAN_ANOM,
              DROUGHT_SEV, WET_SEV, ALL_SEV,
-             GROW_DROUGHT_SEV, GROW_WET_SEV, GROW_ALL_SEV,
+             GROW_DROUGHT_SEV, GROW_WET_SEV, GROW_ALL_SEV, H_struct, Eh_struct, S_struct,
+             H_species, Eh_species, S_species,
              nStems, nLive)
 
     a = NULL
@@ -650,6 +659,13 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 GROW_TMAX_ANOM = first(grow_tmax_anom),
                 GROW_TMEAN_ANOM = first(grow_tmean_anom),
                 CONDPROP_UNADJ = first(CONDPROP_UNADJ),
+                ALSTK = first(ALSTK[ONEORTWO == 1]),
+                H_struct = divIndex(htClass[ONEORTWO == 1], -BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'H'),
+                Eh_struct = divIndex(htClass[ONEORTWO == 1], -BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'Eh'),
+                S_struct = divIndex(htClass[ONEORTWO == 1], -BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'S'),
+                H_species = divIndex(SPCD[ONEORTWO == 1], -TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'H'),
+                Eh_species = divIndex(SPCD[ONEORTWO == 1], -TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'Eh'),
+                S_species = divIndex(SPCD[ONEORTWO == 1], -TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'S'),
                 ELEV = first(ELEV)) %>%
       group_by(PLT_CN, PROP_BASIS, .dots = grpBy) %>%
       summarize(fa = sum(CONDPROP_UNADJ * aDI, na.rm = TRUE),
@@ -665,10 +681,17 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 GROW_VPD_ANOM = sum(CONDPROP_UNADJ * GROW_VPD_ANOM * aDI, na.rm = TRUE),
                 GROW_TMAX_ANOM = sum(CONDPROP_UNADJ * GROW_TMAX_ANOM * aDI, na.rm = TRUE),
                 GROW_TMEAN_ANOM = sum(CONDPROP_UNADJ * GROW_TMEAN_ANOM * aDI, na.rm = TRUE),
-                ELEV = sum(CONDPROP_UNADJ * ELEV * aDI, na.rm = TRUE)
+                ELEV = sum(CONDPROP_UNADJ * ELEV * aDI, na.rm = TRUE),
+                STOCKING = sum(CONDPROP_UNADJ * ALSTK * aDI, na.rm = TRUE),
+                H_struct =sum(CONDPROP_UNADJ * H_struct * aDI, na.rm = TRUE),
+                Eh_struct = sum(CONDPROP_UNADJ * Eh_struct * aDI, na.rm = TRUE),
+                S_struct =sum(CONDPROP_UNADJ * S_struct * aDI, na.rm = TRUE),
+                H_species = sum(CONDPROP_UNADJ * H_species * aDI, na.rm = TRUE),
+                Eh_species = sum(CONDPROP_UNADJ * Eh_species * aDI, na.rm = TRUE),
+                S_species = sum(CONDPROP_UNADJ * S_species * aDI, na.rm = TRUE)
       )
 
-    ### Compute total TREES in domain of interest
+     ### Compute total TREES in domain of interest
     t <- data %>%
       distinct(PLT_CN, TRE_CN, ONEORTWO, .keep_all = TRUE) %>%
       # Compute estimates at plot level
@@ -704,9 +727,13 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 # M = sqrt(x^2 + y^2),
                 #SUST_INDEX = if_else(x < 0, -M, M),
                 plotIn = if_else(sum(tDI) > 0, 1, 0))
+
+    full <- data %>%
+      filter(ONEORTWO == 1) %>%
+      select(PLT_CN, grpBy, SPCD, htClass, TPA_UNADJ, BAA, tDI)
   }
 
-  pltOut <- list(a = a, t = t)
+  pltOut <- list(a = a, t = t, full = full)
   return(pltOut)
 
 }
@@ -748,6 +775,13 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
       GROW_TMAX_ANOM = GROW_TMAX_ANOM * aAdj,
       GROW_TMEAN_ANOM = GROW_TMEAN_ANOM * aAdj,
       ELEV = ELEV * aAdj,
+      STOCKING = STOCKING * aAdj,
+      H_struct =H_struct *  aAdj,
+      Eh_struct = Eh_struct * aAdj,
+      S_struct = S_struct * aAdj,
+      H_species = H_species * aAdj,
+      Eh_species = Eh_species * aAdj,
+      S_species = S_species * aAdj,
       fa = fa * aAdj) %>%
     ungroup()
 
@@ -833,7 +867,8 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
            )) %>%
 
     left_join(select(aAdj, PLT_CN, grpBy, fa, DROUGHT_SEV, WET_SEV, ALL_SEV, GROW_DROUGHT_SEV, GROW_WET_SEV, GROW_ALL_SEV,
-                     VPD_ANOM, TMAX_ANOM, TMEAN_ANOM, GROW_VPD_ANOM, GROW_TMAX_ANOM, GROW_TMEAN_ANOM, ELEV), by = c('PLT_CN', grpBy)) %>%
+                     VPD_ANOM, TMAX_ANOM, TMEAN_ANOM, GROW_VPD_ANOM, GROW_TMAX_ANOM, GROW_TMEAN_ANOM, ELEV,
+                     STOCKING,  H_struct, Eh_struct, S_struct, H_species, Eh_species, S_species), by = c('PLT_CN', grpBy)) %>%
     ## Strata level
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
     summarize(r_t = length(unique(PLT_CN)) / first(nh),
@@ -872,6 +907,16 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               gtmaxStrat = mean(GROW_TMAX_ANOM * r_t, na.rm = TRUE),
               gtmeanStrat = mean(GROW_TMEAN_ANOM * r_t, na.rm = TRUE),
 
+              ## Diversity indices
+              hstStrat = mean(H_struct * r_t, na.rm = TRUE),
+              estStrat = mean(Eh_struct * r_t, na.rm = TRUE),
+              sstStrat = mean(S_struct * r_t, na.rm = TRUE),
+              hspStrat = mean(H_species * r_t, na.rm = TRUE),
+              espStrat = mean(Eh_species * r_t, na.rm = TRUE),
+              sspStrat = mean(S_species * r_t, na.rm = TRUE),
+              stkStrat = mean(STOCKING * r_t, na.rm = TRUE),
+
+
               plotIn_t = sum(plotIn_t, na.rm = TRUE),
               n = n(),
               ## We don't want a vector of these values, since they are repeated
@@ -886,13 +931,6 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               ptv = stratVar(ESTN_METHOD, ptPlot, ptStrat, ndif, a, nh),
               pbv = stratVar(ESTN_METHOD, pbPlot, pbStrat, ndif, a, nh),
               siv = stratVar(ESTN_METHOD, siPlot * fa, siStrat, ndif, a, nh),
-
-
-              #test1 = sum((c(siPlot * fa, numeric(ndif))^2), na.rm = TRUE),
-              #test2 = nh * siStrat^2,
-
-
-
 
               tmortv = stratVar(ESTN_METHOD, tmort, tmortStrat, ndif, a, nh),
               trecrv = stratVar(ESTN_METHOD, trecr, trecrStrat, ndif, a, nh),
@@ -923,6 +961,14 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               gvpdv = stratVar(ESTN_METHOD, GROW_VPD_ANOM, gvpdStrat, ndif, a, nh),
               gtmaxv = stratVar(ESTN_METHOD, GROW_TMAX_ANOM, gtmaxStrat, ndif, a, nh),
               gtmeanv = stratVar(ESTN_METHOD, GROW_TMEAN_ANOM, gtmeanStrat, ndif, a, nh),
+
+              hstv = stratVar(ESTN_METHOD, H_struct, hstStrat, ndif, a, nh),
+              estv = stratVar(ESTN_METHOD, Eh_struct, estStrat, ndif, a, nh),
+              sstv = stratVar(ESTN_METHOD, S_struct, sstStrat, ndif, a, nh),
+              hspv = stratVar(ESTN_METHOD, H_species, hspStrat, ndif, a, nh),
+              espv = stratVar(ESTN_METHOD, Eh_species, espStrat, ndif, a, nh),
+              sspv = stratVar(ESTN_METHOD, S_species, sspStrat, ndif, a, nh),
+              stkv = stratVar(ESTN_METHOD, STOCKING, stkStrat, ndif, a, nh),
 
               # Strata level covariances
               cvStrat_ct = stratVar(ESTN_METHOD, ctPlot, ctStrat, ndif, a, nh, ptPlot, ptStrat),
@@ -955,6 +1001,15 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               cvStrat_gvpd = stratVar(ESTN_METHOD, GROW_VPD_ANOM, gvpdStrat, ndif, a, nh, fa, faStrat),
               cvStrat_gtmax = stratVar(ESTN_METHOD, GROW_TMAX_ANOM, gtmaxStrat, ndif, a, nh, fa, faStrat),
               cvStrat_gtmean = stratVar(ESTN_METHOD, GROW_TMEAN_ANOM, gtmeanStrat, ndif, a, nh, fa, faStrat),
+
+              cvStrat_hst = stratVar(ESTN_METHOD, H_struct, hstStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_est = stratVar(ESTN_METHOD, Eh_struct, estStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_sst = stratVar(ESTN_METHOD, S_struct, sstStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_hsp = stratVar(ESTN_METHOD, H_species, hspStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_esp = stratVar(ESTN_METHOD, Eh_species, espStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_ssp = stratVar(ESTN_METHOD, S_species, sspStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_stk = stratVar(ESTN_METHOD, STOCKING, stkStrat, ndif, a, nh, fa, faStrat),
+
     ) %>%
 
     ## Estimation unit
@@ -995,6 +1050,14 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               gtmaxEst =  unitMean(ESTN_METHOD, a, nh, w, gtmaxStrat),
               gtmeanEst =  unitMean(ESTN_METHOD, a, nh, w, gtmeanStrat),
 
+              hstEst = unitMean(ESTN_METHOD, a, nh, w, hstStrat),
+              estEst = unitMean(ESTN_METHOD, a, nh, w, estStrat),
+              sstEst = unitMean(ESTN_METHOD, a, nh, w, sstStrat),
+              hspEst = unitMean(ESTN_METHOD, a, nh, w, hspStrat),
+              espEst = unitMean(ESTN_METHOD, a, nh, w, espStrat),
+              sspEst = unitMean(ESTN_METHOD, a, nh, w, sspStrat),
+              stkEst = unitMean(ESTN_METHOD, a, nh, w, stkStrat),
+
               nh = first(nh),
               # Estimation of unit variance
               ctVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ctv, ctStrat, ctEst),
@@ -1031,6 +1094,15 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               gvpdVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, gvpdv, gvpdStrat, gvpdEst),
               gtmaxVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, gtmaxv, gtmaxStrat, gtmaxEst),
               gtmeanVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, gtmeanv, gtmeanStrat, gtmeanEst),
+
+              hstVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, hstv, hstStrat, hstEst),
+              estVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, estv, estStrat, estEst),
+              sstVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, sstv, sstStrat, sstEst),
+              hspVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, hspv, hspStrat, hspEst),
+              espVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, espv, espStrat, espEst),
+              sspVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, sspv, sspStrat, sspEst),
+              stkVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, stkv, stkStrat, stkEst),
+
               ## Covariances
               cvEst_ct = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_ct, ctStrat, ctEst, ptStrat, ptEst),
               cvEst_cb = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_cb, cbStrat, cbEst, pbStrat, pbEst),
@@ -1065,6 +1137,14 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               cvEst_gvpd = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_gvpd, gvpdStrat, gvpdEst, faStrat, faEst),
               cvEst_gtmax = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_gtmax, gtmaxStrat, gtmaxEst, faStrat, faEst),
               cvEst_gtmean = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_gtmean, gtmeanStrat, gtmeanEst, faStrat, faEst),
+
+              cvEst_hst = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_hst, hstStrat, hstEst, faStrat, faEst),
+              cvEst_est = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_est, estStrat, estEst, faStrat, faEst),
+              cvEst_sst = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_sst, sstStrat, sstEst, faStrat, faEst),
+              cvEst_hsp = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_hsp, hspStrat, hspEst, faStrat, faEst),
+              cvEst_esp = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_esp, espStrat, espEst, faStrat, faEst),
+              cvEst_ssp = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_ssp, sspStrat, sspEst, faStrat, faEst),
+              cvEst_stk = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_stk, stkStrat, stkEst, faStrat, faEst),
 
               plotIn_t = sum(plotIn_t, na.rm = TRUE))
 

@@ -1038,6 +1038,9 @@ si <- function(db,
     db$TREE <- db$TREE[!is.na(db$TREE$sizeClass),]
   }
 
+  ## Make some height classes
+  db$TREE$htClass <- makeClasses(db$TREE$HT, interval = 5, numLabs = TRUE)
+
 
   # # Seperate area grouping names, (ex. TPA red oak in total land area of ingham county, rather than only area where red oak occurs)
   # if (!is.null(polys)){
@@ -1091,6 +1094,7 @@ si <- function(db,
     out <- unlist(out, recursive = FALSE)
     a <- bind_rows(out[names(out) == 'a'])
     t <- bind_rows(out[names(out) == 't'])
+    full <- bind_rows(out[names(out) == 'full'])
 
 
     ## Adding YEAR to groups
@@ -1217,8 +1221,8 @@ si <- function(db,
 
 
       tEst <- tEst %>%
-        mutate_at(vars(ctEst:gaEst), ~(.*wgt)) %>%
-        mutate_at(vars(ctVar:cvEst_ga), ~(.*(wgt^2))) %>%
+        mutate_at(vars(ctEst:sspEst), ~(.*wgt)) %>%
+        mutate_at(vars(ctVar:cvEst_ssp), ~(.*(wgt^2))) %>%
         group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
         summarize_at(vars(ctEst:plotIn_t), sum, na.rm = TRUE)
 
@@ -1271,7 +1275,13 @@ si <- function(db,
                GROW_VPD_ANOM = gvpdEst / faEst,
                GROW_TMAX_ANOM = gtmaxEst / faEst,
                GROW_TMEAN_ANOM = gtmeanEst / faEst,
-
+               H_a_species = hspEst / faEst,
+               Eh_a_species = espEst / faEst,
+               S_a_species = sspEst / faEst,
+               H_a_struct = hstEst / faEst,
+               Eh_a_struct = estEst / faEst,
+               S_a_struct = sstEst / faEst,
+               STOCKING = stkEst / faEst,
 
                ## TOTAL SE
                CHNG_TPA_SE = sqrt(ctVar) / abs(ctEst) * 100,
@@ -1310,6 +1320,15 @@ si <- function(db,
                gvpdVar = (1/faEst^2) * (gvpdVar + (GROW_VPD_ANOM^2 * faVar) - 2 * GROW_VPD_ANOM * cvEst_gvpd),
                gtmaxVar = (1/faEst^2) * (gtmaxVar + (GROW_TMAX_ANOM^2 * faVar) - 2 * GROW_TMAX_ANOM * cvEst_gtmax),
                gtmeanVar = (1/faEst^2) * (gtmeanVar + (GROW_TMEAN_ANOM^2 * faVar) - 2 * GROW_TMEAN_ANOM * cvEst_gtmean),
+
+               hstVar = (1/faEst^2) * (hstVar + (H_a_struct^2 * faVar) - 2 * H_a_struct * cvEst_hst),
+               estVar = (1/faEst^2) * (estVar + (Eh_a_struct^2 * faVar) - 2 * Eh_a_struct * cvEst_est),
+               sstVar = (1/faEst^2) * (sstVar + (S_a_struct^2 * faVar) - 2 * S_a_struct * cvEst_sst),
+               hspVar = (1/faEst^2) * (hspVar + (H_a_species^2 * faVar) - 2 * H_a_species * cvEst_hsp),
+               espVar = (1/faEst^2) * (espVar + (Eh_a_species^2 * faVar) - 2 * Eh_a_species * cvEst_esp),
+               sspVar = (1/faEst^2) * (sspVar + (S_a_species^2 * faVar) - 2 * S_a_species * cvEst_ssp),
+               stkVar = (1/faEst^2) * (stkVar + (STOCKING^2 * faVar) - 2 * STOCKING * cvEst_stk),
+
                ## RATIO SE
                TPA_RATE_SE = sqrt(ctVar) / abs(TPA_RATE) * 100,
                BAA_RATE_SE = sqrt(cbVar) / abs(BAA_RATE) * 100,
@@ -1341,6 +1360,15 @@ si <- function(db,
                GROW_VPD_ANOM_SE = sqrt(gvpdVar) / abs(GROW_VPD_ANOM) * 100,
                GROW_TMAX_ANOM_SE = sqrt(gtmaxVar) / abs(GROW_TMAX_ANOM) * 100,
                GROW_TMEAN_ANOM_SE = sqrt(gtmeanVar) / abs(GROW_TMEAN_ANOM) * 100,
+
+               H_a_species_SE = sqrt(hspVar) / abs(H_a_species) * 100,
+               Eh_a_species_SE = sqrt(espVar) / abs(Eh_a_species) * 100,
+               S_a_species_SE = sqrt(sspVar) / abs(S_a_species) * 100,
+               H_a_struct_SE = sqrt(hstVar) / abs(H_a_struct) * 100,
+               Eh_a_struct_SE = sqrt(estVar) / abs(Eh_a_struct) * 100,
+               S_a_struct_SE = sqrt(sstVar) / abs(S_a_struct) * 100,
+               STOCKING_SE = sqrt(stkVar) / abs(STOCKING) * 100,
+
                #SI_SE = sqrt(Mvar) / abs(SI) * 100,
                nPlots = plotIn_t,
                nTotal = nh,
@@ -1368,6 +1396,31 @@ si <- function(db,
         ))
     })
 
+    ### UP a few spatial scales
+    ## Which grpByNames are in which table? Helps us subset below
+    grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
+    grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
+    grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
+    ### REALLY DON'T LIKE WORKING WITH FULL TABLES, WORK ON A FIX
+    ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
+    fullArea <- full %>%
+      left_join(select(pops, PLT_CN, YEAR), by = 'PLT_CN') %>%
+      group_by(.dots = grpBy) %>%
+      summarize(H_g_struct = divIndex(htClass, -BAA * tDI, index = 'H'),
+                Eh_g_struct = divIndex(htClass, -BAA * tDI, index = 'Eh'),
+                S_g_struct = divIndex(htClass, -BAA * tDI, index = 'S'),
+                H_g_species = divIndex(SPCD, -TPA_UNADJ * tDI, index = 'H'),
+                Eh_g_species = divIndex(SPCD, -TPA_UNADJ * tDI, index = 'Eh'),
+                S_g_species = divIndex(SPCD, -TPA_UNADJ * tDI, index = 'S'))
+
+    tOut <- left_join(tOut, fullArea, by = grpBy) %>%
+      mutate(H_b_struct = H_g_struct - H_a_struct,
+             Eh_b_struct = Eh_g_struct - Eh_a_struct,
+             S_b_struct = S_g_struct - S_a_struct,
+             H_b_species = H_g_species - H_a_species,
+             Eh_b_species = Eh_g_species - Eh_a_species,
+             S_b_species = S_g_species - S_a_species)
+
 
 
     if (totals) {
@@ -1378,13 +1431,15 @@ si <- function(db,
                INSECT_RATE, DISEASE_RATE, FIRE_RATE, ANIMAL_RATE, WEATHER_RATE, VEG_RATE, UNKNOWN_RATE, SILV_RATE,
                DROUGHT_SEV, WET_SEV, ALL_SEV, GROW_DROUGHT_SEV, GROW_WET_SEV, GROW_ALL_SEV,
                VPD_ANOM, TMAX_ANOM, TMEAN_ANOM, GROW_VPD_ANOM, GROW_TMAX_ANOM, GROW_TMEAN_ANOM,
+               STOCKING, H_a_struct, H_b_struct, H_g_struct, S_a_struct, S_b_struct, S_g_struct, Eh_a_struct, Eh_b_struct, Eh_g_struct,
+               H_a_species, H_b_species, H_g_species, S_a_species, S_b_species, S_g_species, Eh_a_species, Eh_b_species, Eh_g_species,
                SI_SE, TPA_RATE_SE, BAA_RATE_SE,
                TPA_MORT_SE, TPA_RECR_SE, BAA_MORT_SE, BAA_RECR_SE, BAA_GROW_SE, ELEV_SE,
                CHNG_TPA_SE, CHNG_BAA_SE, PREV_TPA_SE, PREV_BAA_SE,
                INSECT_RATE_SE, DISEASE_RATE_SE, FIRE_RATE_SE, ANIMAL_RATE_SE, WEATHER_RATE_SE, VEG_RATE_SE, UNKNOWN_RATE_SE, SILV_RATE_SE,
                DROUGHT_SEV_SE, WET_SEV_SE, ALL_SEV_SE, GROW_DROUGHT_SEV_SE, GROW_WET_SEV_SE, GROW_ALL_SEV_SE,
                VPD_ANOM_SE, TMAX_ANOM_SE, TMEAN_ANOM_SE, GROW_VPD_ANOM_SE, GROW_TMAX_ANOM_SE, GROW_TMEAN_ANOM_SE,
-
+               STOCKING_SE, H_a_struct_SE, Eh_a_struct_SE, S_a_struct_SE, H_a_species_SE, Eh_a_species_SE, S_a_species_SE,
                nPlots)
 
     } else {
@@ -1394,11 +1449,14 @@ si <- function(db,
                INSECT_RATE, DISEASE_RATE, FIRE_RATE, ANIMAL_RATE, WEATHER_RATE, VEG_RATE, UNKNOWN_RATE, SILV_RATE,
                DROUGHT_SEV, WET_SEV, ALL_SEV, GROW_DROUGHT_SEV, GROW_WET_SEV, GROW_ALL_SEV,
                VPD_ANOM, TMAX_ANOM, TMEAN_ANOM, GROW_VPD_ANOM, GROW_TMAX_ANOM, GROW_TMEAN_ANOM,
+               STOCKING, H_a_struct, H_b_struct, H_g_struct, S_a_struct, S_b_struct, S_g_struct, Eh_a_struct, Eh_b_struct, Eh_g_struct,
+               H_a_species, H_b_species, H_g_species, S_a_species, S_b_species, S_g_species, Eh_a_species, Eh_b_species, Eh_g_species,
                SI_SE, TPA_RATE_SE, BAA_RATE_SE,
                TPA_MORT_SE, TPA_RECR_SE, BAA_MORT_SE, BAA_RECR_SE, BAA_GROW_SE, ELEV_SE,
                INSECT_RATE_SE, DISEASE_RATE_SE, FIRE_RATE_SE, ANIMAL_RATE_SE, WEATHER_RATE_SE, VEG_RATE_SE, UNKNOWN_RATE_SE, SILV_RATE_SE,
                DROUGHT_SEV_SE, WET_SEV_SE, ALL_SEV_SE, GROW_DROUGHT_SEV_SE, GROW_WET_SEV_SE, GROW_ALL_SEV_SE,
                VPD_ANOM_SE, TMAX_ANOM_SE, TMEAN_ANOM_SE, GROW_VPD_ANOM_SE, GROW_TMAX_ANOM_SE, GROW_TMEAN_ANOM_SE,
+               STOCKING_SE, H_a_struct_SE, Eh_a_struct_SE, S_a_struct_SE, H_a_species_SE, Eh_a_species_SE, S_a_species_SE,
                nPlots)
     }
 
@@ -1406,6 +1464,7 @@ si <- function(db,
     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
 
   }
+
 
   ## Pretty output
   tOut <- tOut %>%
