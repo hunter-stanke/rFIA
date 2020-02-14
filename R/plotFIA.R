@@ -168,14 +168,18 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet
 
       yName <- names(data)[max.col(SE)]
       seName <- paste0(yName, '_SE')
-      data$seVar <- (data[[seName]] / 100) * data$yVar #* 1.96 # 95 % confidence
+      data$seVar <- (data[[seName]] / 100) * abs(data$yVar) * 1.96 # 95 % confidence
+      data$ymin <- data$yVar - data$seVar
+      data$ymax <- data$yVar + data$seVar
     }
+
+    #print(data$seVar)
 
     ## Default to time series if x not specified
     if (quo_name(x_quo) == 'NULL'){
       data$xVar <- data$YEAR
       # Convert year to date format
-      data$xVar <-as.Date(paste(data$YEAR, 1, 1, sep = "-"))
+      data$xVar <- as.Date(paste(data$YEAR, 1, 1, sep = "-"))
       # Make a new label for x-axis if not specified
       if (is.null(x.lab)) x.lab <- 'YEAR'
     } else if (animate == FALSE) {
@@ -192,56 +196,102 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet
       }
     }
 
-    ylim = if_else(any(data$yVar < 0), min(data$yVar,na.rm = TRUE) * 1.4, 0)
+    if (se){
+      ylim = if_else(any(data$ymin < 0), min(data$ymin,na.rm = TRUE) * 1.4, 0)
+      #ylimMax = max(data$ymax,na.rm = TRUE) * 1.4
+    } else {
+      ylim = if_else(any(data$yVar < 0), min(data$yVar,na.rm = TRUE) * 1.4, 0)
+    }
 
     # Simple time series
     if (quo_name(grp_quo) == 'NULL'){
-      map <- data %>%
-        select(yVar, xVar) %>%
-        ungroup() %>%
-        ggplot(aes(x = xVar, y = yVar, group = 1), group = 1) +
-        #geom_ribbon(aes(x = xVar, ymin = (yVar * ))) +
-        geom_line(aes(group = 1), color = line.color, lwd = line.width) +
-        #geom_line(color = line.color, lwd = line.width) +
-        theme_bw() +
-        ggtitle(plot.title) +
-        xlab(ifelse(is.null(x.lab), quo_name(x_quo), x.lab)) +
-        ylab(ifelse(is.null(y.lab), quo_name(y_quo), y.lab)) +
-        #scale_y_continuous(limits = c(0, NA), expand = c(0,0))
-        ylim(ylim, max(data$yVar) * 1.4) +
-        theme(axis.text = element_text(size = 11 * text.size, family = text.font),
-              axis.title = element_text(size = 15 * text.size, family = text.font),
-              plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font))
+      if (se){
+        map <- data %>%
+          select(yVar, xVar, ymin, ymax) %>%
+          ungroup() %>%
+          ggplot(aes(x = xVar, y = yVar, group = 1), group = 1) +
+          geom_errorbar(aes(ymin=ymin, ymax=ymax), size = .67, alpha= .67, width = .5) +
+          #geom_ribbon(aes(x = xVar, ymin = (yVar * ))) +
+          geom_line(aes(group = 1), color = line.color, lwd = line.width) +
+          #geom_line(color = line.color, lwd = line.width) +
+          theme_bw() +
+          ggtitle(plot.title) +
+          xlab(ifelse(is.null(x.lab), quo_name(x_quo), x.lab)) +
+          ylab(ifelse(is.null(y.lab), quo_name(y_quo), y.lab)) +
+          #scale_y_continuous(limits = c(0, NA), expand = c(0,0))
+          ylim(ylim, max(data$ymax) * 1.4) +
+          theme(axis.text = element_text(size = 11 * text.size, family = text.font),
+                axis.title = element_text(size = 15 * text.size, family = text.font),
+                plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font))
+
+      } else {
+        map <- data %>%
+          select(yVar, xVar) %>%
+          ungroup() %>%
+          ggplot(aes(x = xVar, y = yVar, group = 1), group = 1) +
+          #geom_ribbon(aes(x = xVar, ymin = (yVar * ))) +
+          geom_line(aes(group = 1), color = line.color, lwd = line.width) +
+          #geom_line(color = line.color, lwd = line.width) +
+          theme_bw() +
+          ggtitle(plot.title) +
+          xlab(ifelse(is.null(x.lab), quo_name(x_quo), x.lab)) +
+          ylab(ifelse(is.null(y.lab), quo_name(y_quo), y.lab)) +
+          #scale_y_continuous(limits = c(0, NA), expand = c(0,0))
+          ylim(ylim, max(data$yVar) * 1.4) +
+          theme(axis.text = element_text(size = 11 * text.size, family = text.font),
+                axis.title = element_text(size = 15 * text.size, family = text.font),
+                plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font))
+      }
+
 
       # grouped time series
     } else {
       # Handle legend labels
       #if (is.null(legend.labs)) legend.labs = waiver()
+      if (se){
+        # Omit any NAs in grp
+        data <- filter(data, !is.na(grpVar))
+        map <- data %>%
+          ggplot(aes(x = as.factor(xVar), y = yVar, colour = as.factor(grpVar), group = as.factor(grpVar))) +
+          geom_line(lwd = line.width) +
+          #labs(colour = ifelse(is.null(legend.title), str_wrap(y, width = 10 * lab.width), str_wrap(legend.title, width = 10 * lab.width))) +
+          scale_colour_viridis_d(alpha = alpha, option = color.option, direction = direction, labels = legend.labs) +
+          labs(colour = ifelse(is.null(legend.title), '', str_wrap(legend.title, width = 10 * lab.width))) +
+          theme_bw() +
+          ggtitle(plot.title) +
+          xlab(ifelse(is.null(x.lab), quo_name(x_quo), x.lab)) +
+          ylab(ifelse(is.null(y.lab), quo_name(y_quo), y.lab)) +
+          ylim(ylim, max(data$ymax) * 1.4) +
+          theme(axis.text = element_text(size = 11 * text.size, family = text.font),
+                axis.title = element_text(size = 15 * text.size, family = text.font),
+                plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),
+                legend.title = element_text(size = 15 * text.size, face = 'bold.italic', family = text.font),
+                legend.text = element_text(size = 15 * text.size, face = 'italic', family = text.font)) +
+          geom_errorbar(aes(ymin=ymin, ymax=ymax), size = .67, alpha= .67, width = .5)
+      } else {
+        # Omit any NAs in grp
+        data <- filter(data, !is.na(grpVar))
+        map <- data %>%
+          ggplot(aes(x = as.factor(xVar), y = yVar, colour = as.factor(grpVar), group = as.factor(grpVar))) +
+          geom_line(lwd = line.width) +
+          #labs(colour = ifelse(is.null(legend.title), str_wrap(y, width = 10 * lab.width), str_wrap(legend.title, width = 10 * lab.width))) +
+          scale_colour_viridis_d(alpha = alpha, option = color.option, direction = direction, labels = legend.labs) +
+          labs(colour = ifelse(is.null(legend.title), '', str_wrap(legend.title, width = 10 * lab.width))) +
+          theme_bw() +
+          ggtitle(plot.title) +
+          xlab(ifelse(is.null(x.lab), quo_name(x_quo), x.lab)) +
+          ylab(ifelse(is.null(y.lab), quo_name(y_quo), y.lab)) +
+          ylim(ylim, max(data$yVar) * 1.4) +
+          theme(axis.text = element_text(size = 11 * text.size, family = text.font),
+                axis.title = element_text(size = 15 * text.size, family = text.font),
+                plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),
+                legend.title = element_text(size = 15 * text.size, face = 'bold.italic', family = text.font),
+                legend.text = element_text(size = 15 * text.size, face = 'italic', family = text.font))
+      }
 
-      # Omit any NAs in grp
-      data <- filter(data, !is.na(grpVar))
-      map <- data %>%
-        ggplot(aes(x = as.factor(xVar), y = yVar, colour = as.factor(grpVar), group = as.factor(grpVar))) +
-        geom_line(lwd = line.width) +
-        #labs(colour = ifelse(is.null(legend.title), str_wrap(y, width = 10 * lab.width), str_wrap(legend.title, width = 10 * lab.width))) +
-        scale_colour_viridis_d(alpha = alpha, option = color.option, direction = direction, labels = legend.labs) +
-        labs(colour = ifelse(is.null(legend.title), '', str_wrap(legend.title, width = 10 * lab.width))) +
-        theme_bw() +
-        ggtitle(plot.title) +
-        xlab(ifelse(is.null(x.lab), quo_name(x_quo), x.lab)) +
-        ylab(ifelse(is.null(y.lab), quo_name(y_quo), y.lab)) +
-        ylim(ylim, max(data$yVar) * 1.4) +
-        theme(axis.text = element_text(size = 11 * text.size, family = text.font),
-              axis.title = element_text(size = 15 * text.size, family = text.font),
-              plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),
-              legend.title = element_text(size = 15 * text.size, face = 'bold.italic', family = text.font),
-              legend.text = element_text(size = 15 * text.size, face = 'italic', family = text.font))
+
     }
 
-    if (se){
-      map <- map +
-        geom_errorbar(aes(ymin=yVar - seVar, ymax=yVar + seVar), size = .67, alpha= .67, width = .5, position = position_dodge(.05))
-    }
 
     ## IF you want to animate
     if (animate){

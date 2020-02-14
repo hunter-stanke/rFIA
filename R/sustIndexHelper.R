@@ -445,6 +445,7 @@ sustIndexHelper2 <- function(x, popState, t, grpBy, method){
   return(out)
 }
 
+
 siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
 
   ## Selecting the plots for one county
@@ -469,7 +470,7 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
   # db$TREE$treID <- paste(db$TREE$SUBP, db$TREE$TREE, sep = '_')
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR',
+  data <- select(db$PLOT, c('PLT_CN', 'pltID', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR',
                             'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp', 'DESIGNCD',
                             'drought_sev', 'wet_sev', 'all_sev', 'grow_drought_sev', 'grow_wet_sev', 'grow_all_sev',
                             'tmean_anom', tmax_anom, vpd_anom, 'grow_tmean_anom', grow_tmax_anom, grow_vpd_anom, ELEV)) %>%
@@ -477,12 +478,12 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
 
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
     ## AGENTCD at remeasurement, died during the measurement interval
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'TPA_UNADJ', 'DIA', 'AGENTCD', 'MORTYR', 'STATUSCD')), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'TPA_UNADJ', 'DIA', 'AGENTCD', 'MORTYR', 'STATUSCD', 'SPCD')), by = c('PLT_CN', 'CONDID')) %>%
     #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', DIA_BEGIN, DIA_END)), by = c('TRE_CN')) %>%
 
     left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p', 'DESIGNCD', 'PLOT_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('2', '1')) %>%
-    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'TPA_UNADJ', 'DIA', 'STATUSCD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
+    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'TPA_UNADJ', 'DIA', 'STATUSCD', htClass, SPCD)), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
     #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
 
     mutate_if(is.factor,
@@ -501,9 +502,11 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
     if_else(data$STATUSCD1 == 1, 1, 0) *
     if_else(is.na(data$STATUSCD1), NA_real_, if_else(data$STATUSCD1 == 0 | data$STATUSCD2 == 0, 0, 1))
 
-    ## Doesn't allow recruitment to happen, becuase no previous status
-    ## Adjust later, after the pivot
-    #if_else(data$STATUSCD1 == 0 | data$STATUSCD2 == 0, 0, 1)
+  ## Doesn't allow recruitment to happen, becuase no previous status
+  ## Adjust later, after the pivot
+  #if_else(data$STATUSCD1 == 0 | data$STATUSCD2 == 0, 0, 1)
+
+
 
   ## PREVIOUS and CURRENT attributes
   data <- data %>%
@@ -532,7 +535,7 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
   ## Just what we need
   data <- data %>%
     select(PLT_CN, PREV_PLT_CN, TRE_CN, SUBP, CONDID, TREE, CONDPROP_UNADJ,
-           MEASYEAR, MACRO_BREAKPOINT_DIA, PROP_BASIS,
+           MEASYEAR, MACRO_BREAKPOINT_DIA, PROP_BASIS, htClass,
            BUG, DISEASE, FIRE, ANIMAL, WEATHER, VEG, UNKNOWN, SILV, MORTYR, MORT, SURV, ELEV,
            drought_sev, wet_sev, all_sev, grow_drought_sev, grow_wet_sev, grow_all_sev,
            tmean_anom, tmax_anom, vpd_anom, grow_tmean_anom, grow_tmax_anom, grow_vpd_anom,
@@ -540,7 +543,7 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
            one_of(str_c(grpP,1), str_c(grpC,1), str_c(grpT,1),
                   str_c(grpP,2), str_c(grpC,2), str_c(grpT,2)),
            tDI1, tDI2, STATUSCD1, STATUSCD2,
-           DIA1, DIA2, BAA1, BAA2, TPA_UNADJ1, TPA_UNADJ2) %>%
+           DIA1, DIA2, BAA1, BAA2, TPA_UNADJ1, TPA_UNADJ2, SPCD1, SPCD2) %>%
     mutate(BAA1 = -(BAA1),
            TPA_UNADJ1 = -(TPA_UNADJ1)) %>%
     ## Rearrange previous values as observations
@@ -556,11 +559,29 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
       DIA >= 5 & is.na(MACRO_BREAKPOINT_DIA) ~ 'SUBP',
       DIA >= 5 & DIA < MACRO_BREAKPOINT_DIA ~ 'SUBP',
       DIA >= MACRO_BREAKPOINT_DIA ~ 'MACR')) #%>%
-    #mutate(tDI = tDI * if_else())
+  #mutate(tDI = tDI * if_else())
+
+
+  ### PREVIOUS DIVERSITY, STOCKING, on the PLOT
+  ### Irrespective of all TREE level groups
+  div <- data %>%
+    select(PLT_CN, grpP, grpC, htClass, SPCD, BAA, TPA_UNADJ, ONEORTWO, tDI) %>%
+    filter(ONEORTWO == 1) %>%
+    group_by(PLT_CN, .dots = c(grpP, grpC)) %>%
+    summarize(H_struct = divIndex(htClass, -BAA * tDI, index = 'H'),
+              Eh_struct = divIndex(htClass, -BAA * tDI, index = 'Eh'),
+              S_struct = divIndex(htClass, -BAA * tDI, index = 'S'),
+              H_species = divIndex(SPCD, -TPA_UNADJ * tDI, index = 'H'),
+              Eh_species = divIndex(SPCD, -TPA_UNADJ * tDI, index = 'Eh'),
+              S_species = divIndex(SPCD, -TPA_UNADJ * tDI, index = 'S'))
+
+  full <- data %>%
+    filter(ONEORTWO == 1) %>%
+    select(PLT_CN, grpBy, SPCD, htClass, TPA_UNADJ, BAA, tDI)
 
 
   if (byPlot){
-    grpBy <- c('YEAR', grpBy, 'PLOT_STATUS_CD')
+    grpBy <- c('YEAR', grpBy)
 
     t <- data %>%
       mutate(YEAR = MEASYEAR) %>%
@@ -577,7 +598,6 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 CURR_BAA = PREV_BAA + CHNG_BAA,
                 TPA_RATE = (CHNG_TPA / REMPER) / (PREV_TPA + CURR_TPA)* 2,
                 BAA_RATE = (CHNG_BAA / REMPER) / (PREV_BAA + CURR_BAA)* 2,
-
                 ## Disturbances
                 INSECT_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & BUG == 1] * tDI[ONEORTWO == 1 & BUG == 1], na.rm = TRUE), 0) / (PREV_BAA + CURR_BAA)* 2 / REMPER,
                 DISEASE_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & DISEASE == 1] * tDI[ONEORTWO == 1 & DISEASE == 1], na.rm = TRUE), 0) / (PREV_BAA + CURR_BAA)* 2 / REMPER,
@@ -605,11 +625,13 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
                 y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
                 M = sqrt(x^2 + y^2),
-                SUST_INDEX = if_else(x < 0, -M, M),
+                SI = if_else(x < 0, -M, M),
                 nStems = length(which(tDI == 1))) %>%
       ungroup() %>%
+      left_join(div, by = c('PLT_CN', grpP, grpC)) %>%
       select(PLT_CN, PREV_PLT_CN, grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, MORT_RATE, BAA_CHNG_PERC, TPA_CHNG_PERC,
              PREV_TPA, PREV_BAA, CHNG_TPA, CHNG_BAA, CURR_TPA, CURR_BAA,
+             H_struct, Eh_struct, S_struct, H_species, Eh_species, S_species,
              INSECT_RATE,
              DISEASE_RATE, FIRE_RATE, ANIMAL_RATE, WEATHER_RATE, VEG_RATE,
              UNKNOWN_RATE, SILV_RATE,
@@ -618,8 +640,8 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
              DROUGHT_SEV, WET_SEV, ALL_SEV,
              GROW_DROUGHT_SEV, GROW_WET_SEV, GROW_ALL_SEV,
              nStems, nLive)
-
     a = NULL
+    full = NULL
 
   } else {
     # ### Plot-level estimates -- growth accounting
@@ -703,10 +725,11 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 # y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
                 # M = sqrt(x^2 + y^2),
                 #SUST_INDEX = if_else(x < 0, -M, M),
-                plotIn = if_else(sum(tDI) > 0, 1, 0))
+                plotIn = if_else(sum(tDI) > 0, 1, 0)) %>%
+      left_join(div, by = c('PLT_CN', grpP, grpC))
   }
 
-  pltOut <- list(a = a, t = t)
+  pltOut <- list(a = a, t = t, full = full)
   return(pltOut)
 
 }
@@ -750,6 +773,759 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
       ELEV = ELEV * aAdj,
       fa = fa * aAdj) %>%
     ungroup()
+
+  ## Strata level estimates
+  tEst <- t %>%
+    ## Rejoin with population tables
+    right_join(select(popState[[x]], -c(STATECD, REMPER)), by = 'PLT_CN') %>%
+    ## Need forest area to adjust SI indices
+    left_join(select(aAdj, PLT_CN, grpBy, fa, aAdj), by = c('PLT_CN', grpBy)) %>%
+    #Add adjustment factors
+    mutate(tAdj = case_when(
+      ## When NA, stay NA
+      is.na(PLOT_BASIS) ~ NA_real_,
+      ## If the proportion was measured for a macroplot,
+      ## use the macroplot value
+      PLOT_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
+      ## Otherwise, use the subpplot value
+      PLOT_BASIS == 'SUBP' ~ as.numeric(ADJ_FACTOR_SUBP),
+      PLOT_BASIS == 'MICR' ~ as.numeric(ADJ_FACTOR_MICR)),
+      ct = CHNG_TPA * tAdj,
+      cb = CHNG_BAA * tAdj,
+      pt = PREV_TPA * tAdj,
+      pb = PREV_BAA * tAdj,
+      ## COMPONENTS
+      tmort = TPA_MORT * tAdj,
+      trecr = TPA_RECR * tAdj,
+      bmort = BAA_MORT * tAdj,
+      brecr = BAA_RECR * tAdj,
+      bgrow = BAA_GROW * tAdj,
+      bug = BUG_RATE * tAdj,
+      disease = DISEASE_RATE * tAdj,
+      fire = FIRE_RATE * tAdj,
+      animal = ANIMAL_RATE * tAdj,
+      weather = WEATHER_RATE * tAdj,
+      veg = VEG_RATE * tAdj,
+      unknown = UNKNOWN_RATE * tAdj,
+      silv = SILV_RATE * tAdj,
+      mort = MORT_RATE * tAdj,
+      H_struct = H_struct * aAdj,
+      Eh_struct = Eh_struct * aAdj,
+      S_struct = S_struct * aAdj,
+      H_species = H_species * aAdj,
+      Eh_species = Eh_species * aAdj,
+      S_species = S_species * aAdj,
+      #si = SUST_INDEX * fa,
+    ) %>%
+    ## Computing change
+    mutate(ct = (ct) / REMPER,
+           cb = (cb) / REMPER) %>%
+    ## Extra step for variance issues
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy) %>%
+    summarize(ctPlot = sum(ct, na.rm = TRUE),
+              cbPlot = sum(cb, na.rm = TRUE),
+              ptPlot = sum(pt, na.rm = TRUE),
+              pbPlot = sum(pb, na.rm = TRUE),
+              tmort = sum(tmort, na.rm = TRUE),
+              trecr = sum(trecr, na.rm = TRUE),
+              bmort = sum(bmort, na.rm = TRUE),
+              brecr = sum(brecr, na.rm = TRUE),
+              bgrow = sum(bgrow, na.rm = TRUE),
+              #siPlot = sum(si, na.rm = TRUE),
+              bugPlot = sum(bug, na.rm = TRUE),
+              diseasePlot = sum(disease, na.rm = TRUE),
+              firePlot = sum(fire, na.rm = TRUE),
+              animalPlot = sum(animal, na.rm = TRUE),
+              weatherPlot = sum(weather, na.rm = TRUE),
+              vegPlot = sum(veg, na.rm = TRUE),
+              unPlot = sum(unknown, na.rm = TRUE),
+              silvPlot = sum(silv, na.rm = TRUE),
+              mortPlot = sum(mort, na.rm = TRUE),
+              plotIn_t = ifelse(sum(plotIn >  0, na.rm = TRUE), 1,0),
+              nh = first(P2POINTCNT),
+              p2eu = first(p2eu),
+              a = first(AREA_USED),
+              w = first(P1POINTCNT) / first(P1PNTCNT_EU),
+              REMPER = first(REMPER),
+              H_struct = first(H_struct),
+              Eh_struct = first(Eh_struct),
+              S_struct = first(S_struct),
+              H_species = first(H_species),
+              Eh_species = first(Eh_species),
+              S_species = first(S_species)) %>%
+    ## Do not want to compute SI for micro and subp seperately, handle it here
+    mutate(CURR_TPA = ptPlot + (ctPlot * REMPER),
+           CURR_BAA = pbPlot + (cbPlot * REMPER),
+           TPA_RATE = ctPlot / (CURR_TPA + ptPlot) * 2,
+           BAA_RATE = cbPlot / (CURR_BAA + pbPlot) * 2,
+           x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
+           #y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
+           siPlot = sqrt(x^2 + x^2),
+           siPlot = if_else(x < 0, -siPlot, siPlot),
+           siPlot = case_when(
+             is.na(siPlot) ~ 0,
+             TRUE ~ siPlot,
+           )) %>%
+
+    left_join(select(aAdj, PLT_CN, grpBy, fa, DROUGHT_SEV, WET_SEV, ALL_SEV, GROW_DROUGHT_SEV, GROW_WET_SEV, GROW_ALL_SEV,
+                     VPD_ANOM, TMAX_ANOM, TMEAN_ANOM, GROW_VPD_ANOM, GROW_TMAX_ANOM, GROW_TMEAN_ANOM, ELEV), by = c('PLT_CN', grpBy)) %>%
+
+    ## Strata level
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
+    summarize(r_t = length(unique(PLT_CN)) / first(nh),
+              ctStrat = mean(ctPlot * r_t, na.rm = TRUE),
+              cbStrat = mean(cbPlot * r_t, na.rm = TRUE),
+              ptStrat = mean(ptPlot * r_t, na.rm = TRUE),
+              pbStrat = mean(pbPlot * r_t, na.rm = TRUE),
+              siStrat = mean(siPlot * fa * r_t, na.rm = TRUE),
+              tmortStrat = mean(tmort * r_t, na.rm = TRUE),
+              trecrStrat = mean(trecr * r_t, na.rm = TRUE),
+              bmortStrat = mean(bmort * r_t, na.rm = TRUE),
+              brecrStrat = mean(brecr * r_t, na.rm = TRUE),
+              bgrowStrat = mean(bgrow * r_t, na.rm = TRUE),
+              elevStrat = mean(ELEV * r_t, na.rm = TRUE),
+
+              bugStrat = mean(bugPlot * r_t, na.rm = TRUE),
+              diseaseStrat = mean(diseasePlot * r_t, na.rm = TRUE),
+              fireStrat = mean(firePlot * r_t, na.rm = TRUE),
+              animalStrat = mean(animalPlot * r_t, na.rm = TRUE),
+              weatherStrat = mean(weatherPlot * r_t, na.rm = TRUE),
+              vegStrat = mean(vegPlot * r_t, na.rm = TRUE),
+              unStrat = mean(unPlot * r_t, na.rm = TRUE),
+              silvStrat = mean(silvPlot * r_t, na.rm = TRUE),
+              faStrat = mean(fa * r_t, na.rm = TRUE),
+              dStrat = mean(DROUGHT_SEV * r_t, na.rm = TRUE),
+              wStrat = mean(WET_SEV * r_t, na.rm = TRUE),
+              aStrat = mean(ALL_SEV * r_t, na.rm = TRUE),
+              gdStrat = mean(GROW_DROUGHT_SEV * r_t, na.rm = TRUE),
+              gwStrat = mean(GROW_WET_SEV * r_t, na.rm = TRUE),
+              gaStrat = mean(GROW_ALL_SEV * r_t, na.rm = TRUE),
+              mortStrat = mean(mortPlot * r_t, na.rm = TRUE),
+              vpdStrat = mean(VPD_ANOM * r_t, na.rm = TRUE),
+              tmaxStrat = mean(TMAX_ANOM * r_t, na.rm = TRUE),
+              tmeanStrat = mean(TMEAN_ANOM * r_t, na.rm = TRUE),
+              gvpdStrat = mean(GROW_VPD_ANOM * r_t, na.rm = TRUE),
+              gtmaxStrat = mean(GROW_TMAX_ANOM * r_t, na.rm = TRUE),
+              gtmeanStrat = mean(GROW_TMEAN_ANOM * r_t, na.rm = TRUE),
+
+              ## Diversity indices
+              hstStrat = mean(H_struct * r_t, na.rm = TRUE),
+              estStrat = mean(Eh_struct * r_t, na.rm = TRUE),
+              sstStrat = mean(S_struct * r_t, na.rm = TRUE),
+              hspStrat = mean(H_species * r_t, na.rm = TRUE),
+              espStrat = mean(Eh_species * r_t, na.rm = TRUE),
+              sspStrat = mean(S_species * r_t, na.rm = TRUE),
+              #stkStrat = mean(STOCKING * r_t, na.rm = TRUE),
+
+              plotIn_t = sum(plotIn_t, na.rm = TRUE),
+              n = n(),
+              ## We don't want a vector of these values, since they are repeated
+              nh = first(nh),
+              a = first(a),
+              w = first(w),
+              p2eu = first(p2eu),
+              ndif = nh - n,
+              # ## Strata level variances
+              ctv = stratVar(ESTN_METHOD, ctPlot, ctStrat, ndif, a, nh),
+              cbv = stratVar(ESTN_METHOD, cbPlot, cbStrat, ndif, a, nh),
+              ptv = stratVar(ESTN_METHOD, ptPlot, ptStrat, ndif, a, nh),
+              pbv = stratVar(ESTN_METHOD, pbPlot, pbStrat, ndif, a, nh),
+              siv = stratVar(ESTN_METHOD, siPlot * fa, siStrat, ndif, a, nh),
+
+
+              #test1 = sum((c(siPlot * fa, numeric(ndif))^2), na.rm = TRUE),
+              #test2 = nh * siStrat^2,
+              hstv = stratVar(ESTN_METHOD, H_struct, hstStrat, ndif, a, nh),
+              estv = stratVar(ESTN_METHOD, Eh_struct, estStrat, ndif, a, nh),
+              sstv = stratVar(ESTN_METHOD, S_struct, sstStrat, ndif, a, nh),
+              hspv = stratVar(ESTN_METHOD, H_species, hspStrat, ndif, a, nh),
+              espv = stratVar(ESTN_METHOD, Eh_species, espStrat, ndif, a, nh),
+              sspv = stratVar(ESTN_METHOD, S_species, sspStrat, ndif, a, nh),
+              #stkv = stratVar(ESTN_METHOD, STOCKING, stkStrat, ndif, a, nh),
+
+
+
+              tmortv = stratVar(ESTN_METHOD, tmort, tmortStrat, ndif, a, nh),
+              trecrv = stratVar(ESTN_METHOD, trecr, trecrStrat, ndif, a, nh),
+              bmortv = stratVar(ESTN_METHOD, bmort, bmortStrat, ndif, a, nh),
+              brecrv = stratVar(ESTN_METHOD, brecr, brecrStrat, ndif, a, nh),
+              bgrowv = stratVar(ESTN_METHOD, bgrow, bgrowStrat, ndif, a, nh),
+
+              elevv = stratVar(ESTN_METHOD, ELEV, elevStrat, ndif, a, nh),
+              bugv = stratVar(ESTN_METHOD, bugPlot, bugStrat, ndif, a, nh),
+              diseasev = stratVar(ESTN_METHOD, diseasePlot, diseaseStrat, ndif, a, nh),
+              firev = stratVar(ESTN_METHOD, firePlot, fireStrat, ndif, a, nh),
+              animalv = stratVar(ESTN_METHOD, animalPlot, animalStrat, ndif, a, nh),
+              weatherv = stratVar(ESTN_METHOD, weatherPlot, weatherStrat, ndif, a, nh),
+              vegv = stratVar(ESTN_METHOD, vegPlot, vegStrat, ndif, a, nh),
+              unv = stratVar(ESTN_METHOD, unPlot, unStrat, ndif, a, nh),
+              silvv = stratVar(ESTN_METHOD, silvPlot, silvStrat, ndif, a, nh),
+              fav = stratVar(ESTN_METHOD, fa, faStrat, ndif, a, nh),
+              dv = stratVar(ESTN_METHOD, DROUGHT_SEV, dStrat, ndif, a, nh),
+              wv = stratVar(ESTN_METHOD, WET_SEV, wStrat, ndif, a, nh),
+              av = stratVar(ESTN_METHOD, ALL_SEV, aStrat, ndif, a, nh),
+              gdv = stratVar(ESTN_METHOD, GROW_DROUGHT_SEV, gdStrat, ndif, a, nh),
+              gwv = stratVar(ESTN_METHOD, GROW_WET_SEV, gwStrat, ndif, a, nh),
+              gav = stratVar(ESTN_METHOD, GROW_ALL_SEV, gaStrat, ndif, a, nh),
+              mortv = stratVar(ESTN_METHOD, mortPlot, mortStrat, ndif, a, nh),
+              vpdv = stratVar(ESTN_METHOD, VPD_ANOM, vpdStrat, ndif, a, nh),
+              tmaxv = stratVar(ESTN_METHOD, TMAX_ANOM, tmaxStrat, ndif, a, nh),
+              tmeanv = stratVar(ESTN_METHOD, TMEAN_ANOM, tmeanStrat, ndif, a, nh),
+              gvpdv = stratVar(ESTN_METHOD, GROW_VPD_ANOM, gvpdStrat, ndif, a, nh),
+              gtmaxv = stratVar(ESTN_METHOD, GROW_TMAX_ANOM, gtmaxStrat, ndif, a, nh),
+              gtmeanv = stratVar(ESTN_METHOD, GROW_TMEAN_ANOM, gtmeanStrat, ndif, a, nh),
+
+              # Strata level covariances
+              cvStrat_ct = stratVar(ESTN_METHOD, ctPlot, ctStrat, ndif, a, nh, ptPlot, ptStrat),
+              cvStrat_cb = stratVar(ESTN_METHOD, cbPlot, cbStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_si = stratVar(ESTN_METHOD, siPlot * fa, siStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_tmort = stratVar(ESTN_METHOD, tmort, tmortStrat, ndif, a, nh, ptPlot, ptStrat),
+              cvStrat_trecr = stratVar(ESTN_METHOD, trecr, trecrStrat, ndif, a, nh, ptPlot, ptStrat),
+              cvStrat_bmort = stratVar(ESTN_METHOD, bmort, bmortStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_brecr = stratVar(ESTN_METHOD, brecr, brecrStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_bgrow = stratVar(ESTN_METHOD, bgrow, bgrowStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_elev = stratVar(ESTN_METHOD, ELEV, elevStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_bug = stratVar(ESTN_METHOD, bugPlot, bugStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_disease = stratVar(ESTN_METHOD, diseasePlot, diseaseStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_fire = stratVar(ESTN_METHOD, firePlot, fireStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_animal = stratVar(ESTN_METHOD, animalPlot, animalStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_weather = stratVar(ESTN_METHOD, weatherPlot, weatherStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_veg = stratVar(ESTN_METHOD, vegPlot, vegStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_un = stratVar(ESTN_METHOD, unPlot, unStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_silv = stratVar(ESTN_METHOD, silvPlot, silvStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_d = stratVar(ESTN_METHOD, DROUGHT_SEV, dStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_w = stratVar(ESTN_METHOD, WET_SEV, wStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_a = stratVar(ESTN_METHOD, ALL_SEV, aStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_gd = stratVar(ESTN_METHOD, GROW_DROUGHT_SEV, gdStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_gw = stratVar(ESTN_METHOD, GROW_WET_SEV, gwStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_ga = stratVar(ESTN_METHOD, GROW_ALL_SEV, gaStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_mort = stratVar(ESTN_METHOD, mortPlot, mortStrat, ndif, a, nh, ptPlot, ptStrat),
+              cvStrat_vpd = stratVar(ESTN_METHOD, VPD_ANOM, vpdStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_tmax = stratVar(ESTN_METHOD, TMAX_ANOM, tmaxStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_tmean = stratVar(ESTN_METHOD, TMEAN_ANOM, tmeanStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_gvpd = stratVar(ESTN_METHOD, GROW_VPD_ANOM, gvpdStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_gtmax = stratVar(ESTN_METHOD, GROW_TMAX_ANOM, gtmaxStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_gtmean = stratVar(ESTN_METHOD, GROW_TMEAN_ANOM, gtmeanStrat, ndif, a, nh, fa, faStrat),
+
+
+              cvStrat_hst = stratVar(ESTN_METHOD, H_struct, hstStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_est = stratVar(ESTN_METHOD, Eh_struct, estStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_sst = stratVar(ESTN_METHOD, S_struct, sstStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_hsp = stratVar(ESTN_METHOD, H_species, hspStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_esp = stratVar(ESTN_METHOD, Eh_species, espStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_ssp = stratVar(ESTN_METHOD, S_species, sspStrat, ndif, a, nh, fa, faStrat),
+              #cvStrat_stk = stratVar(ESTN_METHOD, STOCKING, stkStrat, ndif, a, nh, fa, faStrat),
+    ) %>%
+
+    ## Estimation unit
+    group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+    summarize(ctEst = unitMean(ESTN_METHOD, a, nh, w, ctStrat),
+              cbEst = unitMean(ESTN_METHOD, a, nh, w, cbStrat),
+              ptEst = unitMean(ESTN_METHOD, a, nh, w, ptStrat),
+              pbEst = unitMean(ESTN_METHOD, a, nh, w, pbStrat),
+              siEst = unitMean(ESTN_METHOD, a, nh, w, siStrat),
+              tmortEst = unitMean(ESTN_METHOD, a, nh, w, tmortStrat),
+              trecrEst = unitMean(ESTN_METHOD, a, nh, w, trecrStrat),
+              bmortEst = unitMean(ESTN_METHOD, a, nh, w, bmortStrat),
+              brecrEst = unitMean(ESTN_METHOD, a, nh, w, brecrStrat),
+              bgrowEst = unitMean(ESTN_METHOD, a, nh, w, bgrowStrat),
+
+              elevEst = unitMean(ESTN_METHOD, a, nh, w, elevStrat),
+              bugEst = unitMean(ESTN_METHOD, a, nh, w, bugStrat),
+              diseaseEst = unitMean(ESTN_METHOD, a, nh, w, diseaseStrat),
+              fireEst = unitMean(ESTN_METHOD, a, nh, w, fireStrat),
+              animalEst = unitMean(ESTN_METHOD, a, nh, w, animalStrat),
+              weatherEst = unitMean(ESTN_METHOD, a, nh, w, weatherStrat),
+              vegEst = unitMean(ESTN_METHOD, a, nh, w, vegStrat),
+              unEst = unitMean(ESTN_METHOD, a, nh, w, unStrat),
+              silvEst = unitMean(ESTN_METHOD, a, nh, w, silvStrat),
+              mortEst =  unitMean(ESTN_METHOD, a, nh, w, mortStrat),
+              faEst = unitMean(ESTN_METHOD, a, nh, w, faStrat),
+              dEst = unitMean(ESTN_METHOD, a, nh, w, dStrat),
+              wEst = unitMean(ESTN_METHOD, a, nh, w, wStrat),
+              aEst = unitMean(ESTN_METHOD, a, nh, w, aStrat),
+              gdEst = unitMean(ESTN_METHOD, a, nh, w, gdStrat),
+              gwEst = unitMean(ESTN_METHOD, a, nh, w, gwStrat),
+              gaEst = unitMean(ESTN_METHOD, a, nh, w, gaStrat),
+              mortEst =  unitMean(ESTN_METHOD, a, nh, w, mortStrat),
+              vpdEst =  unitMean(ESTN_METHOD, a, nh, w, vpdStrat),
+              tmaxEst =  unitMean(ESTN_METHOD, a, nh, w, tmaxStrat),
+              tmeanEst =  unitMean(ESTN_METHOD, a, nh, w, tmeanStrat),
+              gvpdEst =  unitMean(ESTN_METHOD, a, nh, w, gvpdStrat),
+              gtmaxEst =  unitMean(ESTN_METHOD, a, nh, w, gtmaxStrat),
+              gtmeanEst =  unitMean(ESTN_METHOD, a, nh, w, gtmeanStrat),
+
+              hstEst = unitMean(ESTN_METHOD, a, nh, w, hstStrat),
+              estEst = unitMean(ESTN_METHOD, a, nh, w, estStrat),
+              sstEst = unitMean(ESTN_METHOD, a, nh, w, sstStrat),
+              hspEst = unitMean(ESTN_METHOD, a, nh, w, hspStrat),
+              espEst = unitMean(ESTN_METHOD, a, nh, w, espStrat),
+              sspEst = unitMean(ESTN_METHOD, a, nh, w, sspStrat),
+              #stkEst = unitMean(ESTN_METHOD, a, nh, w, stkStrat),
+
+
+              nh = first(nh),
+              # Estimation of unit variance
+              ctVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ctv, ctStrat, ctEst),
+              cbVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, cbv, cbStrat, cbEst),
+              ptVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ptv, ptStrat, ptEst),
+              pbVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, pbv, pbStrat, pbEst),
+              siVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, siv, siStrat, siEst),
+              tmortVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tmortv, tmortStrat, tmortEst),
+              trecrVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, trecrv, trecrStrat, trecrEst),
+              bmortVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bmortv, bmortStrat, bmortEst),
+              brecrVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, brecrv, brecrStrat, brecrEst),
+              bgrowVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bgrowv, bgrowStrat, bgrowEst),
+
+              elevVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, elevv, elevStrat, elevEst),
+              bugVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bugv, bugStrat, bugEst),
+              diseaseVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, diseasev, diseaseStrat, diseaseEst),
+              fireVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, firev, fireStrat, fireEst),
+              animalVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, animalv, animalStrat, animalEst),
+              weatherVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, weatherv, weatherStrat, weatherEst),
+              vegVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, vegv, vegStrat, vegEst),
+              unVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, unv, unStrat, unEst),
+              silvVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, silvv, silvStrat, silvEst),
+              faVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, fav, faStrat, faEst),
+              dVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, dv, dStrat, dEst),
+              wVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, wv, wStrat, wEst),
+              aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, av, aStrat, aEst),
+              gdVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, gdv, gdStrat, gdEst),
+              gwVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, gwv, gwStrat, gwEst),
+              gaVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, gav, gaStrat, gaEst),
+              mortVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, mortv, mortStrat, mortEst),
+              vpdVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, vpdv, vpdStrat, vpdEst),
+              tmaxVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tmaxv, tmaxStrat, tmaxEst),
+              tmeanVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tmeanv, tmeanStrat, tmeanEst),
+              gvpdVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, gvpdv, gvpdStrat, gvpdEst),
+              gtmaxVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, gtmaxv, gtmaxStrat, gtmaxEst),
+              gtmeanVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, gtmeanv, gtmeanStrat, gtmeanEst),
+
+              hstVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, hstv, hstStrat, hstEst),
+              estVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, estv, estStrat, estEst),
+              sstVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, sstv, sstStrat, sstEst),
+              hspVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, hspv, hspStrat, hspEst),
+              espVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, espv, espStrat, espEst),
+              sspVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, sspv, sspStrat, sspEst),
+              #stkVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, stkv, stkStrat, stkEst),
+
+
+
+
+              ## Covariances
+              cvEst_ct = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_ct, ctStrat, ctEst, ptStrat, ptEst),
+              cvEst_cb = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_cb, cbStrat, cbEst, pbStrat, pbEst),
+              cvEst_si = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_si, siStrat, siEst, faStrat, faEst),
+              cvEst_tmort = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_tmort, tmortStrat, tmortEst, ptStrat, ptEst),
+              cvEst_trecr = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_trecr, trecrStrat, trecrEst, ptStrat, ptEst),
+              cvEst_bmort = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_bmort, bmortStrat, bmortEst, pbStrat, pbEst),
+              cvEst_brecr = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_brecr, brecrStrat, brecrEst, pbStrat, pbEst),
+              cvEst_bgrow = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_bgrow, bgrowStrat, bgrowEst, pbStrat, pbEst),
+
+              cvEst_elev = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_elev, elevStrat, elevEst, faStrat, faEst),
+              cvEst_bug = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_bug, bugStrat, bugEst, pbStrat, pbEst),
+              cvEst_disease = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_disease, diseaseStrat, diseaseEst, pbStrat, pbEst),
+              cvEst_fire = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_fire, fireStrat, fireEst, pbStrat, pbEst),
+              cvEst_animal = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_animal, animalStrat, animalEst, pbStrat, pbEst),
+              cvEst_weather = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_weather, weatherStrat, weatherEst, pbStrat, pbEst),
+              cvEst_veg = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_veg, vegStrat, vegEst, pbStrat, pbEst),
+              cvEst_un = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_un, unStrat, unEst, pbStrat, pbEst),
+              cvEst_silv = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_silv, silvStrat, silvEst, pbStrat, pbEst),
+              cvEst_mort = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_mort, mortStrat, mortEst, ptStrat, ptEst),
+
+              cvEst_d = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_d, dStrat, dEst, faStrat, faEst),
+              cvEst_w = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_w, wStrat, wEst, faStrat, faEst),
+              cvEst_a = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_a, aStrat, aEst, faStrat, faEst),
+              cvEst_gd = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_gd, gdStrat, gdEst, faStrat, faEst),
+              cvEst_gw = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_gw, gwStrat, gwEst, faStrat, faEst),
+              cvEst_ga = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_ga, gaStrat, gaEst, faStrat, faEst),
+
+              cvEst_vpd = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_vpd, vpdStrat, vpdEst, faStrat, faEst),
+              cvEst_tmax = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_tmax, tmaxStrat, tmaxEst, faStrat, faEst),
+              cvEst_tmean = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_tmean, tmeanStrat, tmeanEst, faStrat, faEst),
+              cvEst_gvpd = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_gvpd, gvpdStrat, gvpdEst, faStrat, faEst),
+              cvEst_gtmax = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_gtmax, gtmaxStrat, gtmaxEst, faStrat, faEst),
+              cvEst_gtmean = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_gtmean, gtmeanStrat, gtmeanEst, faStrat, faEst),
+
+              cvEst_hst = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_hst, hstStrat, hstEst, faStrat, faEst),
+              cvEst_est = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_est, estStrat, estEst, faStrat, faEst),
+              cvEst_sst = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_sst, sstStrat, sstEst, faStrat, faEst),
+              cvEst_hsp = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_hsp, hspStrat, hspEst, faStrat, faEst),
+              cvEst_esp = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_esp, espStrat, espEst, faStrat, faEst),
+              cvEst_ssp = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_ssp, sspStrat, sspEst, faStrat, faEst),
+              #cvEst_stk = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_stk, stkStrat, stkEst, faStrat, faEst),
+
+              plotIn_t = sum(plotIn_t, na.rm = TRUE))
+
+  out <- list(tEst = tEst, aEst = NULL)
+
+  return(out)
+}
+
+
+
+
+
+
+
+
+
+siHelper1_backup <- function(x, plts, db, grpBy, byPlot, minLive, aGrpBy){
+
+  ## Selecting the plots for one county
+  db$PLOT <- plts[[x]]
+  ## Carrying out filter across all tables
+  #db <- clipFIA(db, mostRecent = FALSE)
+
+  # Only subplots from cond change matrix
+  #db$SUBP_COND_CHNG_MTRX <- filter(db$SUBP_COND_CHNG_MTRX, SUBPTYP == 1)
+
+
+  ## Which grpByNames are in which table? Helps us subset below
+  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
+  grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
+  grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
+
+  ## Making a replica condition ID so that we can group by attributes of previous conditions
+  ## PREV COND is an issue because of recruitment values (PREVCOND = NA)
+  #db$COND <- mutate(db$COND, PREV_CONDID = CONDID)
+
+  ## Making a treeID
+  # db$TREE$treID <- paste(db$TREE$SUBP, db$TREE$TREE, sep = '_')
+
+  ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR',
+                            'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp', 'DESIGNCD',
+                            'drought_sev', 'wet_sev', 'all_sev', 'grow_drought_sev', 'grow_wet_sev', 'grow_all_sev',
+                            'tmean_anom', tmax_anom, vpd_anom, 'grow_tmean_anom', grow_tmax_anom, grow_vpd_anom, ELEV)) %>%
+    filter(!is.na(REMPER) & !is.na(PREV_PLT_CN) & DESIGNCD == 1 & PLOT_STATUS_CD != 3) %>%
+
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
+    ## AGENTCD at remeasurement, died during the measurement interval
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT[grpT != 'SPCD'], 'tD', 'typeD', 'TPA_UNADJ', 'DIA', 'AGENTCD', 'MORTYR', 'STATUSCD')), by = c('PLT_CN', 'CONDID')) %>%
+    #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', DIA_BEGIN, DIA_END)), by = c('TRE_CN')) %>%
+
+    left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p', 'DESIGNCD', 'PLOT_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD', 'ALSTK')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('2', '1')) %>%
+    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'TPA_UNADJ', 'DIA', 'STATUSCD', SPCD, htClass)), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
+    #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
+
+    mutate_if(is.factor,
+              as.character)
+
+  ## Comprehensive indicator function -- w/ growth accounting
+  data$tDI2 <- data$landD2 * data$aD_p2 * data$aD_c2 * data$tD2 * data$typeD2 * data$sp2 *
+    if_else(data$PLOT_STATUS_CD1 == 1 & data$PLOT_STATUS_CD2 == 1, 1, 0) *
+    if_else(data$STATUSCD2 == 1, 1, 0) *
+    ## If it is NA, then it is a recruit, otherwise, make sure it was not
+    ## flagged incorrectly previously
+    if_else(is.na(data$STATUSCD1), 1, if_else(data$STATUSCD1 == 0 | data$STATUSCD2 == 0, 0, 1))
+
+  data$tDI1 <- data$landD1 * data$aD_p1 * data$aD_c1 * data$tD1 * data$typeD1 * data$sp1 *
+    if_else(data$PLOT_STATUS_CD1 == 1 & data$PLOT_STATUS_CD2 == 1, 1, 0) *
+    if_else(data$STATUSCD1 == 1, 1, 0) *
+    if_else(is.na(data$STATUSCD1), NA_real_, if_else(data$STATUSCD1 == 0 | data$STATUSCD2 == 0, 0, 1))
+
+    ## Doesn't allow recruitment to happen, becuase no previous status
+    ## Adjust later, after the pivot
+    #if_else(data$STATUSCD1 == 0 | data$STATUSCD2 == 0, 0, 1)
+
+  ## PREVIOUS and CURRENT attributes
+  data <- data %>%
+    mutate(TPA_UNADJ1 = TPA_UNADJ1,
+           TPA_UNADJ2 = TPA_UNADJ2,
+           BAA1 = basalArea(DIA1) * TPA_UNADJ1,
+           BAA2 = basalArea(DIA2) * TPA_UNADJ2,
+           BUG = if_else(AGENTCD == 10, 1, 0),
+           DISEASE = if_else(AGENTCD == 20, 1, 0),
+           FIRE = if_else(AGENTCD == 30, 1, 0),
+           ANIMAL = if_else(AGENTCD == 40, 1, 0),
+           WEATHER = if_else(AGENTCD == 50, 1, 0),
+           VEG = if_else(AGENTCD == 60, 1, 0),
+           UNKNOWN = if_else(AGENTCD == 70, 1, 0),
+           SILV = if_else(AGENTCD == 80, 1, 0),
+           MORT = case_when(
+             STATUSCD1 == 1 & STATUSCD2 == 2 ~ 1,
+             STATUSCD1 == 1 & STATUSCD2 == 3 ~ 1,
+             TRUE ~ 0),
+           SURV = case_when(
+             STATUSCD1 == 1 & STATUSCD2 == 1 ~ 1,
+             TRUE ~ 0)
+           #DISTURB = if_else()
+    ) #%>%
+
+
+
+  ## Just what we need
+  data <- data %>%
+    select(PLT_CN, PREV_PLT_CN, TRE_CN, SUBP, CONDID, TREE, CONDPROP_UNADJ,
+           MEASYEAR, MACRO_BREAKPOINT_DIA, PROP_BASIS,
+           BUG, DISEASE, FIRE, ANIMAL, WEATHER, VEG, UNKNOWN, SILV, MORTYR, MORT, SURV, ELEV, ALSTK,
+           htClass, SPCD,
+           drought_sev, wet_sev, all_sev, grow_drought_sev, grow_wet_sev, grow_all_sev,
+           tmean_anom, tmax_anom, vpd_anom, grow_tmean_anom, grow_tmax_anom, grow_vpd_anom,
+           REMPER, PLOT_STATUS_CD1, PLOT_STATUS_CD2,
+           one_of(str_c(grpP,1), str_c(grpC,1), str_c(grpT,1),
+                  str_c(grpP,2), str_c(grpC,2), str_c(grpT,2)),
+           tDI1, tDI2, STATUSCD1, STATUSCD2,
+           DIA1, DIA2, BAA1, BAA2, TPA_UNADJ1, TPA_UNADJ2) %>%
+    mutate(BAA1 = -(BAA1),
+           TPA_UNADJ1 = -(TPA_UNADJ1)) %>%
+    ## Rearrange previous values as observations
+    pivot_longer(cols = -c(PLT_CN:REMPER),
+                 names_to = c(".value", 'ONEORTWO'),
+                 names_sep = -1) %>%
+    mutate(PLOT_BASIS = case_when(
+      ## When DIA is na, adjustment is NA
+      is.na(DIA) ~ NA_character_,
+      ## When DIA is less than 5", use microplot value
+      DIA < 5 ~ 'MICR',
+      ## When DIA is greater than 5", use subplot value
+      DIA >= 5 & is.na(MACRO_BREAKPOINT_DIA) ~ 'SUBP',
+      DIA >= 5 & DIA < MACRO_BREAKPOINT_DIA ~ 'SUBP',
+      DIA >= MACRO_BREAKPOINT_DIA ~ 'MACR')) #%>%
+    #mutate(tDI = tDI * if_else())
+
+
+  if (byPlot){
+    grpBy <- c('YEAR', grpBy, 'PLOT_STATUS_CD')
+
+    t <- data %>%
+      mutate(YEAR = MEASYEAR) %>%
+      distinct(PLT_CN, SUBP, TREE, ONEORTWO, .keep_all = TRUE) %>%
+      # Compute estimates at plot level
+      group_by(.dots = grpBy, PLT_CN, PREV_PLT_CN) %>%
+      summarize(nLive = length(which(tDI[ONEORTWO == 1] > 0)), ## Number of live trees in domain of interest at previous measurement
+                REMPER = first(REMPER),
+                PREV_TPA = if_else(nLive >= minLive, sum(-TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
+                PREV_BAA = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
+                CHNG_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE), 0),
+                CHNG_BAA = if_else(nLive >= minLive, sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE), 0),
+                CURR_TPA = PREV_TPA + CHNG_TPA,
+                CURR_BAA = PREV_BAA + CHNG_BAA,
+                TPA_RATE = (CHNG_TPA / REMPER) / (PREV_TPA + CURR_TPA)* 2,
+                BAA_RATE = (CHNG_BAA / REMPER) / (PREV_BAA + CURR_BAA)* 2,
+
+                ## Disturbances
+                INSECT_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & BUG == 1] * tDI[ONEORTWO == 1 & BUG == 1], na.rm = TRUE), 0) / (PREV_BAA + CURR_BAA)* 2 / REMPER,
+                DISEASE_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & DISEASE == 1] * tDI[ONEORTWO == 1 & DISEASE == 1], na.rm = TRUE), 0) / (PREV_BAA + CURR_BAA)* 2 / REMPER,
+                FIRE_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & FIRE == 1] * tDI[ONEORTWO == 1 & FIRE == 1], na.rm = TRUE), 0) / (PREV_BAA + CURR_BAA)* 2 / REMPER,
+                ANIMAL_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & ANIMAL == 1] * tDI[ONEORTWO == 1 & ANIMAL == 1], na.rm = TRUE), 0) / (PREV_BAA + CURR_BAA)* 2 / REMPER,
+                WEATHER_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & WEATHER == 1] * tDI[ONEORTWO == 1 & WEATHER == 1], na.rm = TRUE), 0) / (PREV_BAA + CURR_BAA)* 2 / REMPER,
+                VEG_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & VEG == 1] * tDI[ONEORTWO == 1 & VEG == 1], na.rm = TRUE), 0) / (PREV_BAA + CURR_BAA)* 2 / REMPER,
+                UNKNOWN_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & UNKNOWN == 1] * tDI[ONEORTWO == 1 & UNKNOWN == 1], na.rm = TRUE), 0) / (PREV_BAA + CURR_BAA)* 2 / REMPER,
+                SILV_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & SILV == 1] * tDI[ONEORTWO == 1 & SILV == 1], na.rm = TRUE), 0) / (PREV_BAA + CURR_BAA)* 2 / REMPER,
+                MORT_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & MORT == 1] * tDI[ONEORTWO == 1 & MORT == 1], na.rm = TRUE), 0) / (PREV_BAA + CURR_BAA)* 2 / REMPER,
+                BAA_CHNG_PERC = CHNG_BAA / PREV_BAA,
+                TPA_CHNG_PERC = CHNG_TPA / PREV_TPA,
+                DROUGHT_SEV = first(drought_sev),
+                VPD_ANOM = first(vpd_anom),
+                TMAX_ANOM = first(tmax_anom),
+                TMEAN_ANOM = first(tmean_anom),
+                GROW_VPD_ANOM = first(grow_vpd_anom),
+                GROW_TMAX_ANOM = first(grow_tmax_anom),
+                GROW_TMEAN_ANOM = first(grow_tmean_anom),
+                WET_SEV = first(wet_sev),
+                ALL_SEV = first(all_sev),
+                GROW_DROUGHT_SEV = first(grow_drought_sev),
+                GROW_WET_SEV = first(grow_wet_sev),
+                GROW_ALL_SEV = first(grow_all_sev),
+                x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
+                M = sqrt(x^2 + x^2),
+                SI = if_else(x < 0, -M, M),
+                H_struct = divIndex(htClass[ONEORTWO == 1], -BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'H'),
+                Eh_struct = divIndex(htClass[ONEORTWO == 1], -BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'Eh'),
+                S_struct = divIndex(htClass[ONEORTWO == 1], -BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'S'),
+                H_species = divIndex(SPCD[ONEORTWO == 1], -TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'H'),
+                Eh_species = divIndex(SPCD[ONEORTWO == 1], -TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'Eh'),
+                S_species = divIndex(SPCD[ONEORTWO == 1], -TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'S'),
+                nStems = length(which(tDI == 1))) %>%
+      ungroup() #%>%
+
+    div <- data %>%
+      mutate(YEAR = MEASYEAR) %>%
+      distinct(PLT_CN, SUBP, TREE, ONEORTWO, .keep_all = TRUE) %>%
+      # Compute estimates at plot level
+      group_by(.dots = aGrpBy, PLT_CN, PREV_PLT_CN) %>%
+      summarize(H_struct = divIndex(htClass[ONEORTWO == 1], -BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'H'),
+                Eh_struct = divIndex(htClass[ONEORTWO == 1], -BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'Eh'),
+                S_struct = divIndex(htClass[ONEORTWO == 1], -BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'S'),
+                H_species = divIndex(SPCD[ONEORTWO == 1], -TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'H'),
+                Eh_species = divIndex(SPCD[ONEORTWO == 1], -TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'Eh'),
+                S_species = divIndex(SPCD[ONEORTWO == 1], -TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'S'))
+
+    t <- t %>%
+      left_join(div, by = c(PLT_CN, PREV_PLT_CN, aGrpBy)) %>%
+      select(PLT_CN, PREV_PLT_CN, grpBy, SI, TPA_RATE, BAA_RATE, MORT_RATE, BAA_CHNG_PERC, TPA_CHNG_PERC,
+             PREV_TPA, PREV_BAA, CHNG_TPA, CHNG_BAA, CURR_TPA, CURR_BAA,
+             INSECT_RATE,
+             DISEASE_RATE, FIRE_RATE, ANIMAL_RATE, WEATHER_RATE, VEG_RATE,
+             UNKNOWN_RATE, SILV_RATE,
+             VPD_ANOM, TMAX_ANOM, TMEAN_ANOM,
+             GROW_VPD_ANOM, GROW_TMAX_ANOM, GROW_TMEAN_ANOM,
+             DROUGHT_SEV, WET_SEV, ALL_SEV,
+             GROW_DROUGHT_SEV, GROW_WET_SEV, GROW_ALL_SEV, H_struct, Eh_struct, S_struct,
+             H_species, Eh_species, S_species,
+             nStems, nLive)
+
+    a = NULL
+    full = NULL
+
+  } else {
+    # ### Plot-level estimates -- growth accounting
+    # a <- data %>%
+    #   ## Will be lots of trees here, so CONDPROP listed multiple times
+    #   ## Adding PROP_BASIS so we can handle adjustment factors at strata level
+    #   distinct(PLT_CN, SUBP, CONDID, .keep_all = TRUE) %>%
+    #   group_by(PLT_CN, PROP_BASIS, .dots = aGrpBy) %>%
+    #   summarize(fa = sum(SUBPTYP_PROP_CHNG * aDI, na.rm = TRUE),
+    #             plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
+    ### Plot-level estimates
+    a <- data %>%
+      ## Will be lots of trees here, so CONDPROP listed multiple times
+      ## Adding PROP_BASIS so we can handle adjustment factors at strata level
+      #distinct(PLT_CN, CONDID, .keep_all = TRUE) %>%
+      group_by(PLT_CN, PROP_BASIS, CONDID, .dots = grpBy) %>%
+      summarize(aDI = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0),
+                DROUGHT_SEV = first(drought_sev),
+                WET_SEV = first(wet_sev),
+                ALL_SEV = first(all_sev),
+                GROW_DROUGHT_SEV = first(grow_drought_sev),
+                GROW_WET_SEV = first(grow_wet_sev),
+                GROW_ALL_SEV = first(grow_all_sev),
+                VPD_ANOM = first(vpd_anom),
+                TMAX_ANOM = first(tmax_anom),
+                TMEAN_ANOM = first(tmean_anom),
+                GROW_VPD_ANOM = first(grow_vpd_anom),
+                GROW_TMAX_ANOM = first(grow_tmax_anom),
+                GROW_TMEAN_ANOM = first(grow_tmean_anom),
+                CONDPROP_UNADJ = first(CONDPROP_UNADJ),
+                ALSTK = first(ALSTK[ONEORTWO == 1]),
+                H_struct = divIndex(htClass[ONEORTWO == 1], -BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'H'),
+                Eh_struct = divIndex(htClass[ONEORTWO == 1], -BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'Eh'),
+                S_struct = divIndex(htClass[ONEORTWO == 1], -BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'S'),
+                H_species = divIndex(SPCD[ONEORTWO == 1], -TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'H'),
+                Eh_species = divIndex(SPCD[ONEORTWO == 1], -TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'Eh'),
+                S_species = divIndex(SPCD[ONEORTWO == 1], -TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], index = 'S'),
+                ELEV = first(ELEV)) %>%
+      group_by(PLT_CN, PROP_BASIS, .dots = grpBy) %>%
+      summarize(fa = sum(CONDPROP_UNADJ * aDI, na.rm = TRUE),
+                DROUGHT_SEV = sum(CONDPROP_UNADJ * DROUGHT_SEV * aDI, na.rm = TRUE),
+                WET_SEV = sum(CONDPROP_UNADJ * WET_SEV * aDI, na.rm = TRUE),
+                ALL_SEV = sum(CONDPROP_UNADJ * ALL_SEV * aDI, na.rm = TRUE),
+                GROW_DROUGHT_SEV = sum(CONDPROP_UNADJ * GROW_DROUGHT_SEV * aDI, na.rm = TRUE),
+                GROW_WET_SEV = sum(CONDPROP_UNADJ * GROW_WET_SEV * aDI, na.rm = TRUE),
+                GROW_ALL_SEV = sum(CONDPROP_UNADJ * GROW_ALL_SEV * aDI, na.rm = TRUE),
+                VPD_ANOM = sum(CONDPROP_UNADJ * VPD_ANOM * aDI, na.rm = TRUE),
+                TMAX_ANOM = sum(CONDPROP_UNADJ * TMAX_ANOM * aDI, na.rm = TRUE),
+                TMEAN_ANOM = sum(CONDPROP_UNADJ * TMEAN_ANOM * aDI, na.rm = TRUE),
+                GROW_VPD_ANOM = sum(CONDPROP_UNADJ * GROW_VPD_ANOM * aDI, na.rm = TRUE),
+                GROW_TMAX_ANOM = sum(CONDPROP_UNADJ * GROW_TMAX_ANOM * aDI, na.rm = TRUE),
+                GROW_TMEAN_ANOM = sum(CONDPROP_UNADJ * GROW_TMEAN_ANOM * aDI, na.rm = TRUE),
+                ELEV = sum(CONDPROP_UNADJ * ELEV * aDI, na.rm = TRUE),
+                STOCKING = sum(CONDPROP_UNADJ * ALSTK * aDI, na.rm = TRUE),
+                H_struct =sum(CONDPROP_UNADJ * H_struct * aDI, na.rm = TRUE),
+                Eh_struct = sum(CONDPROP_UNADJ * Eh_struct * aDI, na.rm = TRUE),
+                S_struct =sum(CONDPROP_UNADJ * S_struct * aDI, na.rm = TRUE),
+                H_species = sum(CONDPROP_UNADJ * H_species * aDI, na.rm = TRUE),
+                Eh_species = sum(CONDPROP_UNADJ * Eh_species * aDI, na.rm = TRUE),
+                S_species = sum(CONDPROP_UNADJ * S_species * aDI, na.rm = TRUE)
+      )
+
+     ### Compute total TREES in domain of interest
+    t <- data %>%
+      distinct(PLT_CN, TRE_CN, ONEORTWO, .keep_all = TRUE) %>%
+      # Compute estimates at plot level
+      group_by(PLT_CN, PLOT_BASIS, .dots = grpBy) %>%
+      summarize(nLive = length(which(tDI[ONEORTWO == 1] > 0)), ## Number of live trees in domain of interest at previous measurement
+                REMPER = first(REMPER),
+                MEASYEAR = first(MEASYEAR),
+                PREV_TPA = if_else(nLive >= minLive, sum(-TPA_UNADJ[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE), 0),
+                PREV_BAA = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE), 0),
+                CHNG_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE), 0),
+                CHNG_BAA = if_else(nLive >= minLive, sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE), 0),
+                #CURR_TPA = PREV_TPA + CHNG_TPA,
+                #CURR_BAA = PREV_BAA + CHNG_BAA,
+                #TPA_RATE = (CHNG_TPA / REMPER) / (PREV_TPA + CURR_TPA) * 2,
+                #BAA_RATE = (CHNG_BAA / REMPER) / (PREV_BAA + CURR_BAA) * 2,
+                TPA_MORT = if_else(nLive >= minLive, sum(-TPA_UNADJ[ONEORTWO == 1 & MORT == 1] * tDI[ONEORTWO == 1 & MORT == 1], na.rm = TRUE), 0) / REMPER,
+                TPA_RECR = (CHNG_TPA / REMPER) + TPA_MORT,
+                BAA_MORT = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & MORT == 1] * tDI[ONEORTWO == 1 & MORT == 1], na.rm = TRUE), 0) / REMPER,
+                BAA_GROW = if_else(nLive >= minLive, sum(BAA[SURV == 1] * tDI[SURV == 1], na.rm = TRUE), 0) / REMPER,
+                BAA_RECR = (CHNG_BAA / REMPER) - BAA_GROW + BAA_MORT,
+                ## Disturbances
+                BUG_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & BUG == 1] * tDI[ONEORTWO == 1 & BUG == 1], na.rm = TRUE), 0) / REMPER,
+                DISEASE_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & DISEASE == 1] * tDI[ONEORTWO == 1 & DISEASE == 1], na.rm = TRUE), 0) / REMPER,
+                FIRE_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & FIRE == 1] * tDI[ONEORTWO == 1 & FIRE == 1], na.rm = TRUE), 0) / REMPER,
+                ANIMAL_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & ANIMAL == 1] * tDI[ONEORTWO == 1 & ANIMAL == 1], na.rm = TRUE), 0) / REMPER,
+                WEATHER_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & WEATHER == 1] * tDI[ONEORTWO == 1 & WEATHER == 1], na.rm = TRUE), 0) / REMPER,
+                VEG_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & VEG == 1] * tDI[ONEORTWO == 1 & VEG == 1], na.rm = TRUE), 0) / REMPER,
+                UNKNOWN_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & UNKNOWN == 1] * tDI[ONEORTWO == 1 & UNKNOWN == 1], na.rm = TRUE), 0) / REMPER,
+                SILV_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & SILV == 1] * tDI[ONEORTWO == 1 & SILV == 1], na.rm = TRUE), 0) / REMPER,
+                MORT_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & MORT == 1] * tDI[ONEORTWO == 1 & MORT == 1], na.rm = TRUE), 0) / REMPER,
+                # x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
+                # y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
+                # M = sqrt(x^2 + y^2),
+                #SUST_INDEX = if_else(x < 0, -M, M),
+                plotIn = if_else(sum(tDI) > 0, 1, 0))
+
+    full <- data %>%
+      filter(ONEORTWO == 1) %>%
+      select(PLT_CN, grpBy, SPCD, htClass, TPA_UNADJ, BAA, tDI)
+  }
+
+  pltOut <- list(a = a, t = t, full = full)
+  return(pltOut)
+
+}
+
+siHelper2_backup <- function(x, popState, a, t, grpBy, method){
+
+  ## DOES NOT MODIFY OUTSIDE ENVIRONMENT
+  if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
+    grpBy <- c(grpBy, 'INVYR')
+    popState[[x]]$P2POINTCNT <- popState[[x]]$P2POINTCNT_INVYR
+    popState[[x]]$p2eu <- popState[[x]]$p2eu_INVYR
+  }
+
+  ######## ------------------ TREE ESTIMATES + CV
+  aAdj <- a %>%
+    ## Rejoin with population tables
+    right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
+    mutate(
+      ## AREA
+      aAdj = case_when(
+        ## When NA, stay NA
+        is.na(PROP_BASIS) ~ NA_real_,
+        ## If the proportion was measured for a macroplot,
+        ## use the macroplot value
+        PROP_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
+        ## Otherwise, use the subpplot value
+        PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
+      DROUGHT_SEV =  DROUGHT_SEV * aAdj,
+      WET_SEV = WET_SEV * aAdj,
+      ALL_SEV = ALL_SEV * aAdj,
+      GROW_DROUGHT_SEV = GROW_DROUGHT_SEV * aAdj,
+      GROW_WET_SEV = GROW_WET_SEV * aAdj,
+      GROW_ALL_SEV = GROW_ALL_SEV * aAdj,
+      VPD_ANOM = VPD_ANOM * aAdj,
+      TMAX_ANOM = TMAX_ANOM * aAdj,
+      TMEAN_ANOM = TMEAN_ANOM * aAdj,
+      GROW_VPD_ANOM = GROW_VPD_ANOM * aAdj,
+      GROW_TMAX_ANOM = GROW_TMAX_ANOM * aAdj,
+      GROW_TMEAN_ANOM = GROW_TMEAN_ANOM * aAdj,
+      ELEV = ELEV * aAdj,
+      STOCKING = STOCKING * aAdj,
+      H_struct =H_struct *  aAdj,
+      Eh_struct = Eh_struct * aAdj,
+      S_struct = S_struct * aAdj,
+      H_species = H_species * aAdj,
+      Eh_species = Eh_species * aAdj,
+      S_species = S_species * aAdj,
+      fa = fa * aAdj) %>%
+    ungroup()
+
+
 
   ## Strata level estimates
   tEst <- t %>%
@@ -833,7 +1609,8 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
            )) %>%
 
     left_join(select(aAdj, PLT_CN, grpBy, fa, DROUGHT_SEV, WET_SEV, ALL_SEV, GROW_DROUGHT_SEV, GROW_WET_SEV, GROW_ALL_SEV,
-                     VPD_ANOM, TMAX_ANOM, TMEAN_ANOM, GROW_VPD_ANOM, GROW_TMAX_ANOM, GROW_TMEAN_ANOM, ELEV), by = c('PLT_CN', grpBy)) %>%
+                     VPD_ANOM, TMAX_ANOM, TMEAN_ANOM, GROW_VPD_ANOM, GROW_TMAX_ANOM, GROW_TMEAN_ANOM, ELEV,
+                     STOCKING,  H_struct, Eh_struct, S_struct, H_species, Eh_species, S_species), by = c('PLT_CN', grpBy)) %>%
     ## Strata level
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
     summarize(r_t = length(unique(PLT_CN)) / first(nh),
@@ -872,6 +1649,16 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               gtmaxStrat = mean(GROW_TMAX_ANOM * r_t, na.rm = TRUE),
               gtmeanStrat = mean(GROW_TMEAN_ANOM * r_t, na.rm = TRUE),
 
+              ## Diversity indices
+              hstStrat = mean(H_struct * r_t, na.rm = TRUE),
+              estStrat = mean(Eh_struct * r_t, na.rm = TRUE),
+              sstStrat = mean(S_struct * r_t, na.rm = TRUE),
+              hspStrat = mean(H_species * r_t, na.rm = TRUE),
+              espStrat = mean(Eh_species * r_t, na.rm = TRUE),
+              sspStrat = mean(S_species * r_t, na.rm = TRUE),
+              stkStrat = mean(STOCKING * r_t, na.rm = TRUE),
+
+
               plotIn_t = sum(plotIn_t, na.rm = TRUE),
               n = n(),
               ## We don't want a vector of these values, since they are repeated
@@ -886,13 +1673,6 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               ptv = stratVar(ESTN_METHOD, ptPlot, ptStrat, ndif, a, nh),
               pbv = stratVar(ESTN_METHOD, pbPlot, pbStrat, ndif, a, nh),
               siv = stratVar(ESTN_METHOD, siPlot * fa, siStrat, ndif, a, nh),
-
-
-              #test1 = sum((c(siPlot * fa, numeric(ndif))^2), na.rm = TRUE),
-              #test2 = nh * siStrat^2,
-
-
-
 
               tmortv = stratVar(ESTN_METHOD, tmort, tmortStrat, ndif, a, nh),
               trecrv = stratVar(ESTN_METHOD, trecr, trecrStrat, ndif, a, nh),
@@ -923,6 +1703,14 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               gvpdv = stratVar(ESTN_METHOD, GROW_VPD_ANOM, gvpdStrat, ndif, a, nh),
               gtmaxv = stratVar(ESTN_METHOD, GROW_TMAX_ANOM, gtmaxStrat, ndif, a, nh),
               gtmeanv = stratVar(ESTN_METHOD, GROW_TMEAN_ANOM, gtmeanStrat, ndif, a, nh),
+
+              hstv = stratVar(ESTN_METHOD, H_struct, hstStrat, ndif, a, nh),
+              estv = stratVar(ESTN_METHOD, Eh_struct, estStrat, ndif, a, nh),
+              sstv = stratVar(ESTN_METHOD, S_struct, sstStrat, ndif, a, nh),
+              hspv = stratVar(ESTN_METHOD, H_species, hspStrat, ndif, a, nh),
+              espv = stratVar(ESTN_METHOD, Eh_species, espStrat, ndif, a, nh),
+              sspv = stratVar(ESTN_METHOD, S_species, sspStrat, ndif, a, nh),
+              stkv = stratVar(ESTN_METHOD, STOCKING, stkStrat, ndif, a, nh),
 
               # Strata level covariances
               cvStrat_ct = stratVar(ESTN_METHOD, ctPlot, ctStrat, ndif, a, nh, ptPlot, ptStrat),
@@ -955,6 +1743,15 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               cvStrat_gvpd = stratVar(ESTN_METHOD, GROW_VPD_ANOM, gvpdStrat, ndif, a, nh, fa, faStrat),
               cvStrat_gtmax = stratVar(ESTN_METHOD, GROW_TMAX_ANOM, gtmaxStrat, ndif, a, nh, fa, faStrat),
               cvStrat_gtmean = stratVar(ESTN_METHOD, GROW_TMEAN_ANOM, gtmeanStrat, ndif, a, nh, fa, faStrat),
+
+              cvStrat_hst = stratVar(ESTN_METHOD, H_struct, hstStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_est = stratVar(ESTN_METHOD, Eh_struct, estStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_sst = stratVar(ESTN_METHOD, S_struct, sstStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_hsp = stratVar(ESTN_METHOD, H_species, hspStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_esp = stratVar(ESTN_METHOD, Eh_species, espStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_ssp = stratVar(ESTN_METHOD, S_species, sspStrat, ndif, a, nh, fa, faStrat),
+              cvStrat_stk = stratVar(ESTN_METHOD, STOCKING, stkStrat, ndif, a, nh, fa, faStrat),
+
     ) %>%
 
     ## Estimation unit
@@ -995,6 +1792,14 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               gtmaxEst =  unitMean(ESTN_METHOD, a, nh, w, gtmaxStrat),
               gtmeanEst =  unitMean(ESTN_METHOD, a, nh, w, gtmeanStrat),
 
+              hstEst = unitMean(ESTN_METHOD, a, nh, w, hstStrat),
+              estEst = unitMean(ESTN_METHOD, a, nh, w, estStrat),
+              sstEst = unitMean(ESTN_METHOD, a, nh, w, sstStrat),
+              hspEst = unitMean(ESTN_METHOD, a, nh, w, hspStrat),
+              espEst = unitMean(ESTN_METHOD, a, nh, w, espStrat),
+              sspEst = unitMean(ESTN_METHOD, a, nh, w, sspStrat),
+              stkEst = unitMean(ESTN_METHOD, a, nh, w, stkStrat),
+
               nh = first(nh),
               # Estimation of unit variance
               ctVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ctv, ctStrat, ctEst),
@@ -1031,6 +1836,15 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               gvpdVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, gvpdv, gvpdStrat, gvpdEst),
               gtmaxVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, gtmaxv, gtmaxStrat, gtmaxEst),
               gtmeanVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, gtmeanv, gtmeanStrat, gtmeanEst),
+
+              hstVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, hstv, hstStrat, hstEst),
+              estVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, estv, estStrat, estEst),
+              sstVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, sstv, sstStrat, sstEst),
+              hspVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, hspv, hspStrat, hspEst),
+              espVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, espv, espStrat, espEst),
+              sspVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, sspv, sspStrat, sspEst),
+              stkVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, stkv, stkStrat, stkEst),
+
               ## Covariances
               cvEst_ct = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_ct, ctStrat, ctEst, ptStrat, ptEst),
               cvEst_cb = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_cb, cbStrat, cbEst, pbStrat, pbEst),
@@ -1065,6 +1879,14 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               cvEst_gvpd = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_gvpd, gvpdStrat, gvpdEst, faStrat, faEst),
               cvEst_gtmax = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_gtmax, gtmaxStrat, gtmaxEst, faStrat, faEst),
               cvEst_gtmean = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_gtmean, gtmeanStrat, gtmeanEst, faStrat, faEst),
+
+              cvEst_hst = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_hst, hstStrat, hstEst, faStrat, faEst),
+              cvEst_est = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_est, estStrat, estEst, faStrat, faEst),
+              cvEst_sst = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_sst, sstStrat, sstEst, faStrat, faEst),
+              cvEst_hsp = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_hsp, hspStrat, hspEst, faStrat, faEst),
+              cvEst_esp = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_esp, espStrat, espEst, faStrat, faEst),
+              cvEst_ssp = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_ssp, sspStrat, sspEst, faStrat, faEst),
+              cvEst_stk = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_stk, stkStrat, stkEst, faStrat, faEst),
 
               plotIn_t = sum(plotIn_t, na.rm = TRUE))
 

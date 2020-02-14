@@ -554,6 +554,8 @@ tpa <- function(db,
                bpVar = (1/BA_TOTAL_full^2) * (baVar + (BAA_PERC^2 * bTVar) - (2 * BAA_PERC * cvBT)),
                TPA_PERC_SE = sqrt(tpVar) / TPA_PERC * 100,
                BAA_PERC_SE = sqrt(bpVar) / BAA_PERC * 100)
+
+
     })
 
 
