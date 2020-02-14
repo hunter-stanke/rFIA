@@ -34,13 +34,14 @@ vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
   #If previous attributes are unavailable for trees, default to current (otherwise we get NAs for early inventories)
   data$tD.prev <- ifelse(is.na(data$tD.prev), data$tD, data$tD.prev)
   data$typeD.prev <- ifelse(is.na(data$typeD.prev), data$typeD, data$typeD.prev)
-  data$landD.prev <- ifelse(is.na(data$landD.prev), data$landD, data$landD.prev)
+  data$landD.prev <- ifelse(data$landD == 1 & data$landD.prev == 1, 1, 0)
+    #ifelse(is.na(data$landD.prev), data$landD, data$landD.prev)
   data$aD_p.prev <- ifelse(is.na(data$aD_p.prev), data$aD_p, data$aD_p.prev)
   data$aD_c.prev <- ifelse(is.na(data$aD_c.prev), data$aD_c, data$aD_c.prev)
   data$sp.prev <- ifelse(is.na(data$sp.prev), data$sp, data$sp.prev)
 
   ## Comprehensive indicator function
-  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp #* data$aChng
+  data$aDI <- data$landD.prev * data$aD_p * data$aD_c * data$sp * data$aChng
   data$tDI <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev * data$tChng
 
 
@@ -94,7 +95,7 @@ vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
                            1, 0),
            SUBPTYP_PROP_CHNG = SUBPTYP_PROP_CHNG * .25)
 
-  aData$aDI <- aData$landD * aData$aD_p * aData$aD_c * aData$sp * aData$aChng
+  aData$aDI <- aData$landD * aData$landD.prev * aData$aD_p * aData$aD_c * aData$sp * aData$aChng
 
 
   if (byPlot){
@@ -126,6 +127,7 @@ vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
   } else {
     ### Plot-level estimates -- growth accounting
     a <- aData %>%
+      #filter(SUBPTYP_GRM == 1) %>%
       ## Adding PROP_BASIS so we can handle adjustment factors at strata level
       group_by(PLT_CN, PROP_BASIS, .dots = aGrpBy) %>%
       summarize(fa = sum(SUBPTYP_PROP_CHNG * aDI, na.rm = TRUE),

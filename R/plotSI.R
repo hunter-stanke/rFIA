@@ -254,9 +254,9 @@ plotSI <- function(data, y = NULL, grp = NULL, x = NULL, style = 'cleveland', an
     plt <- data %>%
       mutate(SI_STATUS = factor(data$SI_STATUS, ordered = TRUE, levels = c('Expand', 'Marginal Expand', 'Stable', 'Marginal Decline', 'Decline', 'Opposing Signals'))) %>%
       ggplot(aes(x = yVar, y = grpVar)) +
-        geom_vline(xintercept = 0, alpha = .67, colour = 'grey', linetype = 'dashed')+
+        geom_vline(xintercept = 0, alpha = .67, colour = 'grey', linetype = 'dashed', size = 1.2)+
         geom_segment(aes(yend=grpVar), xend=0, colour = 'grey50') +
-        geom_point(size = 3, aes(colour = SI_STATUS))+
+        geom_point(aes(size = PREV_BAA, colour = SI_STATUS))+
         scale_color_viridis_d(option = 'viridis')+
         theme_bw()+
         theme(panel.grid.major.y = element_blank()) +
@@ -268,7 +268,9 @@ plotSI <- function(data, y = NULL, grp = NULL, x = NULL, style = 'cleveland', an
             axis.title = element_text(size = 15 * text.size, family = text.font),
             plot.title = element_text(size = 17 * text.size, face = 'bold', family = text.font),
             legend.title = element_text(size = 15 * text.size, face = 'bold.italic', family = text.font),
-            legend.text = element_text(size = 13 * text.size, face = 'italic', family = text.font))
+            legend.text = element_text(size = 13 * text.size, face = 'italic', family = text.font)) +
+      guides(size = FALSE, colour = guide_legend(override.aes = list(size=4)))
+
     ## IF you want to animate
     if (animate){
       # plt <- plt +

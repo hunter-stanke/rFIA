@@ -70,11 +70,11 @@ vitalRates <- function(db,
 
   ## No EXP_GROW available for most Western States, make sure we warn that values will be returned as 0
   # These states do not allow temporal queries. Things are extremely weird with their eval groups
-  noGrow <- c(02,03,04,07,08,11,14,15,16, 23, 30, 32, 35,43,49, 78)
+  noGrow <- c(02,03,04,07,08,11,14,15,16, 30, 32, 35,43,49, 78)
   if(any(unique(db$PLOT$STATECD) %in% noGrow)){
     vState <- unique(db$PLOT$STATECD[db$PLOT$STATECD %in% noGrow])
     fancyName <- unique(intData$EVAL_GRP$STATE[intData$EVAL_GRP$STATECD %in% vState])
-    warning(paste('Growth data unavailable for: ', toString(fancyName) , '. Returning 0 for all recruitment estimates which include these states.', sep = ''))
+    warning(paste('Growth data unavailable for: ', toString(fancyName) , '. Returning 0 for all growth estimates which include these states.', sep = ''))
   }
 
   # These states do not allow change estimates.
@@ -177,7 +177,7 @@ vitalRates <- function(db,
                                       COMPONENT = SUBP_COMPONENT_AL_FOREST)
 
     } else if (tolower(treeType) == 'gs'){
-      db$TREE$typeD <- ifelse(db$TREE$DIA >= 5, 1, 0)
+      db$TREE$typeD <- 1 #ifelse(db$TREE$DIA >= 5, 1, 0)
       db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
                                       TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_GS_FOREST,
                                       TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_GS_FOREST,
@@ -199,7 +199,7 @@ vitalRates <- function(db,
                                       COMPONENT = SUBP_COMPONENT_AL_TIMBER)
 
     } else if (tolower(treeType) == 'gs'){
-      db$TREE$typeD <- ifelse(db$TREE$DIA >= 5, 1, 0)
+      db$TREE$typeD <- 1 #ifelse(db$TREE$DIA >= 5, 1, 0)
       db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
                                       TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_GS_TIMBER,
                                       TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_GS_TIMBER,
