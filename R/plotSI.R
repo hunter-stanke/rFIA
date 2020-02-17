@@ -223,13 +223,8 @@ plotSI <- function(data, y = NULL, grp = NULL, x = NULL, style = 'cleveland', an
             legend.text = element_text(size = 13 * text.size, face = 'italic', family = text.font))
     ## IF you want to animate
     if (animate){
-      # plt <- plt +
-      #   transition_reveal(along = as.numeric(xVar))
+
       plt <- plt +
-        # transition_states(YEAR,
-        #                   transition_length = 2,
-        #                   state_length = 2,
-        #                   wrap = FALSE)
         transition_time(YEAR)+
         enter_fade() +
         exit_fade()+
