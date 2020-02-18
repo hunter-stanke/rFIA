@@ -535,7 +535,7 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
   ## Just what we need
   data <- data %>%
     select(PLT_CN, PREV_PLT_CN, TRE_CN, SUBP, CONDID, TREE, CONDPROP_UNADJ,
-           MEASYEAR, MACRO_BREAKPOINT_DIA, PROP_BASIS, htClass, grpP, grpC,
+           MEASYEAR, MACRO_BREAKPOINT_DIA, PROP_BASIS, htClass, grpP[grpP != 'PLOT_STATUS_CD'], grpC,
            BUG, DISEASE, FIRE, ANIMAL, WEATHER, VEG, UNKNOWN, SILV, MORTYR, MORT, SURV, ELEV,
            drought_sev, wet_sev, all_sev, grow_drought_sev, grow_wet_sev, grow_all_sev,
            tmean_anom, tmax_anom, vpd_anom, grow_tmean_anom, grow_tmax_anom, grow_vpd_anom,
@@ -630,7 +630,7 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 nStems = length(which(tDI == 1))) %>%
       ungroup() %>%
       left_join(div, by = c('PLT_CN', grpP, grpC)) %>%
-      select(PLT_CN, PREV_PLT_CN, grpBy, SUST_INDEX, TPA_RATE, BAA_RATE, MORT_RATE, BAA_CHNG_PERC, TPA_CHNG_PERC,
+      select(PLT_CN, PREV_PLT_CN, grpBy, SI, TPA_RATE, BAA_RATE, MORT_RATE, BAA_CHNG_PERC, TPA_CHNG_PERC,
              PREV_TPA, PREV_BAA, CHNG_TPA, CHNG_BAA, CURR_TPA, CURR_BAA,
              H_struct, Eh_struct, S_struct, H_species, Eh_species, S_species,
              INSECT_RATE,
