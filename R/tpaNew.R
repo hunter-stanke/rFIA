@@ -518,8 +518,6 @@ tpa <- function(db,
             nPlots_TREE = plotIn_TREE) %>%
       select(grpBy, TREE_TOTAL, BA_TOTAL, treeVar, baVar, cvT, cvB, TREE_SE, BA_SE, nPlots_TREE)
 
-    return(tTotal)
-
     ## IF using polys, we treat each zone as a unique population
     if (!is.null(polys)){
       propGrp <- c('polyID', grpBy)
