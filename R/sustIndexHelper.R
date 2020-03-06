@@ -132,6 +132,9 @@ sustIndexHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 CHNG_BAA = if_else(nLive >= minLive, sum(BAA * tDI, na.rm = TRUE), 0) / REMPER,
                 TPA_RATE = CHNG_TPA / PREV_TPA,
                 BAA_RATE = CHNG_BAA / PREV_BAA,
+
+
+
                 ## Disturbances
                 BUG_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & BUG == 1] * tDI[ONEORTWO == 1 & BUG == 1], na.rm = TRUE), 0) / PREV_BAA,
                 DISEASE_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & DISEASE == 1] * tDI[ONEORTWO == 1 & DISEASE == 1], na.rm = TRUE), 0) / PREV_BAA,
@@ -478,12 +481,12 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
 
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
     ## AGENTCD at remeasurement, died during the measurement interval
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'TPA_UNADJ', 'DIA', 'AGENTCD', 'MORTYR', 'STATUSCD', 'SPCD')), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'TPA_UNADJ', 'BAA', 'DIA', 'AGENTCD', 'MORTYR', 'STATUSCD', 'SPCD')), by = c('PLT_CN', 'CONDID')) %>%
     #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', DIA_BEGIN, DIA_END)), by = c('TRE_CN')) %>%
 
     left_join(select(db$PLOT, c('PLT_CN', 'sp', 'aD_p', 'DESIGNCD', 'PLOT_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('2', '1')) %>%
-    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'TPA_UNADJ', 'DIA', 'STATUSCD', htClass, SPCD)), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
+    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'TPA_UNADJ', 'BAA', 'DIA', 'STATUSCD', htClass, SPCD)), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
     #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
 
     mutate_if(is.factor,
@@ -512,8 +515,8 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
   data <- data %>%
     mutate(TPA_UNADJ1 = TPA_UNADJ1,
            TPA_UNADJ2 = TPA_UNADJ2,
-           BAA1 = basalArea(DIA1) * TPA_UNADJ1,
-           BAA2 = basalArea(DIA2) * TPA_UNADJ2,
+           BAA1 = BAA1,
+           BAA2 = BAA2,
            BUG = if_else(AGENTCD == 10, 1, 0),
            DISEASE = if_else(AGENTCD == 20, 1, 0),
            FIRE = if_else(AGENTCD == 30, 1, 0),
@@ -585,20 +588,26 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
     grpBy <- c('YEAR', grpBy)
 
     t <- data %>%
-      mutate(YEAR = MEASYEAR) %>%
+      mutate(YEAR = MEASYEAR,
+             #TPA_SCALE = scale(TPA_UNADJ),
+             #BAA_SCALE = scale(BAA),
+             #TPA_SCALE = (TPA_UNADJ - mean(TPA_UNADJ, na.rm = TRUE)) / (max(TPA_UNADJ, na.rm = TRUE) - min(TPA_UNADJ, na.rm = TRUE)),
+             #BAA_SCALE = (BAA - mean(BAA, na.rm = TRUE)) / (max(BAA, na.rm = TRUE) - min(BAA, na.rm = TRUE)),
+             ) %>%
       distinct(PLT_CN, SUBP, TREE, ONEORTWO, .keep_all = TRUE) %>%
       # Compute estimates at plot level
       group_by(.dots = grpBy, PLT_CN, PREV_PLT_CN) %>%
       summarize(nLive = length(which(tDI[ONEORTWO == 1] > 0)), ## Number of live trees in domain of interest at previous measurement
                 REMPER = first(REMPER),
-                PREV_TPA = if_else(nLive >= minLive, sum(-TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
                 PREV_BAA = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
+                PREV_TPA = if_else(nLive >= minLive, sum(-TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
                 CHNG_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE), 0),
                 CHNG_BAA = if_else(nLive >= minLive, sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE), 0),
                 CURR_TPA = PREV_TPA + CHNG_TPA,
                 CURR_BAA = PREV_BAA + CHNG_BAA,
-                TPA_RATE = (CHNG_TPA / REMPER) / (PREV_TPA + CURR_TPA)* 2,
-                BAA_RATE = (CHNG_BAA / REMPER) / (PREV_BAA + CURR_BAA)* 2,
+                #TPA_RATE = (CHNG_TPA / REMPER),
+                #BAA_RATE = (CHNG_BAA / REMPER),
+
                 ## Disturbances
                 INSECT_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & BUG == 1] * tDI[ONEORTWO == 1 & BUG == 1], na.rm = TRUE), 0) / (PREV_BAA + CURR_BAA)* 2 / REMPER,
                 DISEASE_RATE = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & DISEASE == 1] * tDI[ONEORTWO == 1 & DISEASE == 1], na.rm = TRUE), 0) / (PREV_BAA + CURR_BAA)* 2 / REMPER,
@@ -623,14 +632,15 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 GROW_DROUGHT_SEV = first(grow_drought_sev),
                 GROW_WET_SEV = first(grow_wet_sev),
                 GROW_ALL_SEV = first(grow_all_sev),
-                x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
-                y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
-                M = sqrt(x^2 + y^2),
-                SI = if_else(x < 0, -M, M),
+                #x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
+                #y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
+                #M = sqrt(x^2 + y^2),
+                #SI = if_else(x < 0, -M, M),
                 nStems = length(which(tDI == 1))) %>%
       ungroup() %>%
       left_join(div, by = c('PLT_CN', grpP, grpC)) %>%
-      select(PLT_CN, PREV_PLT_CN, grpBy, SI, TPA_RATE, BAA_RATE, MORT_RATE, BAA_CHNG_PERC, TPA_CHNG_PERC,
+      select(PLT_CN, PREV_PLT_CN, REMPER, grpBy, #SI, TPA_RATE, BAA_RATE,
+             MORT_RATE, BAA_CHNG_PERC, TPA_CHNG_PERC,
              PREV_TPA, PREV_BAA, CHNG_TPA, CHNG_BAA, CURR_TPA, CURR_BAA,
              H_struct, Eh_struct, S_struct, H_species, Eh_species, S_species,
              INSECT_RATE,
@@ -726,7 +736,7 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 # y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
                 # M = sqrt(x^2 + y^2),
                 #SUST_INDEX = if_else(x < 0, -M, M),
-                plotIn = if_else(sum(tDI) > 0, 1, 0)) %>%
+                plotIn = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0)) %>%
       left_join(div, by = c('PLT_CN', grpP, grpC))
   }
 
@@ -857,8 +867,8 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
     ## Do not want to compute SI for micro and subp seperately, handle it here
     mutate(CURR_TPA = ptPlot + (ctPlot * REMPER),
            CURR_BAA = pbPlot + (cbPlot * REMPER),
-           TPA_RATE = ctPlot / (CURR_TPA + ptPlot) * 2,
-           BAA_RATE = cbPlot / (CURR_BAA + pbPlot) * 2,
+           TPA_RATE = ctPlot, #/ (CURR_TPA + ptPlot) * 2,
+           BAA_RATE = cbPlot, #/ (CURR_BAA + pbPlot) * 2,
            x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
            #y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
            siPlot = sqrt(x^2 + x^2),
@@ -871,7 +881,7 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
     left_join(select(aAdj, PLT_CN, grpBy, fa, DROUGHT_SEV, WET_SEV, ALL_SEV, GROW_DROUGHT_SEV, GROW_WET_SEV, GROW_ALL_SEV,
                      VPD_ANOM, TMAX_ANOM, TMEAN_ANOM, GROW_VPD_ANOM, GROW_TMAX_ANOM, GROW_TMEAN_ANOM, ELEV), by = c('PLT_CN', grpBy)) %>%
 
-    ## Strata level
+    ## StbasalArea(DIA2) * TPA_UNADJbasalArea(DIA2) * TPA_UNADJrata level
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
     summarize(r_t = length(unique(PLT_CN)) / first(nh),
               ctStrat = mean(ctPlot * r_t, na.rm = TRUE),

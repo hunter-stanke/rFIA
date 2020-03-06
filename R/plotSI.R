@@ -252,6 +252,7 @@ plotSI <- function(data, y = NULL, grp = NULL, x = NULL, style = 'cleveland', an
         geom_vline(xintercept = 0, alpha = .67, colour = 'grey', linetype = 'dashed', size = 1.2)+
         geom_segment(aes(yend=grpVar), xend=0, colour = 'grey50') +
         geom_point(aes(size = PREV_BAA, colour = SI_STATUS))+
+        #geom_point(aes(colour = SI_STATUS), size = 4)+
         scale_color_viridis_d(option = 'viridis')+
         theme_bw()+
         theme(panel.grid.major.y = element_blank()) +

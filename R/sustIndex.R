@@ -1054,6 +1054,20 @@ si <- function(db,
   ## Reduce the memory load for others
   db <- clipFIA(db, mostRecent = FALSE)
 
+  #### Need to scale our variables globally
+  db$TREE <- db$TREE %>%
+    mutate(BAA = basalArea(DIA) * TPA_UNADJ)
+  # ## Scaling factors
+  # tpaMean <- mean(db$TREE$TPA_UNADJ, na.rm = TRUE)
+  # tpaSD <- sd(db$TREE$TPA_UNADJ, na.rm = TRUE)
+  # baaMean <- mean(db$TREE$BAA, na.rm = TRUE)
+  # baaSD <- sd(db$TREE$BAA, na.rm = TRUE)
+  # ## Apply them
+  # db$TREE <- db$TREE %>%
+  #   mutate(TPA_UNADJ = scale(TPA_UNADJ),
+  #          BAA = scale(BAA))
+
+
   ## Merging state and county codes
   plts <- split(db$PLOT, as.factor(paste(db$PLOT$COUNTYCD, db$PLOT$STATECD, sep = '_')))
 
@@ -1078,6 +1092,24 @@ si <- function(db,
     ## back to dataframes
     out <- unlist(out, recursive = FALSE)
     tOut <- bind_rows(out[names(out) == 't'])
+
+    ## Standardize the changes in each state variable
+    tOut <- tOut %>%
+      mutate(TPA_RATE = CHNG_TPA / REMPER / abs(mean(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
+             BAA_RATE = CHNG_BAA / REMPER / abs(mean(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
+             x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
+             y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
+             M = sqrt(x^2 + y^2),
+             SI = if_else(x < 0, -M, M)) %>%
+      select(-c(x,y,M)) %>%
+      select(YEAR, PLT_CN, PREV_PLT_CN, REMPER, grpBy[grpBy != 'YEAR'], SI, TPA_RATE, BAA_RATE,
+             everything())
+
+    ## Save these
+    tpaRateMean <- mean(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+    baaRateMean <- mean(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+
+
     ## Make it spatial
     if (returnSpatial){
       tOut <- tOut %>%
@@ -1095,6 +1127,13 @@ si <- function(db,
     t <- bind_rows(out[names(out) == 't'])
     full <- bind_rows(out[names(out) == 'full'])
 
+    ## Standardize the changes in each state variable
+    t <- t %>%
+      mutate(TPA_RATE = CHNG_TPA / REMPER / abs(mean(CHNG_TPA[t$plotIn == 1], na.rm = TRUE)),
+             BAA_RATE = CHNG_BAA / REMPER / abs(mean(CHNG_BAA[t$plotIn == 1], na.rm = TRUE)))
+    ## Save these
+    tpaRateMean <- mean(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE)
+    baaRateMean <- mean(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE)
 
     ## Adding YEAR to groups
     grpBy <- c('YEAR', grpBy)
@@ -1386,7 +1425,7 @@ si <- function(db,
         mutate(SI_STATUS = case_when(
           SI < 0 & SI + SI_INT < 0 ~ 'Decline',
           SI < 0 & SI + SI_INT > 0 ~ 'Stable',
-          SI > 0 & SI - SI_INT > 0 ~ 'Expand',
+          SI > 0 & SI - SI_INT > 0  ~ 'Expand',
           TRUE ~ 'Stable'
         ))
     })
@@ -1498,6 +1537,12 @@ si <- function(db,
   if (returnSpatial) tOut <- st_sf(tOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) tOut <- unique(tOut)
+
+  ## Standardization factors
+  tOut$tpaRateMean <- tpaRateMean
+  tOut$baaRateMean <- baaRateMean
+
+
   return(tOut)
 }
 
@@ -1845,6 +1890,8 @@ si_backup <- function(db,
 
   ## Merging state and county codes
   plts <- split(db$PLOT, as.factor(paste(db$PLOT$COUNTYCD, db$PLOT$STATECD, sep = '_')))
+
+
 
   suppressWarnings({
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
@@ -3007,5 +3054,13 @@ si_old <- function(db,
   if (returnSpatial) tOut <- st_sf(tOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) tOut <- unique(tOut)
+
+
+  ## Add our scaling factors
+  tOut$tpaMean <- tpaMean
+  tOut$tpaSD <- tpaSD
+  tOut$baaMean <- baaMean
+  tOut$baaSD <- baaSD
+
   return(tOut)
 }
