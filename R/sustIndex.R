@@ -1095,8 +1095,15 @@ si <- function(db,
 
     ## Standardize the changes in each state variable
     tOut <- tOut %>%
-      mutate(TPA_RATE = CHNG_TPA / REMPER / abs(mean(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
-             BAA_RATE = CHNG_BAA / REMPER / abs(mean(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
+      mutate(#TPA_RATE = CHNG_TPA / REMPER / abs(mean(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
+             #BAA_RATE = CHNG_BAA / REMPER / abs(mean(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
+             TPA_RATE = (scale(CHNG_TPA) +
+               (mean(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / sd(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE))) /
+               REMPER,
+             BAA_RATE = (scale(CHNG_BAA) +
+                           (mean(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / sd(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE))) /
+               REMPER,
+
              x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
              y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
              M = sqrt(x^2 + y^2),
@@ -1108,6 +1115,8 @@ si <- function(db,
     ## Save these
     tpaRateMean <- mean(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
     baaRateMean <- mean(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+    tpaRateSD <- sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+    baaRateSD <- sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
 
 
     ## Make it spatial
@@ -1129,12 +1138,19 @@ si <- function(db,
 
     ## Standardize the changes in each state variable
     t <- t %>%
-      mutate(TPA_RATE = CHNG_TPA / REMPER / abs(mean(CHNG_TPA[t$plotIn == 1], na.rm = TRUE)),
-             BAA_RATE = CHNG_BAA / REMPER / abs(mean(CHNG_BAA[t$plotIn == 1], na.rm = TRUE)))
+      mutate(#TPA_RATE = CHNG_TPA / REMPER / abs(mean(CHNG_TPA[t$plotIn == 1], na.rm = TRUE)),
+             #BAA_RATE = CHNG_BAA / REMPER / abs(mean(CHNG_BAA[t$plotIn == 1], na.rm = TRUE)),
+             TPA_RATE = (scale(CHNG_TPA) +
+                           (mean(CHNG_TPA[t$plotIn == 1], na.rm = TRUE) / sd(CHNG_TPA[t$plotIn == 1], na.rm = TRUE))) /
+               REMPER,
+             BAA_RATE = (scale(CHNG_BAA) +
+                           (mean(CHNG_BAA[t$plotIn == 1], na.rm = TRUE) / sd(CHNG_BAA[t$plotIn == 1], na.rm = TRUE))) /
+               REMPER)
     ## Save these
     tpaRateMean <- mean(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE)
     baaRateMean <- mean(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE)
-
+    tpaRateSD <- sd(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE)
+    baaRateSD <- sd(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE)
     ## Adding YEAR to groups
     grpBy <- c('YEAR', grpBy)
     #aGrpBy <- c('YEAR', aGrpBy)
@@ -1541,7 +1557,8 @@ si <- function(db,
   ## Standardization factors
   tOut$tpaRateMean <- tpaRateMean
   tOut$baaRateMean <- baaRateMean
-
+  tOut$tpaRateSD <- tpaRateSD
+  tOut$baaRateSD <- baaRateSD
 
   return(tOut)
 }
