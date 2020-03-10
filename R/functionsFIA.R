@@ -4,20 +4,25 @@
   #packageStartupMessage('Download FIA Data Here: https://apps.fs.usda.gov/fia/datamart/datamart.html')
 }
 
-projectPnts <- function(x, y, slope, yint){
-  P = data.frame(x, y)
-  P$m <- slope
-  P$n <- yint
-  ## Perp Points
-  P$x1 = P$x + -slope
-  P$y1 = P$y + 1
-  ## Perp Line
-  P$m1 = (P$y1-P$y)/(P$x1-P$x)
-  P$n1 = P$y - P$m1*P$x
-  ## Line intersection
-  P$x=(P$n1-P$n)/(P$m-P$m1)
-  P$y=P$m*P$x+P$n
-
+projectPnts <- function(x, y, slope = NULL, yint = NULL){
+  if (is.null(slope)){
+    P = data.frame(xOrig = x, yOrig = y)
+    P$x <- (P$yOrig+P$xOrig) / 2
+    P$y <- P$x
+  } else {
+    P = data.frame(x, y)
+    P$m <- slope
+    P$n <- yint
+    ## Perp Points
+    P$x1 = P$x + -slope
+    P$y1 = P$y + 1
+    ## Perp Line
+    P$m1 = (P$y1-P$y)/(P$x1-P$x)
+    P$n1 = P$y - P$m1*P$x
+    ## Line intersection
+    P$x=(P$n1-P$n)/(P$m-P$m1)
+    P$y=P$m*P$x+P$n
+  }
   return(P)
 }
 

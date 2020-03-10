@@ -1094,23 +1094,31 @@ si <- function(db,
     tOut <- bind_rows(out[names(out) == 't'])
 
     ## Standardize the changes in each state variable
-    tOut <- tOut %>%
-      mutate(#TPA_RATE = CHNG_TPA / REMPER / abs(mean(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
-             #BAA_RATE = CHNG_BAA / REMPER / abs(mean(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
-             TPA_RATE = (scale(CHNG_TPA) +
-               (mean(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / sd(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE))) /
-               REMPER,
-             BAA_RATE = (scale(CHNG_BAA) +
-                           (mean(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / sd(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE))) /
-               REMPER,
+    tOut$TPA_RATE <- tOut$CHNG_TPA / sd(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
+    tOut$BAA_RATE <- tOut$CHNG_BAA / sd(tOut$BHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
+    # Compute the SI
+    x = projectPnts(tOut$TPA_RATE, tOut$BAA_RATE, 1, 0)$x
+    y = x
+    M = sqrt(x^2 + y^2)
+    tOut$SI = if_else(x < 0, -M, M)
 
-             x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
-             y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
-             M = sqrt(x^2 + y^2),
-             SI = if_else(x < 0, -M, M)) %>%
-      select(-c(x,y,M)) %>%
-      select(YEAR, PLT_CN, PREV_PLT_CN, REMPER, grpBy[grpBy != 'YEAR'], SI, TPA_RATE, BAA_RATE,
-             everything())
+    tOut <- select(tOut, YEAR, PLT_CN, PREV_PLT_CN, REMPER, grpBy[grpBy != 'YEAR'], SI, TPA_RATE, BAA_RATE, everything())
+    # tOut <- tOut %>%
+    #   mutate(#TPA_RATE = CHNG_TPA / REMPER / abs(mean(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
+    #          #BAA_RATE = CHNG_BAA / REMPER / abs(mean(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
+    #          TPA_RATE = (scale(CHNG_TPA) +
+    #            (mean(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / sd(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE))) /
+    #            REMPER,
+    #          BAA_RATE = (scale(CHNG_BAA) +
+    #                        (mean(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / sd(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE))) /
+    #            REMPER,
+    #
+    #          x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
+    #          y = x,
+    #          M = sqrt(x^2 + y^2),
+    #          SI = if_else(x < 0, -M, M)) %>%
+    #   select(-c(x,y,M)) %>%
+
 
     ## Save these
     tpaRateMean <- mean(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
@@ -1136,16 +1144,26 @@ si <- function(db,
     t <- bind_rows(out[names(out) == 't'])
     full <- bind_rows(out[names(out) == 'full'])
 
+    # ## Standardize the changes in each state variable
+    # t <- t %>%
+    #   mutate(#TPA_RATE = CHNG_TPA / REMPER / abs(mean(CHNG_TPA[t$plotIn == 1], na.rm = TRUE)),
+    #          #BAA_RATE = CHNG_BAA / REMPER / abs(mean(CHNG_BAA[t$plotIn == 1], na.rm = TRUE)),
+    #          TPA_RATE = (scale(CHNG_TPA) +
+    #                        (mean(CHNG_TPA[t$plotIn == 1], na.rm = TRUE) / sd(CHNG_TPA[t$plotIn == 1], na.rm = TRUE))) /
+    #            REMPER,
+    #          BAA_RATE = (scale(CHNG_BAA) +
+    #                        (mean(CHNG_BAA[t$plotIn == 1], na.rm = TRUE) / sd(CHNG_BAA[t$plotIn == 1], na.rm = TRUE))) /
+    #            REMPER)
+
     ## Standardize the changes in each state variable
-    t <- t %>%
-      mutate(#TPA_RATE = CHNG_TPA / REMPER / abs(mean(CHNG_TPA[t$plotIn == 1], na.rm = TRUE)),
-             #BAA_RATE = CHNG_BAA / REMPER / abs(mean(CHNG_BAA[t$plotIn == 1], na.rm = TRUE)),
-             TPA_RATE = (scale(CHNG_TPA) +
-                           (mean(CHNG_TPA[t$plotIn == 1], na.rm = TRUE) / sd(CHNG_TPA[t$plotIn == 1], na.rm = TRUE))) /
-               REMPER,
-             BAA_RATE = (scale(CHNG_BAA) +
-                           (mean(CHNG_BAA[t$plotIn == 1], na.rm = TRUE) / sd(CHNG_BAA[t$plotIn == 1], na.rm = TRUE))) /
-               REMPER)
+    t$TPA_RATE <- t$CHNG_TPA / sd(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE) / t$REMPER
+    t$BAA_RATE <- t$CHNG_BAA / sd(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE) / t$REMPER
+    # Compute the SI
+    x = projectPnts(t$TPA_RATE, t$BAA_RATE, 1, 0)$x
+    y = x
+    M = sqrt(x^2 + y^2)
+    t$SI = if_else(x < 0, -M, M)
+
     ## Save these
     tpaRateMean <- mean(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE)
     baaRateMean <- mean(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE)
@@ -1289,6 +1307,7 @@ si <- function(db,
       summarize_all(sum,na.rm = TRUE)
 
 
+
     ##---------------------  TOTALS and RATIOS
     suppressWarnings({
       tOut <- tTotal %>%
@@ -1422,9 +1441,10 @@ si <- function(db,
                #SI_SE = sqrt(Mvar) / abs(SI) * 100,
                nPlots = plotIn_t,
                nTotal = nh,
-               TPA_RATE_INT = abs(TPA_RATE) * 1.96 * TPA_RATE_SE / 100,
-               BAA_RATE_INT = abs(BAA_RATE) * 1.96 * BAA_RATE_SE / 100,
-               SI_INT = abs(SI) * 1.96 * SI_SE / 100,
+               TPA_RATE_INT = 1.96 * (sqrt(ctVar)/sqrt(nTotal)),
+               BAA_RATE_INT = 1.96 * (sqrt(cbVar)/sqrt(nTotal)),
+               #SI_INT1 = abs(SI) * 1.96 * SI_SE / 100,
+               SI_INT = 1.96 * (sqrt(siVar)/sqrt(nTotal)),
                TPA_STATUS = case_when(
                  TPA_RATE < 0 & TPA_RATE + TPA_RATE_INT < 0 ~ 'Decline',
                  TPA_RATE < 0 & TPA_RATE + TPA_RATE_INT > 0 ~ 'Stable',
