@@ -1095,7 +1095,7 @@ si <- function(db,
 
     ## Standardize the changes in each state variable
     tOut$TPA_RATE <- tOut$CHNG_TPA / sd(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
-    tOut$BAA_RATE <- tOut$CHNG_BAA / sd(tOut$BHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
+    tOut$BAA_RATE <- tOut$CHNG_BAA / sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
     # Compute the SI
     x = projectPnts(tOut$TPA_RATE, tOut$BAA_RATE, 1, 0)$x
     y = x
