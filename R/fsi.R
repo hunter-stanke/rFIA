@@ -351,6 +351,7 @@ fsi <- function(db,
         library(dplyr)
         library(stringr)
         library(rFIA)
+        library(tidyr)
       })
       out <- parLapply(cl, X = names(plts), fun = fsiHelper1, plts, db, grpBy, byPlot)
       #stopCluster(cl) # Keep the cluster active for the next run
@@ -369,15 +370,19 @@ fsi <- function(db,
     if (scaleGCB){
 
       ## Standardize the changes in each state variable
-      #tOut$TPA_RATE <- tOut$CHNG_TPA /  / tOut$REMPER
-      #tOut$BAA_RATE <- tOut$CHNG_BAA / / tOut$REMPER
+      tOut$TPA_RATE <- tOut$CHNG_TPA / 130.2595301 / tOut$REMPER
+      tOut$BAA_RATE <- tOut$CHNG_BAA / 2.012262 / tOut$REMPER
 
+      tpaRateSD <- 130.2595301
+      baaRateSD <-  2.012262
     } else {
 
       ## Standardize the changes in each state variable
       tOut$TPA_RATE <- tOut$CHNG_TPA / sd(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
       tOut$BAA_RATE <- tOut$CHNG_BAA / sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
 
+      tpaRateSD <- sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+      baaRateSD <- sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
     }
 
     # Compute the SI
@@ -405,10 +410,9 @@ fsi <- function(db,
 
 
     ## Save these
-    tpaRateMean <- mean(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
-    baaRateMean <- mean(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
-    tpaRateSD <- sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
-    baaRateSD <- sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+    #tpaRateMean <- mean(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+    #baaRateMean <- mean(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+
 
 
     ## Make it spatial
@@ -427,31 +431,36 @@ fsi <- function(db,
     a <- bind_rows(out[names(out) == 'a'])
     t <- bind_rows(out[names(out) == 't'])
 
-    # ## Standardize the changes in each state variable
-    # t <- t %>%
-    #   mutate(#TPA_RATE = CHNG_TPA / REMPER / abs(mean(CHNG_TPA[t$plotIn == 1], na.rm = TRUE)),
-    #          #BAA_RATE = CHNG_BAA / REMPER / abs(mean(CHNG_BAA[t$plotIn == 1], na.rm = TRUE)),
-    #          TPA_RATE = (scale(CHNG_TPA) +
-    #                        (mean(CHNG_TPA[t$plotIn == 1], na.rm = TRUE) / sd(CHNG_TPA[t$plotIn == 1], na.rm = TRUE))) /
-    #            REMPER,
-    #          BAA_RATE = (scale(CHNG_BAA) +
-    #                        (mean(CHNG_BAA[t$plotIn == 1], na.rm = TRUE) / sd(CHNG_BAA[t$plotIn == 1], na.rm = TRUE))) /
-    #            REMPER)
+    # ## Standardize the changes in each state variable AT THE PLOT LEVEL
 
-    ## Standardize the changes in each state variable
-    t$TPA_RATE <- t$CHNG_TPA / sd(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE) / t$REMPER
-    t$BAA_RATE <- t$CHNG_BAA / sd(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE) / t$REMPER
-    # Compute the SI
-    x = projectPnts(t$TPA_RATE, t$BAA_RATE, 1, 0)$x
-    y = x
-    M = sqrt(x^2 + y^2)
-    t$SI = if_else(x < 0, -M, M)
 
-    ## Save these
-    tpaRateMean <- mean(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE)
-    baaRateMean <- mean(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE)
-    tpaRateSD <- sd(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE)
-    baaRateSD <- sd(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE)
+
+    if (scaleGCB){
+      tpaRateSD <- 130.2595301
+      baaRateSD <-  2.012262
+
+      ## Standardize the changes in each state variable
+      t$TPA_RATE <- t$CHNG_TPA / 130.2595301
+      t$BAA_RATE <- t$CHNG_BAA / 2.012262
+
+    } else {
+      ### CANNOT USE vectors as they are to compute SD, because of PLOT_BASIS issues
+      ### SD is unnessarily high --> plot level first
+      pltRates <- t %>%
+        select(PLT_CN, CHNG_TPA, CHNG_BAA, REMPER, n, plotIn, grpBy) %>%
+        group_by(PLT_CN, plotIn, .dots = grpBy) %>%
+        summarize(t = sum(CHNG_TPA / REMPER, na.rm = TRUE),
+                  n = sum(n, na.rm = TRUE),
+                  b = sum(CHNG_BAA / REMPER, na.rm = TRUE) / n)
+      tpaRateSD <- sd(pltRates$t[pltRates$plotIn == 1], na.rm = TRUE)
+      baaRateSD <- sd(pltRates$b[pltRates$plotIn == 1], na.rm = TRUE)
+
+
+      ## Standardize the changes in each state variable
+      t$TPA_RATE <- t$CHNG_TPA / tpaRateSD
+      t$BAA_RATE <- t$CHNG_BAA / baaRateSD
+    }
+
     ## Adding YEAR to groups
     grpBy <- c('YEAR', grpBy)
     #aGrpBy <- c('YEAR', aGrpBy)
@@ -687,8 +696,6 @@ fsi <- function(db,
   if (byPlot) tOut <- unique(tOut)
 
   ## Standardization factors
-  tOut$tpaRateMean <- tpaRateMean
-  tOut$baaRateMean <- baaRateMean
   tOut$tpaRateSD <- tpaRateSD
   tOut$baaRateSD <- baaRateSD
 

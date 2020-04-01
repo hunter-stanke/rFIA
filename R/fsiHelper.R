@@ -77,7 +77,7 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
 
   ## Just what we need
   data <- data %>%
-    select(PLT_CN, PREV_PLT_CN, TRE_CN, SUBP, CONDID, TREE, CONDPROP_UNADJ,
+    select(PLT_CN, PREV_PLT_CN, pltID, TRE_CN, SUBP, CONDID, TREE, CONDPROP_UNADJ,
            MEASYEAR, MACRO_BREAKPOINT_DIA, PROP_BASIS, grpP[grpP != 'PLOT_STATUS_CD'], grpC,
            REMPER, PLOT_STATUS_CD1, PLOT_STATUS_CD2,
            #one_of(str_c(grpP,1), str_c(grpC,1), str_c(grpT,1),
@@ -151,6 +151,8 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
 
     ### Compute total TREES in domain of interest
     t <- data %>%
+      ## Need to count number of trees in each
+      mutate(treID = paste(pltID, SUBP, TREE)) %>%
       distinct(PLT_CN, TRE_CN, ONEORTWO, .keep_all = TRUE) %>%
       # Compute estimates at plot level
       group_by(PLT_CN, PLOT_BASIS, .dots = grpBy) %>%
@@ -160,8 +162,9 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
                 PREV_TPA = sum(-TPA_UNADJ[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE),
                 PREV_BAA = sum(-BAA[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE),
                 CHNG_TPA = sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
-                CHNG_BAA = mean((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE),
-                plotIn = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0))
+                CHNG_BAA = sum((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE),
+                plotIn = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0),
+                n = length(unique(treID[tDI == 1])))
   }
 
   pltOut <- list(a = a, t = t)
@@ -231,12 +234,19 @@ fsiHelper2 <- function(x, popState, a, t, grpBy, method){
               p2eu = first(p2eu),
               a = first(AREA_USED),
               w = first(P1POINTCNT) / first(P1PNTCNT_EU),
-              REMPER = first(REMPER)) %>%
+              REMPER = first(REMPER),
+              ## Summing change across subp and micr
+              TPA_RATE = sum(TPA_RATE, na.rm = TRUE),
+              BAA_RATE = sum(BAA_RATE, na.rm = TRUE),
+              ## Total unique number of trees
+              n = sum(n, na.rm = TRUE)) %>%
     ## Do not want to compute SI for micro and subp seperately, handle it here
-    mutate(CURR_TPA = ptPlot + (ctPlot * REMPER),
-           CURR_BAA = pbPlot + (cbPlot * REMPER),
-           TPA_RATE = ctPlot, #/ (CURR_TPA + ptPlot) * 2,
-           BAA_RATE = cbPlot, #/ (CURR_BAA + pbPlot) * 2,
+    mutate(TPA_RATE = TPA_RATE / REMPER,
+           BAA_RATE = BAA_RATE / REMPER / n,
+           #CURR_TPA = ptPlot + (ctPlot * REMPER),
+           #CURR_BAA = pbPlot + (cbPlot * REMPER),
+           #TPA_RATE = ctPlot, #/ (CURR_TPA + ptPlot) * 2,
+           #BAA_RATE = cbPlot, #/ (CURR_BAA + pbPlot) * 2,
            x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
            #y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
            siPlot = sqrt(x^2 + x^2),
