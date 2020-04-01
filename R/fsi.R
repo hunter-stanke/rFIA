@@ -448,7 +448,7 @@ fsi <- function(db,
       ### SD is unnessarily high --> plot level first
       pltRates <- t %>%
         select(PLT_CN, CHNG_TPA, CHNG_BAA, REMPER, n, plotIn, grpBy) %>%
-        group_by(PLT_CN, plotIn, .dots = grpBy) %>%
+        group_by(PLT_CN, plotIn) %>%
         summarize(t = sum(CHNG_TPA / REMPER, na.rm = TRUE),
                   n = sum(n, na.rm = TRUE),
                   b = sum(CHNG_BAA / REMPER, na.rm = TRUE) / n)
