@@ -368,13 +368,13 @@ fsi <- function(db,
 
     ## Should scaling be consistent with GCB paper?
     if (scaleGCB){
+      tpaRateSD <- 29.86784
+      baaRateSD <-  0.1498109
 
       ## Standardize the changes in each state variable
-      tOut$TPA_RATE <- tOut$CHNG_TPA / 130.2595301 / tOut$REMPER
-      tOut$BAA_RATE <- tOut$CHNG_BAA / 2.012262 / tOut$REMPER
+      tOut$TPA_RATE <- tOut$CHNG_TPA / tpaRateSD / tOut$REMPER
+      tOut$BAA_RATE <- tOut$CHNG_BAA / baaRateSD / tOut$REMPER
 
-      tpaRateSD <- 130.2595301
-      baaRateSD <-  2.012262
     } else {
 
       ## Standardize the changes in each state variable
@@ -436,12 +436,12 @@ fsi <- function(db,
 
 
     if (scaleGCB){
-      tpaRateSD <- 130.2595301
-      baaRateSD <-  2.012262
+      tpaRateSD <- 29.86784
+      baaRateSD <-  0.1498109
 
       ## Standardize the changes in each state variable
-      t$TPA_RATE <- t$CHNG_TPA / 130.2595301
-      t$BAA_RATE <- t$CHNG_BAA / 2.012262
+      t$TPA_RATE <- t$CHNG_TPA / tpaRateSD
+      t$BAA_RATE <- t$CHNG_BAA / baaRateSD
 
     } else {
       ### CANNOT USE vectors as they are to compute SD, because of PLOT_BASIS issues
