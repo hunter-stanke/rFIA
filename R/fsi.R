@@ -12,6 +12,7 @@ fsi <- function(db,
                 areaDomain = NULL,
                 totals = TRUE,
                 byPlot = FALSE,
+                scaleGCB = TRUE,
                 nCores = 1) {
 
   ## Need a plotCN
@@ -364,9 +365,21 @@ fsi <- function(db,
     out <- unlist(out, recursive = FALSE)
     tOut <- bind_rows(out[names(out) == 't'])
 
-    ## Standardize the changes in each state variable
-    tOut$TPA_RATE <- tOut$CHNG_TPA / sd(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
-    tOut$BAA_RATE <- tOut$CHNG_BAA / sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
+    ## Should scaling be consistent with GCB paper?
+    if (scaleGCB){
+
+      ## Standardize the changes in each state variable
+      #tOut$TPA_RATE <- tOut$CHNG_TPA /  / tOut$REMPER
+      #tOut$BAA_RATE <- tOut$CHNG_BAA / / tOut$REMPER
+
+    } else {
+
+      ## Standardize the changes in each state variable
+      tOut$TPA_RATE <- tOut$CHNG_TPA / sd(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
+      tOut$BAA_RATE <- tOut$CHNG_BAA / sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
+
+    }
+
     # Compute the SI
     x = projectPnts(tOut$TPA_RATE, tOut$BAA_RATE, 1, 0)$x
     y = x
@@ -563,8 +576,8 @@ fsi <- function(db,
 
 
       tEst <- tEst %>%
-        mutate_at(vars(ctEst:sspEst), ~(.*wgt)) %>%
-        mutate_at(vars(ctVar:cvEst_ssp), ~(.*(wgt^2))) %>%
+        mutate_at(vars(ctEst:faEst), ~(.*wgt)) %>%
+        mutate_at(vars(ctVar:cvEst_si), ~(.*(wgt^2))) %>%
         group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
         summarize_at(vars(ctEst:plotIn_t), sum, na.rm = TRUE)
 
