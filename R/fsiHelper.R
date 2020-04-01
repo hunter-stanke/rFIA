@@ -154,6 +154,8 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
       ## Need to count number of trees in each
       mutate(treID = paste(pltID, SUBP, TREE)) %>%
       distinct(PLT_CN, TRE_CN, ONEORTWO, .keep_all = TRUE) %>%
+      #group_by(PLT_CN, PLOT_BASIS, TRE_CN) %>%
+      #summarize()
       # Compute estimates at plot level
       group_by(PLT_CN, PLOT_BASIS, .dots = grpBy) %>%
       summarize(nLive = length(which(tDI[ONEORTWO == 1] > 0)), ## Number of live trees in domain of interest at previous measurement
@@ -162,9 +164,11 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
                 PREV_TPA = sum(-TPA_UNADJ[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE),
                 PREV_BAA = sum(-BAA[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE),
                 CHNG_TPA = sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
-                CHNG_BAA = sum((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE),
+                CHNG_BAA = sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
+                #CHNG_BAA1 = sum((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE),
                 plotIn = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0),
-                n = length(unique(treID[tDI == 1])))
+                n = length(unique(TRE_CN[tDI == 1])))
+                #n1 = length(unique(treID[tDI == 1])))
   }
 
   pltOut <- list(a = a, t = t)

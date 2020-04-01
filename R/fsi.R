@@ -447,6 +447,7 @@ fsi <- function(db,
       ### CANNOT USE vectors as they are to compute SD, because of PLOT_BASIS issues
       ### SD is unnessarily high --> plot level first
       pltRates <- t %>%
+        ungroup() %>%
         select(PLT_CN, CHNG_TPA, CHNG_BAA, REMPER, n, plotIn, grpBy) %>%
         group_by(PLT_CN, plotIn) %>%
         summarize(t = sum(CHNG_TPA / REMPER, na.rm = TRUE),
