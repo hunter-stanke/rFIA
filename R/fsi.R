@@ -1,21 +1,21 @@
-#' @export
-tpa <- function(db,
-                       grpBy = NULL,
-                       polys = NULL,
-                       returnSpatial = FALSE,
-                       bySpecies = FALSE,
-                       bySizeClass = FALSE,
-                       landType = 'forest',
-                       treeType = 'live',
-                       method = 'TI',
-                       lambda = .5,
-                       treeDomain = NULL,
-                       areaDomain = NULL,
-                       totals = FALSE,
-                       byPlot = FALSE,
-                       nCores = 1) {
+fsi <- function(db,
+                grpBy = NULL,
+                polys = NULL,
+                returnSpatial = FALSE,
+                bySpecies = FALSE,
+                bySizeClass = FALSE,
+                landType = 'forest',
+                treeType = 'live',
+                method = 'annual',
+                lambda = .5,
+                treeDomain = NULL,
+                areaDomain = NULL,
+                totals = TRUE,
+                byPlot = FALSE,
+                nCores = 1) {
 
-
+  ## Need a plotCN
+  db$TREE <- db[['TREE']] %>% mutate(TRE_CN = CN)
   ## Need a plotCN, and a new ID
   db$PLOT <- db$PLOT %>% mutate(PLT_CN = CN,
                                 pltID = paste(UNITCD, STATECD, COUNTYCD, PLOT, sep = '_'))
@@ -48,7 +48,8 @@ tpa <- function(db,
     }
   }
 
-  reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
+  reqTables <- c('PLOT', 'TREE', 'TREE_GRM_COMPONENT', 'COND',
+                 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
   ## Some warnings
   if (class(db) != "FIA.Database"){
@@ -68,18 +69,27 @@ tpa <- function(db,
     warning(paste('Method', method, 'unknown. Defaulting to Temporally Indifferent (TI).'))
   }
 
+  # ## No EXP_GROW available for Western States, make sure we warn that values will be returned as 0
+  # # These states do not allow temporal queries. Things are extremely weird with their eval groups
+  # noGrow <- c(02,03,04,07,08,11,14,15,16, 23, 30, 32, 35,43,49, 78)
+  # if(any(unique(db$PLOT$STATECD) %in% noGrow)){
+  #   vState <- unique(db$PLOT$STATECD[db$PLOT$STATECD %in% noGrow])
+  #   fancyName <- unique(intData$EVAL_GRP$STATE[intData$EVAL_GRP$STATECD %in% vState])
+  #   warning(paste('Recruitment data unavailable for: ', toString(fancyName) , '. Returning 0 for all recruitment estimates which include these states.', sep = ''))
+  # }
+  # # These states do not allow change estimates.
+  # if(any(unique(db$PLOT$STATECD) %in% c(69, 72, 78, 15, 02))){
+  #   vState <- unique(db$PLOT$STATECD[db$PLOT$STATECD %in% c(69, 72, 78, 15, 02)])
+  #   fancyName <- unique(intData$EVAL_GRP$STATE[intData$EVAL_GRP$STATECD %in% vState])
+  #   stop(paste('Growth & Mortality Estimates unavailable for: ', paste(as.character(fancyName), collapse = ', '), sep = ''))
+  # }
+
+
+
   # I like a unique ID for a plot through time
-  if (byPlot) {grpBy <- c('pltID', grpBy)}
+  if (byPlot) {grpBy <- c('pltID', 'PLOT_STATUS_CD', grpBy)}
   # Save original grpBy for pretty return with spatial objects
   grpByOrig <- grpBy
-
-  ## IF the object was clipped
-  if ('prev' %in% names(db$PLOT)){
-    ## Only want the current plots, no grm
-    db$PLOT <- filter(db$PLOT, prev == 0)
-  }
-
-
 
   ### AREAL SUMMARY PREP
   if(!is.null(polys)) {
@@ -129,7 +139,7 @@ tpa <- function(db,
     }
     ## Add polygon names to PLOT
     db$PLOT <- db$PLOT %>%
-      left_join(select(pltSF, polyID, pltID), by = 'pltID')
+      left_join(pltSF, by = 'pltID')
 
     # Test if any polygons cross state boundaries w/ different recent inventory years (continued w/in loop)
     if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
@@ -151,19 +161,24 @@ tpa <- function(db,
   # Land type domain indicator
   if (tolower(landType) == 'forest'){
     db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1, 1, 0)
+    # Tree Type domain indicator
+    if (tolower(treeType) == 'live'){
+      db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1, 1, 0)
+    } else if (tolower(treeType) == 'gs'){
+      db$TREE$typeD <- ifelse(db$TREE$DIA >= 5 & db$TREE$STATUSCD == 1, 1, 0)
+    }
   } else if (tolower(landType) == 'timber'){
     db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
+    # Tree Type domain indicator
+    if (tolower(treeType) == 'live'){
+      db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1, 1, 0)
+    } else if (tolower(treeType) == 'gs'){
+      db$TREE$typeD <- ifelse(db$TREE$DIA >= 5 & db$TREE$STATUSCD == 1, 1, 0)
+    }
   }
-  # Tree Type domain indicator
-  if (tolower(treeType) == 'live'){
-    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1, 1, 0)
-  } else if (tolower(treeType) == 'dead'){
-    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 2 & db$TREE$STANDING_DEAD_CD == 1, 1, 0)
-  } else if (tolower(treeType) == 'gs'){
-    db$TREE$typeD <- ifelse(db$TREE$STATUSCD == 1 & db$TREE$DIA >= 5 & db$TREE$TREECLCD == 2, 1, 0)
-  } else if (tolower(treeType) == 'all'){
-    db$TREE$typeD <- 1
-  }
+
+
+
   # update spatial domain indicator
   if(!is.null(polys)){
     db$PLOT$sp <- ifelse(db$PLOT$pltID %in% pltSF$pltID, 1, 0)
@@ -193,11 +208,13 @@ tpa <- function(db,
   if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
   db$TREE$tD <- as.numeric(tD)
 
+
   ### Snag the EVALIDs that are needed
-  db$POP_EVAL<- db$POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID', 'ESTN_METHOD') %>%
-    inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
-    filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
+  db$POP_EVAL  <- db$POP_EVAL %>%
+    #left_join(ga, by = 'END_INVYR') %>%
+    select('CN', 'END_INVYR', 'EVALID', 'ESTN_METHOD', 'GROWTH_ACCT') %>%
+    left_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
+    filter(EVAL_TYP %in% c('EXPVOL')) %>%
     filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
     distinct(END_INVYR, EVALID, .keep_all = TRUE)# %>%
   #group_by(END_INVYR) %>%
@@ -206,13 +223,16 @@ tpa <- function(db,
   ## Make an annual panel ID, associated with an INVYR
 
   ### The population tables
-  pops <- select(db$POP_EVAL, c('EVALID', 'ESTN_METHOD', 'CN', 'END_INVYR', 'EVAL_TYP')) %>%
+  pops <- select(db$POP_EVAL, c('EVALID', 'ESTN_METHOD', 'CN', 'GROWTH_ACCT', 'END_INVYR', 'EVAL_TYP')) %>%
     rename(EVAL_CN = CN) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('EVAL_CN')) %>%
     rename(ESTN_UNIT_CN = CN) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'CN', 'P1POINTCNT', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MICR', "ADJ_FACTOR_MACR")), by = c('ESTN_UNIT_CN')) %>%
     rename(STRATUM_CN = CN) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN', 'INVYR', 'STATECD')), by = 'STRATUM_CN') %>%
+    ## Join on REMPER PLOTS
+    left_join(select(db$PLOT, PLT_CN, REMPER, PREV_PLT_CN, DESIGNCD, PLOT_STATUS_CD), by = 'PLT_CN') %>%
+    filter(!is.na(REMPER) & !is.na(PREV_PLT_CN) & DESIGNCD == 1 & PLOT_STATUS_CD != 3) %>%
     mutate_if(is.factor,
               as.character)
 
@@ -289,21 +309,38 @@ tpa <- function(db,
     db$TREE$sizeClass <- makeClasses(db$TREE$DIA, interval = 2, numLabs = TRUE)
     db$TREE <- db$TREE[!is.na(db$TREE$sizeClass),]
   }
+  db$TREE$htClass <- makeClasses(db$TREE$HT, interval = 5)
 
 
-  # Seperate area grouping names, (ex. TPA red oak in total land area of ingham county, rather than only area where red oak occurs)
-  if (!is.null(polys)){
-    aGrpBy <- c(grpBy[grpBy %in% names(db$PLOT) | grpBy %in% names(db$COND) | grpBy %in% names(pltSF)])
-  } else {
-    aGrpBy <- c(grpBy[grpBy %in% names(db$PLOT) | grpBy %in% names(db$COND)])
-  }
+  # # Seperate area grouping names, (ex. TPA red oak in total land area of ingham county, rather than only area where red oak occurs)
+  # if (!is.null(polys)){
+  #   aGrpBy <- c(grpBy[grpBy %in% names(db$PLOT) | grpBy %in% names(db$COND) | grpBy %in% names(pltSF)])
+  # } else {
+  #   aGrpBy <- c(grpBy[grpBy %in% names(db$PLOT) | grpBy %in% names(db$COND)])
+  # }
 
   ## Only the necessary plots for EVAL of interest
-  db$PLOT <- filter(db$PLOT, PLT_CN %in% pops$PLT_CN)
+  db$PLOT <- filter(db$PLOT, PLT_CN %in% pops$PLT_CN | PLT_CN %in% pops$PREV_PLT_CN)
+
+  ## Reduce the memory load for others
+  db <- clipFIA(db, mostRecent = FALSE)
+
+  #### Need to scale our variables globally
+  db$TREE <- db$TREE %>%
+    mutate(BAA = basalArea(DIA) * TPA_UNADJ)
+  # ## Scaling factors
+  # tpaMean <- mean(db$TREE$TPA_UNADJ, na.rm = TRUE)
+  # tpaSD <- sd(db$TREE$TPA_UNADJ, na.rm = TRUE)
+  # baaMean <- mean(db$TREE$BAA, na.rm = TRUE)
+  # baaSD <- sd(db$TREE$BAA, na.rm = TRUE)
+  # ## Apply them
+  # db$TREE <- db$TREE %>%
+  #   mutate(TPA_UNADJ = scale(TPA_UNADJ),
+  #          BAA = scale(BAA))
+
 
   ## Merging state and county codes
   plts <- split(db$PLOT, as.factor(paste(db$PLOT$COUNTYCD, db$PLOT$STATECD, sep = '_')))
-  #plts <- split(db$PLOT, as.factor(db$PLOT$STATECD))
 
   suppressWarnings({
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
@@ -314,17 +351,53 @@ tpa <- function(db,
         library(stringr)
         library(rFIA)
       })
-      out <- parLapply(cl, X = names(plts), fun = tpaHelper1, plts, db, grpBy, aGrpBy, byPlot)
+      out <- parLapply(cl, X = names(plts), fun = fsiHelper1, plts, db, grpBy, byPlot)
       #stopCluster(cl) # Keep the cluster active for the next run
     } else { # Unix systems
-      out <- mclapply(names(plts), FUN = tpaHelper1, plts, db, grpBy, aGrpBy, byPlot, mc.cores = nCores)
+      out <- mclapply(names(plts), FUN = fsiHelper1, plts, db, grpBy, byPlot, mc.cores = nCores)
     }
   })
+
 
   if (byPlot){
     ## back to dataframes
     out <- unlist(out, recursive = FALSE)
     tOut <- bind_rows(out[names(out) == 't'])
+
+    ## Standardize the changes in each state variable
+    tOut$TPA_RATE <- tOut$CHNG_TPA / sd(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
+    tOut$BAA_RATE <- tOut$CHNG_BAA / sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
+    # Compute the SI
+    x = projectPnts(tOut$TPA_RATE, tOut$BAA_RATE, 1, 0)$x
+    y = x
+    M = sqrt(x^2 + y^2)
+    tOut$SI = if_else(x < 0, -M, M)
+
+    tOut <- select(tOut, YEAR, PLT_CN, PREV_PLT_CN, grpBy[grpBy != 'YEAR'], SI, TPA_RATE, BAA_RATE, REMPER, everything())
+    # tOut <- tOut %>%
+    #   mutate(#TPA_RATE = CHNG_TPA / REMPER / abs(mean(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
+    #          #BAA_RATE = CHNG_BAA / REMPER / abs(mean(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
+    #          TPA_RATE = (scale(CHNG_TPA) +
+    #            (mean(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / sd(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE))) /
+    #            REMPER,
+    #          BAA_RATE = (scale(CHNG_BAA) +
+    #                        (mean(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / sd(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE))) /
+    #            REMPER,
+    #
+    #          x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
+    #          y = x,
+    #          M = sqrt(x^2 + y^2),
+    #          SI = if_else(x < 0, -M, M)) %>%
+    #   select(-c(x,y,M)) %>%
+
+
+    ## Save these
+    tpaRateMean <- mean(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+    baaRateMean <- mean(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+    tpaRateSD <- sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+    baaRateSD <- sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+
+
     ## Make it spatial
     if (returnSpatial){
       tOut <- tOut %>%
@@ -341,10 +414,34 @@ tpa <- function(db,
     a <- bind_rows(out[names(out) == 'a'])
     t <- bind_rows(out[names(out) == 't'])
 
+    # ## Standardize the changes in each state variable
+    # t <- t %>%
+    #   mutate(#TPA_RATE = CHNG_TPA / REMPER / abs(mean(CHNG_TPA[t$plotIn == 1], na.rm = TRUE)),
+    #          #BAA_RATE = CHNG_BAA / REMPER / abs(mean(CHNG_BAA[t$plotIn == 1], na.rm = TRUE)),
+    #          TPA_RATE = (scale(CHNG_TPA) +
+    #                        (mean(CHNG_TPA[t$plotIn == 1], na.rm = TRUE) / sd(CHNG_TPA[t$plotIn == 1], na.rm = TRUE))) /
+    #            REMPER,
+    #          BAA_RATE = (scale(CHNG_BAA) +
+    #                        (mean(CHNG_BAA[t$plotIn == 1], na.rm = TRUE) / sd(CHNG_BAA[t$plotIn == 1], na.rm = TRUE))) /
+    #            REMPER)
 
+    ## Standardize the changes in each state variable
+    t$TPA_RATE <- t$CHNG_TPA / sd(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE) / t$REMPER
+    t$BAA_RATE <- t$CHNG_BAA / sd(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE) / t$REMPER
+    # Compute the SI
+    x = projectPnts(t$TPA_RATE, t$BAA_RATE, 1, 0)$x
+    y = x
+    M = sqrt(x^2 + y^2)
+    t$SI = if_else(x < 0, -M, M)
+
+    ## Save these
+    tpaRateMean <- mean(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE)
+    baaRateMean <- mean(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE)
+    tpaRateSD <- sd(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE)
+    baaRateSD <- sd(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE)
     ## Adding YEAR to groups
     grpBy <- c('YEAR', grpBy)
-    aGrpBy <- c('YEAR', aGrpBy)
+    #aGrpBy <- c('YEAR', aGrpBy)
 
 
     ## Splitting up by ESTN_UNIT
@@ -360,17 +457,15 @@ tpa <- function(db,
         #   library(stringr)
         #   library(rFIA)
         # })
-        out <- parLapply(cl, X = names(popState), fun = tpaHelper2, popState, a, t, grpBy, aGrpBy, method)
+        out <- parLapply(cl, X = names(popState), fun = fsiHelper2, popState, a, t, grpBy, method)
         stopCluster(cl)
       } else { # Unix systems
-        out <- mclapply(names(popState), FUN = tpaHelper2, popState, a, t, grpBy, aGrpBy, method, mc.cores = nCores)
+        out <- mclapply(names(popState), FUN = fsiHelper2, popState, a, t, grpBy, method, mc.cores = nCores)
       }
     })
     ## back to dataframes
     out <- unlist(out, recursive = FALSE)
-    aEst <- bind_rows(out[names(out) == 'aEst'])
     tEst <- bind_rows(out[names(out) == 'tEst'])
-
 
     ##### ----------------- MOVING AVERAGES
     if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){
@@ -381,7 +476,7 @@ tpa <- function(db,
           group_by(ESTN_UNIT_CN) %>%
           summarize(wgt = 1 / length(unique(INVYR)))
 
-        aEst <- left_join(aEst, wgts, by = 'ESTN_UNIT_CN')
+        #aEst <- left_join(aEst, wgts, by = 'ESTN_UNIT_CN')
         tEst <- left_join(tEst, wgts, by = 'ESTN_UNIT_CN')
 
         #### ----- Linear MOVING AVERAGE
@@ -404,7 +499,7 @@ tpa <- function(db,
           ungroup() %>%
           select(ESTN_UNIT_CN, INVYR, wgt)
 
-        aEst <- left_join(aEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
+        #aEst <- left_join(aEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
         tEst <- left_join(tEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
 
         #### ----- EXPONENTIAL MOVING AVERAGE
@@ -432,7 +527,7 @@ tpa <- function(db,
             select(ESTN_UNIT_CN, INVYR, wgt)
         } else {
           grpBy <- c('lambda', grpBy)
-          aGrpBy <- c('lambda', aGrpBy)
+          #aGrpBy <- c('lambda', aGrpBy)
           ## Duplicate weights for each level of lambda
           yrWgts <- list()
           for (i in 1:length(unique(lambda))) {
@@ -453,118 +548,81 @@ tpa <- function(db,
             select(lambda, ESTN_UNIT_CN, INVYR, wgt)
         }
 
-        aEst <- left_join(aEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
+        #aEst <- left_join(aEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
         tEst <- left_join(tEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
 
       }
 
       ### Applying the weights
       # Area
-      aEst <- aEst %>%
-        mutate_at(vars(aEst), ~(.*wgt)) %>%
-        mutate_at(vars(aVar), ~(.*(wgt^2))) %>%
-        group_by(ESTN_UNIT_CN, .dots = aGrpBy) %>%
-        summarize_at(vars(aEst:plotIn_AREA), sum, na.rm = TRUE)
+      # aEst <- aEst %>%
+      #   mutate_at(vars(aEst), ~(.*wgt)) %>%
+      #   mutate_at(vars(aVar), ~(.*(wgt^2))) %>%
+      #   group_by(ESTN_UNIT_CN, .dots = aGrpBy) %>%
+      #   summarize_at(vars(aEst:plotIn_AREA), sum, na.rm = TRUE)
+
 
       tEst <- tEst %>%
-        mutate_at(vars(tEst:bTEst), ~(.*wgt)) %>%
-        mutate_at(vars(tVar:cvEst_bT), ~(.*(wgt^2))) %>%
+        mutate_at(vars(ctEst:sspEst), ~(.*wgt)) %>%
+        mutate_at(vars(ctVar:cvEst_ssp), ~(.*(wgt^2))) %>%
         group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
-        summarize_at(vars(tEst:cvEst_bT), sum, na.rm = TRUE)
+        summarize_at(vars(ctEst:plotIn_t), sum, na.rm = TRUE)
 
     }
 
+    ##---------------------  TOTALS and RATIOS
+    # Tree
+    tTotal <- tEst %>%
+      group_by(.dots = grpBy) %>%
+      summarize_all(sum,na.rm = TRUE)
 
 
 
     ##---------------------  TOTALS and RATIOS
-    # Area
-    aTotal <- aEst %>%
-      group_by(.dots = aGrpBy) %>%
-      summarize(AREA_TOTAL = sum(aEst, na.rm = TRUE),
-                aVar = sum(aVar, na.rm = TRUE),
-                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
-                nPlots_AREA = sum(plotIn_AREA, na.rm = TRUE))
-    # # Tree
-    # tTotal <- tEst %>%
-    #   group_by(.dots = grpBy) %>%
-    #   #left_join(aTotal, by = c(aGrpBy)) %>%
-    #   summarize(TREE_TOTAL = sum(tEst, na.rm = TRUE),
-    #             BA_TOTAL = sum(bEst, na.rm = TRUE),
-    #             ## Variances
-    #             treeVar = sum(tVar, na.rm = TRUE),
-    #             baVar = sum(bVar, na.rm = TRUE),
-    #             #aVar = first(aVar),
-    #             cvT = sum(cvEst_t, na.rm = TRUE),
-    #             cvB = sum(cvEst_b, na.rm = TRUE),
-    #             ## Sampling Errors
-    #             TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
-    #             BA_SE = sqrt(baVar) / BA_TOTAL * 100,
-    #             nPlots_TREE = sum(plotIn_TREE, na.rm = TRUE)) #%>%
-    tTotal <- tEst %>%
-      group_by(.dots = grpBy) %>%
-      summarize_all(sum, na.rm = TRUE) %>%
-      mutate(TREE_TOTAL = tEst,
-            BA_TOTAL = bEst,
-            ## Variances
-            treeVar = tVar,
-            baVar = bVar,
-            #aVar = first(aVar),
-            cvT = cvEst_t,
-            cvB = cvEst_b,
-            ## Sampling Errors
-            TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
-            BA_SE = sqrt(baVar) / BA_TOTAL * 100,
-            nPlots_TREE = plotIn_TREE) %>%
-      select(grpBy, TREE_TOTAL, BA_TOTAL, treeVar, baVar, cvT, cvB, TREE_SE, BA_SE, nPlots_TREE)
-
-    ## IF using polys, we treat each zone as a unique population
-    if (!is.null(polys)){
-      propGrp <- c('polyID', grpBy)
-    } else {
-      propGrp <- 'YEAR'
-    }
-    ## Hand the proportions
-    tpTotal <- tEst %>%
-      group_by(.dots = propGrp) %>%
-      summarize(TREE_TOTAL_full = sum(tTEst, na.rm = TRUE), ## Need to sum this
-                BA_TOTAL_full = sum(bTEst, na.rm = TRUE), ## Need to sum this
-                tTVar = sum(tTVar, na.rm = TRUE),
-                bTVar = sum(bTVar, na.rm = TRUE),
-                cvTT = sum(cvEst_tT, na.rm = TRUE),
-                cvBT = sum(cvEst_bT, na.rm = TRUE))
-
-
     suppressWarnings({
-      ## Bring them together
-      tTotal <- tTotal %>%
-        left_join(aTotal, by = aGrpBy) %>%
-        left_join(tpTotal, by = propGrp) %>%
-        mutate(TPA = TREE_TOTAL / AREA_TOTAL,
-               BAA = BA_TOTAL / AREA_TOTAL,
-               tpaVar = (1/AREA_TOTAL^2) * (treeVar + (TPA^2 * aVar) - 2 * TPA * cvT),
-               baaVar = (1/AREA_TOTAL^2) * (baVar + (BAA^2 * aVar) - (2 * BAA * cvB)),
-               TPA_SE = sqrt(tpaVar) / TPA * 100,
-               BAA_SE = sqrt(baaVar) / BAA * 100,
-               TPA_PERC = TREE_TOTAL / (TREE_TOTAL_full) * 100,
-               BAA_PERC = BA_TOTAL / (BA_TOTAL_full) * 100,
-               tpVar = (1/TREE_TOTAL_full^2) * (treeVar + (TPA_PERC^2 * tTVar) - 2 * TPA_PERC * cvTT),
-               bpVar = (1/BA_TOTAL_full^2) * (baVar + (BAA_PERC^2 * bTVar) - (2 * BAA_PERC * cvBT)),
-               TPA_PERC_SE = sqrt(tpVar) / TPA_PERC * 100,
-               BAA_PERC_SE = sqrt(bpVar) / BAA_PERC * 100)
+      tOut <- tTotal %>%
+        group_by(.dots = grpBy) %>%
+        summarize_all(sum,na.rm = TRUE) %>%
+        mutate(TPA_RATE = ctEst / ptEst,
+               BAA_RATE = cbEst / pbEst,
+               SI = siEst / faEst,
 
+               ## Ratio variance
+               ctVar = (1/ptEst^2) * (ctVar + (TPA_RATE^2 * ptVar) - (2 * TPA_RATE * cvEst_ct)),
+               cbVar = (1/pbEst^2) * (cbVar + (BAA_RATE^2 * pbVar) - (2 * BAA_RATE * cvEst_cb)),
+               siVar = (1/faEst^2) * (siVar + (SI^2 * faVar) - (2 * SI * cvEst_si)),
 
+               ## RATIO SE
+               TPA_RATE_SE = sqrt(ctVar) / abs(TPA_RATE) * 100,
+               BAA_RATE_SE = sqrt(cbVar) / abs(BAA_RATE) * 100,
+               SI_SE = sqrt(siVar) / abs(SI) * 100,
+               SI_VAR = siVar,
+               TPA_RATE_VAR = ctVar,
+               BAA_RATE_VAR = cbVar,
+               nPlots = plotIn_t,
+               N = nh,
+               #SI_INT1 = abs(SI) * 1.96 * SI_SE / 100,
+               SI_INT = qt(.975, df=N-1) * (sqrt(siVar)/sqrt(N))) %>%
+        mutate(SI_STATUS = case_when(
+          SI < 0 & SI + SI_INT < 0 ~ 'Decline',
+          SI < 0 & SI + SI_INT > 0 ~ 'Stable',
+          SI > 0 & SI - SI_INT > 0  ~ 'Expand',
+          TRUE ~ 'Stable'
+        ))
     })
 
 
     if (totals) {
-      tOut <- tTotal %>%
-        select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC, TREE_TOTAL, BA_TOTAL, AREA_TOTAL, TPA_SE, BAA_SE,
-               TPA_PERC_SE, BAA_PERC_SE, TREE_SE, BA_SE, AREA_TOTAL_SE, nPlots_TREE, nPlots_AREA)
+      tOut <- tOut %>%
+        select(grpBy, SI, SI_STATUS, SI_INT, TPA_RATE, BAA_RATE,
+               SI_SE, TPA_RATE_SE, BAA_RATE_SE, SI_VAR, TPA_RATE_VAR, BAA_RATE_VAR,
+               nPlots, N)
+
     } else {
-      tOut <- tTotal %>%
-        select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC,  TPA_SE, BAA_SE,
-               TPA_PERC_SE, BAA_PERC_SE, nPlots_TREE, nPlots_AREA)
+      tOut <- tOut %>%
+        select(grpBy, SI, SI_STATUS, SI_INT, TPA_RATE, BAA_RATE,
+               SI_SE, TPA_RATE_SE, BAA_RATE_SE, SI_VAR, TPA_RATE_VAR, BAA_RATE_VAR,
+               nPlots, N)
     }
 
     # Snag the names
@@ -579,7 +637,6 @@ tpa <- function(db,
     drop_na(grpBy) %>%
     arrange(YEAR) %>%
     as_tibble()
-
 
   # Return a spatial object
   if (!is.null(polys) & byPlot == FALSE) {
@@ -596,9 +653,9 @@ tpa <- function(db,
     }
 
     suppressMessages({suppressWarnings({
-      tOut <- left_join(tOut, polys) %>%
-      select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
-      filter(!is.na(polyID))})})
+      tOut <- left_join(tOut, polys, by = 'polyID') %>%
+        select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
+        filter(!is.na(polyID))})})
 
     ## Makes it horrible to work with as a dataframe
     if (returnSpatial == FALSE) tOut <- select(tOut, -c(geometry))
@@ -607,6 +664,7 @@ tpa <- function(db,
     tOut <- left_join(tOut, select(polys, -c(geometry)), by = 'polyID')
   }
 
+
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
 
@@ -614,8 +672,14 @@ tpa <- function(db,
   if (returnSpatial) tOut <- st_sf(tOut)
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) tOut <- unique(tOut)
+
+  ## Standardization factors
+  tOut$tpaRateMean <- tpaRateMean
+  tOut$baaRateMean <- baaRateMean
+  tOut$tpaRateSD <- tpaRateSD
+  tOut$baaRateSD <- baaRateSD
+
+
   return(tOut)
+
 }
-
-
-
