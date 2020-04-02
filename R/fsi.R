@@ -432,9 +432,6 @@ fsi <- function(db,
     t <- bind_rows(out[names(out) == 't'])
 
     # ## Standardize the changes in each state variable AT THE PLOT LEVEL
-
-
-
     if (scaleGCB){
       tpaRateSD <- 29.86784
       baaRateSD <-  0.1498109

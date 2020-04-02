@@ -714,7 +714,11 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 PREV_BAA = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE), 0),
                 CHNG_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE), 0),
                 #CHNG_BAA = if_else(nLive >= minLive, sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE), 0),
-                CHNG_BAA = if_else(nLive >= minLive, mean((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE), 0),
+                #CHNG_BAA = if_else(nLive >= minLive, mean((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE), 0),
+                CHNG_BAA = sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
+                #CHNG_BAA1 = sum((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE),
+               # plotIn = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0),
+                n = length(unique(TRE_CN[tDI == 1])),
                 #CURR_TPA = PREV_TPA + CHNG_TPA,
                 #CURR_BAA = PREV_BAA + CHNG_BAA,
                 #TPA_RATE = (CHNG_TPA / REMPER) / (PREV_TPA + CURR_TPA) * 2,
@@ -865,20 +869,39 @@ siHelper2 <- function(x, popState, a, t, grpBy, method){
               S_struct = first(S_struct),
               H_species = first(H_species),
               Eh_species = first(Eh_species),
-              S_species = first(S_species)) %>%
-    ## Do not want to compute SI for micro and subp seperately, handle it here
-    mutate(CURR_TPA = ptPlot + (ctPlot * REMPER),
-           CURR_BAA = pbPlot + (cbPlot * REMPER),
-           TPA_RATE = ctPlot, #/ (CURR_TPA + ptPlot) * 2,
-           BAA_RATE = cbPlot, #/ (CURR_BAA + pbPlot) * 2,
-           x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
-           #y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
-           siPlot = sqrt(x^2 + x^2),
-           siPlot = if_else(x < 0, -siPlot, siPlot),
-           siPlot = case_when(
-             is.na(siPlot) ~ 0,
-             TRUE ~ siPlot,
-           )) %>%
+              S_species = first(S_species),
+              ## Summing change across subp and micr
+              TPA_RATE = sum(TPA_RATE, na.rm = TRUE),
+              BAA_RATE = sum(BAA_RATE, na.rm = TRUE),
+              ## Total unique number of trees
+              n = sum(n, na.rm = TRUE)) %>%
+    # ## Do not want to compute SI for micro and subp seperately, handle it here
+    # mutate(CURR_TPA = ptPlot + (ctPlot * REMPER),
+    #        CURR_BAA = pbPlot + (cbPlot * REMPER),
+    #        TPA_RATE = ctPlot, #/ (CURR_TPA + ptPlot) * 2,
+    #        BAA_RATE = cbPlot, #/ (CURR_BAA + pbPlot) * 2,
+    #        x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
+    #        #y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
+    #        siPlot = sqrt(x^2 + x^2),
+    #        siPlot = if_else(x < 0, -siPlot, siPlot),
+    #        siPlot = case_when(
+    #          is.na(siPlot) ~ 0,
+    #          TRUE ~ siPlot,
+    #        )) %>%
+  ## Do not want to compute SI for micro and subp seperately, handle it here
+  mutate(TPA_RATE = TPA_RATE / REMPER,
+         BAA_RATE = BAA_RATE / REMPER / n,
+         #CURR_TPA = ptPlot + (ctPlot * REMPER),
+         #CURR_BAA = pbPlot + (cbPlot * REMPER),
+         #TPA_RATE = ctPlot, #/ (CURR_TPA + ptPlot) * 2,
+         #BAA_RATE = cbPlot, #/ (CURR_BAA + pbPlot) * 2,
+         x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
+         #y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
+         siPlot = sqrt(x^2 + x^2),
+         siPlot = if_else(x < 0, -siPlot, siPlot),
+         siPlot = case_when(
+           is.na(siPlot) ~ 0,
+           TRUE ~ siPlot)) %>%
 
     left_join(select(aAdj, PLT_CN, grpBy, fa, DROUGHT_SEV, WET_SEV, ALL_SEV, GROW_DROUGHT_SEV, GROW_WET_SEV, GROW_ALL_SEV,
                      VPD_ANOM, TMAX_ANOM, TMEAN_ANOM, GROW_VPD_ANOM, GROW_TMAX_ANOM, GROW_TMEAN_ANOM, ELEV), by = c('PLT_CN', grpBy)) %>%

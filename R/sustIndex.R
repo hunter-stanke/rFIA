@@ -736,6 +736,7 @@ si <- function(db,
                areaDomain = NULL,
                totals = TRUE,
                byPlot = FALSE,
+               scaleGCB = TRUE,
                nCores = 1) {
 
   if (!('grow_drought_sev' %in% names(db$PLOT))){
@@ -1092,17 +1093,17 @@ si <- function(db,
     out <- unlist(out, recursive = FALSE)
     tOut <- bind_rows(out[names(out) == 't'])
 
-    ## Standardize the changes in each state variable
-    tOut$TPA_RATE <- tOut$CHNG_TPA / sd(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
-    tOut$BAA_RATE <- tOut$CHNG_BAA / sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
-    # Compute the SI
-    x = projectPnts(tOut$TPA_RATE, tOut$BAA_RATE, 1, 0)$x
-    y = x
-    M = sqrt(x^2 + y^2)
-    tOut$SI = if_else(x < 0, -M, M)
-
-    tOut <- select(tOut, YEAR, PLT_CN, PREV_PLT_CN, REMPER, grpBy[grpBy != 'YEAR'], SI, TPA_RATE, BAA_RATE, everything())
-    # tOut <- tOut %>%
+    # ## Standardize the changes in each state variable
+    # tOut$TPA_RATE <- tOut$CHNG_TPA / sd(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
+    # tOut$BAA_RATE <- tOut$CHNG_BAA / sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
+    # # Compute the SI
+    # x = projectPnts(tOut$TPA_RATE, tOut$BAA_RATE, 1, 0)$x
+    # y = x
+    # M = sqrt(x^2 + y^2)
+    # tOut$SI = if_else(x < 0, -M, M)
+    #
+    # tOut <- select(tOut, YEAR, PLT_CN, PREV_PLT_CN, REMPER, grpBy[grpBy != 'YEAR'], SI, TPA_RATE, BAA_RATE, everything())
+    # # tOut <- tOut %>%
     #   mutate(#TPA_RATE = CHNG_TPA / REMPER / abs(mean(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
     #          #BAA_RATE = CHNG_BAA / REMPER / abs(mean(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
     #          TPA_RATE = (scale(CHNG_TPA) +
@@ -1117,6 +1118,25 @@ si <- function(db,
     #          M = sqrt(x^2 + y^2),
     #          SI = if_else(x < 0, -M, M)) %>%
     #   select(-c(x,y,M)) %>%
+
+    ## Should scaling be consistent with GCB paper?
+    if (scaleGCB){
+      tpaRateSD <- 29.86784
+      baaRateSD <-  0.1498109
+
+      ## Standardize the changes in each state variable
+      tOut$TPA_RATE <- tOut$CHNG_TPA / tpaRateSD / tOut$REMPER
+      tOut$BAA_RATE <- tOut$CHNG_BAA / baaRateSD / tOut$REMPER
+
+    } else {
+
+      ## Standardize the changes in each state variable
+      tOut$TPA_RATE <- tOut$CHNG_TPA / sd(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
+      tOut$BAA_RATE <- tOut$CHNG_BAA / sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / tOut$REMPER
+
+      tpaRateSD <- sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+      baaRateSD <- sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+    }
 
 
     ## Save these
@@ -1154,20 +1174,50 @@ si <- function(db,
     #                        (mean(CHNG_BAA[t$plotIn == 1], na.rm = TRUE) / sd(CHNG_BAA[t$plotIn == 1], na.rm = TRUE))) /
     #            REMPER)
 
-    ## Standardize the changes in each state variable
-    t$TPA_RATE <- t$CHNG_TPA / sd(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE) / t$REMPER
-    t$BAA_RATE <- t$CHNG_BAA / sd(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE) / t$REMPER
-    # Compute the SI
-    x = projectPnts(t$TPA_RATE, t$BAA_RATE, 1, 0)$x
-    y = x
-    M = sqrt(x^2 + y^2)
-    t$SI = if_else(x < 0, -M, M)
+    # ## Standardize the changes in each state variable
+    # t$TPA_RATE <- t$CHNG_TPA / sd(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE) / t$REMPER
+    # t$BAA_RATE <- t$CHNG_BAA / sd(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE) / t$REMPER
+    # # Compute the SI
+    # x = projectPnts(t$TPA_RATE, t$BAA_RATE, 1, 0)$x
+    # y = x
+    # M = sqrt(x^2 + y^2)
+    # t$SI = if_else(x < 0, -M, M)
+    #
+    # ## Save these
+    # tpaRateMean <- mean(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE)
+    # baaRateMean <- mean(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE)
+    # tpaRateSD <- sd(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE)
+    # baaRateSD <- sd(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE)
 
-    ## Save these
-    tpaRateMean <- mean(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE)
-    baaRateMean <- mean(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE)
-    tpaRateSD <- sd(t$CHNG_TPA[t$plotIn == 1], na.rm = TRUE)
-    baaRateSD <- sd(t$CHNG_BAA[t$plotIn == 1], na.rm = TRUE)
+    # ## Standardize the changes in each state variable AT THE PLOT LEVEL
+    if (scaleGCB){
+      tpaRateSD <- 29.86784
+      baaRateSD <-  0.1498109
+
+      ## Standardize the changes in each state variable
+      t$TPA_RATE <- t$CHNG_TPA / tpaRateSD
+      t$BAA_RATE <- t$CHNG_BAA / baaRateSD
+
+    } else {
+      ### CANNOT USE vectors as they are to compute SD, because of PLOT_BASIS issues
+      ### SD is unnessarily high --> plot level first
+      pltRates <- t %>%
+        ungroup() %>%
+        select(PLT_CN, CHNG_TPA, CHNG_BAA, REMPER, n, plotIn, grpBy) %>%
+        group_by(PLT_CN, plotIn) %>%
+        summarize(t = sum(CHNG_TPA / REMPER, na.rm = TRUE),
+                  n = sum(n, na.rm = TRUE),
+                  b = sum(CHNG_BAA / REMPER, na.rm = TRUE) / n)
+      tpaRateSD <- sd(pltRates$t[pltRates$plotIn == 1], na.rm = TRUE)
+      baaRateSD <- sd(pltRates$b[pltRates$plotIn == 1], na.rm = TRUE)
+
+
+      ## Standardize the changes in each state variable
+      t$TPA_RATE <- t$CHNG_TPA / tpaRateSD
+      t$BAA_RATE <- t$CHNG_BAA / baaRateSD
+    }
+
+
     ## Adding YEAR to groups
     grpBy <- c('YEAR', grpBy)
     #aGrpBy <- c('YEAR', aGrpBy)
@@ -1574,8 +1624,8 @@ si <- function(db,
   if (byPlot) tOut <- unique(tOut)
 
   ## Standardization factors
-  tOut$tpaRateMean <- tpaRateMean
-  tOut$baaRateMean <- baaRateMean
+  #tOut$tpaRateMean <- tpaRateMean
+  #tOut$baaRateMean <- baaRateMean
   tOut$tpaRateSD <- tpaRateSD
   tOut$baaRateSD <- baaRateSD
 
