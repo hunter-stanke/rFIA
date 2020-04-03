@@ -181,6 +181,20 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'cvEst_bgrow', 'cvEst_bmort', 'cvEst_brecr', 'cvEst_elev', 'cvEst_tmort',
                          'cvEst_trecr', 'cvStrat_bgrow', 'cvStrat_bmort', 'cvStrat_brecr', 'cvStrat_elev',
                          'cvStrat_tmort', 'cvStrat_trecr', 'elevEst', 'elevStrat', 'elevVar', 'elevv', 'tmort',
-                         'tmortEst', 'tmortStrat', 'tmortVar', 'tmortv', 'trecr', 'trecrEst', 'trecrStrat'
+                         'tmortEst', 'tmortStrat', 'tmortVar', 'tmortv', 'trecr', 'trecrEst', 'trecrStrat',
+                         'ALSTK', 'BAA_RATE_VAR', 'ELEV', 'ELEV_SE', 'Eh_a_species', 'Eh_a_species_SE',
+                         'Eh_a_struct', 'Eh_a_struct_SE', 'Eh_b_species', 'Eh_b_struct', 'Eh_g_species',
+                         'Eh_g_struct', 'Eh_species', 'Eh_struct', 'H_a_species', 'H_a_species_SE',
+                         'H_a_struct', 'H_a_struct_SE', 'H_b_species', 'H_b_struct', 'H_g_species',
+                         'H_g_struct', 'H_species', 'H_struct', 'N', 'SI_VAR', 'SPCD1', 'SPCD2', 'STOCKING',
+                         'STOCKING_SE', 'S_a_species', 'S_a_species_SE', 'S_a_struct', 'S_a_struct_SE',
+                         'S_b_species', 'S_b_struct', 'S_g_species', 'S_g_struct', 'S_species', 'S_struct',
+                         'TPA_RATE_VAR', 'baaMean', 'baaSD', 'cvEst_esp', 'cvEst_est', 'cvEst_hsp', 'cvEst_hst',
+                         'cvEst_ssp', 'cvEst_sst', 'cvEst_stk', 'cvStrat_esp', 'cvStrat_est', 'cvStrat_hsp',
+                         'cvStrat_hst', 'cvStrat_ssp', 'cvStrat_sst', 'cvStrat_stk', 'espEst', 'espStrat',
+                         'espVar', 'espv', 'estEst', 'estStrat', 'estVar', 'estv', 'hspEst', 'hspStrat', 'hspVar', 'hspv',
+                         'hstEst', 'hstStrat', 'hstVar', 'hstv', 'htClass', 'minLive', 'nTotal', 'qt', 'sd', 'sspEst',
+                         'sspStrat', 'sspVar', 'sspv', 'sstEst', 'sstStrat', 'sstVar', 'sstv', 'stkEst', 'stkStrat',
+                         'stkVar', 'stkv', 'tpaMean', 'tpaSD', 'trecrVar', 'trecrv', 'ymax', 'ymin'
 
 ))

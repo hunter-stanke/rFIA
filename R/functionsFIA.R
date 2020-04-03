@@ -1173,9 +1173,12 @@ clipFIA <- function(db,
        filter(!is.na(LAT) & !is.na(LON)) %>%
        distinct(pltID, .keep_all = TRUE)
      coordinates(pltSF) <- ~LON+LAT
-     proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-     pltSF <- as(pltSF, 'sf') %>%
-       st_transform(crs = st_crs(mask)$proj4string)
+     #proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
+     #pltSF <- as(pltSF, 'sf') %>%
+     #   st_transform(crs = st_crs(mask)$proj4string)
+     pltSF <- as(pltSF, 'sf')
+     st_crs(pltSF) <- 4326 #%>%
+     pltSF <- st_transform(pltSF, crs = st_crs(mask))
 
      ## Split up polys
      polyList <- split(mask, as.factor(mask$polyID))
