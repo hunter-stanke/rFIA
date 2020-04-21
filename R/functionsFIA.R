@@ -1127,14 +1127,27 @@ clipFIA <- function(db,
       filter(EVALID %in% mrids)
     })
 
+    # Write out evalids so that we don't have to repeat above later
+    evalid <- unique(tempData$EVALID)
+
+    # # Extract appropriate PLOTS
+    # PPLOT <- db$PLOT[db$PLOT$CN %in% tempData$PREV_PLT_CN,]
+    # if (nrow(PPLOT) < 1) PPLOT <- NULL
+    # db$PLOT <- db$PLOT[db$PLOT$CN %in% tempData$PLT_CN,]
+    # #test = db$PLOT <- db$PLOT[db$PLOT$CN %in% tempData$PLT_CN,]
+
     # Extract appropriate PLOTS
     PPLOT <- db$PLOT[db$PLOT$CN %in% tempData$PREV_PLT_CN,]
-    if (nrow(PPLOT) < 1) PPLOT <- NULL
+    if (nrow(PPLOT) < 1) {
+      PPLOT <- NULL
+    } else {
+      ## Cutting duplicates
+      PPLOT <- PPLOT %>%
+        filter(!(PLT_CN %in% tempData$PLT_CN))
+    }
     db$PLOT <- db$PLOT[db$PLOT$CN %in% tempData$PLT_CN,]
     #test = db$PLOT <- db$PLOT[db$PLOT$CN %in% tempData$PLT_CN,]
 
-    # Write out evalids sot aht we don't have to repeat above later
-    evalid <- unique(tempData$EVALID)
 
     ## If not most recent, but still want matching evals, go for it.
     } else if (matchEval){
@@ -1190,6 +1203,7 @@ clipFIA <- function(db,
            library(dplyr)
            library(stringr)
            library(rFIA)
+           #library(sf)
          })
          out <- parLapply(cl, X = names(polyList), fun = areal_par, pltSF, polyList)
          #stopCluster(cl) # Keep the cluster active for the next run
@@ -1201,7 +1215,8 @@ clipFIA <- function(db,
      pltSF <- bind_rows(out) %>%
        left_join(select(db$PLOT, PLT_CN, PREV_PLT_CN, pltID), by = 'pltID')
 
-     if(mostRecent == FALSE & is.null(evalid)) PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PREV_PLT_CN)
+     #if(mostRecent == FALSE & is.null(evalid)) PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PREV_PLT_CN)
+     if(mostRecent == FALSE & is.null(evalid)) PPLOT <- NULL
      db$PLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PLT_CN)
 
     #  ###OLD
