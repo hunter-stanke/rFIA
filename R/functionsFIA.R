@@ -1203,7 +1203,7 @@ clipFIA <- function(db,
            library(dplyr)
            library(stringr)
            library(rFIA)
-           #library(sf)
+           library(sf)
          })
          out <- parLapply(cl, X = names(polyList), fun = areal_par, pltSF, polyList)
          #stopCluster(cl) # Keep the cluster active for the next run
@@ -1216,7 +1216,11 @@ clipFIA <- function(db,
        left_join(select(db$PLOT, PLT_CN, PREV_PLT_CN, pltID), by = 'pltID')
 
      #if(mostRecent == FALSE & is.null(evalid)) PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PREV_PLT_CN)
-     if(mostRecent == FALSE & is.null(evalid)) PPLOT <- NULL
+     if(mostRecent == FALSE & is.null(evalid)) {
+       PPLOT <- NULL
+     } else {
+       PPLOT <- filter(PPLOT, pltID %in% pltSF$pltID)
+     }
      db$PLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PLT_CN)
 
     #  ###OLD
