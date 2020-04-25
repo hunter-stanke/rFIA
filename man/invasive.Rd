@@ -94,13 +94,13 @@ fiaRI_mr <- clipFIA(fiaRI)
 invasive(db = fiaRI_mr,
     landType = 'forest')
 
+\donttest{
 ## Same as above, but implemented in parallel (much quicker)
 parallel::detectCores(logical = FALSE) # 4 cores available, we will take 2
 invasive(db = fiaRI_mr,
          landType = 'forest',
          nCores = 2)
 
-\donttest{
 ## Most recent estimates grouped by stand age on forest land
 # Make a categorical variable which represents stand age (grouped by 10 yr intervals)
 fiaRI_mr$COND$STAND_AGE <- makeClasses(fiaRI_mr$COND$STDAGE, interval = 10)

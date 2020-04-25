@@ -195,6 +195,6 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'espVar', 'espv', 'estEst', 'estStrat', 'estVar', 'estv', 'hspEst', 'hspStrat', 'hspVar', 'hspv',
                          'hstEst', 'hstStrat', 'hstVar', 'hstv', 'htClass', 'minLive', 'nTotal', 'qt', 'sd', 'sspEst',
                          'sspStrat', 'sspVar', 'sspv', 'sstEst', 'sstStrat', 'sstVar', 'sstv', 'stkEst', 'stkStrat',
-                         'stkVar', 'stkv', 'tpaMean', 'tpaSD', 'trecrVar', 'trecrv', 'ymax', 'ymin'
+                         'stkVar', 'stkv', 'tpaMean', 'tpaSD', 'trecrVar', 'trecrv', 'ymax', 'ymin', 'EVAL_DESCR'
 
 ))

@@ -115,13 +115,13 @@ diversity(db = fiaRI_mr,
           landType = 'forest',
           treeType = 'live')
 
+\donttest{
 ## Most recent estimates grouped by stand age on forest land
 # Make a categorical variable which represents stand age (grouped by 10 yr intervals)
 fiaRI_mr$COND$STAND_AGE <- makeClasses(fiaRI_mr$COND$STDAGE, interval = 10)
 diversity(db = fiaRI_mr,
           grpBy = STAND_AGE)
 
-\donttest{
 ## Estimates for live white pine ( > 12" DBH) on forested mesic sites (all available inventories)
 diversity(fiaRI,
           treeType = 'live',

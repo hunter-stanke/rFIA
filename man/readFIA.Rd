@@ -56,14 +56,26 @@ Alternatively, use \code{\link{getFIA}} to automate the download, reading, and s
 
 
 \examples{
+\donttest{
+## The following examples shows how you
+## can take an existing in-memory FIA.Datbase,
+## save it, and read it back in!
 
-## First we write the 'fiaRI' object to a temporary directory
-## Replace temp_dir with the path to your directory (where data will be saved)
-temp_dir = tempdir()
-writeFIA(fiaRI, dir = temp_dir)
+
+## First download the common tables for Rhode Island,
+## load into R, but don't save it anywhere yet
+db <- getFIA(states = 'RI')
+
+## Now we write it all out
+## Replace tempdir() with the path to your
+## directory (where data will be saved)
+writeFIA(db, dir = tempdir())
+}
+\dontrun{
 
 ## Then read it back in with readFIA
-db <- readFIA(dir = temp_dir)
+db <- readFIA(dir = tempdir())
+}
 
 }
 

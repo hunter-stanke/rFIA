@@ -1138,12 +1138,11 @@ si <- function(db,
       baaRateSD <- sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
     }
 
-
-    ## Save these
-    tpaRateMean <- mean(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
-    baaRateMean <- mean(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
-    tpaRateSD <- sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
-    baaRateSD <- sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+    ## Compute the SI
+    x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x
+    M = sqrt(x^2 + x^2)
+    tOut$SI = if_else(x < 0, -M, M)
+    tOut <- select(tOut, grpBy, SI, TPA_RATE, BAA_RATE, everything())
 
 
     ## Make it spatial

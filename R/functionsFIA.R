@@ -1024,7 +1024,8 @@ findEVALID <- function(db = NULL,
   #### REWRITING FOR SIMPLICITY #####
   # Joing w/ evaltype code
   ids <- db$POP_EVAL %>%
-    left_join(select(db$POP_EVAL_TYP, c('EVAL_GRP_CN', 'EVAL_TYP')), by = 'EVAL_GRP_CN')
+    left_join(select(db$POP_EVAL_TYP, c('EVAL_GRP_CN', 'EVAL_TYP')), by = 'EVAL_GRP_CN') %>%
+    mutate(place = str_to_upper(LOCATION_NM))
 
   if (!is.null(state)){
     state <- str_to_upper(state)
@@ -1046,19 +1047,56 @@ findEVALID <- function(db = NULL,
     ids <- filter(ids, EVAL_TYP %in% paste0('EXP', type))
   }
   if (mostRecent) {
+
     ## Grouped filter wasn't working as intended, use filtering join
     maxYear <- ids %>%
+      ## Remove TX, do it seperately
+      filter(!(STATECD %in% 48)) %>%
       mutate(place = str_to_upper(LOCATION_NM)) %>%
       group_by(place, EVAL_TYP) %>%
       summarize(END_INVYR = max(END_INVYR, na.rm = TRUE),
                 LOCATION_NM = first(LOCATION_NM))
-      #filter(END_INVYR == max(END_INVYR, na.rm = TRUE))
 
-    ids <- ids %>%
-      mutate(place = str_to_upper(LOCATION_NM)) %>%
-      ### TEXAS IS REALLY ANNOYING LIKE THIS
-      ### FOR NOW, ONLY THE ENTIRE STATE
-      filter(place %in% c('TEXAS(EAST)', 'TEXAS(WEST)') == FALSE)
+    ## Texas coding standards are very bad
+    ## Name two different inventory units with 5 different names
+    ## Due to that, only use inventories for the ENTIRE state, sorry
+    if (any(ids$STATECD %in% 48)){
+      # evalType <- c('EXP_ALL', 'EXP_VOL', '')
+      # evalCode <- c('00', '01', '03', '07', '09', '29')
+      #
+      # txIDS <- ids %>%
+      #   filter(STATECD %in% 48) %>%
+      #   # ## Removing any inventory that references east or west, sorry
+      #   # filter(str_detect(str_to_upper(EVAL_DESCR), 'EAST', negate = TRUE) &
+      #   #          str_detect(str_to_upper(EVAL_DESCR), 'WEST', negate = TRUE)) %>%
+      #   mutate(typeCode = str_sub(str_trim(EVALID), -2, -1))
+      #
+      #   mutate(place = str_to_upper(LOCATION_NM)) %>%
+      #   group_by(place, EVAL_TYP) %>%
+      #   summarize(END_INVYR = max(END_INVYR, na.rm = TRUE),
+      #             LOCATION_NM = first(LOCATION_NM))
+
+      ## Will require manual updates, fix your shit texas
+      txIDS <- ids %>%
+        filter(STATECD %in% 48) %>%
+        filter(END_INVYR < 2017) %>%
+        filter(END_INVYR > 2006) %>%
+        ## Removing any inventory that references east or west, sorry
+        filter(str_detect(str_to_upper(EVAL_DESCR), 'EAST', negate = TRUE) &
+                 str_detect(str_to_upper(EVAL_DESCR), 'WEST', negate = TRUE)) %>%
+        mutate(place = str_to_upper(LOCATION_NM)) %>%
+        group_by(place, EVAL_TYP) %>%
+        summarize(END_INVYR = max(END_INVYR, na.rm = TRUE),
+                  LOCATION_NM = first(LOCATION_NM))
+
+      maxYear <- bind_rows(maxYear, txIDS)
+    }
+
+    # ids <- ids %>%
+    #   mutate(place = str_to_upper(LOCATION_NM)) %>%
+    #   ### TEXAS IS REALLY ANNOYING LIKE THIS
+    #   ### FOR NOW, ONLY THE ENTIRE STATE
+    #   filter(place %in% c('TEXAS(EAST)', 'TEXAS(WEST)') == FALSE)
 
 
     ids <- left_join(maxYear, select(ids, c('place', 'EVAL_TYP', 'END_INVYR', 'EVALID')), by = c('place', 'EVAL_TYP', 'END_INVYR'))

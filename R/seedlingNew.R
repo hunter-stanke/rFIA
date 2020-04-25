@@ -77,6 +77,19 @@ seedling <- function(db,
   }
 
 
+  ### DEAL WITH TEXAS
+  if (any(db$POP_EVAL$STATECD %in% 48)){
+    ## Will require manual updates, fix your shit texas
+    txIDS <- db$POP_EVAL %>%
+      filter(STATECD %in% 48) %>%
+      filter(END_INVYR < 2017) %>%
+      filter(END_INVYR > 2006) %>%
+      ## Removing any inventory that references east or west, sorry
+      filter(str_detect(str_to_upper(EVAL_DESCR), 'EAST', negate = TRUE) &
+               str_detect(str_to_upper(EVAL_DESCR), 'WEST', negate = TRUE))
+    db$POP_EVAL <- bind_rows(filter(db$POP_EVAL, !(STATECD %in% 48)), txIDS)
+  }
+
 
   ### AREAL SUMMARY PREP
   if(!is.null(polys)) {
