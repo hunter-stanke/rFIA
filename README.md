@@ -1,17 +1,27 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# rFIA: Unlocking the FIA Database in R <a href='https://rfia.netlify.app'><img src='man/figures/logo.png' align="right" height="139" /></a>
+# rFIA: Unlocking the FIA Database in R <a href='https://rfia.netlify.app'><img src='man/figures/logo.PNG' align="right" height="139" /></a>
 
 <!-- badges: start -->
 
-[![CRAN
-status](https://www.r-pkg.org/badges/version/rFIA)](https://cran.r-project.org/package=rFIA)
-[![](https://cranlogs.r-pkg.org/badges/grand-total/rFIA)](https://cran.r-project.org/package=rFIA)
-[![Travis build
-status](https://travis-ci.org/hunter-stanke/rFIA.svg?branch=master)](https://travis-ci.org/hunter-stanke/rFIA)
-[![Lifecycle:
-maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing)
+[![](https://www.r-pkg.org/badges/version/rFIA?color=green)](https://cran.r-project.org/package=rFIA)
+[![](https://img.shields.io/badge/Cite%20rFIA!-in%20EMS-yellow.svg)](https://www.sciencedirect.com/science/article/abs/pii/S1364815219311089)
+[![](http://cranlogs.r-pkg.org/badges/last-month/rFIA?color=blue)](https://cran.r-project.org/package=rFIA)
+[![](https://travis-ci.org/hunter-stanke/rFIA.svg?branch=master)](https://travis-ci.org/hunter-stanke/rFIA)
+
+<!-- [![](https://img.shields.io/badge/Cite%20rFIA!-in%20EMS-yellow.svg)](https://www.sciencedirect.com/science/article/abs/pii/S1364815219311089) -->
+
+<!-- [![CRAN status](https://www.r-pkg.org/badges/version/rFIA)](https://cran.r-project.org/package=rFIA) -->
+
+<!-- [![](https://cranlogs.r-pkg.org/badges/grand-total/rFIA)](https://cran.r-project.org/package=rFIA) -->
+
+<!-- [![](http://cranlogs.r-pkg.org/badges/last-month/rFIA?color=green)](https://cran.r-project.org/package=rFIA) -->
+
+<!-- [![Travis build status](https://travis-ci.org/hunter-stanke/rFIA.svg?branch=master)](https://travis-ci.org/hunter-stanke/rFIA) -->
+
+<!-- [![Lifecycle: maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing) -->
+
 <!-- badges: end -->
 
 ![US Biomass](man/figures/usBiomass.png)
@@ -153,7 +163,7 @@ plotFIA(tpaRI, BAA, se = TRUE,
         plot.title = 'Basal area per acre in Rhode Island over time')
 ```
 
-<img src="man/figures/README-unnamed-chunk-4-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-5-1.png" width="100%" />
 
 **What if I want to group estimates by species? How about by size
 class?**
@@ -193,7 +203,7 @@ plotFIA(tpaRI_spsc, BAA, grp = COMMON_NAME, x = sizeClass,
         n.max = 5) # Only want the top 5 species, try n.max = -5 for bottom 5
 ```
 
-<img src="man/figures/README-unnamed-chunk-5-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-6-1.png" width="100%" />
 
 **What if I want estimates for a specific type of tree (ex. greater than
 12-inches DBH and in a canopy dominant or subdominant position) in
@@ -238,7 +248,7 @@ tpaRI_counties <- tpa(fiaRI_MR, polys = countiesRI, returnSpatial = TRUE)
 plotFIA(tpaRI_counties, BAA) # Plotting method for spatial FIA summaries, also try 'TPA' or 'TPA_PERC'
 ```
 
-<img src="man/figures/README-unnamed-chunk-7-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-8-1.png" width="100%" />
 
 **We produced a really cool time series earlier, how would I marry the
 spatial and temporal capacity of `rFIA` to produce estimates across
