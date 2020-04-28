@@ -14,7 +14,7 @@ knitr::opts_chunk$set(
 #usethis::use_lifecycle_badge('maturing')
 
 ```
-# rFIA: Unlocking the FIA Database in R
+# rFIA: Unlocking the FIA Database in R <a href='https://rfia.netlify.app'><img src='man/figures/logo.png' align="right" height="139" /></a>
 
 <!-- badges: start -->
 [![CRAN status](https://www.r-pkg.org/badges/version/rFIA)](https://cran.r-project.org/package=rFIA)
@@ -99,7 +99,7 @@ db <- readFIA('/path/to/your/directory/')
 Now that you have loaded your FIA data into R, it's time to put it to work. Let's explore the basic functionality of `rFIA` with `tpa`, a function to compute tree abundance estimates (TPA, BAA, & relative abundance) from FIA data, and `fiaRI`, a subset of the FIA Database for Rhode Island including inventories from 2013-2018. 
 
 **Estimate the abundance of live trees in Rhode Island:**
-```{r warning= FALSE, message=FALSE, fig.width=6, fig.height=3.5}
+```{r warning= FALSE, message=FALSE, fig.width=5, fig.height=2.5}
 library(rFIA)
 ## Load the Rhode Island subset of the FIADB (included w/ rFIA)
 ## NOTE: This object can be produced using getFIA and/or readFIA
