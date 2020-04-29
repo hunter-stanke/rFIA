@@ -609,8 +609,8 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 PREV_BAA = if_else(nLive >= minLive, sum(-BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
                 PREV_TPA = if_else(nLive >= minLive, sum(-TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), 0),
                 CHNG_TPA = if_else(nLive >= minLive, sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE), 0),
-                #CHNG_BAA = if_else(nLive >= minLive, sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE), 0),
-                CHNG_BAA = if_else(nLive >= minLive, mean((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE), 0),
+                CHNG_BAA = if_else(nLive >= minLive, sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE), 0),
+                #CHNG_BAA = if_else(nLive >= minLive, mean((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE), 0),
                 CURR_TPA = PREV_TPA + CHNG_TPA,
                 CURR_BAA = PREV_BAA + CHNG_BAA,
                 #TPA_RATE = (CHNG_TPA / REMPER),
@@ -644,7 +644,10 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
                 #y = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$y,
                 #M = sqrt(x^2 + y^2),
                 #SI = if_else(x < 0, -M, M),
-                nStems = length(which(tDI == 1))) %>%
+                nStems = length(which(tDI == 1)),
+                n = length(unique(TRE_CN[tDI == 1]))) %>%
+      ## Then divide by number of unique stems for an average
+      mutate(CHNG_BAA = CHNG_BAA / n) %>%
       ungroup() %>%
       left_join(div, by = c('PLT_CN', grpP, grpC)) %>%
       select(PLT_CN, PREV_PLT_CN, REMPER, grpBy, #SI, TPA_RATE, BAA_RATE,

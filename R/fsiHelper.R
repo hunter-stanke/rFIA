@@ -123,11 +123,16 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
                 PREV_TPA = sum(-TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
                 CHNG_TPA = sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
                 #CHNG_BAA = sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
-                CHNG_BAA = mean((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE),
+                #CHNG_BAA = mean((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE),
+                ## Sum here to avoid issues w/ zeros
+                CHNG_BAA = sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
                 CURR_TPA = PREV_TPA + CHNG_TPA,
                 CURR_BAA = PREV_BAA + CHNG_BAA,
                 #DIFF_BAA = mean((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE),
-                nStems = length(which(tDI == 1))) %>%
+                nStems = length(which(tDI == 1)),
+                n = length(unique(TRE_CN[tDI == 1]))) %>%
+      ## Then divide by number of unique stems for an average
+      mutate(CHNG_BAA = CHNG_BAA / n) %>%
       ungroup() %>%
       select(PLT_CN, PREV_PLT_CN, REMPER, grpBy,
              PREV_TPA, PREV_BAA, CHNG_TPA, CHNG_BAA, CURR_TPA, CURR_BAA,
