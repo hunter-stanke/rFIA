@@ -46,6 +46,11 @@ The goal of `rFIA` is to increase the accessibility and use of the USFS Forest I
 
 Specifically, `rFIA` improves accessibility to the spatio-temporal estimation capacity of the FIA Database by producing space-time indexed summaries of forest variables within user-defined population boundaries. Direct integration with other popular R packages (e.g., dplyr, sp, and sf) facilitates efficient space-time query and data summary, and supports common data representations and API design. The package implements design-based estimation procedures outlined by Bechtold & Patterson (2005), and has been validated against estimates and sampling errors produced by EVALIDator. Current development is focused on the implementation of spatially-enabled model-assisted estimators to improve population, change, and ratio estimates.
 
+For more information and example usage of `rFIA`, check out our [website](https://rfia.netlify.app/). To report a bug or suggest additions to `rFIA`, please use our [active issues](https://github.com/hunter-stanke/rFIA/issues) page here on GitHub, or contact [Hunter Stanke](https://hunter-stanke.com/) (lead developer and maintainer). 
+
+_**To cite**_ `rFIA`, please refer to our recent publication in [Environmental Modeling and Software](https://doi.org/10.1016/j.envsoft.2020.104664) (doi: https://doi.org/10.1016/j.envsoft.2020.104664).
+
+
 <br>
 
 ## Installation
@@ -67,20 +72,21 @@ devtools::install_github('hunter-stanke/rFIA')
 
 |`rFIA` Function  | Description                                                          |
 |---------------- |----------------------------------------------------------------------|
-|`area`           | Estimate land area                                                   |
+|`area`           | Estimate land area in various classes                                |
 |`biomass`        | Estimate volume, biomass, & carbon stocks of standing trees          |
-|`clipFIA`        | Spatial & temporal queries                                           |
-|`diversity`      | Estimate species diversity                                           |
+|`clipFIA`        | Spatial & temporal queries for FIA data                              |
+|`diversity`      | Estimate diversity indices (e.g. species diversity)                  |
 |`dwm`            | Estimate volume, biomass, and carbon stocks of down woody material   |
 |`getFIA`         | Download FIA data, load into R, and optionally save to disk          |
 |`growMort`       | Estimate recruitment, mortality, and harvest rates                   |
 |`invasive`       | Estimate areal coverage of invasive species                          |
-|`plotFIA`        | Produce static & animated plots of spatial FIA summaries             |
-|`readFIA`        | Load FIA database into R environment                                 |
+|`plotFIA`        | Produce static & animated plots of FIA summaries                     |
+|`readFIA`        | Load FIA database into R environment from disk                       |
 |`seedling`       | Estimate seedling abundance (TPA)                                    |
 |`standStruct`    | Estimate forest structural stage distributions                       |
 |`tpa`            | Estimate abundance of standing trees (TPA & BAA)                     |
 |`vitalRates`     | Estimate live tree growth rates                                      |
+|`writeFIA`       | Write in-memory FIA Database to disk                                 |
 
 <br>
 
@@ -115,7 +121,7 @@ db <- readFIA('/path/to/your/directory/')
 Now that you have loaded your FIA data into R, it's time to put it to work. Let's explore the basic functionality of `rFIA` with `tpa`, a function to compute tree abundance estimates (TPA, BAA, & relative abundance) from FIA data, and `fiaRI`, a subset of the FIA Database for Rhode Island including inventories from 2013-2018. 
 
 **Estimate the abundance of live trees in Rhode Island:**
-```{r warning= FALSE, message=FALSE, fig.width=5, fig.height=2.5}
+```{r warning= FALSE, message=FALSE, fig.width = .5, fig.height=.5}
 library(rFIA)
 ## Load the Rhode Island subset of the FIADB (included w/ rFIA)
 ## NOTE: This object can be produced using getFIA and/or readFIA
@@ -128,10 +134,7 @@ head(tpaRI_MR)
 
 ## All Inventory Years Available (i.e., returns a time series)
 tpaRI <- tpa(fiaRI)
-
-## Time Series plot
-plotFIA(tpaRI, BAA, se = TRUE,
-        plot.title = 'Basal area per acre in Rhode Island over time')
+head(tpaRI)
 
 ```
 

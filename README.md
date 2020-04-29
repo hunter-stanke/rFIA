@@ -46,6 +46,18 @@ errors produced by EVALIDator. Current development is focused on the
 implementation of spatially-enabled model-assisted estimators to improve
 population, change, and ratio estimates.
 
+For more information and example usage of `rFIA`, check out our
+[website](https://rfia.netlify.app/). To report a bug or suggest
+additions to `rFIA`, please use our [active
+issues](https://github.com/hunter-stanke/rFIA/issues) page here on
+GitHub, or contact [Hunter Stanke](https://hunter-stanke.com/) (lead
+developer and maintainer).
+
+***To cite*** `rFIA`, please refer to our recent publication in
+[Environmental Modeling and
+Software](https://doi.org/10.1016/j.envsoft.2020.104664) (doi:
+<https://doi.org/10.1016/j.envsoft.2020.104664>).
+
 <br>
 
 ## Installation
@@ -69,20 +81,21 @@ devtools::install_github('hunter-stanke/rFIA')
 
 | `rFIA` Function | Description                                                        |
 | --------------- | ------------------------------------------------------------------ |
-| `area`          | Estimate land area                                                 |
+| `area`          | Estimate land area in various classes                              |
 | `biomass`       | Estimate volume, biomass, & carbon stocks of standing trees        |
-| `clipFIA`       | Spatial & temporal queries                                         |
-| `diversity`     | Estimate species diversity                                         |
+| `clipFIA`       | Spatial & temporal queries for FIA data                            |
+| `diversity`     | Estimate diversity indices (e.g. species diversity)                |
 | `dwm`           | Estimate volume, biomass, and carbon stocks of down woody material |
 | `getFIA`        | Download FIA data, load into R, and optionally save to disk        |
 | `growMort`      | Estimate recruitment, mortality, and harvest rates                 |
 | `invasive`      | Estimate areal coverage of invasive species                        |
-| `plotFIA`       | Produce static & animated plots of spatial FIA summaries           |
-| `readFIA`       | Load FIA database into R environment                               |
+| `plotFIA`       | Produce static & animated plots of FIA summaries                   |
+| `readFIA`       | Load FIA database into R environment from disk                     |
 | `seedling`      | Estimate seedling abundance (TPA)                                  |
 | `standStruct`   | Estimate forest structural stage distributions                     |
 | `tpa`           | Estimate abundance of standing trees (TPA & BAA)                   |
 | `vitalRates`    | Estimate live tree growth rates                                    |
+| `writeFIA`      | Write in-memory FIA Database to disk                               |
 
 <br>
 
@@ -157,13 +170,17 @@ head(tpaRI_MR)
 
 ## All Inventory Years Available (i.e., returns a time series)
 tpaRI <- tpa(fiaRI)
-
-## Time Series plot
-plotFIA(tpaRI, BAA, se = TRUE,
-        plot.title = 'Basal area per acre in Rhode Island over time')
+head(tpaRI)
+#> # A tibble: 5 x 11
+#>    YEAR   TPA   BAA TPA_PERC BAA_PERC TPA_SE BAA_SE TPA_PERC_SE BAA_PERC_SE
+#>   <int> <dbl> <dbl>    <dbl>    <dbl>  <dbl>  <dbl>       <dbl>       <dbl>
+#> 1  2014  466.  120.     96.8     95.0   6.73   3.09        7.62        4.60
+#> 2  2015  444.  121.     96.6     95.0   6.40   3.06        7.37        4.48
+#> 3  2016  450.  123.     95.8     95.0   6.46   2.94        7.45        4.49
+#> 4  2017  441.  123.     95.4     94.6   6.66   3.01        7.66        4.49
+#> 5  2018  427.  122.     93.2     93.7   6.63   3.06        7.62        4.48
+#> # ... with 2 more variables: nPlots_TREE <dbl>, nPlots_AREA <dbl>
 ```
-
-<img src="man/figures/README-unnamed-chunk-5-1.png" width="100%" />
 
 **What if I want to group estimates by species? How about by size
 class?**
