@@ -282,5 +282,6 @@ tpaRI_st <- tpa(fiaRI, polys = countiesRI, returnSpatial = TRUE)
 
 ## Animate the output
 plotFIA(tpaRI_st, TPA, animate = TRUE, legend.title = 'Abundance (TPA)', legend.height = .8)
-#> NULL
 ```
+
+<img src="man/figures/README-unnamed-chunk-9-1.gif" width="100%" />
