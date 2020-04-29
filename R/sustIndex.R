@@ -1139,7 +1139,7 @@ si <- function(db,
     }
 
     ## Compute the SI
-    x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x
+    x = projectPnts(tOut$TPA_RATE, tOut$BAA_RATE, 1, 0)$x
     M = sqrt(x^2 + x^2)
     tOut$SI = if_else(x < 0, -M, M)
     tOut <- select(tOut, grpBy, SI, TPA_RATE, BAA_RATE, everything())
