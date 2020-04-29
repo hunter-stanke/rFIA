@@ -24,7 +24,7 @@
 
 <!-- badges: end -->
 
-![US Biomass](man/figures/usBiomass.png)
+![US Biomass](man/figures/usBiomass.jpg)
 
 The goal of `rFIA` is to increase the accessibility and use of the USFS
 Forest Inventory and Analysis (FIA) Database by providing a

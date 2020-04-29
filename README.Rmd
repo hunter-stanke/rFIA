@@ -39,7 +39,7 @@ cat(
 <!-- [![Lifecycle: maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing) -->
 <!-- badges: end -->
 
-![US Biomass](man/figures/usBiomass.png)
+![US Biomass](man/figures/usBiomass.jpg)
 
 
 The goal of `rFIA` is to increase the accessibility and use of the USFS Forest Inventory and Analysis (FIA) Database by providing a user-friendly, open source platform to easily query and analyze FIA Data. Designed to accommodate a wide range of potential user objectives, `rFIA` simplifies the estimation of forest variables from the FIA Database and allows all R users (experts and newcomers alike) to unlock the flexibility and potential inherent to the Enhanced FIA design.
