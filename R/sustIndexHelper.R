@@ -584,6 +584,13 @@ siHelper1 <- function(x, plts, db, grpBy, byPlot, minLive){
     select(PLT_CN, grpBy, SPCD, htClass, TPA_UNADJ, BAA, tDI)
 
 
+  ## Under Daves reformulation, we cannot have NAs as absence values
+  ## Change all NA's to zeros for TPA and BAA
+  data <- data %>%
+    mutate(TPA_UNADJ = replace_na(TPA_UNADJ, replace = 0),
+           BAA = replace_na(BAA, replace = 0))
+
+
   if (byPlot){
     grpBy <- c('YEAR', grpBy)
 

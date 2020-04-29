@@ -102,6 +102,11 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
       DIA >= MACRO_BREAKPOINT_DIA ~ 'MACR')) #%>%
   #mutate(tDI = tDI * if_else())
 
+  ## Under Daves reformulation, we cannot have NAs as absence values
+  ## Change all NA's to zeros for TPA and BAA
+  data <- data %>%
+    mutate(TPA_UNADJ = replace_na(TPA_UNADJ, replace = 0),
+           BAA = replace_na(BAA, replace = 0))
 
 
   if (byPlot){
@@ -165,6 +170,9 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
                 PREV_BAA = sum(-BAA[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE),
                 CHNG_TPA = sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
                 CHNG_BAA = sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
+                #CHNG_BAA = sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
+                #CHNG_BAA = mean((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE),
+
                 #CHNG_BAA1 = sum((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE),
                 plotIn = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0),
                 n = length(unique(TRE_CN[tDI == 1])))
