@@ -113,7 +113,9 @@ biomass <- function(db,
     coordinates(pltSF) <- ~LON+LAT
     proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
     pltSF <- as(pltSF, 'sf') %>%
-      st_transform(crs = st_crs(polys)$proj4string)
+      #st_transform(crs = st_crs(polys)$proj4string)
+      st_transform(crs = st_crs(polys))
+
 
     ## Split up polys
     polyList <- split(polys, as.factor(polys$polyID))
@@ -125,6 +127,7 @@ biomass <- function(db,
           library(dplyr)
           library(stringr)
           library(rFIA)
+          #library(sf)
         })
         out <- parLapply(cl, X = names(polyList), fun = areal_par, pltSF, polyList)
         #stopCluster(cl) # Keep the cluster active for the next run

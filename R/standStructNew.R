@@ -109,7 +109,7 @@ standStruct <- function(db,
     coordinates(pltSF) <- ~LON+LAT
     proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
     pltSF <- as(pltSF, 'sf') %>%
-      st_transform(crs = st_crs(polys)$proj4string)
+      st_transform(crs = st_crs(polys))
 
     ## Split up polys
     polyList <- split(polys, as.factor(polys$polyID))
