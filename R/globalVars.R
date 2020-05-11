@@ -195,6 +195,11 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'espVar', 'espv', 'estEst', 'estStrat', 'estVar', 'estv', 'hspEst', 'hspStrat', 'hspVar', 'hspv',
                          'hstEst', 'hstStrat', 'hstVar', 'hstv', 'htClass', 'minLive', 'nTotal', 'qt', 'sd', 'sspEst',
                          'sspStrat', 'sspVar', 'sspv', 'sstEst', 'sstStrat', 'sstVar', 'sstv', 'stkEst', 'stkStrat',
-                         'stkVar', 'stkv', 'tpaMean', 'tpaSD', 'trecrVar', 'trecrv', 'ymax', 'ymin', 'EVAL_DESCR'
+                         'stkVar', 'stkv', 'tpaMean', 'tpaSD', 'trecrVar', 'trecrv', 'ymax', 'ymin', 'EVAL_DESCR',
+                         'AG_LIVE', 'AG_OVER_DEAD', 'AG_OVER_LIVE', 'AG_UNDER_LIVE', 'BG_LIVE', 'BG_OVER_DEAD',
+                         'BG_OVER_LIVE', 'BG_UNDER_LIVE', 'CARBON_DOWN_DEAD', 'CARBON_LITTER',
+                         'CARBON_SOIL_ORG', 'CARBON_STANDING_DEAD', 'CARBON_UNDERSTORY_AG',
+                         'CARBON_UNDERSTORY_BG', 'DEAD_WOOD', 'DOWN_DEAD', 'LITTER', 'SOIL_ORG', 'STAND_DEAD',
+                         'STAND_DEAD_MOD', 'all_of', 'caVar', 'cvStrat_c', 'dead', 'live'
 
 ))
