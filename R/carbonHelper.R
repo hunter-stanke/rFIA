@@ -177,7 +177,6 @@ carbonHelper2 <- function(x, popState, t, a, grpBy, method, byPool, byComponent,
   ## DOES NOT MODIFY OUTSIDE ENVIRONMENT
   if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
     grpBy <- c(grpBy, 'INVYR')
-    aGrpBy <- c(aGrpBy, 'INVYR')
     popState[[x]]$P2POINTCNT <- popState[[x]]$P2POINTCNT_INVYR
     popState[[x]]$p2eu <- popState[[x]]$p2eu_INVYR
 
@@ -232,7 +231,7 @@ carbonHelper2 <- function(x, popState, t, a, grpBy, method, byPool, byComponent,
               p2eu = first(p2eu),
               a = first(AREA_USED),
               w = first(P1POINTCNT) / first(P1PNTCNT_EU)) %>%
-    left_join(aAdjusted, by = c('PLT_CN', grpBy[!(grpBy %in% c('POOL', 'COMPONENT'))]))
+    left_join(aAdjusted, by = c('PLT_CN', grpBy[!(grpBy %in% c('POOL', 'COMPONENT', 'INVYR'))]))
 
   ######## ------------------ SWAP TO LONG FORMAT
   ## Decide which estimate to use for snags

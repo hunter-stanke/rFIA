@@ -463,6 +463,7 @@ print.FIA.Database <- function(x, ...){
 #' @import ggplot2
 #' @import bit64
 #' @import progress
+#' @import tidyselect
 #' @importFrom data.table fread fwrite rbindlist
 #' @importFrom parallel makeCluster detectCores mclapply parLapply stopCluster clusterEvalQ
 #' @import tidyr

@@ -293,8 +293,11 @@ carbon <- function(db,
   ## Add pool/component to grpBy if necessary
   if (byPool & byComponent == FALSE){
     grpBy = c(grpBy, 'POOL')
+    grpByOrig = c(grpByOrig, 'POOL')
   } else if (byComponent){
     grpBy = c(grpBy, 'COMPONENT')
+    grpByOrig = c(grpByOrig, 'COMPONENT')
+
   }
 
   if (byPlot){
