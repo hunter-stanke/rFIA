@@ -50,7 +50,7 @@ divHelper1 <- function(x, plts, db, grpBy, byPlot){
     # Diversity is computed at the stand (condition level), and we continue to use the ratio of means estimator to get at
     #  average of the attribute of interest weighted by the area in which it occurs.
     t <- data %>%
-      distinct(PLT_CN, CONDID, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
+      distinct(PLT_CN, CONDID, TREE, COND_STATUS_CD, .keep_all = TRUE) %>%
       group_by(.dots = grpBy, PLT_CN, PROP_BASIS, CONDID) %>%
       # filter(tDI > 0) %>%
       summarize(condArea = first(CONDPROP_UNADJ),

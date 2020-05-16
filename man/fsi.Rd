@@ -6,9 +6,9 @@
 \usage{
 fsi(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
     bySpecies = FALSE, bySizeClass = FALSE, landType = "forest",
-    treeType = "live", method = "annual", lambda = 0.5,
+    treeType = "live", method = "sma", lambda = 0.5,
     treeDomain = NULL, areaDomain = NULL, totals = TRUE,
-    byPlot = FALSE, scaleGCB = TRUE, nCores = 1)
+    byPlot = FALSE, scaleGCB = TRUE, useLM = FALSE, nCores = 1)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -41,6 +41,8 @@ fsi(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations (population totals not returned).}
 
   \item{scaleGCB}{logical; Scale the FSI using the same standardization factors in our original article in Global Change Biology? Allows users to compare estimates on a standardized scale. }
+
+  \item{useLM}{logical; If TRUE, use a linear model to estimate change in TPA & BA on each plot, allowing more than 2 measurements to be used.}
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 

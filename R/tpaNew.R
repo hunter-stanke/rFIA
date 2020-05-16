@@ -537,7 +537,7 @@ tpa <- function(db,
     }
     ## Hand the proportions
     tpTotal <- tEst %>%
-      group_by(.dots = propGrp) %>%
+      group_by(.dots = unique(propGrp)) %>%
       summarize(TREE_TOTAL_full = sum(tTEst, na.rm = TRUE), ## Need to sum this
                 BA_TOTAL_full = sum(bTEst, na.rm = TRUE), ## Need to sum this
                 tTVar = sum(tTVar, na.rm = TRUE),
@@ -550,7 +550,7 @@ tpa <- function(db,
       ## Bring them together
       tTotal <- tTotal %>%
         left_join(aTotal, by = aGrpBy) %>%
-        left_join(tpTotal, by = propGrp) %>%
+        left_join(tpTotal, by = unique(propGrp)) %>%
         mutate(TPA = TREE_TOTAL / AREA_TOTAL,
                BAA = BA_TOTAL / AREA_TOTAL,
                tpaVar = (1/AREA_TOTAL^2) * (treeVar + (TPA^2 * aVar) - 2 * TPA * cvT),

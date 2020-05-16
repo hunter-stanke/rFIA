@@ -200,6 +200,7 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'BG_OVER_LIVE', 'BG_UNDER_LIVE', 'CARBON_DOWN_DEAD', 'CARBON_LITTER',
                          'CARBON_SOIL_ORG', 'CARBON_STANDING_DEAD', 'CARBON_UNDERSTORY_AG',
                          'CARBON_UNDERSTORY_BG', 'DEAD_WOOD', 'DOWN_DEAD', 'LITTER', 'SOIL_ORG', 'STAND_DEAD',
-                         'STAND_DEAD_MOD', 'all_of', 'caVar', 'cvStrat_c', 'dead', 'live'
+                         'STAND_DEAD_MOD', 'all_of', 'caVar', 'cvStrat_c', 'dead', 'live',
+                         'MEASDAY', 'MEASMON', 'b_rate', 'coef', 'df', 'lm', 'meas', 't_rate', 'treID'
 
 ))

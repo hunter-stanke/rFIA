@@ -8,13 +8,14 @@ fsi <- function(db,
                 bySizeClass = FALSE,
                 landType = 'forest',
                 treeType = 'live',
-                method = 'annual',
+                method = 'sma',
                 lambda = .5,
                 treeDomain = NULL,
                 areaDomain = NULL,
                 totals = TRUE,
                 byPlot = FALSE,
                 scaleGCB = TRUE,
+                useLM = FALSE,
                 nCores = 1) {
 
   ## Need a plotCN
@@ -325,7 +326,7 @@ fsi <- function(db,
     db$TREE$sizeClass <- makeClasses(db$TREE$DIA, interval = 2, numLabs = TRUE)
     db$TREE <- db$TREE[!is.na(db$TREE$sizeClass),]
   }
-  db$TREE$htClass <- makeClasses(db$TREE$HT, interval = 5)
+  #db$TREE$htClass <- makeClasses(db$TREE$HT, interval = 5)
 
 
   # # Seperate area grouping names, (ex. TPA red oak in total land area of ingham county, rather than only area where red oak occurs)
@@ -358,22 +359,44 @@ fsi <- function(db,
   ## Merging state and county codes
   plts <- split(db$PLOT, as.factor(paste(db$PLOT$COUNTYCD, db$PLOT$STATECD, sep = '_')))
 
-  suppressWarnings({
-    ## Compute estimates in parallel -- Clusters in windows, forking otherwise
-    if (Sys.info()['sysname'] == 'Windows'){
-      cl <- makeCluster(nCores)
-      clusterEvalQ(cl, {
-        library(dplyr)
-        library(stringr)
-        library(rFIA)
-        library(tidyr)
-      })
-      out <- parLapply(cl, X = names(plts), fun = fsiHelper1, plts, db, grpBy, byPlot)
-      #stopCluster(cl) # Keep the cluster active for the next run
-    } else { # Unix systems
-      out <- mclapply(names(plts), FUN = fsiHelper1, plts, db, grpBy, byPlot, mc.cores = nCores)
-    }
-  })
+  ## Use the linear model procedures or strictly t2-t1 / remper?
+  if (useLM){
+    suppressWarnings({
+      ## Compute estimates in parallel -- Clusters in windows, forking otherwise
+      if (Sys.info()['sysname'] == 'Windows'){
+        cl <- makeCluster(nCores)
+        clusterEvalQ(cl, {
+          library(dplyr)
+          library(stringr)
+          library(rFIA)
+          library(tidyr)
+          library(purrr)
+        })
+        out <- parLapply(cl, X = names(plts), fun = fsiHelper1_lm, plts, db, grpBy, byPlot)
+        #stopCluster(cl) # Keep the cluster active for the next run
+      } else { # Unix systems
+        out <- mclapply(names(plts), FUN = fsiHelper1_lm, plts, db, grpBy, byPlot, mc.cores = nCores)
+      }
+    })
+  } else {
+    suppressWarnings({
+      ## Compute estimates in parallel -- Clusters in windows, forking otherwise
+      if (Sys.info()['sysname'] == 'Windows'){
+        cl <- makeCluster(nCores)
+        clusterEvalQ(cl, {
+          library(dplyr)
+          library(stringr)
+          library(rFIA)
+          library(tidyr)
+        })
+        out <- parLapply(cl, X = names(plts), fun = fsiHelper1, plts, db, grpBy, byPlot)
+        #stopCluster(cl) # Keep the cluster active for the next run
+      } else { # Unix systems
+        out <- mclapply(names(plts), FUN = fsiHelper1, plts, db, grpBy, byPlot, mc.cores = nCores)
+      }
+    })
+  }
+
 
 
   if (byPlot){
@@ -406,7 +429,7 @@ fsi <- function(db,
     M = sqrt(x^2 + y^2)
     tOut$SI = if_else(x < 0, -M, M)
 
-    tOut <- select(tOut, YEAR, PLT_CN, PREV_PLT_CN, grpBy[grpBy != 'YEAR'], SI, TPA_RATE, BAA_RATE, REMPER, everything())
+    tOut <- select(tOut, YEAR, PLT_CN, any_of('PREV_PLT_CN'), grpBy[grpBy != 'YEAR'], SI, TPA_RATE, BAA_RATE, REMPER, everything())
     # tOut <- tOut %>%
     #   mutate(#TPA_RATE = CHNG_TPA / REMPER / abs(mean(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
     #          #BAA_RATE = CHNG_BAA / REMPER / abs(mean(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
@@ -485,7 +508,7 @@ fsi <- function(db,
     suppressWarnings({
       ## Compute estimates in parallel -- Clusters in windows, forking otherwise
       if (Sys.info()['sysname'] == 'Windows'){
-        ## Use the same cluster as above
+        # # Use the same cluster as above
         # cl <- makeCluster(nCores)
         # clusterEvalQ(cl, {
         #   library(dplyr)
@@ -501,6 +524,7 @@ fsi <- function(db,
     ## back to dataframes
     out <- unlist(out, recursive = FALSE)
     tEst <- bind_rows(out[names(out) == 'tEst'])
+    tEst <- ungroup(tEst)
 
     ##### ----------------- MOVING AVERAGES
     if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){

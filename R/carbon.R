@@ -436,7 +436,7 @@ carbon <- function(db,
         mutate_at(vars(cEst,aEst), ~(.*wgt)) %>%
         mutate_at(vars(cVar:cvEst_c), ~(.*(wgt^2))) %>%
         group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
-        summarize_at(vars(nvEst:plotIn_TREE), sum, na.rm = TRUE)
+        summarize_at(vars(cEst:plotIn_TREE), sum, na.rm = TRUE)
 
     }
 
