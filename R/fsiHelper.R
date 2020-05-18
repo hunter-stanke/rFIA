@@ -20,21 +20,22 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
   #db$COND <- mutate(db$COND, PREV_CONDID = CONDID)
 
   ## Making a treeID
-  # db$TREE$treID <- paste(db$TREE$SUBP, db$TREE$TREE, sep = '_')
+  db$TREE$treID <- paste(db$TREE$SUBP, db$TREE$TREE, sep = '_')
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   data <- select(db$PLOT, c('PLT_CN', 'pltID', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR',
-                            'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp', 'DESIGNCD')) %>%
-    filter(!is.na(REMPER) & !is.na(PREV_PLT_CN) & DESIGNCD == 1 & PLOT_STATUS_CD != 3) %>%
-
+                            'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp', 'DESIGNCD',
+                            MEASMON, MEASDAY, MEASYEAR)) %>%
+    #filter(!is.na(REMPER) & !is.na(PREV_PLT_CN) & DESIGNCD == 1 & PLOT_STATUS_CD != 3) %>%
+    #filter(!is.na(PREV_PLT_CN)) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
     ## AGENTCD at remeasurement, died during the measurement interval
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'TPA_UNADJ', 'BAA', 'DIA', 'AGENTCD', 'MORTYR', 'STATUSCD', 'SPCD')), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE, c('PLT_CN', treID, 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'TPA_UNADJ', 'BAA', 'DIA', 'AGENTCD', 'MORTYR', 'STATUSCD', 'SPCD')), by = c('PLT_CN', 'CONDID')) %>%
     #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', DIA_BEGIN, DIA_END)), by = c('TRE_CN')) %>%
 
     left_join(select(db$PLOT, c('PLT_CN', 'sp', 'aD_p', 'DESIGNCD', 'PLOT_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('2', '1')) %>%
-    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'TPA_UNADJ', 'BAA', 'DIA', 'STATUSCD', SPCD)), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
+    left_join(select(db$TREE, c('TRE_CN', grpT, treID, 'typeD', 'tD', 'TPA_UNADJ', 'BAA', 'DIA', 'STATUSCD', SPCD)), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
     #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
 
     mutate_if(is.factor,
@@ -42,22 +43,20 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
 
   ## Comprehensive indicator function -- w/ growth accounting
   data$tDI2 <- data$landD2 * data$aD_p2 * data$aD_c2 * data$tD2 * data$typeD2 * data$sp2 *
-    if_else(data$PLOT_STATUS_CD1 == 1 & data$PLOT_STATUS_CD2 == 1, 1, 0) *
-    if_else(data$STATUSCD2 == 1, 1, 0) *
+    #if_else(data$PLOT_STATUS_CD1 == 1 & data$PLOT_STATUS_CD2 == 1, 1, 0) *
+    if_else(data$STATUSCD2 == 1, 1, 0) #*
     ## If it is NA, then it is a recruit, otherwise, make sure it was not
     ## flagged incorrectly previously
-    if_else(is.na(data$STATUSCD1), 1, if_else(data$STATUSCD1 == 0 | data$STATUSCD2 == 0, 0, 1))
+    #if_else(is.na(data$STATUSCD1), 1, if_else(data$STATUSCD1 == 0 | data$STATUSCD2 == 0, 0, 1))
 
   data$tDI1 <- data$landD1 * data$aD_p1 * data$aD_c1 * data$tD1 * data$typeD1 * data$sp1 *
-    if_else(data$PLOT_STATUS_CD1 == 1 & data$PLOT_STATUS_CD2 == 1, 1, 0) *
-    if_else(data$STATUSCD1 == 1, 1, 0) *
-    if_else(is.na(data$STATUSCD1), NA_real_, if_else(data$STATUSCD1 == 0 | data$STATUSCD2 == 0, 0, 1))
+    #if_else(data$PLOT_STATUS_CD1 == 1 & data$PLOT_STATUS_CD2 == 1, 1, 0) *
+    if_else(data$STATUSCD1 == 1, 1, 0) #*
+    #if_else(is.na(data$STATUSCD1), NA_real_, if_else(data$STATUSCD1 == 0 | data$STATUSCD2 == 0, 0, 1))
 
   ## Doesn't allow recruitment to happen, becuase no previous status
   ## Adjust later, after the pivot
   #if_else(data$STATUSCD1 == 0 | data$STATUSCD2 == 0, 0, 1)
-
-
 
   ## PREVIOUS and CURRENT attributes
   data <- data %>%
@@ -75,11 +74,20 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
            #DISTURB = if_else()
     ) #%>%
 
+  ## Save a copy for area calculations
+  ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
+  aData <- select(db$PLOT, c('PLT_CN', 'PREV_PLT_CN', 'pltID', 'DESIGNCD', 'REMPER', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'MEASMON', 'MEASDAY', 'PLOT_STATUS_CD', all_of(grpP), 'aD_p', 'sp')) %>%
+    filter(DESIGNCD == 1 & PLOT_STATUS_CD != 3) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
+    mutate(aDI = landD * aD_p * aD_c * sp)
+
+
   ## Just what we need
   data <- data %>%
     select(PLT_CN, PREV_PLT_CN, pltID, TRE_CN, SUBP, CONDID, TREE, CONDPROP_UNADJ,
            MEASYEAR, MACRO_BREAKPOINT_DIA, PROP_BASIS, grpP[grpP != 'PLOT_STATUS_CD'], grpC,
            REMPER, PLOT_STATUS_CD1, PLOT_STATUS_CD2,
+           treID1, treID2,
            #one_of(str_c(grpP,1), str_c(grpC,1), str_c(grpT,1),
            #        str_c(grpP,2), str_c(grpC,2), str_c(grpT,2)),
            one_of(str_c(grpT,1),str_c(grpT,2)),
@@ -108,6 +116,14 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
     mutate(TPA_UNADJ = replace_na(TPA_UNADJ, replace = 0),
            BAA = replace_na(BAA, replace = 0))
 
+  ## TOTAL number of unique stems on each plot through time
+  stems <- data %>%
+    #distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
+    filter(!is.na(treID)) %>%
+    filter(tDI == 1) %>%
+    group_by(PLT_CN, .dots = grpBy[!(grpBy %in% c('pltID', 'PLOT_STATUS_CD', 'YEAR'))]) %>%
+    summarize(n = length(unique(treID)))
+
 
   if (byPlot){
     grpBy <- c('YEAR', grpBy)
@@ -127,16 +143,14 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
                 ## Sum here to avoid issues w/ zeros
                 CHNG_BAA = sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
                 CURR_TPA = PREV_TPA + CHNG_TPA,
-                CURR_BAA = PREV_BAA + CHNG_BAA,
-                #DIFF_BAA = mean((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE),
-                nStems = length(which(tDI == 1)),
-                n = length(unique(TRE_CN[tDI == 1]))) %>%
+                CURR_BAA = PREV_BAA + CHNG_BAA) %>%
+      left_join(stems, by = c('PLT_CN', grpBy[!(grpBy %in% c('pltID', 'PLOT_STATUS_CD', 'YEAR'))])) %>%
       ## Then divide by number of unique stems for an average
       mutate(CHNG_BAA = CHNG_BAA / n) %>%
       ungroup() %>%
       select(PLT_CN, PREV_PLT_CN, REMPER, grpBy,
              PREV_TPA, PREV_BAA, CHNG_TPA, CHNG_BAA, CURR_TPA, CURR_BAA,
-             nStems, nLive)
+             n, nLive)
     a = NULL
 
   } else {
@@ -149,15 +163,35 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
     #   summarize(fa = sum(SUBPTYP_PROP_CHNG * aDI, na.rm = TRUE),
     #             plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
     ### Plot-level estimates
-    a <- data %>%
+    a <- aData %>%
+      ## date column
+      mutate(date = paste(MEASYEAR, MEASMON, MEASDAY, sep = '-'),
+             date = as.Date(date, "%Y-%m-%d")) %>%
       ## Will be lots of trees here, so CONDPROP listed multiple times
       ## Adding PROP_BASIS so we can handle adjustment factors at strata level
-      #distinct(PLT_CN, CONDID, .keep_all = TRUE) %>%
-      group_by(PLT_CN, PROP_BASIS, CONDID, .dots = grpBy) %>%
-      summarize(aDI = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0),
-                CONDPROP_UNADJ = first(CONDPROP_UNADJ)) %>%
-      group_by(PLT_CN, PROP_BASIS, .dots = grpBy) %>%
-      summarize(fa = sum(CONDPROP_UNADJ * aDI, na.rm = TRUE))
+      distinct(PLT_CN, pltID, date, PROP_BASIS, CONDID, .keep_all = TRUE) %>%
+      group_by(PLT_CN, pltID, date, PROP_BASIS, CONDID, .dots = grpBy) %>%
+      summarize(CONDPROP_UNADJ = first(CONDPROP_UNADJ * aDI)) %>%
+      mutate(CONDPROP_UNADJ = replace_na(CONDPROP_UNADJ, 0)) %>%
+      ## Average forested area between min and max date
+      group_by(pltID, PROP_BASIS, .dots = grpBy) %>%
+      summarize(minDate = min(date, na.rm = TRUE),
+                maxDate = max(date, na.rm = TRUE),
+                amin = sum(CONDPROP_UNADJ[date == minDate], na.rm = TRUE),
+                amax = sum(CONDPROP_UNADJ[date == maxDate], na.rm = TRUE),
+                fa = (amin + amax) / 2) %>%
+      left_join(select(ungroup(db$PLOT), PLT_CN, pltID), by = c('pltID'))
+    # ### Plot-level estimates
+    # a <- data %>%
+    #   ## Will be lots of trees here, so CONDPROP listed multiple times
+    #   ## Adding PROP_BASIS so we can handle adjustment factors at strata level
+    #   distinct(PLT_CN, PROP_BASIS, CONDID, ONEORTWO, .keep_all = TRUE) %>%
+    #   mutate(aDI = replace_na(aDI, 0)) #%>%
+    #   ## Average proportion over remeasurement interval
+    #   group_by(PLT_CN, pltID, PROP_BASIS, CONDID, .dots = grpBy) %>%
+    #   summarize(CONDPROP_UNADJ = mean(CONDPROP_UNADJ * aDI, na.rm = TRUE)) #%>%
+    #   group_by(PLT_CN, pltID, PROP_BASIS, .dots = grpBy) %>%
+    #   summarize(fa = sum(CONDPROP_UNADJ, na.rm = TRUE))
 
     ### Compute total TREES in domain of interest
     t <- data %>%
@@ -179,8 +213,10 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
                 #CHNG_BAA = mean((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE),
 
                 #CHNG_BAA1 = sum((BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2]) + (BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1]), na.rm = TRUE),
-                plotIn = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0),
-                n = length(unique(TRE_CN[tDI == 1])))
+                plotIn = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0)) %>%
+      left_join(stems, by = c('PLT_CN', grpBy)) #%>%
+      #filter()
+
                 #n1 = length(unique(treID[tDI == 1])))
   }
 
@@ -231,11 +267,17 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
     filter(DESIGNCD == 1 & PLOT_STATUS_CD != 3) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
     left_join(select(db$TREE, c('PLT_CN', treID, STATUSCD, 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', BAA, 'SUBP', 'TREE', grpT, 'tD', 'typeD')), by = c('PLT_CN', 'CONDID')) %>%
+    ## A handful of previous tree attributes -- excluding previously incorrectly tallied trees
+    #left_join(select(db$TREE, c('TRE_CN', 'STATUSCD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.old')) %>%
+
     ## Need a code that tells us where the tree was measured
     ## macroplot, microplot, subplot
     mutate(PLOT_BASIS = case_when(
       ## When DIA is na, adjustment is NA
-      is.na(DIA) ~ NA_character_,
+      ## NAs occur at harvest and/or recruitement events
+      ## Doesnt matter if we choose SUBP or MICR, adj will by * 0, then additive
+      is.na(DIA) ~ 'SUBP',
+      #is.na(DIA) ~ NA_character_,
       ## When DIA is less than 5", use microplot value
       DIA < 5 ~ 'MICR',
       ## When DIA is greater than 5", use subplot value
@@ -246,7 +288,9 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
            BAA = replace_na(BAA, 0))
 
   ## Domain indicator
-  data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
+  data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp #*
+    #if_else
+  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
 
 
   ## TOTAL number of observations on each plot
@@ -287,7 +331,7 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
     coef(lm(BAA ~ date, data = df))[2]*365
   }
   remper <- function(df){
-    as.numeric(max(df$date) - min(df$date)) / 365
+    round(as.numeric(max(df$date) - min(df$date)) / 365, 1)
   }
   maxYear <- function(df){
     max(df$MEASYEAR, na.rm = TRUE)
@@ -301,8 +345,12 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
   pstatus <- function(df){
     if_else(any(df$PLOT_STATUS_CD == 1), 1, 2)
   }
+  pstatusPop <- function(df){
+    if_else(any(df$plotIn == 1), 1, 0)
+  }
   completePop <- function(df, grps){
     df %>%
+      ungroup() %>%
       complete(nesting(date, MEASYEAR), nesting(PLOT_BASIS, !!!grps)) %>%
       mutate(TPA = replace_na(TPA, 0),
              BAA = replace_na(BAA, 0))
@@ -310,6 +358,7 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
 
   completePlot <- function(df, grps){
     df %>%
+      ungroup() %>%
       complete(nesting(date, MEASYEAR), nesting(!!!grps)) %>%
       mutate(TPA = replace_na(TPA, 0),
              BAA = replace_na(BAA, 0))
@@ -338,8 +387,8 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
              date = as.Date(date, "%Y-%m-%d")) %>%
       ungroup() %>%
       left_join(select(ungroup(remSeries), PLT_CN, meas), by = 'PLT_CN') %>%
-      left_join(select(ungroup(obs), pltID, obs), by = 'pltID') %>%
-      group_by(PLT_CN, pltID, date, MEASYEAR, meas, obs) #%>%
+      left_join(select(ungroup(obs), pltID, obs), by = 'pltID') #%>%
+      #group_by(PLT_CN, pltID, date, MEASYEAR, meas, obs) #%>%
       #tidyr::complete(nesting(PLT_CN, pltID, date, MEASYEAR, meas, obs), nesting(!!!grps)) %>%
       #mutate(BAA = replace_na(BAA, 0),
       #       TPA = replace_na(TPA, 0))
@@ -383,7 +432,7 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
     t <- bind_rows(tList) %>%
       left_join(select(ungroup(db$PLOT), PLT_CN, MEASYEAR, pltID), by = c('pltID', 'MEASYEAR')) %>%
       rename(YEAR = MEASYEAR) %>%
-      left_join(select(stems, -c(PLOT_STATUS_CD)), by = c('pltID', grpBy[!(grpBy %in% c('pltID', 'PLOT_STATUS_CD'))])) %>%
+      left_join(select(ungroup(stems), -c(PLOT_STATUS_CD)), by = c('pltID', grpBy[!(grpBy %in% c('pltID', 'PLOT_STATUS_CD'))])) %>%
       mutate(CHNG_BAA = CHNG_BAA / n,
              CHNG_BAA = replace_na(CHNG_BAA, 0))
 
@@ -400,14 +449,23 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
     #             plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
     ### Plot-level estimates
     a <- data %>%
+      filter(pltID %in% obs$pltID) %>%
+      ## date column
+      mutate(date = paste(MEASYEAR, MEASMON, MEASDAY, sep = '-'),
+             date = as.Date(date, "%Y-%m-%d")) %>%
       ## Will be lots of trees here, so CONDPROP listed multiple times
       ## Adding PROP_BASIS so we can handle adjustment factors at strata level
-      #distinct(PLT_CN, CONDID, .keep_all = TRUE) %>%
-      group_by(PLT_CN, PROP_BASIS, CONDID, .dots = grpBy) %>%
-      summarize(aDI = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0),
-                CONDPROP_UNADJ = first(CONDPROP_UNADJ)) %>%
-      group_by(PLT_CN, PROP_BASIS, .dots = grpBy) %>%
-      summarize(fa = sum(CONDPROP_UNADJ * aDI, na.rm = TRUE))
+      distinct(PLT_CN, pltID, date, PROP_BASIS, CONDID, .keep_all = TRUE) %>%
+      group_by(PLT_CN, pltID, date, PROP_BASIS, CONDID, .dots = grpBy) %>%
+      summarize(CONDPROP_UNADJ = first(CONDPROP_UNADJ * aDI)) %>%
+      mutate(CONDPROP_UNADJ = replace_na(CONDPROP_UNADJ, 0)) %>%
+      ## Average forested area between min and max date
+      group_by(pltID, PROP_BASIS, .dots = grpBy) %>%
+      summarize(minDate = min(date, na.rm = TRUE),
+                maxDate = max(date, na.rm = TRUE),
+                amin = sum(CONDPROP_UNADJ[date == minDate], na.rm = TRUE),
+                amax = sum(CONDPROP_UNADJ[date == maxDate], na.rm = TRUE),
+                fa = (amin + amax) / 2)
 
     tStart <- data %>%
       filter(pltID %in% obs$pltID) %>%
@@ -418,7 +476,8 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
                 plotIn = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0)) %>%
       mutate(date = paste(MEASYEAR, MEASMON, MEASDAY, sep = '-'),
              date = as.Date(date, "%Y-%m-%d")) %>%
-      filter(!is.na(PLOT_BASIS)) %>%
+      #filter(!is.na(PLOT_BASIS)) %>%
+      #mutate(PLOT_BASIS = replace_na(PLOT_BASIS, 'SUBP')) %>%
       ungroup() %>%
       left_join(select(ungroup(remSeries), PLT_CN, meas), by = 'PLT_CN') %>%
       left_join(select(ungroup(obs), pltID, obs), by = 'pltID') #%>%
@@ -451,6 +510,7 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
                  MEASYEAR = map_dbl(df, maxYear),
                  PREV_TPA = map_dbl(df, ptpa),
                  PREV_BAA = map_dbl(df, pbaa),
+                 plotIn = map_dbl(df, pstatusPop),
                  ## For consistency with other function (direct remeasurements)
                  CHNG_TPA = t_rate * REMPER,
                  CHNG_BAA = b_rate * REMPER) %>%
@@ -468,10 +528,15 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
         mutate(CHNG_BAA = replace_na(CHNG_BAA, 0),
                CHNG_TPA = replace_na(CHNG_TPA, 0)) %>%
         filter(!is.na(t_rate)) %>%
-        left_join(select(ungroup(tStart), PLT_CN, PLOT_BASIS, plotIn, all_of(grpBy)), by = c('PLT_CN', 'PLOT_BASIS', grpBy))
+        left_join(select(ungroup(tStart), PLT_CN, PLOT_BASIS, all_of(grpBy)), by = c('PLT_CN', 'PLOT_BASIS', grpBy))
     } else {
       t = NULL
     }
+
+    ## Need a PLT_CN on a
+    a <- a %>%
+      left_join(select(ungroup(db$PLOT), PLT_CN, pltID), by = c('pltID'))
+
   }
 
 
@@ -530,7 +595,9 @@ fsiHelper2 <- function(x, popState, a, t, grpBy, method){
       ct = CHNG_TPA * tAdj,
       cb = CHNG_BAA * tAdj,
       pt = PREV_TPA * tAdj,
-      pb = PREV_BAA * tAdj) %>%
+      pb = PREV_BAA * tAdj,
+      TPA_RATE = TPA_RATE * tAdj,
+      BAA_RATE = BAA_RATE * tAdj) %>%
     ## Computing change
     mutate(ct = (ct) / REMPER,
            cb = (cb) / REMPER) %>%
@@ -550,7 +617,7 @@ fsiHelper2 <- function(x, popState, a, t, grpBy, method){
               TPA_RATE = sum(TPA_RATE, na.rm = TRUE),
               BAA_RATE = sum(BAA_RATE, na.rm = TRUE),
               ## Total unique number of trees
-              n = sum(n, na.rm = TRUE)) %>%
+              n = first(n)) %>%
     ## Do not want to compute SI for micro and subp seperately, handle it here
     mutate(TPA_RATE = TPA_RATE / REMPER,
            BAA_RATE = BAA_RATE / REMPER / n,
@@ -564,7 +631,8 @@ fsiHelper2 <- function(x, popState, a, t, grpBy, method){
            siPlot = if_else(x < 0, -siPlot, siPlot),
            siPlot = case_when(
              is.na(siPlot) ~ 0,
-             TRUE ~ siPlot)) %>%
+             TRUE ~ siPlot)
+           ) %>%
     ungroup() %>%
     left_join(select(aAdj, PLT_CN, grpBy, fa), by = c('PLT_CN', grpBy)) %>%
 

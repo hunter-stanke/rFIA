@@ -90,11 +90,11 @@ data(countiesRI)
 ## Most recents subset
 fiaRI_mr <- clipFIA(fiaRI)
 
+\donttest{
 ## Most recent estimates on forest land
 invasive(db = fiaRI_mr,
     landType = 'forest')
 
-\donttest{
 ## Same as above, but implemented in parallel (much quicker)
 parallel::detectCores(logical = FALSE) # 4 cores available, we will take 2
 invasive(db = fiaRI_mr,
