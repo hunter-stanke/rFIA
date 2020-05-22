@@ -659,6 +659,7 @@ getFHM <- function(states,
 readFIA <- function(dir,
                     common = TRUE,
                     tables = NULL,
+                    states = NULL,
                     nCores = 1,
                     ...){
 
@@ -676,6 +677,11 @@ readFIA <- function(dir,
     stop(paste('Directory', dir, 'contains no .csv files.'))
   }
 
+  ## Some warnings up front
+  ## Do not try to merge ENTIRE with other states
+  if (length(states) > 1 & any(str_detect(str_to_upper(states), 'ENTIRE'))){
+    stop('Cannot merge ENITRE with other state tables. ENTIRE includes all state tables combined. Do you only need data for a particular region?')
+  }
 
   # Only read in the specified tables
   if (!is.null(tables)){
@@ -701,6 +707,28 @@ readFIA <- function(dir,
       files <- files[str_sub(files,1,-5) %in% cFiles]
     }
   }
+
+
+  ## If individual tables are specified, then just grab those .csvs, otherwise download the .zip file, extract and read with fread. Should be quite a bit quicker.
+  if (!is.null(states)){
+    ### I'm not very smart and like specify the name twice sometimes,
+    ### --> making the function smarter than me
+    states <- str_to_upper(unique(states))
+
+    ## Check to make sure states exist
+    allStates <- unique(str_to_upper(str_sub(files, 1, 2)))
+
+    if (any(states %in% allStates == FALSE)){
+      missStates <- states[states %in% allStates == FALSE]
+      stop(paste('Data unavailable for: ', paste(as.character(missStates),collapse = ', '), '. States not found in specified directory.'))
+    }
+
+    files <- files[str_to_upper(str_sub(files, 1, 2)) %in% states]
+
+
+  }
+
+
 
 
   # ## Compute estimates in parallel -- Clusters in windows, forking otherwise
