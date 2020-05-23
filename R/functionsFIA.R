@@ -465,6 +465,7 @@ print.FIA.Database <- function(x, ...){
 #' @import progress
 #' @import tidyselect
 #' @import purrr
+#' @importFrom rlang eval_tidy enquo enquos quos quo
 #' @importFrom data.table fread fwrite rbindlist
 #' @importFrom parallel makeCluster detectCores mclapply parLapply stopCluster clusterEvalQ
 #' @import tidyr
@@ -660,120 +661,156 @@ readFIA <- function(dir,
                     common = TRUE,
                     tables = NULL,
                     states = NULL,
+                    inMemory = TRUE,
                     nCores = 1,
                     ...){
 
-  # Add a slash to end of directory name if missing
-  if (str_sub(dir,-1) != '/') dir <- paste(dir, '/', sep = "")
-  # Grab all the file names in directory
-  files <- list.files(dir)
-  inTables <- list()
+  ## methods for reading the full database into memory
+    # Add a slash to end of directory name if missing
+    if (str_sub(dir,-1) != '/') dir <- paste(dir, '/', sep = "")
+    # Grab all the file names in directory
+    files <- list.files(dir)
 
-  # Some warnings
-  if(!dir.exists(dir)) {
-    stop(paste('Directory', dir, 'does not exist.'))
-  }
-  if(length(files[str_sub(files,-4, -1) == '.csv']) < 1){
-    stop(paste('Directory', dir, 'contains no .csv files.'))
-  }
+  if (inMemory){
 
-  ## Some warnings up front
-  ## Do not try to merge ENTIRE with other states
-  if (length(states) > 1 & any(str_detect(str_to_upper(states), 'ENTIRE'))){
-    stop('Cannot merge ENITRE with other state tables. ENTIRE includes all state tables combined. Do you only need data for a particular region?')
-  }
+      inTables <- list()
 
-  # Only read in the specified tables
-  if (!is.null(tables)){
-    if (any(str_sub(files, 3, 3) == '_')){
-      files <- files[str_sub(files,4,-5) %in% tables]
-    } else {
-      files <- files[str_sub(files,1,-5) %in% tables]
+    # Some warnings
+    if(!dir.exists(dir)) {
+      stop(paste('Directory', dir, 'does not exist.'))
     }
-  }
-
-  # Only csvs
-  files <- files[str_sub(files,-4,-1) == '.csv']
-
-  # Only extract the tables needed to run functions in rFIA
-  if (common){
-    cFiles <- c('COND', 'COND_DWM_CALC', 'INVASIVE_SUBPLOT_SPP', 'PLOT', 'POP_ESTN_UNIT',
-                'POP_EVAL', 'POP_EVAL_GRP', 'POP_EVAL_TYP', 'POP_PLOT_STRATUM_ASSGN', 'POP_STRATUM',
-                'SUBPLOT', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_MIDPT', 'TREE_GRM_BEGIN', 'SUBP_COND_CHNG_MTRX',
-                'SEEDLING', 'SURVEY', 'SUBP_COND')
-    if (any(str_sub(files, 3, 3) == '_')){
-      files <- files[str_sub(files,4,-5) %in% cFiles]
-    } else{
-      files <- files[str_sub(files,1,-5) %in% cFiles]
-    }
-  }
-
-
-  ## If individual tables are specified, then just grab those .csvs, otherwise download the .zip file, extract and read with fread. Should be quite a bit quicker.
-  if (!is.null(states)){
-    ### I'm not very smart and like specify the name twice sometimes,
-    ### --> making the function smarter than me
-    states <- str_to_upper(unique(states))
-
-    ## Check to make sure states exist
-    allStates <- unique(str_to_upper(str_sub(files, 1, 2)))
-
-    if (any(states %in% allStates == FALSE)){
-      missStates <- states[states %in% allStates == FALSE]
-      stop(paste('Data unavailable for: ', paste(as.character(missStates),collapse = ', '), '. States not found in specified directory.'))
+    if(length(files[str_sub(files,-4, -1) == '.csv']) < 1){
+      stop(paste('Directory', dir, 'contains no .csv files.'))
     }
 
-    files <- files[str_to_upper(str_sub(files, 1, 2)) %in% states]
+    ## Some warnings up front
+    ## Do not try to merge ENTIRE with other states
+    if (length(states) > 1 & any(str_detect(str_to_upper(states), 'ENTIRE'))){
+      stop('Cannot merge ENITRE with other state tables. ENTIRE includes all state tables combined. Do you only need data for a particular region?')
+    }
+
+    # Only read in the specified tables
+    if (!is.null(tables)){
+      if (any(str_sub(files, 3, 3) == '_')){
+        files <- files[str_sub(files,4,-5) %in% tables]
+      } else {
+        files <- files[str_sub(files,1,-5) %in% tables]
+      }
+    }
+
+    # Only csvs
+    files <- files[str_sub(files,-4,-1) == '.csv']
+
+    # Only extract the tables needed to run functions in rFIA
+    if (common){
+      cFiles <- c('COND', 'COND_DWM_CALC', 'INVASIVE_SUBPLOT_SPP', 'PLOT', 'POP_ESTN_UNIT',
+                  'POP_EVAL', 'POP_EVAL_GRP', 'POP_EVAL_TYP', 'POP_PLOT_STRATUM_ASSGN', 'POP_STRATUM',
+                  'SUBPLOT', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_MIDPT', 'TREE_GRM_BEGIN', 'SUBP_COND_CHNG_MTRX',
+                  'SEEDLING', 'SURVEY', 'SUBP_COND')
+      if (any(str_sub(files, 3, 3) == '_')){
+        files <- files[str_sub(files,4,-5) %in% cFiles]
+      } else{
+        files <- files[str_sub(files,1,-5) %in% cFiles]
+      }
+    }
 
 
+    ## If individual tables are specified, then just grab those .csvs, otherwise download the .zip file, extract and read with fread. Should be quite a bit quicker.
+    if (!is.null(states)){
+      ### I'm not very smart and like specify the name twice sometimes,
+      ### --> making the function smarter than me
+      states <- str_to_upper(unique(states))
+
+      ## Check to make sure states exist
+      allStates <- unique(str_to_upper(str_sub(files, 1, 2)))
+
+      if (any(states %in% allStates == FALSE)){
+        missStates <- states[states %in% allStates == FALSE]
+        stop(paste('Data unavailable for: ', paste(as.character(missStates),collapse = ', '), '. States not found in specified directory.'))
+      }
+
+      files <- files[str_to_upper(str_sub(files, 1, 2)) %in% states]
+
+
+    }
+
+
+
+
+    # ## Compute estimates in parallel -- Clusters in windows, forking otherwise
+    # if (Sys.info()['sysname'] == 'Windows'){
+    #   cl <- makeCluster(nCores) # Set up snow cluster
+    #   inTables <- parLapply(cl, X = files, fun = readFIAHelper1, dir)
+    # } else { # Unix systems
+    #   inTables <- mclapply(files, FUN = readFIAHelper1, dir, mc.cores = nCores)
+    # }
+    inTables <- list()
+    for (n in 1:length(files)){
+      # Read in and append each file to a list
+      file <- fread(paste(dir, files[n], sep = ""), showProgress = FALSE, integer64 = 'double', logical01 = FALSE, nThread = nCores, ...)
+      # We don't want data.table formats
+      #file <- as.data.frame(file)
+      fileName <- str_sub(files[n], 1, -5)
+
+      inTables[[fileName]] <- file
+    }
+
+
+    # Give them some names
+    #names(inTables) <- files
+    #inTables <- lapply(inTables, as.data.frame)
+
+    outTables <- list()
+    if (any(str_sub(names(inTables), 3, 3) == '_')){ ## STATE NAMING CONVENTION
+      # Remove the state prefix
+      names(inTables) <- str_sub(names(inTables), 4, -1)
+    }
+    uniqueNames <- unique(names(inTables))
+    ## Works regardless of whether or not there are duplicate names (multiple states)
+    for (i in 1:length(uniqueNames)){
+      outTables[[uniqueNames[i]]] <- rbindlist(inTables[names(inTables) == uniqueNames[i]])
+    }
+
+    # NEW CLASS NAME FOR FIA DATABASE OBJECTS
+    outTables <- lapply(outTables, as.data.frame)
+    class(outTables) <- 'FIA.Database'
+
+    ## If you are on windows, close explicitly
+    #closeAllConnections()
+
+    return(outTables)
+
+    ### Methods for keeping data remote until they are needed
+    ### Chunking up data into states
+    ## inMemory = FALSE
+  } else {
+
+    ## IF states isn't given, default to all
+    ## states in the directory
+    if (is.null(states)){
+      states <- unique(str_to_upper(str_sub(files, 1, 3)))
+      states <- states[str_sub(states, 3,3) == '_']
+      states <- str_sub(states, 1, 2)
+      ## Don't fail if states have been merged
+      if (length(states) < 1) states <- 1
+    }
+
+
+    ## Saving the call to readFIA, for eval later
+    out <- list(dir = dir,
+                common = common,
+                tables = tables,
+                states = states,
+                ... = ...)
+
+    class(out) <- 'Remote.FIA.Database'
+    return(out)
   }
 
-
-
-
-  # ## Compute estimates in parallel -- Clusters in windows, forking otherwise
-  # if (Sys.info()['sysname'] == 'Windows'){
-  #   cl <- makeCluster(nCores) # Set up snow cluster
-  #   inTables <- parLapply(cl, X = files, fun = readFIAHelper1, dir)
-  # } else { # Unix systems
-  #   inTables <- mclapply(files, FUN = readFIAHelper1, dir, mc.cores = nCores)
-  # }
-  inTables <- list()
-  for (n in 1:length(files)){
-    # Read in and append each file to a list
-    file <- fread(paste(dir, files[n], sep = ""), showProgress = FALSE, integer64 = 'double', logical01 = FALSE, nThread = nCores, ...)
-    # We don't want data.table formats
-    #file <- as.data.frame(file)
-    fileName <- str_sub(files[n], 1, -5)
-
-    inTables[[fileName]] <- file
-  }
-
-
-  # Give them some names
-  #names(inTables) <- files
-  #inTables <- lapply(inTables, as.data.frame)
-
-  outTables <- list()
-  if (any(str_sub(names(inTables), 3, 3) == '_')){ ## STATE NAMING CONVENTION
-    # Remove the state prefix
-    names(inTables) <- str_sub(names(inTables), 4, -1)
-  }
-  uniqueNames <- unique(names(inTables))
-  ## Works regardless of whether or not there are duplicate names (multiple states)
-  for (i in 1:length(uniqueNames)){
-    outTables[[uniqueNames[i]]] <- rbindlist(inTables[names(inTables) == uniqueNames[i]])
-  }
-
-  # NEW CLASS NAME FOR FIA DATABASE OBJECTS
-  outTables <- lapply(outTables, as.data.frame)
-  class(outTables) <- 'FIA.Database'
-
-  ## If you are on windows, close explicitly
-  #closeAllConnections()
-
-  return(outTables)
 }
+
+
+
 
 ## Access FIA Database files from the FIA Datamart
 #' @export
@@ -781,6 +818,7 @@ getFIA <- function(states,
                    dir = NULL,
                    common = TRUE,
                    tables = NULL,
+                   load = TRUE,
                    nCores = 1){
 
   if (!is.null(dir)){
@@ -795,6 +833,10 @@ getFIA <- function(states,
     }
 
     message(paste0('Saving to ', dir, '. NOTE: modifying FIA tables in Excel may corrupt csv files.'))
+  }
+
+  if (is.null(dir) & load == FALSE){
+    stop('Must specify a directory ("dir") to save data when "load = FALSE".')
   }
 
   ## If dir is not specified, hold in a temporary directory
@@ -888,50 +930,57 @@ Did you accidentally include the state abbreviation in front of the table name? 
       } else {
         #download.file(urls[n], paste0(dir, tblNames[n]))
         unzip(temp, exdir = str_sub(dir, 1, -2))
-        file <- fread(paste0(dir, newName), showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores)
+        if (load) file <- fread(paste0(dir, newName), showProgress = FALSE, logical01 = FALSE, integer64 = 'double', nThread = nCores)
       }
 
       unlink(temp)
 
-      # We don't want data.table formats
-      file <- as.data.frame(file)
+      if (load){
+        # We don't want data.table formats
+        file <- as.data.frame(file)
+        inTables[[str_sub(urls[n], 43, -5)]] <- file
+      }
 
-      inTables[[str_sub(urls[n], 43, -5)]] <- file
     }
 
-    # Check for corresponding tables (multiple states)
-    # If they exist, loop through and merge corresponding tables
-    ## Check if the directory has the entire US naming convention or state naming convention
-    tableNames <- names(inTables)
-    outTables <- list()
-    if (any(str_sub(tableNames, 3, 3) == '_')){ ## STATE NAMING CONVENTION
-      if (anyDuplicated(str_sub(tableNames, 4)) != 0){
-        for (i in 1:length(unique(str_sub(tableNames, 4)))){
-          subList <- inTables[str_sub(tableNames, 4) == unique(str_sub(tableNames,4))[i]]
-          name <- unique(str_sub(tableNames, 4))[i]
-          # Give a ton of warnings about factors and characters, don't do that
-          outTables[[name]] <- suppressWarnings(do.call(rbind, subList))
+    if (load){
+      # Check for corresponding tables (multiple states)
+      # If they exist, loop through and merge corresponding tables
+      ## Check if the directory has the entire US naming convention or state naming convention
+      tableNames <- names(inTables)
+      outTables <- list()
+      if (any(str_sub(tableNames, 3, 3) == '_')){ ## STATE NAMING CONVENTION
+        if (anyDuplicated(str_sub(tableNames, 4)) != 0){
+          for (i in 1:length(unique(str_sub(tableNames, 4)))){
+            subList <- inTables[str_sub(tableNames, 4) == unique(str_sub(tableNames,4))[i]]
+            name <- unique(str_sub(tableNames, 4))[i]
+            # Give a ton of warnings about factors and characters, don't do that
+            outTables[[name]] <- suppressWarnings(do.call(rbind, subList))
+          }
+        } else {
+          outTables <- inTables
+          names(outTables) <- unique(str_sub(tableNames, 4))
         }
-      } else {
-        outTables <- inTables
-        names(outTables) <- unique(str_sub(tableNames, 4))
-      }
-    } else{ ## ENTIRE NAMING CONVENTION
-      if (anyDuplicated(tableNames) != 0){
-        for (i in 1:length(unique(tableNames))){
-          subList <- inTables[tableNames == unique(tableNames)[i]]
-          name <- unique(str_sub(tableNames, 1))[i]
-          # Give a ton of warnings about factors and characters, don't do that
-          outTables[[name]] <- suppressWarnings(do.call(rbind, subList))
+      } else{ ## ENTIRE NAMING CONVENTION
+        if (anyDuplicated(tableNames) != 0){
+          for (i in 1:length(unique(tableNames))){
+            subList <- inTables[tableNames == unique(tableNames)[i]]
+            name <- unique(str_sub(tableNames, 1))[i]
+            # Give a ton of warnings about factors and characters, don't do that
+            outTables[[name]] <- suppressWarnings(do.call(rbind, subList))
+          }
+        } else {
+          outTables <- inTables
+          names(outTables) <- unique(str_sub(tableNames, 1))
         }
-      } else {
-        outTables <- inTables
-        names(outTables) <- unique(str_sub(tableNames, 1))
       }
+      # NEW CLASS NAME FOR FIA DATABASE OBJECTS
+      #outTables <- lapply(outTables, as.data.frame)
+      class(outTables) <- 'FIA.Database'
     }
-    # NEW CLASS NAME FOR FIA DATABASE OBJECTS
-    #outTables <- lapply(outTables, as.data.frame)
-    class(outTables) <- 'FIA.Database'
+
+
+
     #### DOWNLOADING THE WHOLE ZIP FILE
   } else {
     ## Download to a temporary file location, then extract to the permanent if wanted. Read extracted tables into R w/ readFIA.
@@ -957,13 +1006,16 @@ Did you accidentally include the state abbreviation in front of the table name? 
       unlink(temp)
     }
 
-    ## Read in the files w/ readFIA
-    if (is.null(dir)){
-      outTables <- readFIA(tempDir, nCores = nCores, common = common)
-      #unlink(tempDir, recursive = TRUE)
-    } else {
-      outTables <- readFIA(dir, nCores = nCores, common = common)
+    if (load){
+      ## Read in the files w/ readFIA
+      if (is.null(dir)){
+        outTables <- readFIA(tempDir, nCores = nCores, common = common, states = states)
+        #unlink(tempDir, recursive = TRUE)
+      } else {
+        outTables <- readFIA(dir, nCores = nCores, common = common, states = states)
+      }
     }
+
 
     ## If you are on windows, close explicitly
     #closeAllConnections()
@@ -974,45 +1026,81 @@ Did you accidentally include the state abbreviation in front of the table name? 
   #closeAllConnections()
 
   if (is.null(dir)){
-     tmp <- list.files(tempDir, full.names = TRUE, pattern = '.csv')
-     invisible(file.remove(tmp))
-    }
+    tmp <- list.files(tempDir, full.names = TRUE, pattern = '.csv')
+    invisible(file.remove(tmp))
+  }
 
-  return(outTables)
-
+  if (load) return(outTables)
 }
+
+
 
 ## Write out the raw FIA files
 #' @export
 writeFIA <- function(db,
                      dir,
+                     byState = FALSE,
                      nCores = 1,
                      ...){
+  if (class(db) == 'Remote.FIA.Database'){
+    stop('Cannot write remote database.')
+  }
+
   #cat(sys.call()$dir)
   if (!is.null(dir)){
     # Add a slash to end of directory name if missing
     if (str_sub(dir,-1) != '/'){
       dir <- paste(dir, '/', sep = "")
     }
-    # Check to see directory exists
+    # Check to see directory exists, if not, make it
     if(!dir.exists(dir)) {
-      stop(paste('Directory', dir, 'does not exist. Cannot create new directory.'))
+      dir.create(dir)
+      message(paste('Creating directory:', dir))
     }
     message(paste0('Saving to ', dir, '. NOTE: modifying FIA tables in Excel may corrupt csv files.'))
   }
 
-  tableNames <- names(db)
-  ## Write out tables
-  ## Read/write tables in parallel -- Clusters in windows, forking otherwise
-  # if (Sys.info()['sysname'] == 'Windows'){
-  #   cl <- makeCluster(nCores) # Set up snow cluster
-  #   parLapply(cl, X = tableNames, fun = writeFIAHelper, db, dir)
-  # } else { # Unix systems
-  #   mclapply(X = tableNames, FUN = writeFIAHelper, db, dir, mc.cores = nCores)
-  # }
-  for (i in 1:length(tableNames)){
-    if (is.data.frame(db[[i]])){
-      fwrite(x = db[[i]], file = paste0(dir, tableNames[i], '.csv'), showProgress = FALSE, nThread = nCores)
+  ## Method to chunk up the database into states before writing it out
+  if (byState){
+
+    stateNames <- distinct(db$SURVEY, STATECD, STATEAB)
+    db$PLOT <- db$PLOT %>%
+      left_join(stateNames, by = 'STATECD')
+
+    ## Unique state abbreviations
+    states <- unique(db$PLOT$STATEAB)
+
+    ## Chunk up plot
+    pltList <- split(db$PLOT, as.factor(db$PLOT$STATEAB))
+
+    ## Loop over states, do the writing
+    for (s in 1:length(states)){
+      db_clip <- db
+      ## Overwriting plot with shortened table
+      db_clip$PLOT <- pltList[[s]]
+      ## Subsetting the remaining database based
+      ## on plot table
+      db_clip <- clipFIA(db_clip, mostRecent = FALSE)
+
+      ## Write it all out
+      tableNames <- names(db_clip)[names(db_clip) != 'mostRecent']
+      tableNames <- paste(unique(db_clip$PLOT$STATEAB), tableNames, sep = '_')
+      for (i in 1:length(tableNames)){
+        if (is.data.frame(db_clip[[i]])){
+          fwrite(x = db_clip[[i]], file = paste0(dir, tableNames[i], '.csv'), showProgress = FALSE, nThread = nCores)
+        }
+      }
+    }
+
+
+    ## Merge states together on writing
+  } else {
+    tableNames <- names(db)
+
+    for (i in 1:length(tableNames)){
+      if (is.data.frame(db[[i]])){
+        fwrite(x = db[[i]], file = paste0(dir, tableNames[i], '.csv'), showProgress = FALSE, nThread = nCores)
+      }
     }
   }
 
@@ -1150,7 +1238,21 @@ clipFIA <- function(db,
 
   ## Some warnings
   if (class(db) != "FIA.Database"){
-    stop('db must be of class "FIA.Databse". Use readFIA() to load your FIA data.')
+    ## Add clipFIA arguments to remote database
+    if (class(db) == 'Remote.FIA.Database'){
+
+      db$mostRecent = mostRecent
+      ## Lists won't accept NULL,
+      ## but this is a hack
+      db['mask'] = list(mask)
+
+      db['evalid'] = list(evalid)
+
+      db['designCD'] = list(designCD)
+
+      return(db)
+    }
+    stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
   }
   if (!is.null(mask) & first(class(mask)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('mask must be spatial polygons object of class sp or sf. ')

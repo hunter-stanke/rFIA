@@ -1,21 +1,40 @@
+growMortStarter <- function(x,
+                            db,
+                            grpBy_quo = NULL,
+                            polys = NULL,
+                            returnSpatial = FALSE,
+                            bySpecies = FALSE,
+                            bySizeClass = FALSE,
+                            landType = 'forest',
+                            treeType = 'all',
+                            method = 'TI',
+                            lambda = .5,
+                            stateVar = 'TPA',
+                            treeDomain = NULL,
+                            areaDomain = NULL,
+                            totals = FALSE,
+                            byPlot = FALSE,
+                            nCores = 1,
+                            remote){
 
-#' @export
-growMort <- function(db,
-                     grpBy = NULL,
-                     polys = NULL,
-                     returnSpatial = FALSE,
-                     bySpecies = FALSE,
-                     bySizeClass = FALSE,
-                     landType = 'forest',
-                     treeType = 'all',
-                     method = 'TI',
-                     lambda = .5,
-                     stateVar = 'TPA',
-                     treeDomain = NULL,
-                     areaDomain = NULL,
-                     totals = FALSE,
-                     byPlot = FALSE,
-                     nCores = 1) {
+  if (remote){
+    ## Store the original parameters here
+    params <- db
+
+    ## Read in one state at a time
+    db <- readFIA(dir = db$dir, common = db$common,
+                  tables = db$tables, states = x, ## x is the vector of state names
+                  nCores = nCores)
+
+    ## If a clip was specified, run it now
+    if ('mostRecent' %in% names(params)){
+      db <- clipFIA(db, mostRecent = params$mostRecent,
+                    mask = params$mask, matchEval = params$matchEval,
+                    evalid = params$evalid, designCD = params$designCD,
+                    nCores = nCores)
+    }
+
+  }
 
   ## Need a plotCN
   db$TREE <- db[['TREE']] %>% mutate(TRE_CN = CN)
@@ -23,8 +42,6 @@ growMort <- function(db,
   db$PLOT <- db$PLOT %>% mutate(PLT_CN = CN,
                                 pltID = paste(UNITCD, STATECD, COUNTYCD, PLOT, sep = '_'))
 
-  ##  don't have to change original code
-  grpBy_quo <- enquo(grpBy)
 
   # Probably cheating, but it works
   if (quo_name(grpBy_quo) != 'NULL'){
@@ -49,15 +66,14 @@ growMort <- function(db,
       # Convert to character
       grpBy <- names(d_quo)
     }
+  } else {
+    grpBy <- NULL
   }
 
   reqTables <- c('PLOT', 'TREE', 'TREE_GRM_COMPONENT', 'COND',
                  'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
-  ## Some warnings
-  if (class(db) != "FIA.Database"){
-    stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
-  }
+
   if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
   }
@@ -109,13 +125,13 @@ growMort <- function(db,
 
   ### AREAL SUMMARY PREP
   if(!is.null(polys)) {
-    # Convert polygons to an sf object
-    polys <- polys %>%
-      as('sf')%>%
-      mutate_if(is.factor,
-                as.character)
-    ## A unique ID
-    polys$polyID <- 1:nrow(polys)
+    # # Convert polygons to an sf object
+    # polys <- polys %>%
+    #   as('sf')%>%
+    #   mutate_if(is.factor,
+    #             as.character)
+    # ## A unique ID
+    # polys$polyID <- 1:nrow(polys)
 
     # Add shapefile names to grpBy
     #grpBy = c(names(polys)[str_detect(names(polys), 'geometry') == FALSE], 'polyID', grpBy)
@@ -293,8 +309,8 @@ growMort <- function(db,
 
   # User defined domain indicator for area (ex. specific forest type)
   pcEval <- left_join(db$PLOT, select(db$COND, -c('STATECD', 'UNITCD', 'COUNTYCD', 'INVYR', 'PLOT')), by = 'PLT_CN')
-  areaDomain <- substitute(areaDomain)
-  pcEval$aD <- eval(areaDomain, pcEval) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  #areaDomain <- substitute(areaDomain)
+  pcEval$aD <- rlang::eval_tidy(areaDomain, pcEval) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
   if(!is.null(pcEval$aD)) pcEval$aD[is.na(pcEval$aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
   if(is.null(pcEval$aD)) pcEval$aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
   pcEval$aD <- as.numeric(pcEval$aD)
@@ -307,8 +323,8 @@ growMort <- function(db,
   rm(pcEval)
 
   # Same as above for tree (ex. trees > 20 ft tall)
-  treeDomain <- substitute(treeDomain)
-  tD <- eval(treeDomain, db$TREE) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  #treeDomain <- substitute(treeDomain)
+  tD <- rlang::eval_tidy(treeDomain, db$TREE) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
   if(!is.null(tD)) tD[is.na(tD)] <- 0 # Make NAs 0s. Causes bugs otherwise
   if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
   db$TREE$tD <- as.numeric(tD)
@@ -465,6 +481,8 @@ growMort <- function(db,
       names(tOut) <- str_replace(names(tOut), 'TPA', paste(stateVar, 'ACRE', sep = '_'))
 
     }
+    out <- list(tEst = tOut, grpBy = grpBy, aGrpBy = aGrpBy, grpByOrig = grpByOrig)
+
     ## Population estimation
   } else {
     ## back to dataframes
@@ -500,7 +518,92 @@ growMort <- function(db,
     out <- unlist(out, recursive = FALSE)
     aEst <- bind_rows(out[names(out) == 'aEst'])
     tEst <- bind_rows(out[names(out) == 'tEst'])
+    out <- list(tEst = tEst, aEst = aEst, grpBy = grpBy, aGrpBy = aGrpBy, grpByOrig = grpByOrig)
 
+  }
+
+  return(out)
+}
+
+
+
+#' @export
+growMort <- function(db,
+                     grpBy = NULL,
+                     polys = NULL,
+                     returnSpatial = FALSE,
+                     bySpecies = FALSE,
+                     bySizeClass = FALSE,
+                     landType = 'forest',
+                     treeType = 'all',
+                     method = 'TI',
+                     lambda = .5,
+                     stateVar = 'TPA',
+                     treeDomain = NULL,
+                     areaDomain = NULL,
+                     totals = FALSE,
+                     byPlot = FALSE,
+                     nCores = 1) {
+
+  ##  don't have to change original code
+  grpBy_quo <- enquo(grpBy)
+  areaDomain <- rlang::enquo(areaDomain)
+  treeDomain <- rlang::enquo(treeDomain)
+
+
+  ### Is DB remote?
+  remote <- ifelse(class(db) == 'Remote.FIA.Database', 1, 0)
+  if (remote){
+
+    iter <- db$states
+
+    ## In memory
+  } else {
+    ## Some warnings
+    if (class(db) != "FIA.Database"){
+      stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
+    }
+
+    ## an iterator for remote
+    iter <- 1
+
+  }
+
+  ### AREAL SUMMARY PREP
+  if(!is.null(polys)) {
+    # Convert polygons to an sf object
+    polys <- polys %>%
+      as('sf')%>%
+      mutate_if(is.factor,
+                as.character)
+    ## A unique ID
+    polys$polyID <- 1:nrow(polys)
+  }
+
+
+
+  ## Run the main portion
+  out <- lapply(X = iter, FUN = growMortStarter, db,
+                grpBy_quo, polys, returnSpatial,
+                bySpecies, bySizeClass,
+                landType, treeType, method,
+                lambda, stateVar, treeDomain, areaDomain,
+                totals, byPlot, nCores, remote)
+  ## Bring the results back
+  out <- unlist(out, recursive = FALSE)
+  aEst <- bind_rows(out[names(out) == 'aEst'])
+  tEst <- bind_rows(out[names(out) == 'tEst'])
+  grpBy <- out[names(out) == 'grpBy'][[1]]
+  aGrpBy <- out[names(out) == 'aGrpBy'][[1]]
+  grpByOrig <- out[names(out) == 'grpByOrig'][[1]]
+
+
+
+  if (byPlot){
+    tOut <- tEst
+
+    ## Population estimates
+  } else {
 
     ##### ----------------- MOVING AVERAGES
     if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){

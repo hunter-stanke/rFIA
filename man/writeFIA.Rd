@@ -7,7 +7,7 @@
 }
 
 \usage{
-writeFIA(db, dir, nCores = 1, ...)
+writeFIA(db, dir, byState = FALSE, nCores = 1, ...)
 }
 
 %- maybe also 'usage' for other objects documented here.
@@ -15,6 +15,7 @@ writeFIA(db, dir, nCores = 1, ...)
   \item{db}{\code{FIA.Database} object produced from \code{\link{readFIA}} or \code{\link{getFIA}}.}
   \item{dir}{directory where FIA Datatables will be stored.}
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
+  \item{byState}{logical; should tables be written out by state? Must be TRUE if planning to load data as an out-of-memory database in the future (see \code{\link{readFIA}}).}
   \item{\dots}{other arguments to pass to \code{\link{fwrite}}.}
 }
 

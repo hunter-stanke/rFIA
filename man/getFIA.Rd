@@ -4,7 +4,8 @@
 \description{Easiest and most efficient way to access FIA Data in R. Downloads FIA Data from the FIA Datamart, loads the data into R environment, and optionally saves all downloaded tables as .csv files to local directory. Capable of merging multiple state downloads of the FIA database for regional analysis. Requires an internet connection to access and download tables from the FIA Datamart.}
 
 \usage{
-getFIA(states, dir = NULL, common = TRUE, tables = NULL, nCores = 1)
+getFIA(states, dir = NULL, common = TRUE, tables = NULL,
+       load = TRUE, nCores = 1)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -12,6 +13,7 @@ getFIA(states, dir = NULL, common = TRUE, tables = NULL, nCores = 1)
   \item{dir}{character (optional); directory where FIA tables will be saved after download. If NULL, tables will not be saved on disk and only loaded into R environment.}
   \item{common}{logical; if TRUE, only import most commonly used tables, including all required for \code{rFIA} functions (see Details for list of tables).}
   \item{tables}{character vector (optional); names of specific tables to be downloaded for each state specified (e.g. 'PLOT', 'TREE', 'COND', 'TREE_GRM_COMPONENT').}
+  \item{load}{logical; should downloaded data be loaded into R immediately? If all data is too large to fit in memory, use \code{load = FALSE} and load the data as a \code{"Remote.FIA.Database"} with \code{\link{readFIA}}.}
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }
 

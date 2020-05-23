@@ -27,7 +27,12 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet
   }
   ## IF data is not an FIA.Database, y is required
   if (any(class(data) %in% c('FIA.Database') == FALSE) & quo_name(y_quo) == "NULL"){
-    stop('Argument "y" required unless plotting an FIA.Database object.')
+    ## If it's remote, just read in the plot table
+    if (class(data) == 'Remote.FIA.Database'){
+      data <- readFIA(data$dir, tables = 'PLOT')
+    } else {
+      stop('Argument "y" required unless plotting an FIA.Database object.')
+    }
   } #else if (quo_name(y_quo) != "NULL") {
     #stop(cat('Argument "y" required unless plotting an FIA.Database object.'))
   #}
