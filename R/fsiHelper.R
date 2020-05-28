@@ -24,18 +24,18 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   data <- select(db$PLOT, c('PLT_CN', 'pltID', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR',
-                            'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp', 'DESIGNCD',
+                            'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', all_of(grpP), 'aD_p', 'sp', 'DESIGNCD',
                             MEASMON, MEASDAY, MEASYEAR)) %>%
     #filter(!is.na(REMPER) & !is.na(PREV_PLT_CN) & DESIGNCD == 1 & PLOT_STATUS_CD != 3) %>%
     #filter(!is.na(PREV_PLT_CN)) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', all_of(grpC), 'aD_c', 'landD')), by = c('PLT_CN')) %>%
     ## AGENTCD at remeasurement, died during the measurement interval
-    left_join(select(db$TREE, c('PLT_CN', treID, 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'TPA_UNADJ', 'BAA', 'DIA', 'AGENTCD', 'MORTYR', 'STATUSCD', 'SPCD')), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE, c('PLT_CN', treID, 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', all_of(grpT), 'tD', 'typeD', 'TPA_UNADJ', 'BAA', 'DIA', 'AGENTCD', 'MORTYR', 'STATUSCD', 'SPCD')), by = c('PLT_CN', 'CONDID')) %>%
     #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', DIA_BEGIN, DIA_END)), by = c('TRE_CN')) %>%
 
     left_join(select(db$PLOT, c('PLT_CN', 'sp', 'aD_p', 'DESIGNCD', 'PLOT_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('2', '1')) %>%
-    left_join(select(db$TREE, c('TRE_CN', grpT, treID, 'typeD', 'tD', 'TPA_UNADJ', 'BAA', 'DIA', 'STATUSCD', SPCD)), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
+    left_join(select(db$TREE, c('TRE_CN', all_of(grpT), treID, 'typeD', 'tD', 'TPA_UNADJ', 'BAA', 'DIA', 'STATUSCD', SPCD)), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
     #left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
 
     mutate_if(is.factor,
@@ -169,12 +169,12 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
              date = as.Date(date, "%Y-%m-%d")) %>%
       ## Will be lots of trees here, so CONDPROP listed multiple times
       ## Adding PROP_BASIS so we can handle adjustment factors at strata level
-      distinct(PLT_CN, pltID, date, PROP_BASIS, CONDID, .keep_all = TRUE) %>%
-      group_by(PLT_CN, pltID, date, PROP_BASIS, CONDID, .dots = grpBy) %>%
+      distinct(PLT_CN, pltID, date, PROP_BASIS, CONDID, all_of(grpBy), .keep_all = TRUE) %>%
+      group_by(PLT_CN, pltID, date, PROP_BASIS, CONDID, .dots = grpBy[grpBy %in% names(aData)]) %>%
       summarize(CONDPROP_UNADJ = first(CONDPROP_UNADJ * aDI)) %>%
       mutate(CONDPROP_UNADJ = replace_na(CONDPROP_UNADJ, 0)) %>%
       ## Average forested area between min and max date
-      group_by(pltID, PROP_BASIS, .dots = grpBy) %>%
+      group_by(pltID, PROP_BASIS, .dots = grpBy[grpBy %in% names(aData)]) %>%
       summarize(minDate = min(date, na.rm = TRUE),
                 maxDate = max(date, na.rm = TRUE),
                 amin = sum(CONDPROP_UNADJ[date == minDate], na.rm = TRUE),
@@ -575,13 +575,16 @@ fsiHelper2 <- function(x, popState, a, t, grpBy, method){
       fa = fa * aAdj) %>%
     ungroup()
 
+  ## Sometimes less specific area groups
+  aGrps <- unique(grpBy[grpBy %in% names(aAdj)])
+
   ## Strata level estimates
   tEst <- t %>%
     ## Rejoin with population tables
     right_join(select(popState[[x]], -c(STATECD, REMPER)), by = 'PLT_CN') %>%
     ungroup() %>%
     ## Need forest area to adjust SI indices
-    left_join(select(ungroup(aAdj), PLT_CN, grpBy, fa, aAdj), by = c('PLT_CN', grpBy)) %>%
+    left_join(select(ungroup(aAdj), PLT_CN, aGrps, fa, aAdj), by = c('PLT_CN', aGrps)) %>%
     #Add adjustment factors
     mutate(tAdj = case_when(
       ## When NA, stay NA
@@ -634,7 +637,7 @@ fsiHelper2 <- function(x, popState, a, t, grpBy, method){
              TRUE ~ siPlot)
            ) %>%
     ungroup() %>%
-    left_join(select(aAdj, PLT_CN, grpBy, fa), by = c('PLT_CN', grpBy)) %>%
+    left_join(select(aAdj, PLT_CN, aGrps, fa), by = c('PLT_CN', aGrps)) %>%
 
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
     summarize(r_t = length(unique(PLT_CN)) / first(nh),
