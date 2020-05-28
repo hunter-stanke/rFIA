@@ -163,18 +163,26 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
     #   summarize(fa = sum(SUBPTYP_PROP_CHNG * aDI, na.rm = TRUE),
     #             plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
     ### Plot-level estimates
+
+    if (length(grpBy[grpBy %in% names(aData)]) < 1) {
+      aGrps = NULL
+    }  else {
+      aGrps <- grpBy[grpBy %in% names(aData)]
+    }
+
+
     a <- aData %>%
       ## date column
       mutate(date = paste(MEASYEAR, MEASMON, MEASDAY, sep = '-'),
              date = as.Date(date, "%Y-%m-%d")) %>%
       ## Will be lots of trees here, so CONDPROP listed multiple times
       ## Adding PROP_BASIS so we can handle adjustment factors at strata level
-      distinct(PLT_CN, pltID, date, PROP_BASIS, CONDID, all_of(grpBy), .keep_all = TRUE) %>%
-      group_by(PLT_CN, pltID, date, PROP_BASIS, CONDID, .dots = grpBy[grpBy %in% names(aData)]) %>%
+      distinct(PLT_CN, pltID, date, PROP_BASIS, CONDID, all_of(aGrps), .keep_all = TRUE) %>%
+      group_by(PLT_CN, pltID, date, PROP_BASIS, CONDID, .dots = aGrps) %>%
       summarize(CONDPROP_UNADJ = first(CONDPROP_UNADJ * aDI)) %>%
       mutate(CONDPROP_UNADJ = replace_na(CONDPROP_UNADJ, 0)) %>%
       ## Average forested area between min and max date
-      group_by(pltID, PROP_BASIS, .dots = grpBy[grpBy %in% names(aData)]) %>%
+      group_by(pltID, PROP_BASIS, .dots = aGrps) %>%
       summarize(minDate = min(date, na.rm = TRUE),
                 maxDate = max(date, na.rm = TRUE),
                 amin = sum(CONDPROP_UNADJ[date == minDate], na.rm = TRUE),
