@@ -6,16 +6,10 @@ bioHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
   #db <- clipFIA(db, mostRecent = FALSE)
 
 
-  ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
-  grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
-  grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
-
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', grpP, 'aD_p', 'sp')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT, 'tD', 'typeD',
-                                'VOLCFNET', 'VOLCSNET', 'DRYBIO_AG', 'DRYBIO_BG', 'CARBON_AG', 'CARBON_BG')), by = c('PLT_CN', 'CONDID')) %>%
+  data <- db$PLOT %>%
+    left_join(db$COND, by = c('PLT_CN')) %>%
+    left_join(db$TREE, by = c('PLT_CN', 'CONDID')) %>%
     ## Need a code that tells us where the tree was measured
     ## macroplot, microplot, subplot
     mutate(PLOT_BASIS = case_when(

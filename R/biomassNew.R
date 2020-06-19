@@ -1,6 +1,6 @@
-#' @export
-biomass <- function(db,
-                       grpBy = NULL,
+bioStarter <- function(x,
+                       db,
+                       grpBy_quo = NULL,
                        polys = NULL,
                        returnSpatial = FALSE,
                        bySpecies = FALSE,
@@ -13,13 +13,41 @@ biomass <- function(db,
                        areaDomain = NULL,
                        totals = FALSE,
                        byPlot = FALSE,
-                       nCores = 1) {
+                       nCores = 1,
+                       remote){
+
+  reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
+                 'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
+  if (remote){
+    ## Store the original parameters here
+    params <- db
+
+    ## Read in one state at a time
+    db <- readFIA(dir = db$dir, common = db$common,
+                  tables = reqTables, states = x, ## x is the vector of state names
+                  nCores = nCores)
+
+    ## If a clip was specified, run it now
+    if ('mostRecent' %in% names(params)){
+      db <- clipFIA(db, mostRecent = params$mostRecent,
+                    mask = params$mask, matchEval = params$matchEval,
+                    evalid = params$evalid, designCD = params$designCD,
+                    nCores = nCores)
+    }
+
+  }else {
+    ## Really only want the required tables
+    db <- db[names(db) %in% reqTables]
+  }
+
+
+
   ## Need a plotCN, and a new ID
   db$PLOT <- db$PLOT %>% mutate(PLT_CN = CN,
                                 pltID = paste(UNITCD, STATECD, COUNTYCD, PLOT, sep = '_'))
 
   ##  don't have to change original code
-  grpBy_quo <- enquo(grpBy)
+  #grpBy_quo <- enquo(grpBy)
 
   # Probably cheating, but it works
   if (quo_name(grpBy_quo) != 'NULL'){
@@ -44,14 +72,13 @@ biomass <- function(db,
       # Convert to character
       grpBy <- names(d_quo)
     }
+  } else {
+    grpBy <- NULL
   }
 
   reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
-  ## Some warnings
-  if (class(db) != "FIA.Database"){
-    stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
-  }
+
   if (!is.null(polys) & first(class(polys)) %in% c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
   }
@@ -65,7 +92,6 @@ biomass <- function(db,
   if (str_to_upper(method) %in% c('TI', 'SMA', 'LMA', 'EMA', 'ANNUAL') == FALSE) {
     warning(paste('Method', method, 'unknown. Defaulting to Temporally Indifferent (TI).'))
   }
-
 
   # I like a unique ID for a plot through time
   if (byPlot) {grpBy <- c('pltID', grpBy)}
@@ -91,19 +117,17 @@ biomass <- function(db,
     db$POP_EVAL <- bind_rows(filter(db$POP_EVAL, !(STATECD %in% 48)), txIDS)
   }
 
-
-
   ### AREAL SUMMARY PREP
   if(!is.null(polys)) {
-    # Convert polygons to an sf object
-    polys <- polys %>%
-      as('sf')%>%
-      mutate_if(is.factor,
-                as.character)
-    ## A unique ID
-    polys$polyID <- 1:nrow(polys)
-
-    # Add shapefile names to grpBy
+    # # Convert polygons to an sf object
+    # polys <- polys %>%
+    #   as('sf')%>%
+    #   mutate_if(is.factor,
+    #             as.character)
+    # ## A unique ID
+    # polys$polyID <- 1:nrow(polys)
+    #
+    # # Add shapefile names to grpBy
     grpBy = c(grpBy, 'polyID')
 
     ## Make plot data spatial, projected same as polygon layer
@@ -113,9 +137,7 @@ biomass <- function(db,
     coordinates(pltSF) <- ~LON+LAT
     proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
     pltSF <- as(pltSF, 'sf') %>%
-      #st_transform(crs = st_crs(polys)$proj4string)
       st_transform(crs = st_crs(polys))
-
 
     ## Split up polys
     polyList <- split(polys, as.factor(polys$polyID))
@@ -127,7 +149,6 @@ biomass <- function(db,
           library(dplyr)
           library(stringr)
           library(rFIA)
-          #library(sf)
         })
         out <- parLapply(cl, X = names(polyList), fun = areal_par, pltSF, polyList)
         #stopCluster(cl) # Keep the cluster active for the next run
@@ -143,7 +164,7 @@ biomass <- function(db,
     }
     ## Add polygon names to PLOT
     db$PLOT <- db$PLOT %>%
-      left_join(pltSF, by = 'pltID')
+      left_join(select(pltSF, polyID, pltID), by = 'pltID')
 
     # Test if any polygons cross state boundaries w/ different recent inventory years (continued w/in loop)
     if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
@@ -187,8 +208,8 @@ biomass <- function(db,
 
   # User defined domain indicator for area (ex. specific forest type)
   pcEval <- left_join(db$PLOT, select(db$COND, -c('STATECD', 'UNITCD', 'COUNTYCD', 'INVYR', 'PLOT')), by = 'PLT_CN')
-  areaDomain <- substitute(areaDomain)
-  pcEval$aD <- eval(areaDomain, pcEval) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  #areaDomain <- substitute(areaDomain)
+  pcEval$aD <- rlang::eval_tidy(areaDomain, pcEval) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
   if(!is.null(pcEval$aD)) pcEval$aD[is.na(pcEval$aD)] <- 0 # Make NAs 0s. Causes bugs otherwise
   if(is.null(pcEval$aD)) pcEval$aD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
   pcEval$aD <- as.numeric(pcEval$aD)
@@ -201,8 +222,8 @@ biomass <- function(db,
   rm(pcEval)
 
   # Same as above for tree (ex. trees > 20 ft tall)
-  treeDomain <- substitute(treeDomain)
-  tD <- eval(treeDomain, db$TREE) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
+  #treeDomain <- substitute(treeDomain)
+  tD <- rlang::eval_tidy(treeDomain, db$TREE) ## LOGICAL, THIS IS THE DOMAIN INDICATOR
   if(!is.null(tD)) tD[is.na(tD)] <- 0 # Make NAs 0s. Causes bugs otherwise
   if(is.null(tD)) tD <- 1 # IF NULL IS GIVEN, THEN ALL VALUES TRUE
   db$TREE$tD <- as.numeric(tD)
@@ -220,7 +241,7 @@ biomass <- function(db,
   ## Make an annual panel ID, associated with an INVYR
 
   ### The population tables
-  pops <- select(db$POP_EVAL, c('EVALID', 'ESTN_METHOD', 'CN', 'END_INVYR')) %>%
+  pops <- select(db$POP_EVAL, c('EVALID', 'ESTN_METHOD', 'CN', 'END_INVYR', 'EVAL_TYP')) %>%
     rename(EVAL_CN = CN) %>%
     left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('EVAL_CN')) %>%
     rename(ESTN_UNIT_CN = CN) %>%
@@ -315,8 +336,24 @@ biomass <- function(db,
   ## Only the necessary plots for EVAL of interest
   db$PLOT <- filter(db$PLOT, PLT_CN %in% pops$PLT_CN)
 
+  ## Narrow up the tables to the necessary variables, reduces memory load
+  ## sent out the cores
+  ## Which grpByNames are in which table? Helps us subset below
+  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
+  grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
+  grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
+
+
+  ### Only joining tables necessary to produce plot level estimates
+  db$PLOT <- select(ungroup(db$PLOT), PLT_CN, STATECD, COUNTYCD, MACRO_BREAKPOINT_DIA, INVYR, MEASYEAR, PLOT_STATUS_CD, all_of(grpP), aD_p, sp)
+  db$COND <- select(db$COND, 'PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', all_of(grpC), 'aD_c', 'landD')
+  db$TREE <- select(db$TREE, 'PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', all_of(grpT), 'tD', 'typeD',
+                                'VOLCFNET', 'VOLCSNET', 'DRYBIO_AG', 'DRYBIO_BG', 'CARBON_AG', 'CARBON_BG')
+
+
   ## Merging state and county codes
   plts <- split(db$PLOT, as.factor(paste(db$PLOT$COUNTYCD, db$PLOT$STATECD, sep = '_')))
+  #plts <- split(db$PLOT, as.factor(db$PLOT$STATECD))
 
   suppressWarnings({
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
@@ -335,6 +372,7 @@ biomass <- function(db,
   })
 
   if (byPlot){
+
     ## back to dataframes
     out <- unlist(out, recursive = FALSE)
     tOut <- bind_rows(out[names(out) == 't'])
@@ -347,6 +385,8 @@ biomass <- function(db,
       grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
 
     }
+
+    out <- list(tEst = tOut, grpBy = grpBy, aGrpBy = aGrpBy, grpByOrig = grpByOrig)
     ## Population estimation
   } else {
     ## back to dataframes
@@ -360,9 +400,19 @@ biomass <- function(db,
     aGrpBy <- c('YEAR', aGrpBy)
 
 
-    ## Splitting up by ESTN_UNIT
-    popState <- split(pops, as.factor(pops$STATECD))
+    ## Splitting up by STATECD and groups of 25 ESTN_UNIT_CNs
+    #estunit <- distinct(pops, ESTN_UNIT_CN) #%>%
+    #mutate(estID)
 
+    #estID <- seq(1, nrow(estunit), 50)
+    #estunit$estID <- rep_len(estID, length.out = nrow(estunit))
+    #pops <- pops %>%
+    #  left_join(estunit, by = 'ESTN_UNIT_CN') #%>%
+    #mutate(estBreaks = )
+
+    #popState <- split(pops, as.factor(pops$estID))
+    popState <- split(pops, as.factor(pops$STATECD))
+    #
     suppressWarnings({
       ## Compute estimates in parallel -- Clusters in windows, forking otherwise
       if (Sys.info()['sysname'] == 'Windows'){
@@ -383,6 +433,93 @@ biomass <- function(db,
     out <- unlist(out, recursive = FALSE)
     aEst <- bind_rows(out[names(out) == 'aEst'])
     tEst <- bind_rows(out[names(out) == 'tEst'])
+
+    out <- list(tEst = tEst, aEst = aEst, grpBy = grpBy, aGrpBy = aGrpBy, grpByOrig = grpByOrig)
+  }
+
+  return(out)
+
+}
+
+
+
+
+
+
+#' @export
+biomass <- function(db,
+                       grpBy = NULL,
+                       polys = NULL,
+                       returnSpatial = FALSE,
+                       bySpecies = FALSE,
+                       bySizeClass = FALSE,
+                       landType = 'forest',
+                       treeType = 'live',
+                       method = 'TI',
+                       lambda = .5,
+                       treeDomain = NULL,
+                       areaDomain = NULL,
+                       totals = FALSE,
+                       byPlot = FALSE,
+                       nCores = 1) {
+
+  ##  don't have to change original code
+  grpBy_quo <- rlang::enquo(grpBy)
+  areaDomain <- rlang::enquo(areaDomain)
+  treeDomain <- rlang::enquo(treeDomain)
+
+  ### Is DB remote?
+  remote <- ifelse(class(db) == 'Remote.FIA.Database', 1, 0)
+  if (remote){
+
+    iter <- db$states
+
+    ## In memory
+  } else {
+    ## Some warnings
+    if (class(db) != "FIA.Database"){
+      stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
+    }
+
+    ## an iterator for remote
+    iter <- 1
+
+  }
+
+  ### AREAL SUMMARY PREP
+  if(!is.null(polys)) {
+    # Convert polygons to an sf object
+    polys <- polys %>%
+      as('sf')%>%
+      mutate_if(is.factor,
+                as.character)
+    ## A unique ID
+    polys$polyID <- 1:nrow(polys)
+  }
+
+
+
+  ## Run the main portion
+  out <- lapply(X = iter, FUN = bioStarter, db,
+                grpBy_quo = grpBy_quo, polys, returnSpatial,
+                bySpecies, bySizeClass,
+                landType, treeType, method,
+                lambda, treeDomain, areaDomain,
+                totals, byPlot, nCores, remote)
+  ## Bring the results back
+  out <- unlist(out, recursive = FALSE)
+  aEst <- bind_rows(out[names(out) == 'aEst'])
+  tEst <- bind_rows(out[names(out) == 'tEst'])
+  grpBy <- out[names(out) == 'grpBy'][[1]]
+  aGrpBy <- out[names(out) == 'aGrpBy'][[1]]
+  grpByOrig <- out[names(out) == 'grpByOrig'][[1]]
+
+
+  if (byPlot){
+    ## back to dataframes
+    tOut <- tEst
+
+  } else {
 
 
     ##### ----------------- MOVING AVERAGES

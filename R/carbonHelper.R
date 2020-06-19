@@ -11,13 +11,9 @@ carbonHelper1 <- function(x, plts, db, grpBy, byPlot, byPool, byComponent, model
   grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', all_of(grpP), 'aD_p', 'sp')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD',
-                                'CONDID', all_of(grpC), 'aD_c', 'landD',
-                                CARBON_DOWN_DEAD, CARBON_LITTER, CARBON_SOIL_ORG, CARBON_STANDING_DEAD,
-                                CARBON_UNDERSTORY_AG, CARBON_UNDERSTORY_BG)), by = c('PLT_CN')) %>%
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'TPA_UNADJ', 'SUBP', 'TREE', STATUSCD,
-                                'CARBON_AG', 'CARBON_BG')), by = c('PLT_CN', 'CONDID')) %>%
+  data <- db$PLOT %>%
+    left_join(db$COND, by = c('PLT_CN')) %>%
+    left_join(db$TREE, by = c('PLT_CN', 'CONDID')) %>%
     ## Need a code that tells us where the tree was measured
     ## macroplot, microplot, subplot
     mutate(PLOT_BASIS = case_when(

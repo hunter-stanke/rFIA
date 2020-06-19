@@ -14,7 +14,7 @@ growMort(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALS
 }
 
 \arguments{
-  \item{db}{\code{FIA.Database} object produced from \code{\link{readFIA}}. Function requires that PLOT, TREE, TREE_GRM_COMPONENT, and TREE_GRM_ESTN, COND, POP_PLOT_STRATUM_ASSGN, POP_ESTN_UNIT, POP_EVAL, POP_STRATUM, POP_EVAL_TYP, POP_EVAL_GRP, and SUBP_COND_CHNG_MTRX tables exist in FIA.Database object.}
+  \item{db}{\code{FIA.Database} or \code{Remote.FIA.Database} object produced from \code{\link{readFIA}}. If a \code{Remote.FIA.Database}, data will be read in and processed state-by-state to conserve RAM.}
 
   \item{grpBy}{variables from PLOT, COND, or TREE tables to group estimates by (NOT quoted). Multiple grouping variables should be combined with \code{c()}, and grouping will occur heirarchically. For example, to produce seperate estimates for each ownership group within ecoregion subsections, specify \code{c(ECOSUBCD, OWNGRPCD)}.}
 
@@ -48,7 +48,7 @@ growMort(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALS
 }
 
 \details{
-Estimation of attributes follows the procedures documented in Bechtold and Patterson (2005). Average annual rates are computed using a sample-based ratio of means estimator of total trees subject to an event (e.g. recruitment, mortality) annually / total area. Similarly, the proportion of individuals subject to each event annually is computed as the total trees subject to the event / total trees. All estimates are returned as average annual rates. Only conditions which were forested in time 1 and in time 2 are included in estimates (excluding converted stands).
+Estimation of attributes follows the procedures documented in Bechtold and Patterson (2005). Average annual rates are computed using a sample-based ratio of means estimator of total trees subject to an event (e.g. recruitment, mortality) annually / total area. Similarly, the proportion of individuals subject to each event annually is computed as the total trees subject to the event betweein time 1 and time 2 / total live trees at time 2. All estimates are returned as average annual rates. Only conditions which were forested in time 1 and in time 2 are included in estimates (excluding converted stands).
 
 Recruitment events are defined as when a live stem which is less than 5 inches DBH at time 1, grows to or beyond 5 inches DBH by time 2. This does NOT include stems which grow beyond the 5-inch diameter criteria and are then subject to mortality prior to remeasurement. Natural mortality is defined as when a live stem is subject to non-harvest mortality between successive measurement periods. Finally, harvest is defined as when a live stem is cut and removed between successive measurements.
 

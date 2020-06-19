@@ -6,15 +6,11 @@ divHelper1 <- function(x, plts, db, grpBy, byPlot){
   #db <- clipFIA(db, mostRecent = FALSE)
 
 
-  ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
-  grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
-  grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', grpP, 'aD_p', 'sp')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'grp', 'state', 'SUBP', 'TREE', grpT, 'tD', 'typeD')), by = c('PLT_CN', 'CONDID')) %>%
+  data <- db$PLOT %>%
+    left_join(db$COND, by = c('PLT_CN')) %>%
+    left_join(db$TREE, by = c('PLT_CN', 'CONDID')) %>%
     ## Need a code that tells us where the tree was measured
     ## macroplot, microplot, subplot
     mutate(PLOT_BASIS = case_when(
@@ -45,8 +41,17 @@ divHelper1 <- function(x, plts, db, grpBy, byPlot){
                 Eh = divIndex(grp, state * tDI, index = 'Eh'),
                 nStems = length(which(tDI == 1)))
     a = NULL
+    full = NULL
 
   } else {
+    grp_quo <- syms(grpBy)
+
+    ## Using this to return a tree list for gamma and beta
+    full <- data %>%
+      filter(PLOT_STATUS_CD == 1) %>%
+      mutate(state = state * tDI) %>%
+      distinct(PLT_CN, !!!grp_quo, TRE_CN, grp, state)
+
     # Diversity is computed at the stand (condition level), and we continue to use the ratio of means estimator to get at
     #  average of the attribute of interest weighted by the area in which it occurs.
     t <- data %>%
@@ -67,13 +72,13 @@ divHelper1 <- function(x, plts, db, grpBy, byPlot){
                 plotIn = sum(plotIn, na.rm = TRUE))
   }
 
-  pltOut <- list(t = t)
+  pltOut <- list(t = t, full = full)
   return(pltOut)
 }
 
 
 
-divHelper2 <- function(x, popState, t, grpBy, method){
+divHelper2 <- function(x, popState, t, full, grpBy, method){
 
   ## DOES NOT MODIFY OUTSIDE ENVIRONMENT
   if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
@@ -140,7 +145,13 @@ divHelper2 <- function(x, popState, t, grpBy, method){
               cvEst_s = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_s, sStrat, sEst, aStrat, aEst),
               plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
 
-  out <- list(tEst = tEst)
+  ## For gamma and beta, annoying but can't think of another way
+  full <- full %>%
+    left_join(select(popState[[x]], c(YEAR, PLT_CN)), by = 'PLT_CN') %>%
+    filter(!is.na(YEAR) & !is.na(state) & !is.na(grp))
+
+
+  out <- list(tEst = tEst, full = full)
 
   return(out)
 }

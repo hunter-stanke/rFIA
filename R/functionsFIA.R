@@ -472,6 +472,7 @@ print.FIA.Database <- function(x, ...){
 #' @importFrom sp over proj4string<- coordinates<- spTransform proj4string
 #' @importFrom stats cov var coef lm
 #' @importFrom utils object.size read.csv tail globalVariables type.convert download.file unzip
+#' @import dtplyr
 NULL
 
 #globalVariables(c('.'))
@@ -1147,11 +1148,14 @@ findEVALID <- function(db = NULL,
 
   if (!is.null(state)){
     state <- str_to_upper(state)
+    evalGrp <- intData$EVAL_GRP %>%
+      select(STATECD, STATE) %>%
+      mutate(STATECD = as.numeric(STATECD))
     ## Join state abbs with state codes in popeval
-    ids <- left_join(ids, select(intData$EVAL_GRP, c('STATECD', 'STATE')), by = 'STATECD')
+    ids <- left_join(ids, evalGrp, by = 'STATECD')
     # Check if any specified are missing from db
-    if (any(unique(state) %in% unique(db$POP_EVAL_STATE) == FALSE)){
-      missStates <- state[state %in% unique(db$POP_EVAL_STATE) == FALSE]
+    if (any(unique(state) %in% unique(evalGrp$STATE) == FALSE)){
+      missStates <- state[state %in% unique(evalGrp$STATE) == FALSE]
       fancyName <- unique(intData$EVAL_GRP$STATE[intData$EVAL_GRP$STATECD %in% missStates])
       stop(paste('States: ', toString(fancyName) , 'not found in db.', sep = ''))
     }

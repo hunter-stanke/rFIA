@@ -12,9 +12,9 @@ seedHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
   grpT <- names(db$SEEDLING)[names(db$SEEDLING) %in% grpBy & names(db$SEEDLING) %in% c(grpP, grpC) == FALSE]
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', grpP, 'aD_p', 'sp')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
-    left_join(select(db$SEEDLING,c('PLT_CN', 'CONDID', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREECOUNT_CALC', grpT, 'tD')), by = c('PLT_CN', 'CONDID')) #%>%
+  data <- db$PLOT %>%
+    left_join(db$COND, by = c('PLT_CN')) %>%
+    left_join(db$SEEDLING, by = c('PLT_CN', 'CONDID')) #%>%
     ## Need a code that tells us where the tree was measured
     ## macroplot, microplot, subplot
     # mutate(PLOT_BASIS = case_when(

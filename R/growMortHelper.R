@@ -14,23 +14,45 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
   grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
 
+  # left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
+  #   left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'state_recr')), by = c('PLT_CN', 'CONDID')) %>%
+  #   left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPARECR_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT')), by = c('TRE_CN')) %>%
+  #   left_join(select(db$TREE_GRM_MIDPT, c('TRE_CN', 'DIA', 'state')), by = c('TRE_CN'), suffix = c('', '.mid')) %>%
+  #   #left_join(select(db$SUBP_COND_CHNG_MTRX, SUBP:SUBPTYP_PROP_CHNG), by = c('PLT_CN', 'SUBP', 'CONDID'), suffix = c('', '.subp')) %>%
+  #   #left_join(select(db$COND, PLT_CN, CONDID, COND_STATUS_CD), by = c('PREV_PLT_CN.subp' = 'PLT_CN', 'PREVCOND.subp' = 'CONDID'), suffix = c('', '.chng')) %>%
+  #   left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
+  #   left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
+  #   left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
+  #
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'state_recr')), by = c('PLT_CN', 'CONDID')) %>%
-    left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPARECR_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT')), by = c('TRE_CN')) %>%
-    left_join(select(db$TREE_GRM_MIDPT, c('TRE_CN', 'DIA', 'state')), by = c('TRE_CN'), suffix = c('', '.mid')) %>%
-    #left_join(select(db$SUBP_COND_CHNG_MTRX, SUBP:SUBPTYP_PROP_CHNG), by = c('PLT_CN', 'SUBP', 'CONDID'), suffix = c('', '.subp')) %>%
-    #left_join(select(db$COND, PLT_CN, CONDID, COND_STATUS_CD), by = c('PREV_PLT_CN.subp' = 'PLT_CN', 'PREVCOND.subp' = 'CONDID'), suffix = c('', '.chng')) %>%
-    left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
-    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
+      left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'state_recr', TPA_UNADJ, STATUSCD, DIA)), by = c('PLT_CN', 'CONDID')) %>%
+      left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPARECR_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT')), by = c('TRE_CN')) %>%
+      left_join(select(db$TREE_GRM_MIDPT, c('TRE_CN', 'DIA', 'state')), by = c('TRE_CN'), suffix = c('', '.mid')) %>%
+      #left_join(select(db$SUBP_COND_CHNG_MTRX, SUBP:SUBPTYP_PROP_CHNG), by = c('PLT_CN', 'SUBP', 'CONDID'), suffix = c('', '.subp')) %>%
+      #left_join(select(db$COND, PLT_CN, CONDID, COND_STATUS_CD), by = c('PREV_PLT_CN.subp' = 'PLT_CN', 'PREVCOND.subp' = 'CONDID'), suffix = c('', '.chng')) %>%
+      left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
+      left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
+      left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
+    # left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
+    # left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
+    # left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
+    # left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'state_recr')), by = c('PLT_CN', 'CONDID', 'CONDID.prev' = 'PREVCOND')) %>%
+    # left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPARECR_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT')), by = c('TRE_CN')) %>%
+    # left_join(select(db$TREE_GRM_MIDPT, c('TRE_CN', 'DIA', 'state')), by = c('TRE_CN'), suffix = c('', '.mid')) %>%
+    # #left_join(select(db$SUBP_COND_CHNG_MTRX, SUBP:SUBPTYP_PROP_CHNG), by = c('PLT_CN', 'SUBP', 'CONDID'), suffix = c('', '.subp')) %>%
+    # #left_join(select(db$COND, PLT_CN, CONDID, COND_STATUS_CD), by = c('PREV_PLT_CN.subp' = 'PLT_CN', 'PREVCOND.subp' = 'CONDID'), suffix = c('', '.chng')) %>%
+    # left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
     mutate_if(is.factor,
               as.character) %>%
     mutate(TPAGROW_UNADJ = TPAGROW_UNADJ * state,
            TPAREMV_UNADJ = TPAREMV_UNADJ * state,
            TPAMORT_UNADJ = TPAMORT_UNADJ * state,
            TPARECR_UNADJ = TPARECR_UNADJ * state_recr / REMPER,
+           ## State recruit is the state variable adjustment for ALL TREES at T2,
+           ## So we can estimate live TPA at t2 (t1 unavailable w/out growth accounting) with:
+           TPA_UNADJ = TPA_UNADJ * state_recr * if_else(STATUSCD == 1 & DIA >= 5, 1, 0),
            # mutate(SUBPTYP_PROP_CHNG = SUBPTYP_PROP_CHNG * .25,
            #        TPAGROW_UNADJ = TPAGROW_UNADJ,
            #        TPAMORT_UNADJ1 = TPAMORT_UNADJ,
@@ -40,6 +62,7 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
            aChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.prev == 1 & !is.null(CONDPROP_UNADJ), 1, 0),
            tChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.prev == 1, 1, 0),
            test = if_else(COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2'), 1, 0))
+
 
   # ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   # data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp')) %>%
@@ -84,8 +107,8 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
 
   ## Comprehensive indicator function -- w/ growth accounting
   #data$aDI_ga <- data$landD * data$aD_p * data$aD_c * data$sp * data$aChng
-  data$tDI_ga <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev #* data$tChng
-  data$tDI_ga_r <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp #* data$tChng
+  data$tDI_ga <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev * data$tChng
+  data$tDI_ga_r <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp * data$tChng
 
   ## Comprehensive indicator function
   data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
@@ -120,7 +143,7 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
       summarize(RECR_TPA = sum(TPARECR_UNADJ * tDI, na.rm = TRUE),
                 MORT_TPA = sum(TPAMORT_UNADJ * tDI, na.rm = TRUE),
                 REMV_TPA = sum(TPAREMV_UNADJ * tDI, na.rm = TRUE),
-                TOTAL_TPA = sum(TPAGROW_UNADJ * tDI, na.rm = TRUE) + MORT_TPA + REMV_TPA - RECR_TPA,
+                TOTAL_TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE),
                 RECR_PERC = RECR_TPA / TOTAL_TPA * 100,
                 MORT_PERC = MORT_TPA / TOTAL_TPA * 100,
                 REMV_PERC = REMV_TPA / TOTAL_TPA * 100,
@@ -156,7 +179,7 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
       summarize(rPlot_ga = sum(TPARECR_UNADJ * tDI_ga_r, na.rm = TRUE),
                 mPlot_ga = sum(TPAMORT_UNADJ * tDI_ga, na.rm = TRUE),
                 hPlot_ga = sum(TPAREMV_UNADJ * tDI_ga, na.rm = TRUE),
-                tPlot_ga = sum(TPAGROW_UNADJ * tDI_ga, na.rm = TRUE) + mPlot_ga + hPlot_ga - rPlot_ga,
+                tPlot_ga = sum(TPA_UNADJ * tDI_ga, na.rm = TRUE),
                 plotIn_t_ga = ifelse(tPlot_ga >  0, 1,0),
                 plotIn_r_ga = ifelse(rPlot_ga >  0, 1,0),
                 plotIn_m_ga = ifelse(mPlot_ga > 0, 1,0),
@@ -165,7 +188,7 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
                 rPlot = sum(TPARECR_UNADJ * tDI_r, na.rm = TRUE),
                 mPlot = sum(TPAMORT_UNADJ * tDI, na.rm = TRUE),
                 hPlot = sum(TPAREMV_UNADJ * tDI, na.rm = TRUE),
-                tPlot = sum(TPAGROW_UNADJ * tDI, na.rm = TRUE) + mPlot + hPlot - rPlot,
+                tPlot = sum(TPA_UNADJ * tDI, na.rm = TRUE),
                 plotIn_t = ifelse(tPlot >  0, 1,0),
                 plotIn_r = ifelse(rPlot >  0, 1,0),
                 plotIn_m = ifelse(mPlot > 0, 1,0),
@@ -291,6 +314,7 @@ gmHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
       plotIn_h = case_when(
         GROWTH_ACCT == 'Y' ~ plotIn_h_ga,
         TRUE ~ plotIn_h)) %>%
+    filter(!is.na(SUBPTYP_GRM)) %>%
     ## Extra step for variance issues
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy) %>%
     summarize(tPlot = sum(tPlot, na.rm = TRUE),

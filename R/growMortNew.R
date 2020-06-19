@@ -17,13 +17,18 @@ growMortStarter <- function(x,
                             nCores = 1,
                             remote){
 
+  reqTables <- c('PLOT', 'COND', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_MIDPT',
+                 'SUBP_COND_CHNG_MTRX',
+                 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
+                 'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
+
   if (remote){
     ## Store the original parameters here
     params <- db
 
     ## Read in one state at a time
     db <- readFIA(dir = db$dir, common = db$common,
-                  tables = db$tables, states = x, ## x is the vector of state names
+                  tables = reqTables, states = x, ## x is the vector of state names
                   nCores = nCores)
 
     ## If a clip was specified, run it now
@@ -34,6 +39,9 @@ growMortStarter <- function(x,
                     nCores = nCores)
     }
 
+  } else {
+    ## Really only want the required tables
+    db <- db[names(db) %in% reqTables]
   }
 
   ## Need a plotCN
@@ -70,7 +78,7 @@ growMortStarter <- function(x,
     grpBy <- NULL
   }
 
-  reqTables <- c('PLOT', 'TREE', 'TREE_GRM_COMPONENT', 'COND',
+  reqTables <- c('PLOT', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_MIDPT', 'COND',
                  'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
 

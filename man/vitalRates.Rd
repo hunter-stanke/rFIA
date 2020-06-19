@@ -14,7 +14,7 @@ vitalRates(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FA
 }
 
 \arguments{
-  \item{db}{\code{FIA.Database} object produced from \code{\link{readFIA}}. Function requires that PLOT, TREE, TREE_GRM_COMPONENT, TREE_GRM_ESTN, COND, POP_PLOT_STRATUM_ASSGN, POP_ESTN_UNIT, POP_EVAL, POP_STRATUM, POP_EVAL_TYP, POP_EVAL_GRP, and SUBP_COND_CHNG_MTRX tables exist in FIA.Database object.}
+  \item{db}{\code{FIA.Database} or \code{Remote.FIA.Database} object produced from \code{\link{readFIA}}. If a \code{Remote.FIA.Database}, data will be read in and processed state-by-state to conserve RAM.}
 
   \item{grpBy}{variables from PLOT, COND, or TREE tables to group estimates by (NOT quoted). Multiple grouping variables should be combined with \code{c()}, and grouping will occur heirarchically. For example, to produce seperate estimates for each ownership group within ecoregion subsections, specify \code{c('ECOSUBCD', 'OWNGRPCD')}.}
 

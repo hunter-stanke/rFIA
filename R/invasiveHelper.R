@@ -10,10 +10,10 @@ invHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
   grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'INVASIVE_SAMPLING_STATUS_CD', grpP, 'aD_p', 'sp')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'PROP_BASIS', 'CONDPROP_UNADJ', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
-    left_join(select(db$SUBP_COND, c(PLT_CN, SUBP, CONDID, SUBPCOND_PROP)), by = c('PLT_CN', 'CONDID')) %>%
-    left_join(select(db$INVASIVE_SUBPLOT_SPP, c('PLT_CN', 'COVER_PCT', 'VEG_SPCD', 'SUBP', 'CONDID', 'SYMBOL', 'SCIENTIFIC_NAME', 'COMMON_NAME')), by = c("PLT_CN", "CONDID", 'SUBP'))
+  data <- db$PLOT %>%
+    left_join(db$COND, by = c('PLT_CN')) %>%
+    left_join(db$SUBP_COND, by = c('PLT_CN', 'CONDID')) %>%
+    left_join(db$INVASIVE_SUBPLOT_SPP, by = c("PLT_CN", "CONDID", 'SUBP'))
   #filter(DIA >= 5)
 
   ## Comprehensive indicator function
@@ -59,7 +59,7 @@ invHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
 
 
 
-invHelper2 <- function(x, popState, t, a, grpBy, aGrpBy, method){
+invHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
 
   ## DOES NOT MODIFY OUTSIDE ENVIRONMENT
   if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
@@ -129,7 +129,7 @@ invHelper2 <- function(x, popState, t, a, grpBy, aGrpBy, method){
     left_join(select(aStrat, aStrat, av, ESTN_UNIT_CN, STRATUM_CN, ESTN_METHOD, aGrpBy), by = c('ESTN_UNIT_CN', 'ESTN_METHOD', 'STRATUM_CN', aGrpBy)) %>%
     ## Strata level
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
-    summarize(r_t = length(unique(PLT_CN[INVASIVE_SAMPLING_STATUS_CD == 1])) / first(P2POINTCNT),
+    summarize(r_t = length(unique(PLT_CN)) / first(P2POINTCNT),
               iStrat = mean(iPlot * r_t, na.rm = TRUE),
               aStrat = first(aStrat),
               plotIn_INV = sum(plotIn_INV, na.rm = TRUE),
