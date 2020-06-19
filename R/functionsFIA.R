@@ -487,12 +487,12 @@ print.Remote.FIA.Database <- function(x, ...){
 }
 
 #' @export
-str.FIA.Database <- function(object) {
+str.FIA.Database <- function(object, ...) {
   cat(paste('FIA.Database', "\n"))
 }
 
 #' @export
-str.Remote.FIA.Database <- function(object) {
+str.Remote.FIA.Database <- function(object, ...) {
   cat(paste('Remote.FIA.Database', "\n"))
 }
 

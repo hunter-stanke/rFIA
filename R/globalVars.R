@@ -203,6 +203,7 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'STAND_DEAD_MOD', 'all_of', 'caVar', 'cvStrat_c', 'dead', 'live',
                          'MEASDAY', 'MEASMON', 'b_rate', 'coef', 'df', 'lm', 'meas', 't_rate', 'treID',
                          'aD_p', 'amax', 'amin', 'maxDate', 'minDate', 'treID1', 'treID2', 'STATEAB', 'pops',
-                         'grpC', 'grpP', 'grpT'
+                         'grpC', 'grpP', 'grpT', 'GROWTH_HABIT', 'LAYER', 'P2VEG_SAMPLING_STATUS_CD', 'TOTAL_COVER_AREA',
+                         'cTEst', 'cTStrat', 'plotIn_VEG'
 
 ))
