@@ -484,7 +484,7 @@ invasive <- function(db,
                 grpBy_quo = grpBy_quo, polys, returnSpatial,
                 landType, method,
                 lambda, areaDomain,
-                totals, byPlot, nCores, remote)
+                byPlot, totals, nCores, remote)
   ## Bring the results back
   out <- unlist(out, recursive = FALSE)
   aEst <- bind_rows(out[names(out) == 'aEst'])
@@ -627,7 +627,8 @@ invasive <- function(db,
         left_join(aTotal, by = aGrpBy) %>%
         mutate(COVER_PCT = INV_AREA_TOTAL / AREA_TOTAL * 100,
                cpVar = (1/AREA_TOTAL^2) * (iVar + (COVER_PCT^2 * aVar) - 2 * COVER_PCT * cvEst_i),
-               COVER_PCT_SE = sqrt(cpVar) / COVER_PCT * 100)
+               COVER_PCT_SE = sqrt(cpVar) / COVER_PCT * 100) %>%
+        filter(COVER_PCT > 0)
 
     })
 

@@ -151,7 +151,7 @@ invHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
               plotIn_INV = sum(plotIn_INV, na.rm = TRUE),
               iVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, iv, iStrat, iEst),
               # Unit Covariance
-              cvEst_i = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_i, iStrat, iEst, iTStrat, iTEst))
+              cvEst_i = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_i, iStrat, iEst, aStrat, aEst))
 
   out <- list(tEst = tEst, aEst = aEst)
 

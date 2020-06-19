@@ -1,18 +1,17 @@
-\name{invasive}
-\alias{invasive}
-
-\title{Estimate invasive species coverage from FIADB
-}
-
-\description{
-Produces estimates of areal coverage of invasive species from the Forest Inventory and Analysis Database. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. All estimates are returned by species although can be grouped by other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}). Easy options to implement parallel processing.}
+\name{vegStruct}
+\alias{vegStruct}
+%- Also NEED an '\alias' for EACH other topic documented here.
+\title{Estimate vegation cover by canopy layer with the FIADB}
+\description{Produces estimates of vegetation cover by canopy layer and species growth form from the Forest Inventory and Analysis Database. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. All estimates are returned by species although can be grouped by other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}). Easy options to implement parallel processing.}
 
 \usage{
-invasive(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = "forest",
-         method = 'TI', lambda = .5, areaDomain = NULL, byPlot = FALSE,
-         totals = FALSE, nCores = 1)
+vegStruct(db, grpBy = NULL, polys = NULL,
+          returnSpatial = FALSE, landType = "forest",
+          method = "TI", lambda = 0.5,
+          areaDomain = NULL, byPlot = FALSE,
+          totals = FALSE, nCores = 1)
 }
-
+%- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{db}{\code{FIA.Database} or \code{Remote.FIA.Database} object produced from \code{\link{readFIA}}. If a \code{Remote.FIA.Database}, data will be read in and processed state-by-state to conserve RAM.}
 
@@ -37,8 +36,10 @@ invasive(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = "fore
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }
 
+
+
 \details{
-Estimation of attributes follows the procedures documented in Bechtold and Patterson (2005). Specifically, percent areal coverage is computed using a sample-based ratio-of-means estimator of total invasive coverage area / total land area within the domain of interest. Estimates of areal coverage of individual invasive species should NOT be summed to produce estimates of areal coverage by ALL invasive species, as areal coverage by species is not mutually exclusive (multiple species my occur in the same area). Current FIA data collection protocols do not allow for the unbiased estimation of areal coverage by all invasive species.
+Estimation of attributes follows the procedures documented in Bechtold and Patterson (2005). Specifically, percent areal coverage is computed using a sample-based ratio-of-means estimator of total coverage area / total land area within the domain of interest.
 
 Users may specify alternatives to the 'Temporally Indifferent' method for panel combination using the \code{method} argument. Estimators are currently implemented for the temporally indifferent (TI) method (default, used by EVALIDator), simple moving average (SMA), exponential moving average (EMA), and annual estimation (no panel combination). Users may modify the temporal weighting scheme employed by the exponential moving average using the \code{yrs} argument. See Chapter 5 of Bechtold & Patterson (2005) for more details.
 
@@ -49,20 +50,18 @@ Forest land must be at least 10-percent stocked by trees of any size, including 
 Easy, efficient parallelization is implemented with the \code{\link{parallel}} package. Users must only specify the \code{nCores} argument with a value greater than 1 in order to implement parallel processing on their machines. Parallel implementation is achieved using a snow type cluster on any Windows OS, and with multicore forking on any Unix OS (Linux, Mac). Implementing parallel processing may substantially decrease free memory during processing, particularly on Windows OS. Thus, users should be cautious when running in parallel, and consider implementing serial processing for this task if computational resources are limited (\code{nCores = 1}).
 }
 
-\note{All sampling error estimates are returned as percentages, and represent ~68\% confidence (1 standard deviation). To compute sampling error percent with 95\% confidence, multiply by 1.96.}
 
 \value{
 Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}, values of areal coverage are returned for each plot (sq. ft.). All variables with names ending in \code{SE}, represent the estimate of sampling error (\%) of the variable.
 
 \itemize{
       \item{\strong{YEAR}: reporting year associated with estimates}
-      \item{\strong{SYMBOL}: unique species ID from NRCS Plant Reference Guide}
-      \item{\strong{SCIENTIFIC_NAME}: scientific name of the species}
-      \item{\strong{COMMON_NAME}: common name of the species}
-      \item{\strong{COVER_PCT}: estimate of percent areal coverage of the species }
-      \item{\strong{COVER_AREA}: estimate of areal coverage of the species (acres) }
+      \item{\strong{LAYER}: canopy layer}
+      \item{\strong{GROWTH_HABIT}: species growth habit}
+      \item{\strong{COVER_PCT}: estimate of percent areal coverage of the growth habit within the canopy layer}
+      \item{\strong{COVER_AREA}: estimate of areal coverage of the growth habit within the canopy layer (acres) }
       \item{\strong{AREA}: estimate of total land area (acres) }
-      \item{\strong{nPlots_INV}: number of non-zero plots used to compute invasive coverage estimates}
+      \item{\strong{nPlots_VEG}: number of non-zero plots used to compute areal coverage estimates}
       \item{\strong{nPlots_AREA}: number of non-zero plots used to compute land area estimates}
       }
 }
@@ -77,46 +76,22 @@ FIA Database User Guide: \url{https://www.fia.fs.fed.us/library/database-documen
 Bechtold, W.A.; Patterson, P.L., eds. 2005. The Enhanced Forest Inventory and Analysis Program - National Sampling Design and Estimation Procedures. Gen. Tech. Rep. SRS - 80. Asheville, NC: U.S. Department of Agriculture, Forest Service, Southern Research Station. 85 p. \url{https://www.srs.fs.usda.gov/pubs/gtr/gtr_srs080/gtr_srs080.pdf}
 }
 
+\note{All sampling error estimates are returned as percentages, and represent ~68\% confidence (1 standard deviation). To compute sampling error percent with 95\% confidence, multiply by 1.96.}
+
+
+%% ~Make other sections like Warning with \section{Warning }{....} ~
+
 \seealso{
-\code{\link{dwm}}, \code{\link{vegStruct}}
+\code{\link{invasive}}, \code{\link{dwm}}
 }
 
-\examples{
 
+\examples{
 ## Load data from the rFIA package
 data(fiaRI)
 data(countiesRI)
 
 ## Most recents subset
 fiaRI_mr <- clipFIA(fiaRI)
-
-\donttest{
-## Most recent estimates on forest land
-invasive(db = fiaRI_mr,
-    landType = 'forest')
-
-## Same as above, but implemented in parallel (much quicker)
-parallel::detectCores(logical = FALSE) # 4 cores available, we will take 2
-invasive(db = fiaRI_mr,
-         landType = 'forest',
-         nCores = 2)
-
-## Most recent estimates grouped by stand age on forest land
-# Make a categorical variable which represents stand age (grouped by 10 yr intervals)
-fiaRI_mr$COND$STAND_AGE <- makeClasses(fiaRI_mr$COND$STDAGE, interval = 10)
-invasive(db = fiaRI_mr,
-         grpBy = STAND_AGE)
-
-## Estimates on forested mesic sites (all available inventories)
-invasive(fiaRI,
-         areaDomain = PHYSCLCD \%in\% 21:29) # Mesic Physiographic classes
-
-## Most recent estimates on forest land grouped by user-defined areal units
-ctSF <- invasive(fiaRI_mr,
-                 polys = countiesRI,
-                 returnSpatial = TRUE)
-plot(ctSF) # Plot multiple variables simultaneously
-plotFIA(ctSF[ctSF$SYMBOL == 'ROMU',], COVER_PCT) # Plot Multiflora rose coverage
-}
 }
 
