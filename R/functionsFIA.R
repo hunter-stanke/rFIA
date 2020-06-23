@@ -413,7 +413,7 @@ summary.FIA.Database <- function(object, ...){
 
   ## Tables included
 
-  cat('Tables:          ', names(object))
+  cat('Tables:          ', names(object), '\n')
 
 }
 #' @export
@@ -453,6 +453,7 @@ print.FIA.Database <- function(x, ...){
   } else {
     print(as_tibble(x[1]))
   }
+  cat('\n')
 }
 
 #' @export
@@ -468,6 +469,7 @@ summary.Remote.FIA.Database <- function(object, ...){
   ## Memory Allocated
   mem <- object.size(object)
   cat('Memory Used:     ', format(mem, units = 'MB'), '\n')
+
 
 }
 #' @export
