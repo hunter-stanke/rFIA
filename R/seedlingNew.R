@@ -59,6 +59,7 @@ seedStarter <- function(x,
       },
       plt_quo[10,] %>% # Just the first row
         left_join(select(db$COND, PLT_CN, names(db$COND)[names(db$COND) %in% names(db$PLOT) == FALSE]), by = 'PLT_CN') %>%
+        inner_join(select(db$SEEDLING, PLT_CN, names(db$SEEDLING)[names(db$SEEDLING) %in% c(names(db$PLOT), names(db$COND)) == FALSE]), by = 'PLT_CN') %>%
         select(!!grpBy_quo)
     )
 
