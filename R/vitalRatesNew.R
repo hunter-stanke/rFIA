@@ -838,7 +838,7 @@ vitalRates <- function(db,
     suppressMessages({suppressWarnings({
       tOut <- left_join(tOut, polys) %>%
         select(c('YEAR', grpByOrig, tNames, names(polys))) %>%
-        filter(!is.na(polyID))})})
+        filter(!is.na(polyID) & !is.na(nPlots_AREA))})})
 
     ## Makes it horrible to work with as a dataframe
     if (returnSpatial == FALSE) tOut <- select(tOut, -c(geometry))
