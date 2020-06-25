@@ -101,7 +101,7 @@ Hunter Stanke and Andrew Finley
 ## return a spatial object
 tpaRI <- tpa(fiaRI, polys = countiesRI, returnSpatial = TRUE)
 
-\donttest{\dontrun{
+\dontrun{
 ## Produce animated plot
 plotFIA(tpaRI, y = TPA, animate = TRUE, legend.title = 'Abundance (TPA)')
 ## With a square root transform
@@ -128,6 +128,6 @@ plotFIA(tpaRI_own, y = BAA, grp = OWNGRPCD)
 tpaRI_sc <- tpa(clipFIA(fiaRI), bySpecies = TRUE, bySizeClass = TRUE)
 plotFIA(tpaRI_sc, y = BAA, grp = COMMON_NAME, x = sizeClass, n.max = 4)# Only the top 4
 
-}}
+}
 }
 
