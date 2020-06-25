@@ -418,88 +418,6 @@ areaStarter <- function(x,
     out <- unlist(out, recursive = FALSE)
     tEst <- bind_rows(out[names(out) == 'tEst'])
 
-    out <- list(tEst = tEst, grpBy = grpBy, grpByOrig = grpByOrig)
-  }
-
-  return(out)
-
-}
-
-
-
-
-#' @export
-area <- function(db,
-                 grpBy = NULL,
-                 polys = NULL,
-                 returnSpatial = FALSE,
-                 byLandType = FALSE,
-                 landType = 'forest',
-                 method = 'TI',
-                 lambda = .5,
-                 treeDomain = NULL,
-                 areaDomain = NULL,
-                 totals = FALSE,
-                 byPlot = FALSE,
-                 nCores = 1) {
-
-  ##  don't have to change original code
-  grpBy_quo <- rlang::enquo(grpBy)
-  areaDomain <- rlang::enquo(areaDomain)
-  treeDomain <- rlang::enquo(treeDomain)
-
-  ### Is DB remote?
-  remote <- ifelse(class(db) == 'Remote.FIA.Database', 1, 0)
-  if (remote){
-
-    iter <- db$states
-
-    ## In memory
-  } else {
-    ## Some warnings
-    if (class(db) != "FIA.Database"){
-      stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
-    }
-
-    ## an iterator for remote
-    iter <- 1
-
-  }
-
-  ### AREAL SUMMARY PREP
-  if(!is.null(polys)) {
-    # Convert polygons to an sf object
-    polys <- polys %>%
-      as('sf')%>%
-      mutate_if(is.factor,
-                as.character)
-    ## A unique ID
-    polys$polyID <- 1:nrow(polys)
-  }
-
-
-
-  ## Run the main portion
-  out <- lapply(X = iter, FUN = areaStarter, db,
-                grpBy_quo = grpBy_quo, polys, returnSpatial,
-                byLandType, landType, method,
-                lambda, treeDomain, areaDomain,
-                totals, byPlot, nCores, remote)
-  ## Bring the results back
-  out <- unlist(out, recursive = FALSE)
-  tEst <- bind_rows(out[names(out) == 'tEst'])
-  grpBy <- out[names(out) == 'grpBy'][[1]]
-  grpByOrig <- out[names(out) == 'grpByOrig'][[1]]
-
-
-
-
-  if (byPlot){
-
-    tOut <- tEst
-
-    ## Population estimation
-  } else {
 
     ##### ----------------- MOVING AVERAGES
     if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){
@@ -597,6 +515,123 @@ area <- function(db,
 
     }
 
+    out <- list(tEst = tEst, grpBy = grpBy, grpByOrig = grpByOrig)
+  }
+
+  return(out)
+
+}
+
+
+
+
+#' @export
+area <- function(db,
+                 grpBy = NULL,
+                 polys = NULL,
+                 returnSpatial = FALSE,
+                 byLandType = FALSE,
+                 landType = 'forest',
+                 method = 'TI',
+                 lambda = .5,
+                 treeDomain = NULL,
+                 areaDomain = NULL,
+                 totals = FALSE,
+                 byPlot = FALSE,
+                 nCores = 1) {
+
+  ##  don't have to change original code
+  grpBy_quo <- rlang::enquo(grpBy)
+  areaDomain <- rlang::enquo(areaDomain)
+  treeDomain <- rlang::enquo(treeDomain)
+
+  ### Is DB remote?
+  remote <- ifelse(class(db) == 'Remote.FIA.Database', 1, 0)
+  if (remote){
+
+    iter <- db$states
+
+    ## In memory
+  } else {
+    ## Some warnings
+    if (class(db) != "FIA.Database"){
+      stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
+    }
+
+    ## an iterator for remote
+    iter <- 1
+
+  }
+
+  ### AREAL SUMMARY PREP
+  if(!is.null(polys)) {
+    # Convert polygons to an sf object
+    polys <- polys %>%
+      as('sf')%>%
+      mutate_if(is.factor,
+                as.character)
+    ## A unique ID
+    polys$polyID <- 1:nrow(polys)
+  }
+
+
+
+  ## Run the main portion
+  out <- lapply(X = iter, FUN = areaStarter, db,
+                grpBy_quo = grpBy_quo, polys, returnSpatial,
+                byLandType, landType, method,
+                lambda, treeDomain, areaDomain,
+                totals, byPlot, nCores, remote)
+  ## Bring the results back
+  out <- unlist(out, recursive = FALSE)
+  tEst <- bind_rows(out[names(out) == 'tEst'])
+  grpBy <- out[names(out) == 'grpBy'][[1]]
+  grpByOrig <- out[names(out) == 'grpByOrig'][[1]]
+
+
+
+
+  if (byPlot){
+
+    tOut <- tEst
+
+    ## Population estimation
+  } else {
+    ## Check for a most recent subset
+    if (remote){
+      if ('mostRecent' %in% names(db)){
+        mr = db$mostRecent # logical
+      } else {
+        mr = FALSE
+      }
+      ## In-memory
+    } else {
+      if ('mostRecent' %in% names(db)){
+        mr = TRUE
+      } else {
+        mr = FALSE
+      }
+    }
+
+    suppressMessages({suppressWarnings({
+      ## If a clip was specified, handle the reporting years
+      if (mr){
+        ## If a most recent subset, ignore differences in reporting years across states
+        ## instead combine most recent information from each state
+        # ID mr years by group
+        maxyearsT <- tEst %>%
+          select(grpBy) %>%
+          group_by(.dots = grpBy[!c(grpBy %in% 'YEAR')]) %>%
+          summarise(YEAR = max(YEAR, na.rm = TRUE))
+
+        # Combine estimates
+        tEst <- tEst %>%
+          ungroup() %>%
+          select(-c(YEAR)) %>%
+          left_join(maxyearsT, by = grpBy[!c(grpBy %in% 'YEAR')])
+
+      }
+    })})
     ##---------------------  TOTALS and RATIOS
     # Area
     tTotal <- tEst %>%

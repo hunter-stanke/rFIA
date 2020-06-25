@@ -381,6 +381,26 @@ vrAttHelper <- function(attribute, attribute.prev, attribute.mid, attribute.beg,
   return(at)
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Some base functions for the FIA Database Class
 #' @export
 summary.FIA.Database <- function(object, ...){
@@ -461,7 +481,7 @@ summary.Remote.FIA.Database <- function(object, ...){
   cat('---- Remote FIA Database Object -----', '\n')
 
   # States Covered
-  if (!is.null(x$states)){
+  if (!is.null(object$states)){
     cat('States:          ',
         as.character(object$states), '\n')
   }

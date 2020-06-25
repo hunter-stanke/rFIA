@@ -240,6 +240,7 @@ tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
               cvEst_tT = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_t, tStrat, tEst, tTStrat, tTEst),
               cvEst_bT = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_b, bStrat, bEst, bTStrat, bTEst))
 
+
   out <- list(tEst = tEst, aEst = aEst)
 
   return(out)

@@ -42,7 +42,7 @@ seedHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
     grpBy <- c('YEAR', grpBy, 'PLOT_STATUS_CD')
     t <- data %>%
       mutate(YEAR = MEASYEAR) %>%
-      distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
+      #distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
       group_by(.dots = grpBy, PLT_CN) %>%
       summarize(TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE),
                 TPA_PERC = TPA / sum(TPA_UNADJ * pDI, na.rm = TRUE) * 100,

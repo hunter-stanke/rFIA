@@ -150,6 +150,7 @@ tpaStarter <- function(x,
           library(dplyr)
           library(stringr)
           library(rFIA)
+          library(sf)
         })
         out <- parLapply(cl, X = names(polyList), fun = areal_par, pltSF, polyList)
         #stopCluster(cl) # Keep the cluster active for the next run
@@ -167,15 +168,6 @@ tpaStarter <- function(x,
     db$PLOT <- db$PLOT %>%
       left_join(select(pltSF, polyID, pltID), by = 'pltID')
 
-    # Test if any polygons cross state boundaries w/ different recent inventory years (continued w/in loop)
-    if ('mostRecent' %in% names(db) & length(unique(db$POP_EVAL$STATECD)) > 1){
-      mergeYears <- pltSF %>%
-        right_join(select(db$PLOT, PLT_CN, pltID), by = 'pltID') %>%
-        inner_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID', 'STATECD')), by = 'PLT_CN') %>%
-        inner_join(select(db$POP_EVAL, c('EVALID', 'END_INVYR')), by = 'EVALID') %>%
-        group_by(polyID) %>%
-        summarize(maxYear = max(END_INVYR, na.rm = TRUE))
-    }
 
     ## TO RETURN SPATIAL PLOTS
   }
@@ -433,103 +425,6 @@ tpaStarter <- function(x,
     aEst <- bind_rows(out[names(out) == 'aEst'])
     tEst <- bind_rows(out[names(out) == 'tEst'])
 
-    out <- list(tEst = tEst, aEst = aEst, grpBy = grpBy, aGrpBy = aGrpBy, grpByOrig = grpByOrig)
-  }
-
-  return(out)
-
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#' @export
-tpa <- function(db,
-                grpBy = NULL,
-                polys = NULL,
-                returnSpatial = FALSE,
-                bySpecies = FALSE,
-                bySizeClass = FALSE,
-                landType = 'forest',
-                treeType = 'live',
-                method = 'TI',
-                lambda = .5,
-                treeDomain = NULL,
-                areaDomain = NULL,
-                totals = FALSE,
-                byPlot = FALSE,
-                nCores = 1) {
-
-  ##  don't have to change original code
-  grpBy_quo <- rlang::enquo(grpBy)
-  areaDomain <- rlang::enquo(areaDomain)
-  treeDomain <- rlang::enquo(treeDomain)
-
-  ### Is DB remote?
-  remote <- ifelse(class(db) == 'Remote.FIA.Database', 1, 0)
-  if (remote){
-
-    iter <- db$states
-
-  ## In memory
-  } else {
-    ## Some warnings
-    if (class(db) != "FIA.Database"){
-      stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
-    }
-
-    ## an iterator for remote
-    iter <- 1
-
-  }
-
-  ### AREAL SUMMARY PREP
-  if(!is.null(polys)) {
-    # Convert polygons to an sf object
-    polys <- polys %>%
-      as('sf')%>%
-      mutate_if(is.factor,
-                as.character)
-    ## A unique ID
-    polys$polyID <- 1:nrow(polys)
-  }
-
-
-
-  ## Run the main portion
-  out <- lapply(X = iter, FUN = tpaStarter, db,
-                grpBy_quo = grpBy_quo, polys, returnSpatial,
-                bySpecies, bySizeClass,
-                landType, treeType, method,
-                lambda, treeDomain, areaDomain,
-                totals, byPlot, nCores, remote)
-  ## Bring the results back
-  out <- unlist(out, recursive = FALSE)
-  aEst <- bind_rows(out[names(out) == 'aEst'])
-  tEst <- bind_rows(out[names(out) == 'tEst'])
-  grpBy <- out[names(out) == 'grpBy'][[1]]
-  aGrpBy <- out[names(out) == 'aGrpBy'][[1]]
-  grpByOrig <- out[names(out) == 'grpByOrig'][[1]]
-
-
-
-
-  if (byPlot){
-    tOut <- tEst
-
-    ## Population estimates
-  } else {
-
     ##### ----------------- MOVING AVERAGES
     if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){
       ### ---- SIMPLE MOVING AVERAGE
@@ -633,6 +528,146 @@ tpa <- function(db,
     }
 
 
+    out <- list(tEst = tEst, aEst = aEst, grpBy = grpBy, aGrpBy = aGrpBy, grpByOrig = grpByOrig)
+  }
+
+  return(out)
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#' @export
+tpa <- function(db,
+                grpBy = NULL,
+                polys = NULL,
+                returnSpatial = FALSE,
+                bySpecies = FALSE,
+                bySizeClass = FALSE,
+                landType = 'forest',
+                treeType = 'live',
+                method = 'TI',
+                lambda = .5,
+                treeDomain = NULL,
+                areaDomain = NULL,
+                totals = FALSE,
+                byPlot = FALSE,
+                nCores = 1) {
+
+  ##  don't have to change original code
+  grpBy_quo <- rlang::enquo(grpBy)
+  areaDomain <- rlang::enquo(areaDomain)
+  treeDomain <- rlang::enquo(treeDomain)
+
+  ### Is DB remote?
+  remote <- ifelse(class(db) == 'Remote.FIA.Database', 1, 0)
+  if (remote){
+
+    iter <- db$states
+
+  ## In memory
+  } else {
+    ## Some warnings
+    if (class(db) != "FIA.Database"){
+      stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
+    }
+
+    ## an iterator for remote
+    iter <- 1
+
+  }
+
+  ### AREAL SUMMARY PREP
+  if(!is.null(polys)) {
+    # Convert polygons to an sf object
+    polys <- polys %>%
+      as('sf')%>%
+      mutate_if(is.factor,
+                as.character)
+    ## A unique ID
+    polys$polyID <- 1:nrow(polys)
+  }
+
+
+
+  ## Run the main portion
+  out <- lapply(X = iter, FUN = tpaStarter, db,
+                grpBy_quo = grpBy_quo, polys, returnSpatial,
+                bySpecies, bySizeClass,
+                landType, treeType, method,
+                lambda, treeDomain, areaDomain,
+                totals, byPlot, nCores, remote)
+  ## Bring the results back
+  out <- unlist(out, recursive = FALSE)
+  aEst <- bind_rows(out[names(out) == 'aEst'])
+  tEst <- bind_rows(out[names(out) == 'tEst'])
+  grpBy <- out[names(out) == 'grpBy'][[1]]
+  aGrpBy <- out[names(out) == 'aGrpBy'][[1]]
+  grpByOrig <- out[names(out) == 'grpByOrig'][[1]]
+
+
+
+
+  if (byPlot){
+    tOut <- tEst
+
+    ## Population estimates
+  } else {
+
+    ## Check for a most recent subset
+    if (remote){
+      if ('mostRecent' %in% names(db)){
+        mr = db$mostRecent # logical
+      } else {
+        mr = FALSE
+      }
+      ## In-memory
+    } else {
+      if ('mostRecent' %in% names(db)){
+        mr = TRUE
+      } else {
+        mr = FALSE
+      }
+    }
+
+    suppressMessages({suppressWarnings({
+      ## If a clip was specified, handle the reporting years
+      if (mr){
+        ## If a most recent subset, ignore differences in reporting years across states
+        ## instead combine most recent information from each state
+        # ID mr years by group
+        maxyearsT <- tEst %>%
+          select(grpBy) %>%
+          group_by(.dots = grpBy[!c(grpBy %in% 'YEAR')]) %>%
+          summarise(YEAR = max(YEAR, na.rm = TRUE))
+        maxyearsA <- aEst %>%
+          select(aGrpBy) %>%
+          group_by(.dots = aGrpBy[!c(aGrpBy %in% 'YEAR')]) %>%
+          summarise(YEAR = max(YEAR, na.rm = TRUE))
+
+        # Combine estimates
+        aEst <- aEst %>%
+          ungroup() %>%
+          select(-c(YEAR)) %>%
+          left_join(maxyearsA, by = aGrpBy[!c(aGrpBy %in% 'YEAR')])
+        tEst <- tEst %>%
+          ungroup() %>%
+          select(-c(YEAR)) %>%
+          left_join(maxyearsT, by = grpBy[!c(grpBy %in% 'YEAR')])
+
+      }
+    })})
 
 
     ##---------------------  TOTALS and RATIOS
@@ -1317,110 +1352,6 @@ tpa_test <- function(db,
     ## Population estimates
   } else {
 
-    ##### ----------------- MOVING AVERAGES
-    if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){
-      ### ---- SIMPLE MOVING AVERAGE
-      if (str_to_upper(method) == 'SMA'){
-        ## Assuming a uniform weighting scheme
-        wgts <- pops %>%
-          group_by(ESTN_UNIT_CN) %>%
-          summarize(wgt = 1 / length(unique(INVYR)))
-
-        aEst <- left_join(aEst, wgts, by = 'ESTN_UNIT_CN')
-        tEst <- left_join(tEst, wgts, by = 'ESTN_UNIT_CN')
-
-        #### ----- Linear MOVING AVERAGE
-      } else if (str_to_upper(method) == 'LMA'){
-        wgts <- pops %>%
-          distinct(YEAR, ESTN_UNIT_CN, INVYR, .keep_all = TRUE) %>%
-          arrange(YEAR, ESTN_UNIT_CN, INVYR) %>%
-          group_by(as.factor(YEAR), as.factor(ESTN_UNIT_CN)) %>%
-          mutate(rank = min_rank(INVYR))
-
-        ## Want a number of INVYRs per EU
-        neu <- wgts %>%
-          group_by(ESTN_UNIT_CN) %>%
-          summarize(n = sum(rank, na.rm = TRUE))
-
-        ## Rejoining and computing wgts
-        wgts <- wgts %>%
-          left_join(neu, by = 'ESTN_UNIT_CN') %>%
-          mutate(wgt = rank / n) %>%
-          ungroup() %>%
-          select(ESTN_UNIT_CN, INVYR, wgt)
-
-        aEst <- left_join(aEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
-        tEst <- left_join(tEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
-
-        #### ----- EXPONENTIAL MOVING AVERAGE
-      } else if (str_to_upper(method) == 'EMA'){
-        wgts <- pops %>%
-          distinct(YEAR, ESTN_UNIT_CN, INVYR, .keep_all = TRUE) %>%
-          arrange(YEAR, ESTN_UNIT_CN, INVYR) %>%
-          group_by(as.factor(YEAR), as.factor(ESTN_UNIT_CN)) %>%
-          mutate(rank = min_rank(INVYR))
-
-
-        if (length(lambda) < 2){
-          ## Want sum of weighitng functions
-          neu <- wgts %>%
-            mutate(l = lambda) %>%
-            group_by(ESTN_UNIT_CN) %>%
-            summarize(l = first(lambda),
-                      sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
-
-          ## Rejoining and computing wgts
-          wgts <- wgts %>%
-            left_join(neu, by = 'ESTN_UNIT_CN') %>%
-            mutate(wgt = l*(1-l)^(1-rank) / sumwgt) %>%
-            ungroup() %>%
-            select(ESTN_UNIT_CN, INVYR, wgt)
-        } else {
-          grpBy <- c('lambda', grpBy)
-          aGrpBy <- c('lambda', aGrpBy)
-          ## Duplicate weights for each level of lambda
-          yrWgts <- list()
-          for (i in 1:length(unique(lambda))) {
-            yrWgts[[i]] <- mutate(wgts, lambda = lambda[i])
-          }
-          wgts <- bind_rows(yrWgts)
-          ## Want sum of weighitng functions
-          neu <- wgts %>%
-            group_by(lambda, ESTN_UNIT_CN) %>%
-            summarize(l = first(lambda),
-                      sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
-
-          ## Rejoining and computing wgts
-          wgts <- wgts %>%
-            left_join(neu, by = c('lambda', 'ESTN_UNIT_CN')) %>%
-            mutate(wgt = l*(1-l)^(1-rank) / sumwgt) %>%
-            ungroup() %>%
-            select(lambda, ESTN_UNIT_CN, INVYR, wgt)
-        }
-
-        aEst <- left_join(aEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
-        tEst <- left_join(tEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
-
-      }
-
-      ### Applying the weights
-      # Area
-      aEst <- aEst %>%
-        mutate_at(vars(aEst), ~(.*wgt)) %>%
-        mutate_at(vars(aVar), ~(.*(wgt^2))) %>%
-        group_by(ESTN_UNIT_CN, .dots = aGrpBy) %>%
-        summarize_at(vars(aEst:plotIn_AREA), sum, na.rm = TRUE)
-
-      tEst <- tEst %>%
-        mutate_at(vars(tEst:bTEst), ~(.*wgt)) %>%
-        mutate_at(vars(tVar:cvEst_bT), ~(.*(wgt^2))) %>%
-        group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
-        summarize_at(vars(tEst:cvEst_bT), sum, na.rm = TRUE)
-
-    }
-
-
-
 
     ##---------------------  TOTALS and RATIOS
     # Area
@@ -1942,10 +1873,10 @@ tpa_backup <- function(db,
         #   library(stringr)
         #   library(rFIA)
         # })
-        out <- parLapply(cl, X = names(popState), fun = tpaHelper2, popState, a, t, grpBy, aGrpBy, method)
+        out <- parLapply(cl, X = names(popState), fun = tpaHelper2, popState, a, t, grpBy, aGrpBy, method, lambda)
         stopCluster(cl)
       } else { # Unix systems
-        out <- mclapply(names(popState), FUN = tpaHelper2, popState, a, t, grpBy, aGrpBy, method, mc.cores = nCores)
+        out <- mclapply(names(popState), FUN = tpaHelper2, popState, a, t, grpBy, aGrpBy, method, lambda, mc.cores = nCores)
       }
     })
     ## back to dataframes
