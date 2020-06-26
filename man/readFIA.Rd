@@ -74,13 +74,15 @@ Alternatively, use \code{\link{getFIA}} to automate the download, reading, and s
 ## First download the common tables for Rhode Island,
 ## load into R, but don't save it anywhere yet
 db <- getFIA(states = 'RI')
+}
+
+\dontrun{
 
 ## Now we write it all out
 ## Replace tempdir() with the path to your
 ## directory (where data will be saved)
 writeFIA(db, dir = tempdir())
-}
-\dontrun{
+
 
 ## Then read it back in with readFIA
 db <- readFIA(dir = tempdir())
