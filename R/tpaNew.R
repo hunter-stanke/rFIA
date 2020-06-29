@@ -425,6 +425,9 @@ tpaStarter <- function(x,
     aEst <- bind_rows(out[names(out) == 'aEst'])
     tEst <- bind_rows(out[names(out) == 'tEst'])
 
+
+
+
     ##### ----------------- MOVING AVERAGES
     if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){
       ### ---- SIMPLE MOVING AVERAGE
@@ -474,7 +477,7 @@ tpaStarter <- function(x,
           neu <- wgts %>%
             mutate(l = lambda) %>%
             group_by(ESTN_UNIT_CN) %>%
-            summarize(l = first(lambda),
+            summarize(l = 1 - first(lambda),
                       sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
 
           ## Rejoining and computing wgts
@@ -495,7 +498,7 @@ tpaStarter <- function(x,
           ## Want sum of weighitng functions
           neu <- wgts %>%
             group_by(lambda, ESTN_UNIT_CN) %>%
-            summarize(l = first(lambda),
+            summarize(l = 1 - first(lambda),
                       sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
 
           ## Rejoining and computing wgts

@@ -529,7 +529,7 @@ vrStarter <- function(x,
           neu <- wgts %>%
             mutate(l = lambda) %>%
             group_by(ESTN_UNIT_CN) %>%
-            summarize(l = first(lambda),
+            summarize(l = 1-first(lambda),
                       sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
 
           ## Rejoining and computing wgts
@@ -550,7 +550,7 @@ vrStarter <- function(x,
           ## Want sum of weighitng functions
           neu <- wgts %>%
             group_by(lambda, ESTN_UNIT_CN) %>%
-            summarize(l = first(lambda),
+            summarize(l = 1-first(lambda),
                       sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
 
           ## Rejoining and computing wgts
@@ -1350,7 +1350,7 @@ vitalRates_backup <- function(db,
             neu <- wgts %>%
               mutate(l = lambda) %>%
               group_by(ESTN_UNIT_CN) %>%
-              summarize(l = first(lambda),
+              summarize(l = 1-first(lambda),
                         sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
 
             ## Rejoining and computing wgts
@@ -1371,7 +1371,7 @@ vitalRates_backup <- function(db,
             ## Want sum of weighitng functions
             neu <- wgts %>%
               group_by(lambda, ESTN_UNIT_CN) %>%
-              summarize(l = first(lambda),
+              summarize(l = 1-first(lambda),
                         sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
 
             ## Rejoining and computing wgts

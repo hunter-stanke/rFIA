@@ -464,7 +464,7 @@ diversityStarter <- function(x,
           neu <- wgts %>%
             mutate(l = lambda) %>%
             group_by(ESTN_UNIT_CN) %>%
-            summarize(l = first(lambda),
+            summarize(l = 1-first(lambda),
                       sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
 
           ## Rejoining and computing wgts
@@ -485,7 +485,7 @@ diversityStarter <- function(x,
           ## Want sum of weighitng functions
           neu <- wgts %>%
             group_by(lambda, ESTN_UNIT_CN) %>%
-            summarize(l = first(lambda),
+            summarize(l = 1-first(lambda),
                       sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
 
           ## Rejoining and computing wgts
@@ -659,13 +659,13 @@ diversity <- function(db,
 
     ### Up a few spatial scales
     full <- full %>%
-      group_by(.dots = grpBy) %>%
+      group_by(.dots = grpBy[!c(grpBy %in% 'lambda')]) %>%
       summarize(H_g = divIndex(grp, state, index = 'H'),
                 Eh_g = divIndex(grp, state, index = 'Eh'),
                 S_g = divIndex(grp, state, index = 'S'))
 
     tOut <- tOut %>%
-      left_join(full, by = grpBy) %>%
+      left_join(full, by = grpBy[!c(grpBy %in% 'lambda')]) %>%
       mutate(H_b = H_g - H_a,
              Eh_b = Eh_g - Eh_a,
              S_b = S_g - S_a)
@@ -1187,7 +1187,7 @@ diversity_backup <- function(db,
           neu <- wgts %>%
             mutate(l = lambda) %>%
             group_by(ESTN_UNIT_CN) %>%
-            summarize(l = first(lambda),
+            summarize(l = 1-first(lambda),
                       sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
 
           ## Rejoining and computing wgts
@@ -1208,7 +1208,7 @@ diversity_backup <- function(db,
           ## Want sum of weighitng functions
           neu <- wgts %>%
             group_by(lambda, ESTN_UNIT_CN) %>%
-            summarize(l = first(lambda),
+            summarize(l = 1-first(lambda),
                       sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
 
           ## Rejoining and computing wgts
