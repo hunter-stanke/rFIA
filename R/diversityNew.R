@@ -15,7 +15,8 @@ diversityStarter <- function(x,
                              byPlot = FALSE,
                              totals = FALSE,
                              nCores = 1,
-                             remote){
+                             remote,
+                             mr){
 
   reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
@@ -242,6 +243,14 @@ diversityStarter <- function(x,
     distinct(END_INVYR, EVALID, .keep_all = TRUE)# %>%
   #group_by(END_INVYR) %>%
   #summarise(id = list(EVALID)
+
+  ## If a most-recent subset, make sure that we don't get two reporting years in
+  ## western states
+  if (mr) {
+    db$POP_EVAL <- db$POP_EVAL %>%
+      group_by(EVAL_TYP) %>%
+      filter(END_INVYR == max(END_INVYR, na.rm = TRUE))
+  }
 
   ## Make an annual panel ID, associated with an INVYR
 
@@ -562,6 +571,22 @@ diversity <- function(db,
 
   }
 
+  ## Check for a most recent subset
+  if (remote){
+    if ('mostRecent' %in% names(db)){
+      mr = db$mostRecent # logical
+    } else {
+      mr = FALSE
+    }
+    ## In-memory
+  } else {
+    if ('mostRecent' %in% names(db)){
+      mr = TRUE
+    } else {
+      mr = FALSE
+    }
+  }
+
   ### AREAL SUMMARY PREP
   if(!is.null(polys)) {
     # Convert polygons to an sf object
@@ -582,7 +607,7 @@ diversity <- function(db,
                 landType, treeType, method,
                 lambda, stateVar, grpVar,
                 treeDomain, areaDomain,
-                byPlot, totals, nCores, remote)
+                byPlot, totals, nCores, remote, mr)
   ## Bring the results back
   out <- unlist(out, recursive = FALSE)
   tEst <- bind_rows(out[names(out) == 'tEst'])
@@ -598,22 +623,6 @@ diversity <- function(db,
 
 
   } else {
-
-    ## Check for a most recent subset
-    if (remote){
-      if ('mostRecent' %in% names(db)){
-        mr = db$mostRecent # logical
-      } else {
-        mr = FALSE
-      }
-      ## In-memory
-    } else {
-      if ('mostRecent' %in% names(db)){
-        mr = TRUE
-      } else {
-        mr = FALSE
-      }
-    }
 
     suppressMessages({suppressWarnings({
       ## If a clip was specified, handle the reporting years

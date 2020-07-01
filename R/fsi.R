@@ -237,6 +237,7 @@ fsi <- function(db,
   #group_by(END_INVYR) %>%
   #summarise(id = list(EVALID)
 
+
   ## Make an annual panel ID, associated with an INVYR
 
   ### The population tables

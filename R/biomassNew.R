@@ -14,7 +14,8 @@ bioStarter <- function(x,
                        totals = FALSE,
                        byPlot = FALSE,
                        nCores = 1,
-                       remote){
+                       remote,
+                       mr){
 
   reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
@@ -234,9 +235,16 @@ bioStarter <- function(x,
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
     filter(EVAL_TYP == 'EXPVOL' | EVAL_TYP == 'EXPCURR') %>%
     filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
-    distinct(END_INVYR, EVALID, .keep_all = TRUE)# %>%
-  #group_by(END_INVYR) %>%
-  #summarise(id = list(EVALID)
+    distinct(END_INVYR, EVALID, .keep_all = TRUE)
+
+  ## If a most-recent subset, make sure that we don't get two reporting years in
+  ## western states
+  if (mr) {
+    db$POP_EVAL <- db$POP_EVAL %>%
+      group_by(EVAL_TYP) %>%
+      filter(END_INVYR == max(END_INVYR, na.rm = TRUE))
+  }
+
 
   ## Make an annual panel ID, associated with an INVYR
 
@@ -591,6 +599,22 @@ biomass <- function(db,
 
   }
 
+  ## Check for a most recent subset
+  if (remote){
+    if ('mostRecent' %in% names(db)){
+      mr = db$mostRecent # logical
+    } else {
+      mr = FALSE
+    }
+    ## In-memory
+  } else {
+    if ('mostRecent' %in% names(db)){
+      mr = TRUE
+    } else {
+      mr = FALSE
+    }
+  }
+
   ### AREAL SUMMARY PREP
   if(!is.null(polys)) {
     # Convert polygons to an sf object
@@ -610,7 +634,7 @@ biomass <- function(db,
                 bySpecies, bySizeClass,
                 landType, treeType, method,
                 lambda, treeDomain, areaDomain,
-                totals, byPlot, nCores, remote)
+                totals, byPlot, nCores, remote, mr)
   ## Bring the results back
   out <- unlist(out, recursive = FALSE)
   aEst <- bind_rows(out[names(out) == 'aEst'])
@@ -625,21 +649,6 @@ biomass <- function(db,
     tOut <- tEst
 
   } else {
-    ## Check for a most recent subset
-    if (remote){
-      if ('mostRecent' %in% names(db)){
-        mr = db$mostRecent # logical
-      } else {
-        mr = FALSE
-      }
-      ## In-memory
-    } else {
-      if ('mostRecent' %in% names(db)){
-        mr = TRUE
-      } else {
-        mr = FALSE
-      }
-    }
 
     suppressMessages({suppressWarnings({
       ## If a clip was specified, handle the reporting years
