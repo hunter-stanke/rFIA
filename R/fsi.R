@@ -1,6 +1,5 @@
 
-#' @export
-fsi <- function(db,
+fsi_old <- function(db,
                 grpBy = NULL,
                 polys = NULL,
                 returnSpatial = FALSE,
@@ -431,27 +430,6 @@ fsi <- function(db,
     tOut$SI = if_else(x < 0, -M, M)
 
     tOut <- select(tOut, YEAR, PLT_CN, any_of('PREV_PLT_CN'), grpBy[grpBy != 'YEAR'], SI, TPA_RATE, BAA_RATE, REMPER, everything())
-    # tOut <- tOut %>%
-    #   mutate(#TPA_RATE = CHNG_TPA / REMPER / abs(mean(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
-    #          #BAA_RATE = CHNG_BAA / REMPER / abs(mean(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)),
-    #          TPA_RATE = (scale(CHNG_TPA) +
-    #            (mean(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / sd(CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE))) /
-    #            REMPER,
-    #          BAA_RATE = (scale(CHNG_BAA) +
-    #                        (mean(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE) / sd(CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE))) /
-    #            REMPER,
-    #
-    #          x = projectPnts(TPA_RATE, BAA_RATE, 1, 0)$x,
-    #          y = x,
-    #          M = sqrt(x^2 + y^2),
-    #          SI = if_else(x < 0, -M, M)) %>%
-    #   select(-c(x,y,M)) %>%
-
-
-    ## Save these
-    #tpaRateMean <- mean(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
-    #baaRateMean <- mean(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
-
 
 
     ## Make it spatial

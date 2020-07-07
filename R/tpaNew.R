@@ -387,6 +387,7 @@ tpaStarter <- function(x,
     }
 
     out <- list(tEst = tOut, grpBy = grpBy, aGrpBy = aGrpBy, grpByOrig = grpByOrig)
+
     ## Population estimation
   } else {
     ## back to dataframes
@@ -537,10 +538,11 @@ tpaStarter <- function(x,
         group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
         summarize_at(vars(tEst:cvEst_bT), sum, na.rm = TRUE)
 
+
     }
 
-
     out <- list(tEst = tEst, aEst = aEst, grpBy = grpBy, aGrpBy = aGrpBy, grpByOrig = grpByOrig)
+
   }
 
   return(out)
