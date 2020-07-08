@@ -102,11 +102,6 @@ fsiStarter <- function(x,
   # Save original grpBy for pretty return with spatial objects
   grpByOrig <- grpBy
 
-  ## IF the object was clipped
-  if ('prev' %in% names(db$PLOT)){
-    ## Only want the current plots, no grm
-    db$PLOT <- filter(db$PLOT, prev == 0)
-  }
 
   ### DEAL WITH TEXAS
   if (any(db$POP_EVAL$STATECD %in% 48)){
@@ -267,6 +262,7 @@ fsiStarter <- function(x,
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN', 'INVYR', 'STATECD')), by = 'STRATUM_CN') %>%
     ## ONLY REMEASURED PLOTS MEETING CRITERIA ABOVE
     filter(PLT_CN %in% remPlts$PLT_CN) %>%
+    ungroup() %>%
     mutate_if(is.factor,
               as.character)
 
@@ -330,6 +326,7 @@ fsiStarter <- function(x,
     db$TREE <- db$TREE %>%
       left_join(select(intData$REF_SPECIES_2018, c('SPCD','COMMON_NAME', 'GENUS', 'SPECIES')), by = 'SPCD') %>%
       mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' ')) %>%
+      ungroup() %>%
       mutate_if(is.factor,
                 as.character)
     grpBy <- c(grpBy, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
@@ -417,12 +414,15 @@ fsiStarter <- function(x,
     out <- unlist(out, recursive = FALSE)
     tEst <- bind_rows(out[names(out) == 't'])
 
-    ## Should be estimated across all plots
-    tpaRateSD <- 29.86784
-    baaRateSD <-  0.1498109
+    if (scaleGCB){
+      ## Should be estimated across all plots
+      tpaRateSD <- 29.86784
+      baRateSD <-  0.1498109
 
-    tEst$TPA_RATE <- tEst$CHNG_TPA / tpaRateSD
-    tEst$BAA_RATE <- tEst$CHNG_BAA / baaRateSD
+      tEst$TPA_RATE <- tEst$CHNG_TPA / tpaRateSD
+      tEst$BA_RATE <- tEst$CHNG_BA / baRateSD
+    }
+
 
     ## Make it spatial
     if (returnSpatial){
@@ -451,11 +451,8 @@ fsiStarter <- function(x,
 
       ## Should be estimated across all plots
       tpaRateSD <- 29.86784
-      baaRateSD <-  0.1498109
+      baRateSD <-  0.1498109
 
-      ## Standardize the changes in each state variable
-      t$TPA_RATE <- t$CHNG_TPA / tpaRateSD
-      t$BAA_RATE <- t$CHNG_BAA / baaRateSD
 
       ## Adding YEAR to groups
       grpBy <- c('YEAR', grpBy)
@@ -471,10 +468,10 @@ fsiStarter <- function(x,
           #   library(stringr)
           #   library(rFIA)
           # })
-          out <- parLapply(cl, X = names(popState), fun = fsiHelper2, popState, a, t, grpBy, method)
+          out <- parLapply(cl, X = names(popState), fun = fsiHelper2, popState, a, t, grpBy, method, tpaRateSD, baRateSD)
           stopCluster(cl)
         } else { # Unix systems
-          out <- mclapply(names(popState), FUN = fsiHelper2, popState, a, t, grpBy, method, mc.cores = nCores)
+          out <- mclapply(names(popState), FUN = fsiHelper2, popState, a, t, grpBy, method, tpaRateSD, baRateSD, mc.cores = nCores)
         }
       })
       ## back to dataframes
@@ -652,14 +649,12 @@ fsi <- function(db,
   if(!is.null(polys)) {
     # Convert polygons to an sf object
     polys <- polys %>%
-      as('sf')%>%
+      as('sf') %>%
       mutate_if(is.factor,
                 as.character)
     ## A unique ID
     polys$polyID <- 1:nrow(polys)
   }
-
-
 
 
   ## Run the main portion
@@ -680,7 +675,7 @@ fsi <- function(db,
   ## Set these globally
   if (scaleGCB){
     tpaRateSD <- 29.86784
-    baaRateSD <-  0.1498109
+    baRateSD <-  0.1498109
   }
 
   if (byPlot){
@@ -692,49 +687,66 @@ fsi <- function(db,
     ## If so, scaling is already handled
     ## Otherwise do it here
     if (scaleGCB == FALSE){
-      ## Standardize the changes in each state variable
-      tOut$TPA_RATE <- tOut$CHNG_TPA / sd(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
-      tOut$BAA_RATE <- tOut$CHNG_BAA / sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
-
       tpaRateSD <- sd(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
-      baaRateSD <- sd(tOut$CHNG_BAA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+      baRateSD <- sd(tOut$CHNG_BA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
+
+      tOut$TPA_RATE <- tEst$CHNG_TPA / tpaRateSD
+      tOut$BA_RATE <- tEst$CHNG_BA / baRateSD
     }
 
-    # Compute the SI
-    x = projectPnts(tOut$TPA_RATE, tOut$BAA_RATE, 0.8025, 0)$x
-    y = projectPnts(tOut$TPA_RATE, tOut$BAA_RATE, 0.8025, 0)$y
-    M = sqrt(x^2 + y^2)
-    tOut$SI = if_else(x < 0, -M, M)
+    # # Compute the SI
+    # x = projectPnts(tOut$TPA_RATE, tOut$BAA_RATE, 0.8025, 0)$x
+    # y = projectPnts(tOut$TPA_RATE, tOut$BAA_RATE, 0.8025, 0)$y
+    # M = sqrt(x^2 + y^2)
+    # tOut$SI = if_else(x < 0, -M, M)
 
-    tOut <- select(tOut, YEAR, PLT_CN, any_of('PREV_PLT_CN'), PLOT_STATUS_CD, grpBy[grpBy != 'YEAR'], SI, TPA_RATE, BAA_RATE, REMPER, everything())
+    tOut$SI <- projectPoints(tOut$TPA_RATE, tOut$BA_RATE, 0.8025, 0, returnPoint = FALSE)
+
+    tOut <- select(tOut, YEAR, PLT_CN, any_of('PREV_PLT_CN'), PLOT_STATUS_CD, grpBy[grpBy != 'YEAR'], SI, TPA_RATE, BA_RATE, REMPER, everything())
 
 
 
     ## Population estimation
   } else {
-    ## back to dataframes
-    a <- bind_rows(out[names(out) == 'aEst'])
-    t <- tEst
+
 
     # ## Standardize the changes in each state variable AT THE PLOT LEVEL
     if (scaleGCB == FALSE){
+      ## back to dataframes
+      a <- bind_rows(out[names(out) == 'aEst'])
+      t <- tEst
 
       ### CANNOT USE vectors as they are to compute SD, because of PLOT_BASIS issues
       ### SD is unnessarily high --> plot level first
       pltRates <- t %>%
         ungroup() %>%
-        select(PLT_CN, CHNG_TPA, CHNG_BAA, n, plotIn, grpBy) %>%
+        select(PLT_CN, REMPER, CHNG_TPA, CHNG_BAA, PREV_BAA, PREV_TPA, plotIn, grpBy) %>%
+        ## Replace any NAs with zeros
+        mutate(PREV_BAA = replace_na(PREV_BAA, 0),
+               PREV_TPA = replace_na(PREV_TPA, 0),
+               CHNG_BAA = replace_na(CHNG_BAA, 0),
+               CHNG_TPA = replace_na(CHNG_TPA, 0)) %>%
         group_by(PLT_CN, plotIn) %>%
-        summarize(t = sum(CHNG_TPA, na.rm = TRUE),
-                  n = sum(n, na.rm = TRUE),
-                  b = sum(CHNG_BAA, na.rm = TRUE) / n)
-      tpaRateSD <- sd(pltRates$t[pltRates$plotIn == 1], na.rm = TRUE)
-      baaRateSD <- sd(pltRates$b[pltRates$plotIn == 1], na.rm = TRUE)
+        ## Sum across micro, subp, and macroplots
+        summarize(PREV_BAA = sum(PREV_BAA, na.rm = TRUE),
+                  PREV_TPA = sum(PREV_TPA, na.rm = TRUE),
+                  CHNG_BAA = sum(CHNG_BAA, na.rm = TRUE),
+                  CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
+                  REMPER = first(REMPER)) %>%
+        ## T2 attributes
+        mutate(CURR_BAA = PREV_BAA + CHNG_BAA,
+               CURR_TPA = PREV_TPA + CHNG_TPA) %>%
+        ## Change in average tree BA and QMD
+        mutate(PREV_BA = if_else(PREV_TPA != 0, PREV_BAA / PREV_TPA, 0),
+               CURR_BA = if_else(CURR_TPA != 0, CURR_BAA / CURR_TPA, 0),
+               CHNG_BA = CURR_BA - PREV_BA) %>%
+        ## All CHNG becomes an annual rate
+        mutate(CHNG_BAA = CHNG_BAA / REMPER,
+               CHNG_TPA = CHNG_TPA / REMPER,
+               CHNG_BA = CHNG_BA / REMPER)
 
-
-      ## Standardize the changes in each state variable
-      t$TPA_RATE <- t$CHNG_TPA / tpaRateSD
-      t$BAA_RATE <- t$CHNG_BAA / baaRateSD
+      tpaRateSD <- sd(pltRates$CHNG_TPA[pltRates$plotIn == 1], na.rm = TRUE)
+      baRateSD <- sd(pltRates$CHNG_BA[pltRates$plotIn == 1], na.rm = TRUE)
 
       ## Adding YEAR to groups
       grpBy <- c('YEAR', grpBy)
@@ -752,10 +764,10 @@ fsi <- function(db,
             library(rFIA)
             library(tidyr)
           })
-          out <- parLapply(cl, X = names(popState), fun = fsiHelper2, popState, a, t, grpBy, method)
+          out <- parLapply(cl, X = names(popState), fun = fsiHelper2, popState, a, t, grpBy, method, tpaRateSD, baRateSD)
           stopCluster(cl)
         } else { # Unix systems
-          out <- mclapply(names(popState), FUN = fsiHelper2, popState, a, t, grpBy, method, mc.cores = nCores)
+          out <- mclapply(names(popState), FUN = fsiHelper2, popState, a, t, grpBy, method, tpaRateSD, baRateSD, mc.cores = nCores)
         }
       })
       ## back to dataframes
@@ -871,21 +883,21 @@ fsi <- function(db,
         group_by(.dots = grpBy) %>%
         summarize_all(sum,na.rm = TRUE) %>%
         mutate(TPA_RATE = ctEst / ptEst,
-               BAA_RATE = cbEst / pbEst,
+               BA_RATE = cbEst / pbEst,
                SI = siEst / faEst,
 
                ## Ratio variance
                ctVar = (1/ptEst^2) * (ctVar + (TPA_RATE^2 * ptVar) - (2 * TPA_RATE * cvEst_ct)),
-               cbVar = (1/pbEst^2) * (cbVar + (BAA_RATE^2 * pbVar) - (2 * BAA_RATE * cvEst_cb)),
+               cbVar = (1/pbEst^2) * (cbVar + (BA_RATE^2 * pbVar) - (2 * BA_RATE * cvEst_cb)),
                siVar = (1/faEst^2) * (siVar + (SI^2 * faVar) - (2 * SI * cvEst_si)),
 
                ## RATIO SE
                TPA_RATE_SE = sqrt(ctVar) / abs(TPA_RATE) * 100,
-               BAA_RATE_SE = sqrt(cbVar) / abs(BAA_RATE) * 100,
+               BA_RATE_SE = sqrt(cbVar) / abs(BA_RATE) * 100,
                SI_SE = sqrt(siVar) / abs(SI) * 100,
                SI_VAR = siVar,
                TPA_RATE_VAR = ctVar,
-               BAA_RATE_VAR = cbVar,
+               BA_RATE_VAR = cbVar,
                nPlots = plotIn_t,
                N = nh,
                SI_INT = qt(.975, df=N-1) * (sqrt(siVar)/sqrt(N))) %>%
@@ -900,14 +912,14 @@ fsi <- function(db,
 
     if (totals) {
       tOut <- tOut %>%
-        select(grpBy, SI, SI_STATUS, SI_INT, TPA_RATE, BAA_RATE,
-               SI_SE, TPA_RATE_SE, BAA_RATE_SE, SI_VAR, TPA_RATE_VAR, BAA_RATE_VAR,
+        select(grpBy, SI, SI_STATUS, SI_INT, TPA_RATE, BA_RATE,
+               SI_SE, TPA_RATE_SE, BA_RATE_SE, SI_VAR, TPA_RATE_VAR, BA_RATE_VAR,
                nPlots, N)
 
     } else {
       tOut <- tOut %>%
-        select(grpBy, SI, SI_STATUS, SI_INT, TPA_RATE, BAA_RATE,
-               SI_SE, TPA_RATE_SE, BAA_RATE_SE, SI_VAR, TPA_RATE_VAR, BAA_RATE_VAR,
+        select(grpBy, SI, SI_STATUS, SI_INT, TPA_RATE, BA_RATE,
+               SI_SE, TPA_RATE_SE, BA_RATE_SE, SI_VAR, TPA_RATE_VAR, BA_RATE_VAR,
                nPlots, N)
     }
 
@@ -961,7 +973,7 @@ fsi <- function(db,
 
   ## Standardization factors
   tOut$tpaRateSD <- tpaRateSD
-  tOut$baaRateSD <- baaRateSD
+  tOut$baRateSD <- baRateSD
 
 
   return(tOut)

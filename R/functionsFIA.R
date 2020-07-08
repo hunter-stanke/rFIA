@@ -26,6 +26,29 @@ projectPnts <- function(x, y, slope = NULL, yint = NULL){
   return(P)
 }
 
+projectPoints <- function(x, y, slope = 1, yint = 0, returnPoint = TRUE){
+  ## Solve for 1:1 line by default
+
+  ## So where does y = mx and y = -1/m * x + b converge
+
+  perp_slope <-  - 1 / slope
+  ## Solve for c given x and y
+  perp_int <- -perp_slope*x + y
+
+  ## Set equations equal to each other on y
+  ## -1/m*x + b = mx
+  xproj <- (perp_int - yint) / (slope + -perp_slope)
+  yproj <- slope * xproj
+
+  if (returnPoint){
+    out <- data.frame(x = xproj, y = yproj)
+  } else {
+    out <- sqrt((xproj^2) + (yproj^2))
+    out <- if_else(xproj < 0, -out, out)
+  }
+  return(out)
+}
+
 matchColClasses <- function(df1, df2) {
   df1 <- as.data.frame(df1)
   df2 <- as.data.frame(df2)

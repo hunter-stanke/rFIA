@@ -88,12 +88,12 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
     mutate(TPA_UNADJ = replace_na(TPA_UNADJ, replace = 0),
            BAA = replace_na(BAA, replace = 0))
 
-  ## TOTAL number of unique stems on each plot through time
-  stems <- data %>%
-    filter(!is.na(treID)) %>%
-    filter(tDI == 1) %>%
-    group_by(PLT_CN, .dots = grpBy[!(grpBy %in% c('pltID', 'PLOT_STATUS_CD', 'YEAR'))]) %>%
-    summarize(n = length(unique(treID)))
+  # ## TOTAL number of unique stems on each plot through time
+  # stems <- data %>%
+  #   filter(!is.na(treID)) %>%
+  #   filter(tDI == 1) %>%
+  #   group_by(PLT_CN, .dots = grpBy[!(grpBy %in% c('pltID', 'PLOT_STATUS_CD', 'YEAR'))]) %>%
+  #   summarize(n = length(unique(treID)))
 
 
   if (byPlot){
@@ -106,21 +106,43 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
       group_by(.dots = grpBy, PLT_CN, PREV_PLT_CN) %>%
       summarize(nLive = length(which(tDI[ONEORTWO == 1] > 0)), ## Number of live trees in domain of interest at previous measurement
                 REMPER = first(REMPER),
-                PREV_BAA = sum(-BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
-                PREV_TPA = sum(-TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
-                CHNG_TPA = sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE) / REMPER,
+                PREV_BAA = sum(-BAA[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1& STATUSCD == 1], na.rm = TRUE),
+                PREV_TPA = sum(-TPA_UNADJ[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE),
+                CHNG_TPA = sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
                 ## Sum here to avoid issues w/ zeros
-                CHNG_BAA = sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE) / REMPER,
-                CURR_TPA = PREV_TPA + CHNG_TPA*REMPER,
-                CURR_BAA = PREV_BAA + CHNG_BAA*REMPER,
+                CHNG_BAA = sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
+                #CURR_TPA = PREV_TPA + CHNG_TPA*REMPER,
+                #CURR_BAA = PREV_BAA + CHNG_BAA*REMPER,
                 PLOT_STATUS_CD = if_else(any(PLOT_STATUS_CD == 1), 1, 2)) %>%
-      left_join(stems, by = c('PLT_CN', grpBy[!(grpBy %in% c('pltID', 'PLOT_STATUS_CD', 'YEAR'))])) %>%
-      ## Then divide by number of unique stems for an average
-      mutate(CHNG_BAA = CHNG_BAA / n) %>%
+      ## Replace any NAs with zeros
+      mutate(PREV_BAA = replace_na(PREV_BAA, 0),
+             PREV_TPA = replace_na(PREV_TPA, 0),
+             CHNG_BAA = replace_na(CHNG_BAA, 0),
+             CHNG_TPA = replace_na(CHNG_TPA, 0),
+             ## T2 attributes
+             CURR_BAA = PREV_BAA + CHNG_BAA,
+             CURR_TPA = PREV_TPA + CHNG_TPA) %>%
+      ## Change in average tree BA and QMD
+      mutate(PREV_BA = if_else(PREV_TPA != 0, PREV_BAA / PREV_TPA, 0),
+             CURR_BA = if_else(CURR_TPA != 0, CURR_BAA / CURR_TPA, 0),
+             CHNG_BA = CURR_BA - PREV_BA,
+             PREV_QMD = sqrt(PREV_BA / 0.005454154),
+             CURR_QMD = sqrt(CURR_BA / 0.005454154),
+             CHNG_QMD = CURR_QMD - PREV_QMD) %>%
+      ## All CHNG becomes an annual rate
+      mutate(CHNG_BAA = CHNG_BAA / REMPER,
+             CHNG_TPA = CHNG_TPA / REMPER,
+             CHNG_BA = CHNG_BA / REMPER,
+             CHNG_QMD = CHNG_QMD / REMPER) %>%
+      #left_join(stems, by = c('PLT_CN', grpBy[!(grpBy %in% c('pltID', 'PLOT_STATUS_CD', 'YEAR'))])) %>%
+      ### Then divide by number of unique stems for an average
+      #mutate(CHNG_BAA = CHNG_BAA / n) %>%
       ungroup() %>%
       select(PLT_CN, PREV_PLT_CN, PLOT_STATUS_CD, REMPER, grpBy,
-             PREV_TPA, PREV_BAA, CHNG_TPA, CHNG_BAA, CURR_TPA, CURR_BAA,
-             n, nLive)
+             PREV_TPA, PREV_BAA, PREV_BA, PREV_QMD,
+             CHNG_TPA, CHNG_BAA, CHNG_BA, CHNG_QMD,
+             CURR_TPA, CURR_BAA, CURR_BA, CURR_QMD,
+             nLive)
     a = NULL
 
   } else {
@@ -164,11 +186,11 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
                 MEASYEAR = first(MEASYEAR),
                 PREV_TPA = sum(-TPA_UNADJ[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE),
                 PREV_BAA = sum(-BAA[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE),
-                CHNG_TPA = sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE) / REMPER,
-                CHNG_BAA = sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE) / REMPER,
+                CHNG_TPA = sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
+                CHNG_BAA = sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
 
-                plotIn = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0)) %>%
-      left_join(stems, by = c('PLT_CN', grpBy))
+                plotIn = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0))# %>%
+      #left_join(stems, by = c('PLT_CN', grpBy))
   }
 
   pltOut <- list(a = a, t = t)
@@ -346,9 +368,36 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
                PREV_BAA = map_dbl(df, pbaa),
                PLOT_STATUS_CD = map_dbl(df, pstatus),
                ## For consistency with other function (direct remeasurements)
-               CHNG_TPA = t_rate,
-               CHNG_BAA = b_rate) %>%
-        select(-c(df))
+               CHNG_TPA = t_rate * REMPER,
+               CHNG_BAA = b_rate * REMPER) %>%
+        ## Replace any NAs with zeros
+        mutate(PREV_BAA = replace_na(PREV_BAA, 0),
+               PREV_TPA = replace_na(PREV_TPA, 0),
+               CHNG_BAA = replace_na(CHNG_BAA, 0),
+               CHNG_TPA = replace_na(CHNG_TPA, 0),
+               ## T2 attributes
+               CURR_BAA = PREV_BAA + CHNG_BAA,
+               CURR_TPA = PREV_TPA + CHNG_TPA) %>%
+        ## Change in average tree BA and QMD
+        mutate(PREV_BA = if_else(PREV_TPA != 0, PREV_BAA / PREV_TPA, 0),
+               CURR_BA = if_else(CURR_TPA != 0, CURR_BAA / CURR_TPA, 0),
+               CHNG_BA = CURR_BA - PREV_BA,
+               PREV_QMD = sqrt(PREV_BA / 0.005454154),
+               CURR_QMD = sqrt(CURR_BA / 0.005454154),
+               CHNG_QMD = CURR_QMD - PREV_QMD) %>%
+        ## All CHNG becomes an annual rate
+        mutate(CHNG_BAA = CHNG_BAA / REMPER,
+               CHNG_TPA = CHNG_TPA / REMPER,
+               CHNG_BA = CHNG_BA / REMPER,
+               CHNG_QMD = CHNG_QMD / REMPER) %>%
+        #left_join(stems, by = c('PLT_CN', grpBy[!(grpBy %in% c('pltID', 'PLOT_STATUS_CD', 'YEAR'))])) %>%
+        ### Then divide by number of unique stems for an average
+        #mutate(CHNG_BAA = CHNG_BAA / n) %>%
+        ungroup() %>%
+        select(MEASYEAR, PLOT_STATUS_CD, REMPER, grpBy,
+               PREV_TPA, PREV_BAA, PREV_BA, PREV_QMD,
+               CHNG_TPA, CHNG_BAA, CHNG_BA, CHNG_QMD,
+               CURR_TPA, CURR_BAA, CURR_BA, CURR_QMD)
 
       ## update lists
       #cns <- c(cns, unique(t_int$PLT_CN))
@@ -358,10 +407,7 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
     ## Back to dataframe
     t <- bind_rows(tList) %>%
       left_join(select(ungroup(db$PLOT), PLT_CN, MEASYEAR, pltID), by = c('pltID', 'MEASYEAR')) %>%
-      rename(YEAR = MEASYEAR) %>%
-      left_join(ungroup(stems), by = c('pltID', grpBy[!(grpBy %in% c('pltID', 'PLOT_STATUS_CD'))])) %>%
-      mutate(CHNG_BAA = CHNG_BAA / n,
-             CHNG_BAA = replace_na(CHNG_BAA, 0))
+      rename(YEAR = MEASYEAR)
 
     a = NULL
 
@@ -439,8 +485,8 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
                  PREV_BAA = map_dbl(df, pbaa),
                  plotIn = map_dbl(df, pstatusPop),
                  ## For consistency with other function (direct remeasurements)
-                 CHNG_TPA = t_rate,
-                 CHNG_BAA = b_rate) %>%
+                 CHNG_TPA = t_rate * REMPER,
+                 CHNG_BAA = b_rate * REMPER) %>%
           select(-c(df))
         ## update lists
         #cns <- c(cns, unique(t_int$PLT_CN))
@@ -451,7 +497,6 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
       t <- bind_rows(tList)  %>%
         left_join(select(db$PLOT, PLT_CN, MEASYEAR, pltID), by = c('pltID', 'MEASYEAR')) %>%
         #rename(YEAR = MEASYEAR) %>%
-        left_join(stems, by = c('pltID', grpBy)) %>%
         mutate(CHNG_BAA = replace_na(CHNG_BAA, 0),
                CHNG_TPA = replace_na(CHNG_TPA, 0)) %>%
         filter(!is.na(t_rate)) %>%
@@ -475,14 +520,17 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
 
 
 
-fsiHelper2 <- function(x, popState, a, t, grpBy, method){
+
+
+
+
+fsiHelper2 <- function(x, popState, a, t, grpBy, method, tpaRateSD, baRateSD){
 
   ## DOES NOT MODIFY OUTSIDE ENVIRONMENT
   if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
     grpBy <- c(grpBy, 'INVYR')
     popState[[x]]$P2POINTCNT <- popState[[x]]$P2POINTCNT_INVYR
     popState[[x]]$p2eu <- popState[[x]]$p2eu_INVYR
-
   }
 
   ######## ------------------ TREE ESTIMATES + CV
@@ -505,6 +553,7 @@ fsiHelper2 <- function(x, popState, a, t, grpBy, method){
   ## Sometimes less specific area groups
   aGrps <- unique(grpBy[grpBy %in% names(aAdj)])
 
+
   ## Strata level estimates
   tEst <- t %>%
     ## Rejoin with population tables
@@ -522,38 +571,49 @@ fsiHelper2 <- function(x, popState, a, t, grpBy, method){
       ## Otherwise, use the subpplot value
       PLOT_BASIS == 'SUBP' ~ as.numeric(ADJ_FACTOR_SUBP),
       PLOT_BASIS == 'MICR' ~ as.numeric(ADJ_FACTOR_MICR)),
-      ct = CHNG_TPA * tAdj,
-      cb = CHNG_BAA * tAdj,
-      pt = PREV_TPA * tAdj,
-      pb = PREV_BAA * tAdj,
-      TPA_RATE = TPA_RATE * tAdj,
-      BAA_RATE = BAA_RATE * tAdj) %>%
+      CHNG_TPA = CHNG_TPA * tAdj,
+      CHNG_BAA = CHNG_BAA * tAdj,
+      PREV_TPA = PREV_TPA * tAdj,
+      PREV_BAA = PREV_BAA * tAdj#,
+      #TPA_RATE = TPA_RATE * tAdj,
+      #BAA_RATE = BAA_RATE * tAdj
+      ) %>%
     # ## Computing change
     # mutate(ct = (ct) / REMPER,
     #        cb = (cb) / REMPER) %>%
     ## Extra step for variance issues
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy) %>%
-    summarize(ctPlot = sum(ct, na.rm = TRUE),
-              cbPlot = sum(cb, na.rm = TRUE),
-              ptPlot = sum(pt, na.rm = TRUE),
-              pbPlot = sum(pb, na.rm = TRUE),
+    summarize(CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
+              CHNG_BAA = sum(CHNG_BAA, na.rm = TRUE),
+              PREV_TPA = sum(PREV_TPA, na.rm = TRUE),
+              PREV_BAA = sum(PREV_BAA, na.rm = TRUE),
               plotIn_t = ifelse(sum(plotIn >  0, na.rm = TRUE), 1,0),
               nh = first(P2POINTCNT),
               p2eu = first(p2eu),
               a = first(AREA_USED),
               w = first(P1POINTCNT) / first(P1PNTCNT_EU),
-              #REMPER = first(REMPER),
-              ## Summing change across subp and micr
-              TPA_RATE = sum(TPA_RATE, na.rm = TRUE),
-              BAA_RATE = sum(BAA_RATE, na.rm = TRUE),
-              ## Total unique number of trees
-              n = first(n)) %>%
-    ## Do not want to compute SI for micro and subp seperately, handle it here
-    mutate(BAA_RATE = BAA_RATE / n,
-           x = projectPnts(TPA_RATE, BAA_RATE, 0.8025, 0)$x,
-           y = projectPnts(TPA_RATE, BAA_RATE, 0.8025, 0)$y,
-           siPlot = sqrt(x^2 + y^2),
-           siPlot = if_else(x < 0, -siPlot, siPlot),
+              REMPER = first(REMPER)) %>%
+    ## Replace any NAs with zeros
+    mutate(PREV_BAA = replace_na(PREV_BAA, 0),
+           PREV_TPA = replace_na(PREV_TPA, 0),
+           CHNG_BAA = replace_na(CHNG_BAA, 0),
+           CHNG_TPA = replace_na(CHNG_TPA, 0),
+           ## T2 attributes
+           CURR_BAA = PREV_BAA + CHNG_BAA,
+           CURR_TPA = PREV_TPA + CHNG_TPA) %>%
+    ## Change in average tree BA and QMD
+    mutate(PREV_BA = if_else(PREV_TPA != 0, PREV_BAA / PREV_TPA, 0),
+           CURR_BA = if_else(CURR_TPA != 0, CURR_BAA / CURR_TPA, 0),
+           CHNG_BA = CURR_BA - PREV_BA) %>%
+    ## All CHNG becomes an annual rate
+    mutate(CHNG_BAA = CHNG_BAA / REMPER,
+           CHNG_TPA = CHNG_TPA / REMPER,
+           CHNG_BA = CHNG_BA / REMPER) %>%
+    ## Scaling variables
+    mutate(TPA_RATE = CHNG_TPA / tpaRateSD,
+           BA_RATE = CHNG_BA / baRateSD) %>%
+    ## Estimate FSI
+    mutate(siPlot = projectPoints(TPA_RATE, BA_RATE, 0.8025, 0, returnPoint = FALSE),
            siPlot = case_when(
              is.na(siPlot) ~ 0,
              TRUE ~ siPlot)
@@ -563,10 +623,10 @@ fsiHelper2 <- function(x, popState, a, t, grpBy, method){
 
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
     summarize(r_t = length(unique(PLT_CN)) / first(nh),
-              ctStrat = mean(ctPlot * r_t, na.rm = TRUE),
-              cbStrat = mean(cbPlot * r_t, na.rm = TRUE),
-              ptStrat = mean(ptPlot * r_t, na.rm = TRUE),
-              pbStrat = mean(pbPlot * r_t, na.rm = TRUE),
+              ctStrat = mean(CHNG_TPA * r_t, na.rm = TRUE),
+              cbStrat = mean(CHNG_BA * r_t, na.rm = TRUE),
+              ptStrat = mean(PREV_TPA * r_t, na.rm = TRUE),
+              pbStrat = mean(PREV_BA * r_t, na.rm = TRUE),
               siStrat = mean(siPlot * fa * r_t, na.rm = TRUE),
               faStrat = mean(fa * r_t, na.rm = TRUE),
               plotIn_t = sum(plotIn_t, na.rm = TRUE),
@@ -578,17 +638,17 @@ fsiHelper2 <- function(x, popState, a, t, grpBy, method){
               p2eu = first(p2eu),
               ndif = nh - n,
               # ## Strata level variances
-              ctv = stratVar(ESTN_METHOD, ctPlot, ctStrat, ndif, a, nh),
-              cbv = stratVar(ESTN_METHOD, cbPlot, cbStrat, ndif, a, nh),
-              ptv = stratVar(ESTN_METHOD, ptPlot, ptStrat, ndif, a, nh),
-              pbv = stratVar(ESTN_METHOD, pbPlot, pbStrat, ndif, a, nh),
+              ctv = stratVar(ESTN_METHOD, CHNG_TPA, ctStrat, ndif, a, nh),
+              cbv = stratVar(ESTN_METHOD, CHNG_BA, cbStrat, ndif, a, nh),
+              ptv = stratVar(ESTN_METHOD, PREV_TPA, ptStrat, ndif, a, nh),
+              pbv = stratVar(ESTN_METHOD, PREV_BA, pbStrat, ndif, a, nh),
               siv = stratVar(ESTN_METHOD, siPlot * fa, siStrat, ndif, a, nh),
               fav = stratVar(ESTN_METHOD, fa, faStrat, ndif, a, nh),
 
 
               # Strata level covariances
-              cvStrat_ct = stratVar(ESTN_METHOD, ctPlot, ctStrat, ndif, a, nh, ptPlot, ptStrat),
-              cvStrat_cb = stratVar(ESTN_METHOD, cbPlot, cbStrat, ndif, a, nh, pbPlot, pbStrat),
+              cvStrat_ct = stratVar(ESTN_METHOD, CHNG_TPA, ctStrat, ndif, a, nh, PREV_TPA, ptStrat),
+              cvStrat_cb = stratVar(ESTN_METHOD, CHNG_BA, cbStrat, ndif, a, nh, PREV_BA, pbStrat),
               cvStrat_si = stratVar(ESTN_METHOD, siPlot * fa, siStrat, ndif, a, nh, fa, faStrat)) %>%
 
     ## Estimation unit
