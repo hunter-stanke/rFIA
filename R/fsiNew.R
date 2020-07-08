@@ -867,6 +867,24 @@ fsi <- function(db,
 
     } ## End if scaleGCB == FALSE
 
+    suppressMessages({suppressWarnings({
+      ## If a clip was specified, handle the reporting years
+      if (mr){
+        ## If a most recent subset, ignore differences in reporting years across states
+        ## instead combine most recent information from each state
+        # ID mr years by group
+        maxyearsT <- tEst %>%
+          select(grpBy) %>%
+          group_by(.dots = grpBy[!c(grpBy %in% 'YEAR')]) %>%
+          summarise(YEAR = max(YEAR, na.rm = TRUE))
+
+        # Combine estimates
+        tEst <- tEst %>%
+          ungroup() %>%
+          select(-c(YEAR)) %>%
+          left_join(maxyearsT, by = grpBy[!c(grpBy %in% 'YEAR')])
+      }
+    })})
 
 
     ##---------------------  TOTALS and RATIOS
