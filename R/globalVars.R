@@ -204,6 +204,12 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'MEASDAY', 'MEASMON', 'b_rate', 'coef', 'df', 'lm', 'meas', 't_rate', 'treID',
                          'aD_p', 'amax', 'amin', 'maxDate', 'minDate', 'treID1', 'treID2', 'STATEAB', 'pops',
                          'grpC', 'grpP', 'grpT', 'GROWTH_HABIT', 'LAYER', 'P2VEG_SAMPLING_STATUS_CD', 'TOTAL_COVER_AREA',
-                         'cTEst', 'cTStrat', 'plotIn_VEG'
+                         'cTEst', 'cTStrat', 'plotIn_VEG', 'BA_RATE', 'BA_RATE_SE', 'BA_RATE_VAR', 'CHNG_BA',
+                         'CHNG_QMD', 'CURR_BA', 'CURR_QMD',
+                         'DESIGNCD.prev', 'DESIGNCD1', 'FSI', 'FSI_INT', 'FSI_SE', 'FSI_STATUS', 'FSI_VAR',
+                         'PERC_FSI', 'PERC_FSI_INT', 'PERC_FSI_SE', 'PERC_FSI_VAR', 'PLOT_STATUS_CD.prev',
+                         'PREV_BA', 'PREV_QMD', 'b1', 'b2', 'baSD', 'brate', 'cvEst_psi', 'cvStrat_psi', 'dt',
+                         'psiVar', 'si',
+                         'si1', 'si1Est', 'si1Strat', 'si1Var', 'si1v', 't1', 't2', 'trate'
 
 ))

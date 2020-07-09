@@ -8,7 +8,7 @@ fsi(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
     bySpecies = FALSE, bySizeClass = FALSE, landType = "forest",
     treeType = "live", method = "sma", lambda = 0.5,
     treeDomain = NULL, areaDomain = NULL, totals = TRUE,
-    byPlot = FALSE, scaleGCB = TRUE, useLM = FALSE, nCores = 1)
+    byPlot = FALSE, useLM = FALSE, nCores = 1)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -39,8 +39,6 @@ fsi(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
   \item{totals}{logical; if TRUE, return population estimates (e.g. total area, total biomass) along with ratio estimates (e.g. mean biomass per acre).}
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations (population totals not returned).}
-
-  \item{scaleGCB}{logical; Scale the FSI using the same standardization factors in our original article in Global Change Biology? Allows users to compare estimates on a standardized scale. }
 
   \item{useLM}{logical; If TRUE, use a linear model to estimate change in TPA & BA on each plot, allowing more than 2 measurements to be used.}
 
