@@ -103,7 +103,7 @@ vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
     t <- data %>%
       mutate(YEAR = MEASYEAR) %>%
       distinct(PLT_CN, SUBP, TREE, ONEORTWO, .keep_all = TRUE) %>%
-      group_by(.dots = grpBy, PLT_CN, SUBP, TREE) %>%
+      group_by(.dots = grpBy[grpBy %in% c('SUBP', 'TREE') == FALSE], PLT_CN, SUBP, TREE) %>%
       summarize(d = sum(DIA * tDI, na.rm = TRUE),
                 ba = sum(BA * tDI, na.rm = TRUE),
                 baa = sum(TPAGROW_UNADJ * BA * tDI, na.rm = TRUE),
