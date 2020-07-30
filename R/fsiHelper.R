@@ -660,8 +660,8 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, grpRates){
            t1 = PREV_TPA,
            b1 = PREV_BA) %>%
     ## The FSI and % FSI
-    mutate(si = projectPoints(dt, db, -(1/slope), 0, returnPoint = FALSE),
-           si1 = projectPoints(t1, b1, -(1/slope), 0, returnPoint = FALSE),
+    mutate(si = projectPoints(db, dt, -(1/slope), 0, returnPoint = FALSE),
+           si1 = projectPoints(b1, t1, -(1/slope), 0, returnPoint = FALSE),
            # si1 = case_when(
            #   is.na(si1) ~ 0,
            #   TRUE ~ si1),

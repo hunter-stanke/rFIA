@@ -631,10 +631,10 @@ fsi <- function(db,
              b1 = PREV_BA / REMPER,
              b2 = CURR_BA / REMPER) %>%
       ## The FSI and % FSI
-      mutate(FSI = projectPoints(dt, db, -(1/slope), 0, returnPoint = FALSE),
+      mutate(FSI = projectPoints(db, dt, -(1/slope), 0, returnPoint = FALSE),
              ## can and will produce INF here due to division by zero, that's fine, just use the FSI if that matters to you
-             FSI2 = projectPoints(t2, b2,-(1/slope), 0, returnPoint = FALSE),
-             FSI1 = projectPoints(t1, b1, -(1/slope), 0, returnPoint = FALSE)) %>%
+             FSI2 = projectPoints(b2, t2,-(1/slope), 0, returnPoint = FALSE),
+             FSI1 = projectPoints(b1, t1, -(1/slope), 0, returnPoint = FALSE)) %>%
       ## Summing across scaleBy
       group_by(.dots = grpBy[!c(grpBy %in% 'YEAR')], YEAR, PLT_CN, PLOT_STATUS_CD, PREV_PLT_CN,
                REMPER) %>%
