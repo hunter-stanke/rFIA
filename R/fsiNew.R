@@ -575,8 +575,8 @@ fsi <- function(db,
 
     suppressWarnings({
       ## Summarize results
-      beta1 <- lqmm::coef(mod)[1] + lqmm::ranef(mod)[1]
-      beta2 <- lqmm::coef(mod)[2] + lqmm::ranef(mod)[2]
+      beta1 <- lqmm::coef.lqmm(mod)[1] + lqmm::ranef.lqmm(mod)[1]
+      beta2 <- lqmm::coef.lqmm(mod)[2] + lqmm::ranef.lqmm(mod)[2]
       betas <- bind_cols(beta1, beta2) %>%
         mutate(grps = row.names(.))
       names(betas) <- c('int', 'rate', 'grps')
