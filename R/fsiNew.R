@@ -1,6 +1,7 @@
 fsiStarter <- function(x,
                        db,
                        grpBy_quo = NULL,
+                       scaleBy_quo = NULL,
                        polys = NULL,
                        returnSpatial = FALSE,
                        bySpecies = FALSE,
@@ -78,6 +79,33 @@ fsiStarter <- function(x,
   } else {
     grpBy <- NULL
   }
+
+  # Probably cheating, but it works
+  if (quo_name(scaleBy_quo) != 'NULL'){
+    ## Have to join tables to run select with this object type
+    plt_quo <- filter(db$PLOT, !is.na(PLT_CN))
+    ## We want a unique error message here to tell us when columns are not present in data
+    d_quo <- tryCatch(
+      error = function(cnd) {
+        return(0)
+      },
+      plt_quo[10,] %>% # Just the first row
+        left_join(select(db$COND, PLT_CN, names(db$COND)[names(db$COND) %in% names(db$PLOT) == FALSE]), by = 'PLT_CN') %>%
+        select(!!scaleBy_quo)
+    )
+
+    # If column doesnt exist, just returns 0, not a dataframe
+    if (is.null(nrow(d_quo))){
+      grpName <- quo_name(grpBy_quo)
+      stop(paste('Columns', grpName, 'not found in PLOT or COND tables. Did you accidentally quote the variables names? e.g. use scaleBy = ECOSUBCD (correct) instead of scaleBy = "ECOSUBCD". ', collapse = ', '))
+    } else {
+      # Convert to character
+      scaleBy <- names(d_quo)
+    }
+  } else {
+    scaleBy <- NULL
+  }
+
 
   reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
@@ -353,9 +381,9 @@ fsiStarter <- function(x,
   ## Narrow up the tables to the necessary variables, reduces memory load
   ## sent out the cores
   ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
-  grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
-  grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
+  grpP <- names(db$PLOT)[names(db$PLOT) %in% c(grpBy, scaleBy)]
+  grpC <- names(db$COND)[names(db$COND) %in% c(grpBy, scaleBy) & names(db$COND) %in% grpP == FALSE]
+  grpT <- names(db$TREE)[names(db$TREE) %in% c(grpBy, scaleBy) & names(db$TREE) %in% c(grpP, grpC) == FALSE]
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   db$PLOT <- select(db$PLOT, c('PLT_CN', pltID, 'REMPER', 'DESIGNCD', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR',
@@ -382,10 +410,10 @@ fsiStarter <- function(x,
           library(tidyr)
           library(purrr)
         })
-        out <- parLapply(cl, X = names(plts), fun = fsiHelper1_lm, plts, db, grpBy, byPlot)
+        out <- parLapply(cl, X = names(plts), fun = fsiHelper1_lm, plts, db, grpBy, scaleBy, byPlot)
         #stopCluster(cl) # Keep the cluster active for the next run
       } else { # Unix systems
-        out <- mclapply(names(plts), FUN = fsiHelper1_lm, plts, db, grpBy, byPlot, mc.cores = nCores)
+        out <- mclapply(names(plts), FUN = fsiHelper1_lm, plts, db, grpBy, scaleBy, byPlot, mc.cores = nCores)
       }
     })
   } else {
@@ -399,10 +427,10 @@ fsiStarter <- function(x,
           library(rFIA)
           library(tidyr)
         })
-        out <- parLapply(cl, X = names(plts), fun = fsiHelper1, plts, db, grpBy, byPlot)
+        out <- parLapply(cl, X = names(plts), fun = fsiHelper1, plts, db, grpBy, scaleBy, byPlot)
         #stopCluster(cl) # Keep the cluster active for the next run
       } else { # Unix systems
-        out <- mclapply(names(plts), FUN = fsiHelper1, plts, db, grpBy, byPlot, mc.cores = nCores)
+        out <- mclapply(names(plts), FUN = fsiHelper1, plts, db, grpBy, scaleBy, byPlot, mc.cores = nCores)
       }
     })
   }
@@ -410,9 +438,10 @@ fsiStarter <- function(x,
   ## back to dataframes
   out <- unlist(out, recursive = FALSE)
   t <- bind_rows(out[names(out) == 't'])
+  t1 <- bind_rows(out[names(out) == 't1'])
   a <- bind_rows(out[names(out) == 'a'])
 
-  out <- list(t = t, a = a, grpBy = grpBy, grpByOrig = grpByOrig, pops = pops)
+  out <- list(t = t, t1 = t1, a = a, grpBy = grpBy, scaleBy = scaleBy, grpByOrig = grpByOrig, pops = pops)
 
 }
 
@@ -435,10 +464,12 @@ fsi <- function(db,
                    totals = TRUE,
                    byPlot = FALSE,
                    useLM = FALSE,
+                   scaleBy = NULL,
                    nCores = 1) {
 
   ##  don't have to change original code
   grpBy_quo <- rlang::enquo(grpBy)
+  scaleBy_quo <- rlang::enquo(scaleBy)
   areaDomain <- rlang::enquo(areaDomain)
   treeDomain <- rlang::enquo(treeDomain)
 
@@ -490,7 +521,7 @@ fsi <- function(db,
 
   ## Run the main portion
   out <- lapply(X = iter, FUN = fsiStarter, db,
-                grpBy_quo = grpBy_quo, polys, returnSpatial,
+                grpBy_quo = grpBy_quo, scaleBy_quo, polys, returnSpatial,
                 bySpecies, bySizeClass,
                 landType, treeType, method,
                 lambda, treeDomain, areaDomain,
@@ -500,9 +531,85 @@ fsi <- function(db,
   ## Bring the results back
   out <- unlist(out, recursive = FALSE)
   t <- bind_rows(out[names(out) == 't'])
+  t1 <- bind_rows(out[names(out) == 't1'])
   a <- bind_rows(out[names(out) == 'a'])
   grpBy <- out[names(out) == 'grpBy'][[1]]
+  scaleBy <- out[names(out) == 'scaleBy'][[1]]
   grpByOrig <- out[names(out) == 'grpByOrig'][[1]]
+
+  ## Have to update the PLT_CNs if useLM = TRUE
+  if (useLM){
+    t1 <- t1 %>%
+      ungroup() %>%
+      select(-c(PLT_CN)) %>%
+      left_join(distinct(select(t, PLT_CN, pltID)), by = 'pltID')
+    t$PREV_PLT_CN = NA
+  }
+
+  ## Prep the data for modeling the upper boundary
+  ## of the size-density curve
+  scaleSyms <- syms(scaleBy)
+
+  ## Get groups prepped to fit model
+  grpRates <- t1 %>%
+    ungroup() %>%
+    filter(TPA1 > 0) %>%
+    mutate(t = log(TPA1),
+           b = log(BA1)) %>%
+    select(t, b, PLT_CN, !!!scaleSyms)
+
+  if (!is.null(scaleBy)){
+    ## group IDS
+    grpRates <- mutate(grpRates, grps = paste(!!!scaleSyms))
+  } else {
+    grpRates$grps = 1
+  }
+
+  ## If more than one group use a mixed model
+  if (length(unique(grpRates$grps)) > 1){
+
+    ## Run lmm at the 99 percentile of the distribution
+    mod <- lqmm(t ~ b, random = ~ b, group = grps,
+                tau = .99, data = grpRates,
+                control = list(method = "df"))
+
+    suppressWarnings({
+      ## Summarize results
+      beta1 <- coef(mod)[1] + ranef(mod)[1]
+      beta2 <- coef(mod)[2] + ranef(mod)[2]
+      betas <- bind_cols(beta1, beta2) %>%
+        mutate(grps = row.names(.))
+      names(betas) <- c('int', 'rate', 'grps')
+    })
+
+
+    ## Rejoin and estimate slopes at each plot
+    grpRates <- grpRates %>%
+      left_join(betas, by = 'grps') %>%
+      mutate_at(.vars = vars(t, b, int), .funs = exp) %>%
+      mutate(slope = (int * rate) * (b^(rate-1))) %>%
+      select(PLT_CN, slope, int, rate, !!!scaleSyms)
+
+  } else {
+
+    ## Run lmm at the 99 percentile of the distribution
+    mod <- lqm(t ~ b,
+                tau = .99, data = grpRates)
+
+    ## Summarize results
+    beta1 <- coef(mod)[1]
+    beta2 <- coef(mod)[2]
+    betas <- data.frame(beta1, beta2) %>%
+      mutate(grps = 1)
+    names(betas) <- c('int', 'rate', 'grps')
+
+    ## Rejoin and estimate slopes at each plot
+    grpRates <- grpRates %>%
+      left_join(betas, by = 'grps') %>%
+      mutate_at(.vars = vars(t, b, int), .funs = exp) %>%
+      mutate(slope = (int * rate) * (b^(rate-1))) %>%
+      select(PLT_CN, slope, int, rate, !!!scaleSyms)
+  }
 
 
 
@@ -511,28 +618,41 @@ fsi <- function(db,
     ## back to dataframes
     tOut <- t
 
-
-    grpScale <- tOut %>%
-      filter(PLOT_STATUS_CD == 1) %>%
-      group_by(.dots = grpBy[grpBy %in% c('YEAR', 'pltID') == FALSE]) %>%
-      summarise(tpaSD = sd(c(PREV_TPA, CURR_TPA), na.rm = TRUE),
-                baSD = sd(c(PREV_BA, CURR_BA), na.rm = TRUE))
-
     ## Scale the indices by group
     tOut <- tOut %>%
-      left_join(grpScale, by = grpBy[grpBy %in% c('YEAR', 'pltID') == FALSE]) %>%
-      mutate(dt = CHNG_TPA / tpaSD,
-             db = CHNG_BA / baSD,
-             t1 = PREV_TPA / tpaSD / REMPER,
-             t2 = CURR_TPA / tpaSD/ REMPER,
-             b1 = PREV_BA / baSD / REMPER,
-             b2 = CURR_BA / baSD / REMPER) %>%
+      left_join(grpRates, by = c('PLT_CN', scaleBy)) %>%
+      ## When PREV_BA is 0, slope is infinite
+      mutate(slope = case_when(PREV_BA == 0 ~ 100000,
+                               TRUE ~ slope)) %>%
+      mutate(dt = CHNG_TPA,
+             db = CHNG_BA,
+             t1 = PREV_TPA / REMPER,
+             t2 = CURR_TPA / REMPER,
+             b1 = PREV_BA / REMPER,
+             b2 = CURR_BA / REMPER) %>%
       ## The FSI and % FSI
-      mutate(FSI = projectPoints(dt, db, 0.8025, 0, returnPoint = FALSE),
+      mutate(FSI = projectPoints(dt, db, -(1/slope), 0, returnPoint = FALSE),
              ## can and will produce INF here due to division by zero, that's fine, just use the FSI if that matters to you
-             PERC_FSI = projectPoints(t2, b2, 0.8025, 0, returnPoint = FALSE) / projectPoints(t1, b1, 0.8025, 0, returnPoint = FALSE) -1,
-             TPA_RATE = dt,
-             BA_RATE = db)
+             FSI2 = projectPoints(t2, b2,-(1/slope), 0, returnPoint = FALSE),
+             FSI1 = projectPoints(t1, b1, -(1/slope), 0, returnPoint = FALSE)) %>%
+      ## Summing across scaleBy
+      group_by(.dots = grpBy[!c(grpBy %in% 'YEAR')], YEAR, PLT_CN, PLOT_STATUS_CD, PREV_PLT_CN,
+               REMPER) %>%
+      summarize(PREV_TPA = sum(PREV_TPA, na.rm = TRUE),
+                PREV_BAA = sum(PREV_BAA, na.rm = TRUE),
+                PREV_BA = sum(PREV_BA, na.rm = TRUE),
+                CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
+                CHNG_BAA = sum(CHNG_BAA, na.rm = TRUE),
+                CHNG_BA = sum(CHNG_BA, na.rm = TRUE),
+                CURR_TPA = sum(CURR_TPA, na.rm = TRUE),
+                CURR_BAA = sum(CURR_BAA, na.rm = TRUE),
+                CURR_BA = sum(CURR_BA, na.rm = TRUE),
+                FSI = mean(FSI, na.rm = TRUE),
+                FSI2 = mean(FSI2, na.rm = TRUE),
+                FSI1 = mean(FSI1, na.rm = TRUE)) %>%
+      mutate(PERC_FSI = (FSI2 - FSI1) / FSI1 * 100)
+
+
 
 
     ## Make it spatial
@@ -546,8 +666,9 @@ fsi <- function(db,
     }
 
 
-    tOut <- select(tOut, YEAR, PLT_CN, any_of('PREV_PLT_CN'), PLOT_STATUS_CD, grpBy[grpBy != 'YEAR'], FSI, PERC_FSI, TPA_RATE, BA_RATE, REMPER, everything()) %>%
-      select(-c(dt, db, t1, t2, b1, b2))
+    tOut <- select(tOut, YEAR, PLT_CN, any_of('PREV_PLT_CN'), PLOT_STATUS_CD, grpBy[grpBy != 'YEAR'],
+                   FSI, PERC_FSI, REMPER, everything()) %>%
+      select(-c(FSI2, FSI1))
 
 
 
@@ -555,38 +676,6 @@ fsi <- function(db,
   } else {
     ## back to dataframes
     pops <- bind_rows(out[names(out) == 'pops'])
-
-    ### CANNOT USE vectors as they are to compute SD, because of PLOT_BASIS issues
-    ### SD is unnessarily high --> plot level first
-    pltRates <- t %>%
-      ungroup() %>%
-      filter(plotIn == 1) %>%
-      select(PLT_CN, REMPER, CHNG_TPA, CHNG_BAA, PREV_BAA, PREV_TPA, plotIn, grpBy) %>%
-      ## Replace any NAs with zeros
-      mutate(PREV_BAA = replace_na(PREV_BAA, 0),
-             PREV_TPA = replace_na(PREV_TPA, 0),
-             CHNG_BAA = replace_na(CHNG_BAA, 0),
-             CHNG_TPA = replace_na(CHNG_TPA, 0)) %>%
-      group_by(PLT_CN, plotIn, .dots = grpBy) %>%
-      ## Sum across micro, subp, and macroplots
-      summarize(PREV_BAA = sum(PREV_BAA, na.rm = TRUE),
-                PREV_TPA = sum(PREV_TPA, na.rm = TRUE),
-                CHNG_BAA = sum(CHNG_BAA, na.rm = TRUE),
-                CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
-                REMPER = first(REMPER)) %>%
-      ## T2 attributes
-      mutate(CURR_BAA = PREV_BAA + CHNG_BAA,
-             CURR_TPA = PREV_TPA + CHNG_TPA) %>%
-      ## Change in average tree BA and QMD
-      mutate(PREV_BA = if_else(PREV_TPA != 0, PREV_BAA / PREV_TPA, 0),
-             CURR_BA = if_else(CURR_TPA != 0, CURR_BAA / CURR_TPA, 0),
-             CHNG_BA = CURR_BA - PREV_BA) %>%
-      ## SD by group
-      group_by(.dots = grpBy) %>%
-      summarise(tpaSD = sd(c(PREV_TPA, CURR_TPA), na.rm = TRUE),
-                baSD = sd(c(PREV_BA, CURR_BA), na.rm = TRUE)) %>%
-      ungroup()
-
 
     ## Adding YEAR to groups
     grpBy <- c('YEAR', grpBy)
@@ -603,10 +692,10 @@ fsi <- function(db,
           library(rFIA)
           library(tidyr)
         })
-        out <- parLapply(cl, X = names(popState), fun = fsiHelper2, popState, t, a, grpBy, method, pltRates)
+        out <- parLapply(cl, X = names(popState), fun = fsiHelper2, popState, t, a, grpBy, scaleBy, method, grpRates)
         stopCluster(cl)
       } else { # Unix systems
-        out <- mclapply(names(popState), FUN = fsiHelper2, popState, t, a, grpBy, method, pltRates, mc.cores = nCores)
+        out <- mclapply(names(popState), FUN = fsiHelper2, popState, t, a, grpBy, scaleBy, method, grpRates, mc.cores = nCores)
       }
     })
     ## back to dataframes
@@ -850,8 +939,7 @@ fsi <- function(db,
 
 
 
-#### Pre July 8 re-write where we scale density and size by group
-#
+#### Pre July 28 re-write where we allows slopes to vary by stand age
 # fsiStarter <- function(x,
 #                        db,
 #                        grpBy_quo = NULL,
@@ -867,7 +955,6 @@ fsi <- function(db,
 #                        areaDomain = NULL,
 #                        totals = FALSE,
 #                        byPlot = FALSE,
-#                        scaleGCB = TRUE,
 #                        useLM = FALSE,
 #                        nCores = 1,
 #                        remote,
@@ -1086,7 +1173,7 @@ fsi <- function(db,
 #     filter(!is.na(REMPER) & !is.na(PREV_PLT_CN) & PLOT_STATUS_CD != 3 & DESIGNCD == 1) %>%
 #     left_join(select(db$PLOT, PLT_CN, DESIGNCD, PLOT_STATUS_CD), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
 #     ## past emasurement must be in the previous sample and of national design
-#     filter(PLOT_STATUS_CD != 3 & DESIGNCD == 1)
+#     filter(PLOT_STATUS_CD.prev != 3 & DESIGNCD.prev == 1)
 #
 #   ### Snag the EVALIDs that are needed
 #   db$POP_EVAL<- db$POP_EVAL %>%
@@ -1262,185 +1349,17 @@ fsi <- function(db,
 #     })
 #   }
 #
+#   ## back to dataframes
+#   out <- unlist(out, recursive = FALSE)
+#   t <- bind_rows(out[names(out) == 't'])
+#   a <- bind_rows(out[names(out) == 'a'])
 #
-#   if (byPlot){
-#     ## back to dataframes
-#     out <- unlist(out, recursive = FALSE)
-#     tEst <- bind_rows(out[names(out) == 't'])
-#
-#     if (scaleGCB){
-#       ## Should be estimated across all plots
-#       tpaRateSD <- 29.86784
-#       baRateSD <-  0.1498109
-#
-#       tEst$TPA_RATE <- tEst$CHNG_TPA / tpaRateSD
-#       tEst$BA_RATE <- tEst$CHNG_BA / baRateSD
-#     }
-#
-#
-#     ## Make it spatial
-#     if (returnSpatial){
-#       tEst <- tEst %>%
-#         filter(!is.na(LAT) & !is.na(LON)) %>%
-#         st_as_sf(coords = c('LON', 'LAT'),
-#                  crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
-#       grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
-#
-#     }
-#
-#     out <- list(tEst = tEst, grpBy = grpBy, grpByOrig = grpByOrig)
-#
-#     ## Population estimation
-#   } else {
-#     ## back to dataframes
-#     out <- unlist(out, recursive = FALSE)
-#     t <- bind_rows(out[names(out) == 't'])
-#     a <- bind_rows(out[names(out) == 'a'])
-#
-#     popState <- split(pops, as.factor(pops$STATECD))
-#
-#     ## Should we exit early to get new SD on PREV_TPA and PREV_BAA for scaling?
-#     ## No reason bring all the state data together if we know the SD
-#     if (scaleGCB){
-#
-#       ## Should be estimated across all plots
-#       tpaRateSD <- 29.86784
-#       baRateSD <-  0.1498109
-#
-#
-#       ## Adding YEAR to groups
-#       grpBy <- c('YEAR', grpBy)
-#       popState <- split(pops, as.factor(pops$STATECD))
-#
-#       suppressWarnings({
-#         ## Compute estimates in parallel -- Clusters in windows, forking otherwise
-#         if (Sys.info()['sysname'] == 'Windows'){
-#           ## Use the same cluster as above
-#           # cl <- makeCluster(nCores)
-#           # clusterEvalQ(cl, {
-#           #   library(dplyr)
-#           #   library(stringr)
-#           #   library(rFIA)
-#           # })
-#           out <- parLapply(cl, X = names(popState), fun = fsiHelper2, popState, a, t, grpBy, method, tpaRateSD, baRateSD)
-#           stopCluster(cl)
-#         } else { # Unix systems
-#           out <- mclapply(names(popState), FUN = fsiHelper2, popState, a, t, grpBy, method, tpaRateSD, baRateSD, mc.cores = nCores)
-#         }
-#       })
-#       ## back to dataframes
-#       out <- unlist(out, recursive = FALSE)
-#       tEst <- bind_rows(out[names(out) == 'tEst'])
-#
-#       ##### ----------------- MOVING AVERAGES
-#       if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){
-#         ### ---- SIMPLE MOVING AVERAGE
-#         if (str_to_upper(method) == 'SMA'){
-#           ## Assuming a uniform weighting scheme
-#           wgts <- pops %>%
-#             group_by(ESTN_UNIT_CN) %>%
-#             summarize(wgt = 1 / length(unique(INVYR)))
-#
-#           tEst <- left_join(tEst, wgts, by = 'ESTN_UNIT_CN')
-#
-#           #### ----- Linear MOVING AVERAGE
-#         } else if (str_to_upper(method) == 'LMA'){
-#           wgts <- pops %>%
-#             distinct(YEAR, ESTN_UNIT_CN, INVYR, .keep_all = TRUE) %>%
-#             arrange(YEAR, ESTN_UNIT_CN, INVYR) %>%
-#             group_by(as.factor(YEAR), as.factor(ESTN_UNIT_CN)) %>%
-#             mutate(rank = min_rank(INVYR))
-#
-#           ## Want a number of INVYRs per EU
-#           neu <- wgts %>%
-#             group_by(ESTN_UNIT_CN) %>%
-#             summarize(n = sum(rank, na.rm = TRUE))
-#
-#           ## Rejoining and computing wgts
-#           wgts <- wgts %>%
-#             left_join(neu, by = 'ESTN_UNIT_CN') %>%
-#             mutate(wgt = rank / n) %>%
-#             ungroup() %>%
-#             select(ESTN_UNIT_CN, INVYR, wgt)
-#
-#           tEst <- left_join(tEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
-#
-#           #### ----- EXPONENTIAL MOVING AVERAGE
-#         } else if (str_to_upper(method) == 'EMA'){
-#           wgts <- pops %>%
-#             distinct(YEAR, ESTN_UNIT_CN, INVYR, .keep_all = TRUE) %>%
-#             arrange(YEAR, ESTN_UNIT_CN, INVYR) %>%
-#             group_by(as.factor(YEAR), as.factor(ESTN_UNIT_CN)) %>%
-#             mutate(rank = min_rank(INVYR))
-#
-#
-#           if (length(lambda) < 2){
-#             ## Want sum of weighitng functions
-#             neu <- wgts %>%
-#               mutate(l = lambda) %>%
-#               group_by(ESTN_UNIT_CN) %>%
-#               summarize(l = 1 - first(lambda),
-#                         sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
-#
-#             ## Rejoining and computing wgts
-#             wgts <- wgts %>%
-#               left_join(neu, by = 'ESTN_UNIT_CN') %>%
-#               mutate(wgt = l*(1-l)^(1-rank) / sumwgt) %>%
-#               ungroup() %>%
-#               select(ESTN_UNIT_CN, INVYR, wgt)
-#           } else {
-#             grpBy <- c('lambda', grpBy)
-#             ## Duplicate weights for each level of lambda
-#             yrWgts <- list()
-#             for (i in 1:length(unique(lambda))) {
-#               yrWgts[[i]] <- mutate(wgts, lambda = lambda[i])
-#             }
-#             wgts <- bind_rows(yrWgts)
-#             ## Want sum of weighitng functions
-#             neu <- wgts %>%
-#               group_by(lambda, ESTN_UNIT_CN) %>%
-#               summarize(l = 1 - first(lambda),
-#                         sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
-#
-#             ## Rejoining and computing wgts
-#             wgts <- wgts %>%
-#               left_join(neu, by = c('lambda', 'ESTN_UNIT_CN')) %>%
-#               mutate(wgt = l*(1-l)^(1-rank) / sumwgt) %>%
-#               ungroup() %>%
-#               select(lambda, ESTN_UNIT_CN, INVYR, wgt)
-#           }
-#
-#           tEst <- left_join(tEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
-#
-#         }
-#
-#         ### Applying the weights
-#         tEst <- tEst %>%
-#           mutate_at(vars(ctEst:faEst), ~(.*wgt)) %>%
-#           mutate_at(vars(ctVar:cvEst_si), ~(.*(wgt^2))) %>%
-#           group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
-#           summarize_at(vars(ctEst:plotIn_t), sum, na.rm = TRUE)
-#       }
-#
-#       aEst = NULL
-#       pops = NULL
-#
-#     } else {
-#       ## Exit early, compute SD from all states, then summarize -- far less efficient
-#       tEst = t
-#       aEst = a
-#     }
-#
-#     out <- list(tEst = tEst, aEst = aEst, grpBy = grpBy, grpByOrig = grpByOrig, pops = pops)
-#
-#   }
-#
+#   out <- list(t = t, a = a, grpBy = grpBy, grpByOrig = grpByOrig, pops = pops)
 #
 # }
-#
-#
-#
-#
+
+
+
 # fsi <- function(db,
 #                 grpBy = NULL,
 #                 polys = NULL,
@@ -1455,7 +1374,6 @@ fsi <- function(db,
 #                 areaDomain = NULL,
 #                 totals = TRUE,
 #                 byPlot = FALSE,
-#                 scaleGCB = TRUE,
 #                 useLM = FALSE,
 #                 nCores = 1) {
 #
@@ -1516,209 +1434,215 @@ fsi <- function(db,
 #                 bySpecies, bySizeClass,
 #                 landType, treeType, method,
 #                 lambda, treeDomain, areaDomain,
-#                 totals, byPlot, scaleGCB, useLM,
+#                 totals, byPlot, useLM,
 #                 nCores, remote, mr)
 #
 #   ## Bring the results back
 #   out <- unlist(out, recursive = FALSE)
-#   tEst <- bind_rows(out[names(out) == 'tEst'])
+#   t <- bind_rows(out[names(out) == 't'])
+#   a <- bind_rows(out[names(out) == 'a'])
 #   grpBy <- out[names(out) == 'grpBy'][[1]]
 #   grpByOrig <- out[names(out) == 'grpByOrig'][[1]]
 #
-#   ## Set these globally
-#   if (scaleGCB){
-#     tpaRateSD <- 29.86784
-#     baRateSD <-  0.1498109
-#   }
+#
 #
 #   if (byPlot){
 #
 #     ## back to dataframes
-#     tOut <- tEst
+#     tOut <- t
 #
-#     ## Should scaling be consistent with GCB paper?
-#     ## If so, scaling is already handled
-#     ## Otherwise do it here
-#     if (scaleGCB == FALSE){
-#       tpaRateSD <- sd(tOut$CHNG_TPA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
-#       baRateSD <- sd(tOut$CHNG_BA[tOut$PLOT_STATUS_CD == 1], na.rm = TRUE)
 #
-#       tOut$TPA_RATE <- tEst$CHNG_TPA / tpaRateSD
-#       tOut$BA_RATE <- tEst$CHNG_BA / baRateSD
+#     grpScale <- tOut %>%
+#       filter(PLOT_STATUS_CD == 1) %>%
+#       group_by(.dots = grpBy[grpBy %in% c('YEAR', 'pltID') == FALSE]) %>%
+#       summarise(tpaSD = sd(c(PREV_TPA, CURR_TPA), na.rm = TRUE),
+#                 baSD = sd(c(PREV_BA, CURR_BA), na.rm = TRUE))
+#
+#     ## Scale the indices by group
+#     tOut <- tOut %>%
+#       left_join(grpScale, by = grpBy[grpBy %in% c('YEAR', 'pltID') == FALSE]) %>%
+#       mutate(dt = CHNG_TPA / tpaSD,
+#              db = CHNG_BA / baSD,
+#              t1 = PREV_TPA / tpaSD / REMPER,
+#              t2 = CURR_TPA / tpaSD/ REMPER,
+#              b1 = PREV_BA / baSD / REMPER,
+#              b2 = CURR_BA / baSD / REMPER) %>%
+#       ## The FSI and % FSI
+#       mutate(FSI = projectPoints(dt, db, 0.8025, 0, returnPoint = FALSE),
+#              ## can and will produce INF here due to division by zero, that's fine, just use the FSI if that matters to you
+#              PERC_FSI = projectPoints(t2, b2, 0.8025, 0, returnPoint = FALSE) / projectPoints(t1, b1, 0.8025, 0, returnPoint = FALSE) -1,
+#              TPA_RATE = dt,
+#              BA_RATE = db)
+#
+#
+#     ## Make it spatial
+#     if (returnSpatial){
+#       tOut <- tOut %>%
+#         filter(!is.na(LAT) & !is.na(LON)) %>%
+#         st_as_sf(coords = c('LON', 'LAT'),
+#                  crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
+#       grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
+#
 #     }
 #
-#     # # Compute the SI
-#     # x = projectPnts(tOut$TPA_RATE, tOut$BAA_RATE, 0.8025, 0)$x
-#     # y = projectPnts(tOut$TPA_RATE, tOut$BAA_RATE, 0.8025, 0)$y
-#     # M = sqrt(x^2 + y^2)
-#     # tOut$SI = if_else(x < 0, -M, M)
 #
-#     tOut$SI <- projectPoints(tOut$TPA_RATE, tOut$BA_RATE, 0.8025, 0, returnPoint = FALSE)
-#
-#     tOut <- select(tOut, YEAR, PLT_CN, any_of('PREV_PLT_CN'), PLOT_STATUS_CD, grpBy[grpBy != 'YEAR'], SI, TPA_RATE, BA_RATE, REMPER, everything())
+#     tOut <- select(tOut, YEAR, PLT_CN, any_of('PREV_PLT_CN'), PLOT_STATUS_CD, grpBy[grpBy != 'YEAR'], FSI, PERC_FSI, TPA_RATE, BA_RATE, REMPER, everything()) %>%
+#       select(-c(dt, db, t1, t2, b1, b2))
 #
 #
 #
 #     ## Population estimation
 #   } else {
+#     ## back to dataframes
+#     pops <- bind_rows(out[names(out) == 'pops'])
+#
+#     ### CANNOT USE vectors as they are to compute SD, because of PLOT_BASIS issues
+#     ### SD is unnessarily high --> plot level first
+#     pltRates <- t %>%
+#       ungroup() %>%
+#       filter(plotIn == 1) %>%
+#       select(PLT_CN, REMPER, CHNG_TPA, CHNG_BAA, PREV_BAA, PREV_TPA, plotIn, grpBy) %>%
+#       ## Replace any NAs with zeros
+#       mutate(PREV_BAA = replace_na(PREV_BAA, 0),
+#              PREV_TPA = replace_na(PREV_TPA, 0),
+#              CHNG_BAA = replace_na(CHNG_BAA, 0),
+#              CHNG_TPA = replace_na(CHNG_TPA, 0)) %>%
+#       group_by(PLT_CN, plotIn, .dots = grpBy) %>%
+#       ## Sum across micro, subp, and macroplots
+#       summarize(PREV_BAA = sum(PREV_BAA, na.rm = TRUE),
+#                 PREV_TPA = sum(PREV_TPA, na.rm = TRUE),
+#                 CHNG_BAA = sum(CHNG_BAA, na.rm = TRUE),
+#                 CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
+#                 REMPER = first(REMPER)) %>%
+#       ## T2 attributes
+#       mutate(CURR_BAA = PREV_BAA + CHNG_BAA,
+#              CURR_TPA = PREV_TPA + CHNG_TPA) %>%
+#       ## Change in average tree BA and QMD
+#       mutate(PREV_BA = if_else(PREV_TPA != 0, PREV_BAA / PREV_TPA, 0),
+#              CURR_BA = if_else(CURR_TPA != 0, CURR_BAA / CURR_TPA, 0),
+#              CHNG_BA = CURR_BA - PREV_BA) %>%
+#       ## SD by group
+#       group_by(.dots = grpBy) %>%
+#       summarise(tpaSD = sd(c(PREV_TPA, CURR_TPA), na.rm = TRUE),
+#                 baSD = sd(c(PREV_BA, CURR_BA), na.rm = TRUE)) %>%
+#       ungroup()
 #
 #
-#     # ## Standardize the changes in each state variable AT THE PLOT LEVEL
-#     if (scaleGCB == FALSE){
-#       ## back to dataframes
-#       a <- bind_rows(out[names(out) == 'aEst'])
-#       t <- tEst
-#
-#       ### CANNOT USE vectors as they are to compute SD, because of PLOT_BASIS issues
-#       ### SD is unnessarily high --> plot level first
-#       pltRates <- t %>%
-#         ungroup() %>%
-#         select(PLT_CN, REMPER, CHNG_TPA, CHNG_BAA, PREV_BAA, PREV_TPA, plotIn, grpBy) %>%
-#         ## Replace any NAs with zeros
-#         mutate(PREV_BAA = replace_na(PREV_BAA, 0),
-#                PREV_TPA = replace_na(PREV_TPA, 0),
-#                CHNG_BAA = replace_na(CHNG_BAA, 0),
-#                CHNG_TPA = replace_na(CHNG_TPA, 0)) %>%
-#         group_by(PLT_CN, plotIn) %>%
-#         ## Sum across micro, subp, and macroplots
-#         summarize(PREV_BAA = sum(PREV_BAA, na.rm = TRUE),
-#                   PREV_TPA = sum(PREV_TPA, na.rm = TRUE),
-#                   CHNG_BAA = sum(CHNG_BAA, na.rm = TRUE),
-#                   CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
-#                   REMPER = first(REMPER)) %>%
-#         ## T2 attributes
-#         mutate(CURR_BAA = PREV_BAA + CHNG_BAA,
-#                CURR_TPA = PREV_TPA + CHNG_TPA) %>%
-#         ## Change in average tree BA and QMD
-#         mutate(PREV_BA = if_else(PREV_TPA != 0, PREV_BAA / PREV_TPA, 0),
-#                CURR_BA = if_else(CURR_TPA != 0, CURR_BAA / CURR_TPA, 0),
-#                CHNG_BA = CURR_BA - PREV_BA) %>%
-#         ## All CHNG becomes an annual rate
-#         mutate(CHNG_BAA = CHNG_BAA / REMPER,
-#                CHNG_TPA = CHNG_TPA / REMPER,
-#                CHNG_BA = CHNG_BA / REMPER)
-#
-#       tpaRateSD <- sd(pltRates$CHNG_TPA[pltRates$plotIn == 1], na.rm = TRUE)
-#       baRateSD <- sd(pltRates$CHNG_BA[pltRates$plotIn == 1], na.rm = TRUE)
-#
-#       ## Adding YEAR to groups
-#       grpBy <- c('YEAR', grpBy)
-#       pops <- bind_rows(out[names(out) == 'pops'])
-#       popState <- split(pops, as.factor(pops$STATECD))
+#     ## Adding YEAR to groups
+#     grpBy <- c('YEAR', grpBy)
+#     popState <- split(pops, as.factor(pops$STATECD))
 #
 #
-#       suppressWarnings({
-#         ## Compute estimates in parallel -- Clusters in windows, forking otherwise
-#         if (Sys.info()['sysname'] == 'Windows'){
-#           cl <- makeCluster(nCores)
-#           clusterEvalQ(cl, {
-#             library(dplyr)
-#             library(stringr)
-#             library(rFIA)
-#             library(tidyr)
-#           })
-#           out <- parLapply(cl, X = names(popState), fun = fsiHelper2, popState, a, t, grpBy, method, tpaRateSD, baRateSD)
-#           stopCluster(cl)
-#         } else { # Unix systems
-#           out <- mclapply(names(popState), FUN = fsiHelper2, popState, a, t, grpBy, method, tpaRateSD, baRateSD, mc.cores = nCores)
-#         }
-#       })
-#       ## back to dataframes
-#       out <- unlist(out, recursive = FALSE)
-#       tEst <- bind_rows(out[names(out) == 'tEst'])
-#       tEst <- ungroup(tEst)
+#     suppressWarnings({
+#       ## Compute estimates in parallel -- Clusters in windows, forking otherwise
+#       if (Sys.info()['sysname'] == 'Windows'){
+#         cl <- makeCluster(nCores)
+#         clusterEvalQ(cl, {
+#           library(dplyr)
+#           library(stringr)
+#           library(rFIA)
+#           library(tidyr)
+#         })
+#         out <- parLapply(cl, X = names(popState), fun = fsiHelper2, popState, t, a, grpBy, method, pltRates)
+#         stopCluster(cl)
+#       } else { # Unix systems
+#         out <- mclapply(names(popState), FUN = fsiHelper2, popState, t, a, grpBy, method, pltRates, mc.cores = nCores)
+#       }
+#     })
+#     ## back to dataframes
+#     out <- unlist(out, recursive = FALSE)
+#     tEst <- bind_rows(out[names(out) == 'tEst'])
+#     tEst <- ungroup(tEst)
 #
-#       ##### ----------------- MOVING AVERAGES
-#       if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){
-#         ### ---- SIMPLE MOVING AVERAGE
-#         if (str_to_upper(method) == 'SMA'){
-#           ## Assuming a uniform weighting scheme
-#           wgts <- pops %>%
-#             group_by(ESTN_UNIT_CN) %>%
-#             summarize(wgt = 1 / length(unique(INVYR)))
+#     ##### ----------------- MOVING AVERAGES
+#     if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){
+#       ### ---- SIMPLE MOVING AVERAGE
+#       if (str_to_upper(method) == 'SMA'){
+#         ## Assuming a uniform weighting scheme
+#         wgts <- pops %>%
+#           group_by(ESTN_UNIT_CN) %>%
+#           summarize(wgt = 1 / length(unique(INVYR)))
 #
-#           tEst <- left_join(tEst, wgts, by = 'ESTN_UNIT_CN')
+#         tEst <- left_join(tEst, wgts, by = 'ESTN_UNIT_CN')
 #
-#           #### ----- Linear MOVING AVERAGE
-#         } else if (str_to_upper(method) == 'LMA'){
-#           wgts <- pops %>%
-#             distinct(YEAR, ESTN_UNIT_CN, INVYR, .keep_all = TRUE) %>%
-#             arrange(YEAR, ESTN_UNIT_CN, INVYR) %>%
-#             group_by(as.factor(YEAR), as.factor(ESTN_UNIT_CN)) %>%
-#             mutate(rank = min_rank(INVYR))
+#         #### ----- Linear MOVING AVERAGE
+#       } else if (str_to_upper(method) == 'LMA'){
+#         wgts <- pops %>%
+#           distinct(YEAR, ESTN_UNIT_CN, INVYR, .keep_all = TRUE) %>%
+#           arrange(YEAR, ESTN_UNIT_CN, INVYR) %>%
+#           group_by(as.factor(YEAR), as.factor(ESTN_UNIT_CN)) %>%
+#           mutate(rank = min_rank(INVYR))
 #
-#           ## Want a number of INVYRs per EU
+#         ## Want a number of INVYRs per EU
+#         neu <- wgts %>%
+#           group_by(ESTN_UNIT_CN) %>%
+#           summarize(n = sum(rank, na.rm = TRUE))
+#
+#         ## Rejoining and computing wgts
+#         wgts <- wgts %>%
+#           left_join(neu, by = 'ESTN_UNIT_CN') %>%
+#           mutate(wgt = rank / n) %>%
+#           ungroup() %>%
+#           select(ESTN_UNIT_CN, INVYR, wgt)
+#
+#         tEst <- left_join(tEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
+#
+#         #### ----- EXPONENTIAL MOVING AVERAGE
+#       } else if (str_to_upper(method) == 'EMA'){
+#         wgts <- pops %>%
+#           distinct(YEAR, ESTN_UNIT_CN, INVYR, .keep_all = TRUE) %>%
+#           arrange(YEAR, ESTN_UNIT_CN, INVYR) %>%
+#           group_by(as.factor(YEAR), as.factor(ESTN_UNIT_CN)) %>%
+#           mutate(rank = min_rank(INVYR))
+#
+#
+#         if (length(lambda) < 2){
+#           ## Want sum of weighitng functions
 #           neu <- wgts %>%
+#             mutate(l = lambda) %>%
 #             group_by(ESTN_UNIT_CN) %>%
-#             summarize(n = sum(rank, na.rm = TRUE))
+#             summarize(l = 1 - first(lambda),
+#                       sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
 #
 #           ## Rejoining and computing wgts
 #           wgts <- wgts %>%
 #             left_join(neu, by = 'ESTN_UNIT_CN') %>%
-#             mutate(wgt = rank / n) %>%
+#             mutate(wgt = l*(1-l)^(1-rank) / sumwgt) %>%
 #             ungroup() %>%
 #             select(ESTN_UNIT_CN, INVYR, wgt)
-#
-#           tEst <- left_join(tEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
-#
-#           #### ----- EXPONENTIAL MOVING AVERAGE
-#         } else if (str_to_upper(method) == 'EMA'){
-#           wgts <- pops %>%
-#             distinct(YEAR, ESTN_UNIT_CN, INVYR, .keep_all = TRUE) %>%
-#             arrange(YEAR, ESTN_UNIT_CN, INVYR) %>%
-#             group_by(as.factor(YEAR), as.factor(ESTN_UNIT_CN)) %>%
-#             mutate(rank = min_rank(INVYR))
-#
-#
-#           if (length(lambda) < 2){
-#             ## Want sum of weighitng functions
-#             neu <- wgts %>%
-#               mutate(l = lambda) %>%
-#               group_by(ESTN_UNIT_CN) %>%
-#               summarize(l = 1 - first(lambda),
-#                         sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
-#
-#             ## Rejoining and computing wgts
-#             wgts <- wgts %>%
-#               left_join(neu, by = 'ESTN_UNIT_CN') %>%
-#               mutate(wgt = l*(1-l)^(1-rank) / sumwgt) %>%
-#               ungroup() %>%
-#               select(ESTN_UNIT_CN, INVYR, wgt)
-#           } else {
-#             grpBy <- c('lambda', grpBy)
-#             ## Duplicate weights for each level of lambda
-#             yrWgts <- list()
-#             for (i in 1:length(unique(lambda))) {
-#               yrWgts[[i]] <- mutate(wgts, lambda = lambda[i])
-#             }
-#             wgts <- bind_rows(yrWgts)
-#             ## Want sum of weighitng functions
-#             neu <- wgts %>%
-#               group_by(lambda, ESTN_UNIT_CN) %>%
-#               summarize(l = 1 - first(lambda),
-#                         sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
-#
-#             ## Rejoining and computing wgts
-#             wgts <- wgts %>%
-#               left_join(neu, by = c('lambda', 'ESTN_UNIT_CN')) %>%
-#               mutate(wgt = l*(1-l)^(1-rank) / sumwgt) %>%
-#               ungroup() %>%
-#               select(lambda, ESTN_UNIT_CN, INVYR, wgt)
+#         } else {
+#           grpBy <- c('lambda', grpBy)
+#           ## Duplicate weights for each level of lambda
+#           yrWgts <- list()
+#           for (i in 1:length(unique(lambda))) {
+#             yrWgts[[i]] <- mutate(wgts, lambda = lambda[i])
 #           }
+#           wgts <- bind_rows(yrWgts)
+#           ## Want sum of weighitng functions
+#           neu <- wgts %>%
+#             group_by(lambda, ESTN_UNIT_CN) %>%
+#             summarize(l = 1 - first(lambda),
+#                       sumwgt = sum(l*(1-l)^(1-rank), na.rm = TRUE))
 #
-#           tEst <- left_join(tEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
-#
+#           ## Rejoining and computing wgts
+#           wgts <- wgts %>%
+#             left_join(neu, by = c('lambda', 'ESTN_UNIT_CN')) %>%
+#             mutate(wgt = l*(1-l)^(1-rank) / sumwgt) %>%
+#             ungroup() %>%
+#             select(lambda, ESTN_UNIT_CN, INVYR, wgt)
 #         }
 #
-#         ### Applying the weights
-#         tEst <- tEst %>%
-#           mutate_at(vars(ctEst:faEst), ~(.*wgt)) %>%
-#           mutate_at(vars(ctVar:cvEst_si), ~(.*(wgt^2))) %>%
-#           group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
-#           summarize_at(vars(ctEst:plotIn_t), sum, na.rm = TRUE)
+#         tEst <- left_join(tEst, wgts, by = c('ESTN_UNIT_CN', 'INVYR'))
+#
 #       }
 #
-#     } ## End if scaleGCB == FALSE
+#       ### Applying the weights
+#       tEst <- tEst %>%
+#         mutate_at(vars(ctEst:faEst), ~(.*wgt)) %>%
+#         mutate_at(vars(ctVar:cvEst_psi), ~(.*(wgt^2))) %>%
+#         group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+#         summarize_at(vars(ctEst:plotIn_t), sum, na.rm = TRUE)
+#     }
 #
 #     suppressMessages({suppressWarnings({
 #       ## If a clip was specified, handle the reporting years
@@ -1755,27 +1679,36 @@ fsi <- function(db,
 #         summarize_all(sum,na.rm = TRUE) %>%
 #         mutate(TPA_RATE = ctEst / ptEst,
 #                BA_RATE = cbEst / pbEst,
-#                SI = siEst / faEst,
+#                FSI = siEst / faEst,
+#                PERC_FSI = siEst / si1Est,
 #
 #                ## Ratio variance
 #                ctVar = (1/ptEst^2) * (ctVar + (TPA_RATE^2 * ptVar) - (2 * TPA_RATE * cvEst_ct)),
 #                cbVar = (1/pbEst^2) * (cbVar + (BA_RATE^2 * pbVar) - (2 * BA_RATE * cvEst_cb)),
-#                siVar = (1/faEst^2) * (siVar + (SI^2 * faVar) - (2 * SI * cvEst_si)),
+#                psiVar = (1/si1Est^2) * (siVar + (PERC_FSI^2 * si1Var) - (2 * PERC_FSI * cvEst_psi)),
+#                siVar = (1/faEst^2) * (siVar + (FSI^2 * faVar) - (2 * FSI * cvEst_si)),
+#
+#                ## Make it a percent
+#                PERC_FSI = PERC_FSI * 100,
+#                psiVar = psiVar * (100^2),
 #
 #                ## RATIO SE
 #                TPA_RATE_SE = sqrt(ctVar) / abs(TPA_RATE) * 100,
 #                BA_RATE_SE = sqrt(cbVar) / abs(BA_RATE) * 100,
-#                SI_SE = sqrt(siVar) / abs(SI) * 100,
-#                SI_VAR = siVar,
+#                FSI_SE = sqrt(siVar) / abs(FSI) * 100,
+#                FSI_VAR = siVar,
+#                PERC_FSI_SE = sqrt(psiVar) / abs(PERC_FSI) * 100,
+#                PERC_FSI_VAR = psiVar,
 #                TPA_RATE_VAR = ctVar,
 #                BA_RATE_VAR = cbVar,
 #                nPlots = plotIn_t,
 #                N = nh,
-#                SI_INT = qt(.975, df=N-1) * (sqrt(siVar)/sqrt(N))) %>%
-#         mutate(SI_STATUS = case_when(
-#           SI < 0 & SI + SI_INT < 0 ~ 'Decline',
-#           SI < 0 & SI + SI_INT > 0 ~ 'Stable',
-#           SI > 0 & SI - SI_INT > 0  ~ 'Expand',
+#                FSI_INT = qt(.975, df=N-1) * (sqrt(siVar)/sqrt(N)),
+#                PERC_FSI_INT = qt(.975, df=N-1) * (sqrt(psiVar)/sqrt(N))) %>%
+#         mutate(FSI_STATUS = case_when(
+#           FSI < 0 & FSI + FSI_INT < 0 ~ 'Decline',
+#           FSI < 0 & FSI + FSI_INT > 0 ~ 'Stable',
+#           FSI > 0 & FSI - FSI_INT > 0  ~ 'Expand',
 #           TRUE ~ 'Stable'
 #         ))
 #     })
@@ -1783,14 +1716,20 @@ fsi <- function(db,
 #
 #     if (totals) {
 #       tOut <- tOut %>%
-#         select(grpBy, SI, SI_STATUS, SI_INT, TPA_RATE, BA_RATE,
-#                SI_SE, TPA_RATE_SE, BA_RATE_SE, SI_VAR, TPA_RATE_VAR, BA_RATE_VAR,
+#         select(grpBy, FSI, PERC_FSI, FSI_STATUS,
+#                FSI_INT, PERC_FSI_INT,
+#                TPA_RATE, BA_RATE,
+#                FSI_SE, PERC_FSI_SE, TPA_RATE_SE, BA_RATE_SE,
+#                FSI_VAR, PERC_FSI_VAR, TPA_RATE_VAR, BA_RATE_VAR,
 #                nPlots, N)
 #
 #     } else {
 #       tOut <- tOut %>%
-#         select(grpBy, SI, SI_STATUS, SI_INT, TPA_RATE, BA_RATE,
-#                SI_SE, TPA_RATE_SE, BA_RATE_SE, SI_VAR, TPA_RATE_VAR, BA_RATE_VAR,
+#         select(grpBy, FSI, PERC_FSI, FSI_STATUS,
+#                FSI_INT, PERC_FSI_INT,
+#                TPA_RATE, BA_RATE,
+#                FSI_SE, PERC_FSI_SE, TPA_RATE_SE, BA_RATE_SE,
+#                FSI_VAR, PERC_FSI_VAR, TPA_RATE_VAR, BA_RATE_VAR,
 #                nPlots, N)
 #     }
 #
@@ -1842,12 +1781,7 @@ fsi <- function(db,
 #   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
 #   if (byPlot) tOut <- unique(tOut)
 #
-#   ## Standardization factors
-#   tOut$tpaRateSD <- tpaRateSD
-#   tOut$baRateSD <- baRateSD
-#
 #
 #   return(tOut)
 #
 # }
-#

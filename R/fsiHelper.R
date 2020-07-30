@@ -1,15 +1,24 @@
 
 
-fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
+fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
+
+  ## Does not modify outside environment, just need scaleBy in here as well
+  if (is.null(grpBy)){
+    aGrps <- NULL
+    grpBy <- scaleBy
+  } else {
+    aGrps <- grpBy
+    grpBy <- unique(c(grpBy, scaleBy))
+  }
 
   ## Selecting the plots for one county
   db$PLOT <- plts[[x]]
 
 
   ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
-  grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
-  grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
+  grpP <- names(db$PLOT)[names(db$PLOT) %in% c(grpBy, scaleBy)]
+  grpC <- names(db$COND)[names(db$COND) %in% c(grpBy, scaleBy) & names(db$COND) %in% grpP == FALSE]
+  grpT <- names(db$TREE)[names(db$TREE) %in% c(grpBy, scaleBy) & names(db$TREE) %in% c(grpP, grpC) == FALSE]
 
   ## Making a treeID
   db$TREE$treID <- paste(db$TREE$SUBP, db$TREE$TREE, sep = '_')
@@ -31,6 +40,13 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
     if_else(data$STATUSCD2 == 1, 1, 0)
 
   data$tDI1 <- data$landD1 * data$aD_p1 * data$aD_c1 * data$tD1 * data$typeD1 * data$sp1 *
+    if_else(data$STATUSCD1 == 1, 1, 0)
+
+  ## Comprehensive indicator function -- w/ growth accounting
+  data$pDI2 <- data$landD2 * data$aD_p2 * data$aD_c2 * data$typeD2 * data$sp2 *
+    if_else(data$STATUSCD2 == 1, 1, 0)
+
+  data$pDI1 <- data$landD1 * data$aD_p1 * data$aD_c1 * data$typeD1 * data$sp1 *
     if_else(data$STATUSCD1 == 1, 1, 0)
 
   ## Save a copy for area calculations
@@ -64,7 +80,7 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
            REMPER, PLOT_STATUS_CD1, PLOT_STATUS_CD2,
            treID1, treID2,
            one_of(str_c(grpT,1),str_c(grpT,2)),
-           tDI1, tDI2, STATUSCD1, STATUSCD2,
+           tDI1, tDI2, pDI1, pDI2, STATUSCD1, STATUSCD2,
            DIA1, DIA2, BAA1, BAA2, TPA_UNADJ1, TPA_UNADJ2, SPCD1, SPCD2) %>%
     mutate(BAA1 = -(BAA1),
            TPA_UNADJ1 = -(TPA_UNADJ1)) %>%
@@ -87,6 +103,18 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
   data <- data %>%
     mutate(TPA_UNADJ = replace_na(TPA_UNADJ, replace = 0),
            BAA = replace_na(BAA, replace = 0))
+
+  ## Total trees for the size-density scaling
+  t1 <- data %>%
+    ## Previous only
+    filter(ONEORTWO == 1) %>%
+    distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
+    group_by(.dots = scaleBy, PLT_CN) %>%
+    summarize(REMPER = first(REMPER),
+              BAA = sum(-BAA[STATUSCD == 1] * pDI[STATUSCD == 1], na.rm = TRUE),
+              TPA1 = sum(-TPA_UNADJ[STATUSCD == 1] * pDI[STATUSCD == 1], na.rm = TRUE)) %>%
+    ## Change in average tree BA and QMD
+    mutate(BA1 = if_else(TPA1 != 0, BAA / TPA1, 0))
 
 
   if (byPlot){
@@ -140,11 +168,12 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
   } else {
 
     ### Plot-level estimates
-    if (length(grpBy[grpBy %in% names(aData)]) < 1) {
+    if (length(aGrps[aGrps %in% names(aData)]) < 1) {
       aGrps = NULL
     }  else {
-      aGrps <- grpBy[grpBy %in% names(aData)]
+      aGrps <- aGrps[aGrps %in% names(aData)]
     }
+
 
     ### Plot-level estimates
     a <- aData %>%
@@ -185,12 +214,21 @@ fsiHelper1 <- function(x, plts, db, grpBy, byPlot){
                 plotIn = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0))
   }
 
-  pltOut <- list(t = t, a = a)
+  pltOut <- list(t = t, a = a, t1 = t1)
   return(pltOut)
 
 }
 
-fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
+fsiHelper1_lm <- function(x, plts, db, grpBy, scaleBy, byPlot){
+
+  ## Does not modify outside environment, just need scaleBy in here as well
+  if (is.null(grpBy)){
+    aGrps <- NULL
+    grpBy <- scaleBy
+  } else {
+    aGrps <- grpBy
+    grpBy <- unique(c(grpBy, scaleBy))
+  }
 
   ## Selecting the plots for one county
   db$PLOT <- plts[[x]]
@@ -202,9 +240,9 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
 
 
   ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
-  grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
-  grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
+  grpP <- names(db$PLOT)[names(db$PLOT) %in% c(grpBy, scaleBy)]
+  grpC <- names(db$COND)[names(db$COND) %in% c(grpBy, scaleBy) & names(db$COND) %in% grpP == FALSE]
+  grpT <- names(db$TREE)[names(db$TREE) %in% c(grpBy, scaleBy) & names(db$TREE) %in% c(grpP, grpC) == FALSE]
 
   ## Making a treeID
   db$TREE$treID <- paste(db$TREE$SUBP, db$TREE$TREE, sep = '_')
@@ -235,6 +273,7 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
 
   ## Domain indicator
   data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
+  data$pDI <- data$landD * data$aD_p * data$aD_c * data$typeD * data$sp
   data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
 
 
@@ -265,6 +304,20 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
   ## Every plot will have a one and a two
   ## We need to iterate through each of these
   ## possible 1 - n options
+
+  ## Total trees for the size-density scaling
+  t1 <- data %>%
+    left_join(remSeries, by = c('PLT_CN', 'pltID', 'MEASYEAR')) %>%
+    ## Previous only
+    filter(meas == 1) %>%
+    distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
+    group_by(.dots = scaleBy, PLT_CN, pltID) %>%
+    summarize(REMPER = first(REMPER),
+              BAA = sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
+              TPA1 = sum(TPA_UNADJ[STATUSCD == 1] * pDI[STATUSCD == 1], na.rm = TRUE)) %>%
+    ## Change in average tree BA and QMD
+    mutate(BA1 = if_else(TPA1 != 0, BAA / TPA1, 0))
+
 
   ## TPA and BAA model functions for map
   ## Returns slope of each series in units of
@@ -405,6 +458,7 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
 
 
   } else {
+
     # ### Plot-level estimates -- growth accounting
     ### Plot-level estimates
     a <- data %>%
@@ -415,11 +469,11 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
       ## Will be lots of trees here, so CONDPROP listed multiple times
       ## Adding PROP_BASIS so we can handle adjustment factors at strata level
       distinct(PLT_CN, pltID, date, PROP_BASIS, CONDID, .keep_all = TRUE) %>%
-      group_by(PLT_CN, pltID, date, PROP_BASIS, CONDID, .dots = grpBy) %>%
+      group_by(PLT_CN, pltID, date, PROP_BASIS, CONDID, .dots = aGrps) %>%
       summarize(CONDPROP_UNADJ = first(CONDPROP_UNADJ * aDI)) %>%
       mutate(CONDPROP_UNADJ = replace_na(CONDPROP_UNADJ, 0)) %>%
       ## Average forested area between min and max date
-      group_by(pltID, PROP_BASIS, .dots = grpBy) %>%
+      group_by(pltID, PROP_BASIS, .dots = aGrps) %>%
       summarize(minDate = min(date, na.rm = TRUE),
                 maxDate = max(date, na.rm = TRUE),
                 amin = sum(CONDPROP_UNADJ[date == minDate], na.rm = TRUE),
@@ -488,7 +542,8 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
         mutate(CHNG_BAA = replace_na(CHNG_BAA, 0),
                CHNG_TPA = replace_na(CHNG_TPA, 0)) %>%
         filter(!is.na(t_rate)) %>%
-        left_join(select(ungroup(tStart), PLT_CN, PLOT_BASIS, all_of(grpBy)), by = c('PLT_CN', 'PLOT_BASIS', grpBy))
+        left_join(select(ungroup(tStart), PLT_CN, PLOT_BASIS, all_of(grpBy)), by = c('PLT_CN', 'PLOT_BASIS', grpBy)) %>%
+        mutate(PREV_PLT_CN = NA)
     } else {
       t = NULL
     }
@@ -501,7 +556,7 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
 
 
 
-  pltOut <- list(t = t, a = a)
+  pltOut <- list(t = t, a = a, t1 = t1)
   return(pltOut)
 
 }
@@ -512,7 +567,7 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, byPlot){
 
 
 
-fsiHelper2 <- function(x, popState, t, a, grpBy, method, pltRates){
+fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, grpRates){
 
   ## DOES NOT MODIFY OUTSIDE ENVIRONMENT
   if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
@@ -566,8 +621,8 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, method, pltRates){
       CHNG_BAA = CHNG_BAA * tAdj,
       PREV_TPA = PREV_TPA * tAdj,
       PREV_BAA = PREV_BAA * tAdj) %>%
-    ## Extra step for variance issues
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy) %>%
+    ## Extra step for variance issues - summing micro, subp, and macr components
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = unique(c(grpBy, scaleBy))) %>%
     summarize(CURR_TPA = sum(CURR_TPA, na.rm = TRUE),
               CURR_BAA = sum(CURR_BAA, na.rm = TRUE),
               CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
@@ -596,24 +651,39 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, method, pltRates){
     mutate(CHNG_BAA = CHNG_BAA / REMPER,
            CHNG_TPA = CHNG_TPA / REMPER,
            CHNG_BA = CHNG_BA / REMPER) %>%
-    ## Scale variables by group
-    left_join(pltRates, by = grpBy[grpBy %in% c('YEAR', 'INVYR') == FALSE]) %>%
-    mutate(t1 = PREV_TPA / tpaSD,
-           t2 = CURR_TPA / tpaSD,
-           trate = (t2-t1) / REMPER,
-           b1 = PREV_BA / baSD,
-           b2 = CURR_BA / baSD,
-           brate = (b2-b1) / REMPER) %>%
-    ## The FSI at each time
-    mutate(si1 = projectPoints(t1, b1, 0.8025, 0, returnPoint = FALSE), ## Projected previous abundance
-           si = projectPoints(trate, brate, 0.8025, 0, returnPoint = FALSE), ## Projected change in abundance
-           si1 = case_when(
-             is.na(si1) ~ 0,
-             TRUE ~ si1),
-           si = case_when(
-             is.na(si) ~ 0,
-             TRUE ~ si)
+    left_join(grpRates, by = c('PLT_CN', scaleBy)) %>%
+    ## When PREV_BA is 0, slope is infinite
+    mutate(slope = case_when(PREV_BA == 0 ~ 100000,
+                             TRUE ~ slope)) %>%
+    mutate(dt = CHNG_TPA,
+           db = CHNG_BA,
+           t1 = PREV_TPA,
+           b1 = PREV_BA) %>%
+    ## The FSI and % FSI
+    mutate(si = projectPoints(dt, db, -(1/slope), 0, returnPoint = FALSE),
+           si1 = projectPoints(t1, b1, -(1/slope), 0, returnPoint = FALSE),
+           # si1 = case_when(
+           #   is.na(si1) ~ 0,
+           #   TRUE ~ si1),
+           # si = case_when(
+           #   is.na(si) ~ 0,
+           #   TRUE ~ si)
            ) %>%
+    ## Summing across scaleBy
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy) %>%
+    summarize(PREV_TPA = sum(PREV_TPA, na.rm = TRUE),
+              PREV_BA = sum(PREV_BA, na.rm = TRUE),
+              CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
+              CHNG_BA = sum(CHNG_BA, na.rm = TRUE),
+              si = mean(si, na.rm = TRUE),
+              si1 = mean(si1, na.rm = TRUE),
+              plotIn_t = ifelse(sum(plotIn_t >  0, na.rm = TRUE), 1,0),
+              nh = first(nh),
+              p2eu = first(p2eu),
+              a = first(a),
+              w = first(w),
+              REMPER = first(REMPER)) %>%
+
     left_join(select(aAdj, PLT_CN, aGrps, fa), by = c('PLT_CN', aGrps)) %>%
     ## SI is area adjusted
     mutate(si = si * fa, ## Change

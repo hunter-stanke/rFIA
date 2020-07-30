@@ -210,6 +210,8 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'PERC_FSI', 'PERC_FSI_INT', 'PERC_FSI_SE', 'PERC_FSI_VAR', 'PLOT_STATUS_CD.prev',
                          'PREV_BA', 'PREV_QMD', 'b1', 'b2', 'baSD', 'brate', 'cvEst_psi', 'cvStrat_psi', 'dt',
                          'psiVar', 'si',
-                         'si1', 'si1Est', 'si1Strat', 'si1Var', 'si1v', 't1', 't2', 'trate'
+                         'si1', 'si1Est', 'si1Strat', 'si1Var', 'si1v', 't1', 't2', 'trate',
+                         '.', 'FSI1', 'FSI2', 'TPA1', 'b', 'grps', 'int', 'pDI1', 'pDI2', 'ranef',
+                         'rate', 'slope'
 
 ))

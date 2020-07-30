@@ -30,7 +30,6 @@ projectPoints <- function(x, y, slope = 1, yint = 0, returnPoint = TRUE){
   ## Solve for 1:1 line by default
 
   ## So where does y = mx and y = -1/m * x + b converge
-
   perp_slope <-  - 1 / slope
   ## Solve for c given x and y
   perp_int <- -perp_slope*x + y
@@ -38,7 +37,7 @@ projectPoints <- function(x, y, slope = 1, yint = 0, returnPoint = TRUE){
   ## Set equations equal to each other on y
   ## -1/m*x + b = mx
   xproj <- (perp_int - yint) / (slope + -perp_slope)
-  yproj <- slope * xproj
+  yproj <- slope * xproj + yint
 
   if (returnPoint){
     out <- data.frame(x = xproj, y = yproj)
@@ -559,6 +558,7 @@ str.Remote.FIA.Database <- function(object, ...) {
 #' @importFrom stats cov var coef lm
 #' @importFrom utils object.size read.csv tail globalVariables type.convert download.file unzip
 #' @import dtplyr
+#' @importFrom lqmm lqmm lqm coef.lqmm  coef.lqm ranef.lqmm
 NULL
 
 #globalVariables(c('.'))
