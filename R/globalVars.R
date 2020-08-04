@@ -212,6 +212,7 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'psiVar', 'si',
                          'si1', 'si1Est', 'si1Strat', 'si1Var', 'si1v', 't1', 't2', 'trate',
                          '.', 'FSI1', 'FSI2', 'TPA1', 'b', 'grps', 'int', 'pDI1', 'pDI2', 'ranef',
-                         'rate', 'slope'
+                         'rate', 'slope',
+                         'bSD', 'tSD'
 
 ))

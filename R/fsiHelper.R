@@ -567,7 +567,7 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, scaleBy, byPlot){
 
 
 
-fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, grpRates){
+fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, grpRates, sds){
 
   ## DOES NOT MODIFY OUTSIDE ENVIRONMENT
   if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
@@ -652,23 +652,22 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, grpRates){
            CHNG_TPA = CHNG_TPA / REMPER,
            CHNG_BA = CHNG_BA / REMPER) %>%
     left_join(grpRates, by = c('PLT_CN', scaleBy)) %>%
+    left_join(sds, by = grpBy[!c(grpBy %in% c('YEAR', 'INVYR', 'PLT_CN', 'pltID'))]) %>%
     ## When PREV_BA is 0, slope is infinite
-    mutate(slope = case_when(PREV_BA == 0 ~ 100000,
+    mutate(slope = case_when(PREV_BA == 0 ~ -100000,
                              TRUE ~ slope)) %>%
-    mutate(dt = CHNG_TPA,
-           db = CHNG_BA,
-           t1 = PREV_TPA,
-           b1 = PREV_BA) %>%
+    mutate(dt = CHNG_TPA / tSD,
+           db = CHNG_BA / bSD,
+           t1 = PREV_TPA / tSD,
+           b1 = PREV_BA / bSD,
+           ## multiply absolute slope by reciprical of SD scaling factors
+           ## to push the slope into the same units as CHNG components
+           slope1 = slope,
+           scale = (bSD / tSD) + .000000001, # small constant to keep from /0
+           slope = slope * scale) %>%
     ## The FSI and % FSI
     mutate(si = projectPoints(db, dt, -(1/slope), 0, returnPoint = FALSE),
-           si1 = projectPoints(b1, t1, -(1/slope), 0, returnPoint = FALSE),
-           # si1 = case_when(
-           #   is.na(si1) ~ 0,
-           #   TRUE ~ si1),
-           # si = case_when(
-           #   is.na(si) ~ 0,
-           #   TRUE ~ si)
-           ) %>%
+           si1 = projectPoints(b1, t1, -(1/slope), 0, returnPoint = FALSE)) %>%
     ## Summing across scaleBy
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy) %>%
     summarize(PREV_TPA = sum(PREV_TPA, na.rm = TRUE),

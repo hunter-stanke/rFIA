@@ -465,6 +465,7 @@ fsi <- function(db,
                    byPlot = FALSE,
                    useLM = FALSE,
                    scaleBy = NULL,
+                   returnBetas = FALSE,
                    nCores = 1) {
 
   ##  don't have to change original code
@@ -546,6 +547,32 @@ fsi <- function(db,
     t$PREV_PLT_CN = NA
   }
 
+  ## For easier subset below
+  if (byPlot){
+    t <- mutate(t, cut = if_else(PREV_TPA == 0 & CURR_TPA == 0, 1, 0),
+                plotIn = if_else(cut < 1 & PLOT_STATUS_CD == 1, 1, 0))
+  }
+
+
+  ## Standardize TPA and mean BA so we they're on the same scale *within* groups
+  ## Summarize across groups first, then compute SD for TPA and BA
+  sds <- t %>%
+    ungroup() %>%
+    mutate(cut = if_else(PREV_TPA == 0 & CURR_TPA == 0, 1, 0)) %>%
+    filter(cut < 1) %>%
+    filter(plotIn == 1) %>%
+    group_by(PLT_CN, .dots = grpBy[!c(grpBy %in% c('YEAR', 'PLT_CN', 'pltID'))]) %>%
+    summarize(t1 = sum(PREV_TPA, na.rm = TRUE),
+              b1 = sum(PREV_BAA, na.rm = TRUE),
+              t2 = sum(CURR_TPA, na.rm = TRUE),
+              b2 = sum(CURR_BAA, na.rm = TRUE)) %>%
+    ungroup() %>%
+    group_by(.dots = grpBy[!c(grpBy %in% c('YEAR', 'PLT_CN', 'pltID'))]) %>%
+    summarize(tSD = sd(c(t1, t2), na.rm = TRUE),
+              bSD = sd(c(b1, b2) / c(t1, t2), na.rm = TRUE))
+
+
+
   ## Prep the data for modeling the upper boundary
   ## of the size-density curve
   scaleSyms <- syms(scaleBy)
@@ -568,19 +595,20 @@ fsi <- function(db,
   ## If more than one group use a mixed model
   if (length(unique(grpRates$grps)) > 1){
 
-    ## Run lmm at the 99 percentile of the distribution
-    mod <- lqmm(t ~ b, random = ~ b, group = grps,
-                tau = .99, data = grpRates,
-                control = list(method = "df"))
+    # ## Run lmm at the 95 percentile of the distribution
+    # mod <- lqmm(t ~ b, random = ~ b, group = grps,
+    #             tau = .95, data = grpRates,
+    #             control = list(method = "df", LP_max_iter = 5000,
+    #                            UP_max_iter = 100, startQR = TRUE,
+    #                            check_theta = TRUE))
 
-    suppressWarnings({
-      ## Summarize results
-      beta1 <- lqmm::coef.lqmm(mod)[1] + lqmm::ranef.lqmm(mod)[1]
-      beta2 <- lqmm::coef.lqmm(mod)[2] + lqmm::ranef.lqmm(mod)[2]
-      betas <- bind_cols(beta1, beta2) %>%
-        mutate(grps = row.names(.))
-      names(betas) <- c('int', 'rate', 'grps')
-    })
+    mod <- lmer(t ~ b + (b|grps), data = grpRates)
+
+    ## Summarize results
+    betas <- lme4::fixef(mod) + t(lme4::ranef(mod)[[1]])
+    betas <- as.data.frame(t(betas)) %>%
+      mutate(grps = row.names(.))
+    names(betas) <- c('int', 'rate', 'grps')
 
 
     ## Rejoin and estimate slopes at each plot
@@ -592,9 +620,8 @@ fsi <- function(db,
 
   } else {
 
-    ## Run lmm at the 99 percentile of the distribution
-    mod <- lqm(t ~ b,
-                tau = .99, data = grpRates)
+    ## Run lm
+    mod <- lm(t ~ b, data = grpRates)
 
     ## Summarize results
     beta1 <- coef(mod)[1]
@@ -622,14 +649,21 @@ fsi <- function(db,
     tOut <- tOut %>%
       left_join(grpRates, by = c('PLT_CN', scaleBy)) %>%
       ## When PREV_BA is 0, slope is infinite
-      mutate(slope = case_when(PREV_BA == 0 ~ 100000,
+      mutate(slope = case_when(PREV_BA == 0 ~ -10000000,
                                TRUE ~ slope)) %>%
-      mutate(dt = CHNG_TPA,
-             db = CHNG_BA,
-             t1 = PREV_TPA / REMPER,
-             t2 = CURR_TPA / REMPER,
-             b1 = PREV_BA / REMPER,
-             b2 = CURR_BA / REMPER) %>%
+      left_join(sds, by = grpBy[!c(grpBy %in% c('YEAR', 'PLT_CN', 'pltID'))]) %>%
+      ungroup() %>%
+      mutate(dt = CHNG_TPA / tSD,
+             db = CHNG_BA / bSD,
+             t1 = PREV_TPA / REMPER / tSD,
+             t2 = CURR_TPA / REMPER / tSD,
+             b1 = PREV_BA / REMPER / bSD,
+             b2 = CURR_BA / REMPER / bSD,
+             ## multiply absolute slope by reciprical of SD scaling factors
+             ## to push the slope into the same units as CHNG components
+             scale = (bSD / tSD) + .000000001, # small constant to keep from /0
+             slope = slope * scale) %>%
+
       ## The FSI and % FSI
       mutate(FSI = projectPoints(db, dt, -(1/slope), 0, returnPoint = FALSE),
              ## can and will produce INF here due to division by zero, that's fine, just use the FSI if that matters to you
@@ -692,10 +726,10 @@ fsi <- function(db,
           library(rFIA)
           library(tidyr)
         })
-        out <- parLapply(cl, X = names(popState), fun = fsiHelper2, popState, t, a, grpBy, scaleBy, method, grpRates)
+        out <- parLapply(cl, X = names(popState), fun = fsiHelper2, popState, t, a, grpBy, scaleBy, method, grpRates, sds)
         stopCluster(cl)
       } else { # Unix systems
-        out <- mclapply(names(popState), FUN = fsiHelper2, popState, t, a, grpBy, scaleBy, method, grpRates, mc.cores = nCores)
+        out <- mclapply(names(popState), FUN = fsiHelper2, popState, t, a, grpBy, scaleBy, method, grpRates, sds, mc.cores = nCores)
       }
     })
     ## back to dataframes
@@ -930,6 +964,10 @@ fsi <- function(db,
   # ## remove any duplicates in byPlot (artifact of END_INYR loop)
   if (byPlot) tOut <- unique(tOut)
 
+
+  if (returnBetas) {
+    tOut <- list(results = tOut, betas = mutate(betas, int = exp(int)), scales = sds)
+  }
 
   return(tOut)
 
