@@ -15,6 +15,22 @@ fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
   db$PLOT <- plts[[x]]
 
 
+  ## Any evidence of disturbance or treatment on the plot?
+  ## Excluding natural regeneration
+  disturb <- db$COND %>%
+    mutate(TRTCD1 = case_when(TRTCD1 == 40 ~ 0,
+                              TRUE ~ as.double(TRTCD1)),
+           TRTCD2 = case_when(TRTCD2 == 40 ~ 0,
+                             TRUE ~ as.double(TRTCD2)),
+           TRTCD3 = case_when(TRTCD3 == 40 ~ 0,
+                             TRUE ~ as.double(TRTCD3))) %>%
+    rowwise() %>%
+    mutate(disturb = sum(DSTRBCD1, DSTRBCD2, DSTRBCD3, TRTCD1, TRTCD2, TRTCD3, na.rm = TRUE),
+           disturb = tidyr::replace_na(disturb, 0)) %>%
+    filter(disturb > 0) %>%
+    select(PLT_CN, disturb) %>%
+    left_join(select(db$PLOT, PLT_CN, pltID), by = 'PLT_CN')
+
   ## Which grpByNames are in which table? Helps us subset below
   grpP <- names(db$PLOT)[names(db$PLOT) %in% c(grpBy, scaleBy)]
   grpC <- names(db$COND)[names(db$COND) %in% c(grpBy, scaleBy) & names(db$COND) %in% grpP == FALSE]
@@ -106,6 +122,8 @@ fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
 
   ## Total trees for the size-density scaling
   t1 <- data %>%
+    ## Removing plots w/ evidence of disturbance
+    filter(!c(pltID %in% disturb$pltID)) %>%
     ## Previous only
     filter(ONEORTWO == 1) %>%
     distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
@@ -238,6 +256,22 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, scaleBy, byPlot){
   # Only subplots from cond change matrix
   #db$SUBP_COND_CHNG_MTRX <- filter(db$SUBP_COND_CHNG_MTRX, SUBPTYP == 1)
 
+  ## Any evidence of disturbance or treatment on the plot?
+  ## Excluding natural regeneration
+  disturb <- db$COND %>%
+    mutate(TRTCD1 = case_when(TRTCD1 == 40 ~ 0,
+                              TRUE ~ as.double(TRTCD1)),
+           TRTCD2 = case_when(TRTCD2 == 40 ~ 0,
+                              TRUE ~ as.double(TRTCD2)),
+           TRTCD3 = case_when(TRTCD3 == 40 ~ 0,
+                              TRUE ~ as.double(TRTCD3))) %>%
+    rowwise() %>%
+    mutate(disturb = sum(DSTRBCD1, DSTRBCD2, DSTRBCD3, TRTCD1, TRTCD2, TRTCD3, na.rm = TRUE),
+           disturb = tidyr::replace_na(disturb, 0)) %>%
+    filter(disturb > 0) %>%
+    select(PLT_CN, disturb) %>%
+    left_join(select(db$PLOT, PLT_CN, pltID), by = 'PLT_CN')
+
 
   ## Which grpByNames are in which table? Helps us subset below
   grpP <- names(db$PLOT)[names(db$PLOT) %in% c(grpBy, scaleBy)]
@@ -308,6 +342,7 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, scaleBy, byPlot){
   ## Total trees for the size-density scaling
   t1 <- data %>%
     left_join(remSeries, by = c('PLT_CN', 'pltID', 'MEASYEAR')) %>%
+    filter(!c(pltID %in% disturb$pltID)) %>%
     ## Previous only
     filter(meas == 1) %>%
     distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
@@ -567,7 +602,7 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, scaleBy, byPlot){
 
 
 
-fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, grpRates, sds){
+fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
 
   ## DOES NOT MODIFY OUTSIDE ENVIRONMENT
   if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
@@ -634,7 +669,8 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, grpRates, sds)
               p2eu = first(p2eu),
               a = first(AREA_USED),
               w = first(P1POINTCNT) / first(P1PNTCNT_EU),
-              REMPER = first(REMPER)) %>%
+              REMPER = first(REMPER),
+              grps = first(grps)) %>%
     ## Replace any NAs with zeros
     mutate(PREV_BAA = replace_na(PREV_BAA, 0),
            PREV_TPA = replace_na(PREV_TPA, 0),
@@ -642,7 +678,7 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, grpRates, sds)
            CHNG_TPA = replace_na(CHNG_TPA, 0),
            ## T2 attributes
            CURR_BAA = replace_na(CURR_BAA, 0),
-           CURR_TPA = replace_na(CURR_TPA, 0),) %>%
+           CURR_TPA = replace_na(CURR_TPA, 0)) %>%
     ## Change in average tree BA
     mutate(PREV_BA = if_else(PREV_TPA != 0, PREV_BAA / PREV_TPA, 0),
            CURR_BA = if_else(CURR_TPA != 0, CURR_BAA / CURR_TPA, 0),
@@ -651,20 +687,16 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, grpRates, sds)
     mutate(CHNG_BAA = CHNG_BAA / REMPER,
            CHNG_TPA = CHNG_TPA / REMPER,
            CHNG_BA = CHNG_BA / REMPER) %>%
-    left_join(grpRates, by = c('PLT_CN', scaleBy)) %>%
+    left_join(betas, by = 'grps') %>%
     left_join(sds, by = grpBy[!c(grpBy %in% c('YEAR', 'INVYR', 'PLT_CN', 'pltID'))]) %>%
-    ## When PREV_BA is 0, slope is infinite
-    mutate(slope = case_when(PREV_BA == 0 ~ -100000,
+    mutate(slope = (int * rate) * ((PREV_BAA/PREV_TPA)^(rate-1)),
+           slope = case_when(PREV_TPA == 0 ~ -1e6,
                              TRUE ~ slope)) %>%
+    ## Standardize, now in same units as the slope
     mutate(dt = CHNG_TPA / tSD,
            db = CHNG_BA / bSD,
            t1 = PREV_TPA / tSD,
-           b1 = PREV_BA / bSD,
-           ## multiply absolute slope by reciprical of SD scaling factors
-           ## to push the slope into the same units as CHNG components
-           slope1 = slope,
-           scale = (bSD / tSD) + .000000001, # small constant to keep from /0
-           slope = slope * scale) %>%
+           b1 = PREV_BA / bSD) %>%
     ## The FSI and % FSI
     mutate(si = projectPoints(db, dt, -(1/slope), 0, returnPoint = FALSE),
            si1 = projectPoints(b1, t1, -(1/slope), 0, returnPoint = FALSE)) %>%

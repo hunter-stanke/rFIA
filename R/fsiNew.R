@@ -388,7 +388,8 @@ fsiStarter <- function(x,
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   db$PLOT <- select(db$PLOT, c('PLT_CN', pltID, 'REMPER', 'DESIGNCD', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR',
                                'MEASYEAR', 'MEASMON', 'MEASDAY', 'PLOT_STATUS_CD', PREV_PLT_CN, grpP, 'aD_p', 'sp'))
-  db$COND <- select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD'))
+  db$COND <- select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD',
+                               DSTRBCD1, DSTRBCD2, DSTRBCD3, TRTCD1, TRTCD2, TRTCD3))
   db$TREE <- select(db$TREE, c('PLT_CN', 'TRE_CN', 'CONDID', 'DIA', 'TPA_UNADJ', 'BAA', 'SUBP', 'TREE', grpT, 'tD', 'typeD',
                                PREVCOND, PREV_TRE_CN, STATUSCD, SPCD))
 
@@ -569,27 +570,49 @@ fsi <- function(db,
     ungroup() %>%
     group_by(.dots = grpBy[!c(grpBy %in% c('YEAR', 'PLT_CN', 'pltID'))]) %>%
     summarize(tSD = sd(c(t1, t2), na.rm = TRUE),
-              bSD = sd(c(b1, b2) / c(t1, t2), na.rm = TRUE))
+              bSD = sd(c(b1, b2) / c(t1, t2), na.rm = TRUE)) %>%
+    ungroup() %>%
+    ## Any zeros  or NAs will be replaced by the column mean
+    ## No better way to go about this for small groups
+    mutate(tSD = case_when(is.na(tSD) ~ mean(tSD, na.rm = TRUE),
+                           tSD == 0 ~ mean(tSD, na.rm = TRUE),
+                           TRUE ~ tSD),
+           bSD = case_when(is.na(bSD) ~ mean(bSD, na.rm = TRUE),
+                           bSD == 0 ~ mean(bSD, na.rm = TRUE),
+                           TRUE ~ bSD))
 
 
 
-  ## Prep the data for modeling the upper boundary
-  ## of the size-density curve
+  ## Prep the data for modeling the size-density curve
   scaleSyms <- syms(scaleBy)
+  grpSyms <- syms(grpBy)
+  if (!is.null(grpBy)){
+    grpJoin <- grpBy
+  } else {
+    grpJoin <- character(0)
+  }
 
   ## Get groups prepped to fit model
-  grpRates <- t1 %>%
+  grpRates <- select(ungroup(t), PLT_CN, grpBy, !!!scaleSyms) %>%
+    distinct() %>%
+    left_join(select(t1, PLT_CN, !!!scaleSyms, BA1, TPA1), by = c('PLT_CN', scaleBy)) %>%
+    left_join(sds, by = grpJoin) %>%
     ungroup() %>%
     filter(TPA1 > 0) %>%
-    mutate(t = log(TPA1),
-           b = log(BA1)) %>%
+    mutate(t = log(TPA1 / tSD),
+           b = log(BA1 / bSD)) %>%
     select(t, b, PLT_CN, !!!scaleSyms)
+
 
   if (!is.null(scaleBy)){
     ## group IDS
     grpRates <- mutate(grpRates, grps = paste(!!!scaleSyms))
+    t <- mutate(t, grps = paste(!!!scaleSyms))
+
   } else {
-    grpRates$grps = 1
+
+    grpRates$grps <- 1
+    t$grps = 1
   }
 
   ## If more than one group use a mixed model
@@ -602,40 +625,32 @@ fsi <- function(db,
     #                            UP_max_iter = 100, startQR = TRUE,
     #                            check_theta = TRUE))
 
-    mod <- lmer(t ~ b + (b|grps), data = grpRates)
+    mod <- lme4::lmer(t ~ b + (b|grps), data = grpRates)
 
     ## Summarize results
     betas <- lme4::fixef(mod) + t(lme4::ranef(mod)[[1]])
     betas <- as.data.frame(t(betas)) %>%
       mutate(grps = row.names(.))
     names(betas) <- c('int', 'rate', 'grps')
+    betas$int <- exp(betas$int)
 
-
-    ## Rejoin and estimate slopes at each plot
-    grpRates <- grpRates %>%
-      left_join(betas, by = 'grps') %>%
-      mutate_at(.vars = vars(t, b, int), .funs = exp) %>%
-      mutate(slope = (int * rate) * (b^(rate-1))) %>%
-      select(PLT_CN, slope, int, rate, !!!scaleSyms)
 
   } else {
 
-    ## Run lm
-    mod <- lm(t ~ b, data = grpRates)
+    suppressWarnings({
+      ## Run lm
+      mod <- lm(t ~ b, data = grpRates)
 
-    ## Summarize results
-    beta1 <- coef(mod)[1]
-    beta2 <- coef(mod)[2]
-    betas <- data.frame(beta1, beta2) %>%
-      mutate(grps = 1)
-    names(betas) <- c('int', 'rate', 'grps')
+      ## Summarize results
+      beta1 <- coef(mod)[1]
+      beta2 <- coef(mod)[2]
+      betas <- data.frame(beta1, beta2) %>%
+        mutate(grps = 1)
+      names(betas) <- c('int', 'rate', 'grps')
+      betas$int <- exp(betas$int)
 
-    ## Rejoin and estimate slopes at each plot
-    grpRates <- grpRates %>%
-      left_join(betas, by = 'grps') %>%
-      mutate_at(.vars = vars(t, b, int), .funs = exp) %>%
-      mutate(slope = (int * rate) * (b^(rate-1))) %>%
-      select(PLT_CN, slope, int, rate, !!!scaleSyms)
+    })
+
   }
 
 
@@ -658,12 +673,7 @@ fsi <- function(db,
              t1 = PREV_TPA / REMPER / tSD,
              t2 = CURR_TPA / REMPER / tSD,
              b1 = PREV_BA / REMPER / bSD,
-             b2 = CURR_BA / REMPER / bSD,
-             ## multiply absolute slope by reciprical of SD scaling factors
-             ## to push the slope into the same units as CHNG components
-             scale = (bSD / tSD) + .000000001, # small constant to keep from /0
-             slope = slope * scale) %>%
-
+             b2 = CURR_BA / REMPER / bSD) %>%
       ## The FSI and % FSI
       mutate(FSI = projectPoints(db, dt, -(1/slope), 0, returnPoint = FALSE),
              ## can and will produce INF here due to division by zero, that's fine, just use the FSI if that matters to you
@@ -726,10 +736,10 @@ fsi <- function(db,
           library(rFIA)
           library(tidyr)
         })
-        out <- parLapply(cl, X = names(popState), fun = fsiHelper2, popState, t, a, grpBy, scaleBy, method, grpRates, sds)
+        out <- parLapply(cl, X = names(popState), fun = fsiHelper2, popState, t, a, grpBy, scaleBy, method, betas, sds)
         stopCluster(cl)
       } else { # Unix systems
-        out <- mclapply(names(popState), FUN = fsiHelper2, popState, t, a, grpBy, scaleBy, method, grpRates, sds, mc.cores = nCores)
+        out <- mclapply(names(popState), FUN = fsiHelper2, popState, t, a, grpBy, scaleBy, method, betas, sds, mc.cores = nCores)
       }
     })
     ## back to dataframes
@@ -966,7 +976,7 @@ fsi <- function(db,
 
 
   if (returnBetas) {
-    tOut <- list(results = tOut, betas = mutate(betas, int = exp(int)), scales = sds)
+    tOut <- list(results = tOut, betas = betas, scales = sds)
   }
 
   return(tOut)
