@@ -558,7 +558,7 @@ str.Remote.FIA.Database <- function(object, ...) {
 #' @importFrom stats cov var coef lm
 #' @importFrom utils object.size read.csv tail globalVariables type.convert download.file unzip
 #' @import dtplyr
-#' @importFrom lme4 lmer fixef ranef
+#' @importFrom lqmm lqmm lqm coef.lqmm  coef.lqm ranef.lqmm
 NULL
 
 #globalVariables(c('.'))

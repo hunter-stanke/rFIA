@@ -10,7 +10,7 @@ License: GPL-3
 Encoding: UTF-8
 LazyData: true
 Depends: R (>= 3.1.0)
-Imports: dplyr, stringr, sp, sf, tidyr (>= 1.0.0), parallel, ggplot2, gganimate, methods, data.table, bit64, progress, tidyselect (>= 1.0.0), purrr, rlang, dtplyr (>= 1.0.0), lme4
+Imports: dplyr, stringr, sp, sf, tidyr (>= 1.0.0), parallel, ggplot2, gganimate, methods, data.table, bit64, progress, tidyselect (>= 1.0.0), purrr, rlang, dtplyr (>= 1.0.0), lqmm
 Suggests: 
     knitr,
     rmarkdown

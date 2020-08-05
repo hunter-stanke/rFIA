@@ -618,38 +618,69 @@ fsi <- function(db,
   ## If more than one group use a mixed model
   if (length(unique(grpRates$grps)) > 1){
 
-    # ## Run lmm at the 95 percentile of the distribution
-    # mod <- lqmm(t ~ b, random = ~ b, group = grps,
-    #             tau = .95, data = grpRates,
-    #             control = list(method = "df", LP_max_iter = 5000,
-    #                            UP_max_iter = 100, startQR = TRUE,
-    #                            check_theta = TRUE))
+    ## Run lmm at the 99 percentile of the distribution
+    mod <- lqmm(t ~ b, random = ~ b, group = grps,
+                tau = .99, data = grpRates,
+                control = list(method = "df", LP_max_iter = 5000,
+                               UP_max_iter = 100, startQR = TRUE,
+                               check_theta = TRUE))
+    suppressWarnings({
+      ## Summarize results
+      beta1 <- lqmm::coef.lqmm(mod)[1] + lqmm::ranef.lqmm(mod)[1]
+      beta2 <- lqmm::coef.lqmm(mod)[2] + lqmm::ranef.lqmm(mod)[2]
+      betas <- bind_cols(beta1, beta2) %>%
+        mutate(grps = row.names(.))
+      names(betas) <- c('int', 'rate', 'grps')
+    })
 
-    mod <- lme4::lmer(t ~ b + (b|grps), data = grpRates)
 
-    ## Summarize results
-    betas <- lme4::fixef(mod) + t(lme4::ranef(mod)[[1]])
-    betas <- as.data.frame(t(betas)) %>%
-      mutate(grps = row.names(.))
-    names(betas) <- c('int', 'rate', 'grps')
-    betas$int <- exp(betas$int)
+    # mod <- lme4::lmer(t ~ b + (b|grps), data = grpRates)
+    #
+    # ## Summarize results
+    # betas <- lme4::fixef(mod) + t(lme4::ranef(mod)[[1]])
+    # betas <- as.data.frame(t(betas)) %>%
+    #   mutate(grps = row.names(.))
+    # names(betas) <- c('int', 'rate', 'grps')
+    # betas$int <- exp(betas$int)
 
 
   } else {
 
     suppressWarnings({
-      ## Run lm
-      mod <- lm(t ~ b, data = grpRates)
+      ## Run lqm
+      mod <- lqmm::lqm(t ~ b, data = grpRates, tau = .99)
 
       ## Summarize results
-      beta1 <- coef(mod)[1]
-      beta2 <- coef(mod)[2]
+      beta1 <- lqmm::coef.lqm(mod)[1]
+      beta2 <- lqmm::coef.lqm(mod)[2]
       betas <- data.frame(beta1, beta2) %>%
         mutate(grps = 1)
       names(betas) <- c('int', 'rate', 'grps')
       betas$int <- exp(betas$int)
 
+      # ## Run lm
+      # mod <- lm(t ~ b, data = grpRates)
+      #
+      # ## Summarize results
+      # beta1 <- coef(mod)[1]
+      # beta2 <- coef(mod)[2]
+      # betas <- data.frame(beta1, beta2) %>%
+      #   mutate(grps = 1)
+      # names(betas) <- c('int', 'rate', 'grps')
+      # betas$int <- exp(betas$int)
+
     })
+
+    # ## Run lm
+    # mod <- lqmm::lqm(t ~ b, data = grpRates, tau = .95)
+    #
+    # ## Summarize results
+    # beta1 <- coef(mod)[1]
+    # beta2 <- coef(mod)[2]
+    # betas <- data.frame(beta1, beta2) %>%
+    #   mutate(grps = 1)
+    # names(betas) <- c('int', 'rate', 'grps')
+    # betas$int <- exp(betas$int)
 
   }
 
