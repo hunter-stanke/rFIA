@@ -621,9 +621,10 @@ fsi <- function(db,
     ## Run lmm at the 99 percentile of the distribution
     mod <- lqmm(t ~ b, random = ~ b, group = grps,
                 tau = .99, data = grpRates,
-                control = list(method = "df", LP_max_iter = 5000,
-                               UP_max_iter = 100, startQR = TRUE,
-                               check_theta = TRUE),
+                control = list(method = "df",
+                               #LP_max_iter = 5000,
+                               #UP_max_iter = 100,
+                               startQR = TRUE),
                 na.action = na.omit)
     suppressWarnings({
       ## Summarize results
