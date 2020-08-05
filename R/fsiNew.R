@@ -601,7 +601,8 @@ fsi <- function(db,
     filter(TPA1 > 0) %>%
     mutate(t = log(TPA1 / tSD),
            b = log(BA1 / bSD)) %>%
-    select(t, b, PLT_CN, !!!scaleSyms)
+    select(t, b, PLT_CN, !!!scaleSyms) %>%
+    tidyr::drop_na()
 
 
   if (!is.null(scaleBy)){
