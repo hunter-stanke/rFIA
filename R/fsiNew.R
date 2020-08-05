@@ -599,16 +599,18 @@ fsi <- function(db,
     left_join(sds, by = grpJoin) %>%
     ungroup() %>%
     filter(TPA1 > 0) %>%
+    tidyr::drop_na(!!!grpSyms) %>%
     mutate(t = log(TPA1 / tSD),
            b = log(BA1 / bSD)) %>%
-    select(t, b, PLT_CN, !!!scaleSyms) %>%
-    tidyr::drop_na()
+    select(t, b, PLT_CN, !!!scaleSyms) #%>%
+    #tidyr::drop_na() %>%
+    #filter(!is.infinite(t) & !is.infinite(b))
 
 
   if (!is.null(scaleBy)){
     ## group IDS
-    grpRates <- mutate(grpRates, grps = paste(!!!scaleSyms))
-    t <- mutate(t, grps = paste(!!!scaleSyms))
+    grpRates <- mutate(grpRates, grps = as.factor(paste(!!!scaleSyms)))
+    t <- mutate(t, grps = as.factor(paste(!!!scaleSyms)))
 
   } else {
 
@@ -620,13 +622,10 @@ fsi <- function(db,
   if (length(unique(grpRates$grps)) > 1){
 
     ## Run lmm at the 99 percentile of the distribution
-    mod <- lqmm(t ~ b, random = ~ b, group = grps,
-                tau = .99, data = grpRates,
-                control = list(method = "df",
-                               #LP_max_iter = 5000,
-                               #UP_max_iter = 100,
-                               startQR = TRUE),
-                na.action = na.omit)
+    mod <- lqmm(t ~ b, random = ~b, group = grps, data = grpRates,
+                control = lqmmControl(method = 'df', startQR = TRUE),
+                tau = .99)
+
     suppressWarnings({
       ## Summarize results
       beta1 <- lqmm::coef.lqmm(mod)[1] + lqmm::ranef.lqmm(mod)[1]
@@ -651,8 +650,7 @@ fsi <- function(db,
 
     suppressWarnings({
       ## Run lqm
-      mod <- lqmm::lqm(t ~ b, data = grpRates, tau = .99,
-                       na.action = na.omit)
+      mod <- lqmm::lqm(t ~ b, data = grpRates, tau = .99)
 
       ## Summarize results
       beta1 <- lqmm::coef.lqm(mod)[1]
