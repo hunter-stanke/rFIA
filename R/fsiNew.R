@@ -623,7 +623,8 @@ fsi <- function(db,
                 tau = .99, data = grpRates,
                 control = list(method = "df", LP_max_iter = 5000,
                                UP_max_iter = 100, startQR = TRUE,
-                               check_theta = TRUE))
+                               check_theta = TRUE),
+                na.action = na.omit)
     suppressWarnings({
       ## Summarize results
       beta1 <- lqmm::coef.lqmm(mod)[1] + lqmm::ranef.lqmm(mod)[1]
@@ -648,7 +649,8 @@ fsi <- function(db,
 
     suppressWarnings({
       ## Run lqm
-      mod <- lqmm::lqm(t ~ b, data = grpRates, tau = .99)
+      mod <- lqmm::lqm(t ~ b, data = grpRates, tau = .99,
+                       na.action = na.omit)
 
       ## Summarize results
       beta1 <- lqmm::coef.lqm(mod)[1]
