@@ -367,7 +367,7 @@ fsiStarter <- function(x,
 
       ## make size classes
       spPercentiles <- db$TREE %>%
-        select(PLT_CN, SUBP, TREE, DIA, .dots = grpBy[!c(grpBy %in% c('PLT_CN', 'SUBP', 'TREE', 'DIA'))]) %>%
+        select(PLT_CN, SUBP, TREE, DIA, grpBy[!c(grpBy %in% c('PLT_CN', 'SUBP', 'TREE', 'DIA'))]) %>%
         group_by(.dots = grpBy) %>%
         mutate(spSC = percent_rank(DIA),
                spSC = case_when(spSC >= 1 ~ .9999,
