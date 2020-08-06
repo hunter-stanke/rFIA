@@ -215,6 +215,8 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'rate', 'slope',
                          'bSD', 'tSD', 'DSTRBCD1', 'DSTRBCD2', 'DSTRBCD3', 'TRTCD1', 'TRTCD2', 'TRTCD3',
                          'na.omit', 'ra', 'sds', 'teEst','teStrat', 'teVar', 'tev', 'texpect', 'tmax1', 'tmax2',
-                         'meanBA', 'percentile'
+                         'meanBA', 'percentile', 'CURR_RD', 'CURR_RD_VAR', 'PREV_RD', 'PREV_RD_VAR', 'cvEst_ra1',
+                         'cvEst_ra2', 'cvStrat_ra1', 'cvStrat_ra2', 'ra1', 'ra1Est', 'ra1Strat', 'ra1Var', 'ra1v', 'ra2', 'ra2Est',
+                         'ra2Strat', 'ra2Var', 'ra2v'
 
 ))

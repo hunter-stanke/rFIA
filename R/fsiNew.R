@@ -6,7 +6,6 @@ fsiStarter <- function(x,
                        returnSpatial = FALSE,
                        bySpecies = FALSE,
                        bySizeClass = FALSE,
-                       scPercentile = FALSE,
                        landType = 'forest',
                        treeType = 'live',
                        method = 'sma',
@@ -363,40 +362,11 @@ fsiStarter <- function(x,
 
   ## Break into size classes
   if (bySizeClass){
-    if (scPercentile){
 
-      ## make size classes
-      spPercentiles <- db$TREE %>%
-        select(PLT_CN, SUBP, TREE, DIA, grpBy[!c(grpBy %in% c('PLT_CN', 'SUBP', 'TREE', 'DIA'))]) %>%
-        group_by(.dots = grpBy) %>%
-        mutate(spSC = percent_rank(DIA),
-               spSC = case_when(spSC >= 1 ~ .9999,
-                                TRUE ~ spSC))
-      ## Panics in a mutate, sorry
-      spPercentiles$percentile <- makeClasses(spPercentiles$spSC, lower = 0, interval = .1, numLabs = TRUE) + .05
-
-      ## Get tree size associated with these percentiles
-      spPercentiles <- spPercentiles %>%
-        mutate(sizeClass = quantile(DIA, probs = percentile, na.rm = TRUE),
-               meanBA = basalArea(sizeClass)) %>%
-        select(-c(spSC, DIA))
-
-      ## Join on the rankings
-      db$TREE <- db$TREE %>%
-        left_join(spPercentiles, by = c('PLT_CN', 'SUBP', 'TREE', grpBy[!c(grpBy %in% c('PLT_CN', 'SUBP', 'TREE'))]))
-
-      grpBy <- c(grpBy, 'sizeClass', 'percentile', 'meanBA')
-      grpByOrig <- c(grpByOrig, 'sizeClass', 'percentile')
-
-    } else {
-      grpBy <- c(grpBy, 'sizeClass', 'meanBA')
-      grpByOrig <- c(grpByOrig, 'sizeClass')
-      db$TREE$sizeClass <- makeClasses(db$TREE$DIA, interval = 2, numLabs = TRUE)
-      db$TREE$meanBA <- basalArea(db$TREE$sizeClass)
-      db$TREE <- db$TREE[!is.na(db$TREE$sizeClass),]
-    }
-
-
+    grpBy <- c(grpBy, 'sizeClass')
+    grpByOrig <- c(grpByOrig, 'sizeClass')
+    db$TREE$sizeClass <- makeClasses(db$TREE$DIA, interval = 2, numLabs = TRUE)
+    db$TREE <- db$TREE[!is.na(db$TREE$sizeClass),]
   }
 
 
@@ -489,7 +459,6 @@ fsi <- function(db,
                    returnSpatial = FALSE,
                    bySpecies = FALSE,
                    bySizeClass = FALSE,
-                   scPercentile = FALSE,
                    landType = 'forest',
                    treeType = 'live',
                    method = 'sma',
@@ -558,7 +527,7 @@ fsi <- function(db,
   ## Run the main portion
   out <- lapply(X = iter, FUN = fsiStarter, db,
                 grpBy_quo = grpBy_quo, scaleBy_quo, polys, returnSpatial,
-                bySpecies, bySizeClass, scPercentile,
+                bySpecies, bySizeClass,
                 landType, treeType, method,
                 lambda, treeDomain, areaDomain,
                 totals, byPlot, useLM,
@@ -622,7 +591,7 @@ fsi <- function(db,
     ## Run lmm at the 99 percentile of the distribution
     mod <- lqmm(t ~ b, random = ~b, group = grps, data = grpRates,
                 control = lqmmControl(method = 'df', startQR = TRUE),
-                tau = .5, na.action = na.omit)
+                tau = .99, na.action = na.omit)
 
     suppressWarnings({
       ## Summarize results
@@ -638,7 +607,7 @@ fsi <- function(db,
 
     suppressWarnings({
       ## Run lqm
-      mod <- lqmm::lqm(t ~ b, data = grpRates, tau = .5, na.action = na.omit)
+      mod <- lqmm::lqm(t ~ b, data = grpRates, tau = .99, na.action = na.omit)
 
       ## Summarize results
       beta1 <- lqmm::coef.lqm(mod)[1]
@@ -663,22 +632,12 @@ fsi <- function(db,
     ## back to dataframes
     tOut <- t
 
-    ## If 0 at t2 (complete mortality), expectation is TPA at minimum BA
-    ## allowed by sampling design (1 in stems only) if not grouped by size-class
-    ## If grouped by size-class, mean of the interval
-    if (!c('sizeClass' %in% grpBy)){
-      tOut$meanBA <- 0.08333333 ## minimum of 1 inch is assumed - be careful with treeDomain and DIA
-    }
-
     tOut <- tOut %>%
-             ## If 0 previously, expectation is 0
       mutate(tmax1 = int * (PREV_BA^rate),
-             ## If 0 at t2, expectation is TPA at minimum BA allowed by sampling design (1 in stems only)
-             tmax2 = if_else(CURR_BA > 0, int * (CURR_BA^rate), int * (meanBA^rate)),
-             ## abundance of the population at first measurement relative to tmax1
-             ## if tmax1 is zero, ra has no effect (equals one)
-             ra = if_else(tmax1 > 0, PREV_TPA / tmax1, 1),
-             texpect = tmax2 * ra) %>%
+             tmax2 = int * (CURR_BA^rate),
+             ## Relative abundance of the population (relative to maximum stand density)
+             ra1 = if_else(tmax1 > 0, PREV_TPA / tmax1, 0),
+             ra2 = if_else(tmax2 > 0, CURR_TPA / tmax2, 0)) %>%
       ## Summing across scaleBy
       group_by(.dots = grpBy[!c(grpBy %in% 'YEAR')], YEAR, PLT_CN, PLOT_STATUS_CD, PREV_PLT_CN,
                REMPER) %>%
@@ -691,11 +650,15 @@ fsi <- function(db,
                 CURR_TPA = sum(CURR_TPA, na.rm = TRUE),
                 CURR_BAA = sum(CURR_BAA, na.rm = TRUE),
                 CURR_BA = sum(CURR_BA, na.rm = TRUE),
-                texpect = sum(texpect, na.rm = TRUE)) %>%
-      ## FSI is difference between observed and expected values (quantitative)
+                ## Mean of relative abundance across scaleBy within plot
+                ra1 = mean(ra1, na.rm = TRUE),
+                ra2 = mean(ra2, na.rm = TRUE)) %>%
+      ## FSI is difference in relative abundance between t2 and t1
       ## % FSI is the above expressed as a percentage (relative measure)
-      mutate(FSI = (CURR_TPA - texpect) / REMPER,
-             PERC_FSI = FSI / texpect * 100)
+      mutate(FSI = (ra2 - ra1) / REMPER,
+             PERC_FSI = FSI / ra1 * 100,
+             PREV_RD = ra1,
+             CURR_RD = ra2)
 
 
 
@@ -711,8 +674,8 @@ fsi <- function(db,
 
 
     tOut <- select(tOut, YEAR, PLT_CN, any_of('PREV_PLT_CN'), PLOT_STATUS_CD, grpBy[grpBy != 'YEAR'],
-                   FSI, PERC_FSI, REMPER, everything()) %>%
-      select(-c(texpect))
+                   FSI, PERC_FSI, REMPER, PREV_RD, CURR_RD, everything()) %>%
+      select(-c(ra1, ra2))
 
 
 
@@ -831,7 +794,7 @@ fsi <- function(db,
 
       ### Applying the weights
       tEst <- tEst %>%
-        mutate_at(vars(ctEst:teEst), ~(.*wgt)) %>%
+        mutate_at(vars(ctEst:faEst), ~(.*wgt)) %>%
         mutate_at(vars(ctVar:cvEst_psi), ~(.*(wgt^2))) %>%
         group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
         summarize_at(vars(ctEst:plotIn_t), sum, na.rm = TRUE)
@@ -873,27 +836,31 @@ fsi <- function(db,
         mutate(TPA_RATE = ctEst / ptEst,
                BA_RATE = cbEst / pbEst,
                FSI = siEst / faEst,
-               PERC_FSI = si1Est / teEst,
+               PERC_FSI = siEst / ra1Est,
+               PREV_RD = ra1Est / faEst,
+               CURR_RD = ra2Est / faEst,
 
                ## Ratio variance
                ctVar = (1/ptEst^2) * (ctVar + (TPA_RATE^2 * ptVar) - (2 * TPA_RATE * cvEst_ct)),
                cbVar = (1/pbEst^2) * (cbVar + (BA_RATE^2 * pbVar) - (2 * BA_RATE * cvEst_cb)),
-               psiVar = (1/teEst^2) * (si1Var + (PERC_FSI^2 * teVar) - (2 * PERC_FSI * cvEst_psi)),
+               psiVar = (1/ra1Est^2) * (siVar + (PERC_FSI^2 * ra1Var) - (2 * PERC_FSI * cvEst_psi)),
                siVar = (1/faEst^2) * (siVar + (FSI^2 * faVar) - (2 * FSI * cvEst_si)),
+               ra1Var = (1/faEst^2) * (ra1Var + (PREV_RD^2 * faVar) - (2 * PREV_RD * cvEst_ra1)),
+               ra2Var = (1/faEst^2) * (ra2Var + (CURR_RD^2 * faVar) - (2 * CURR_RD * cvEst_ra2)),
 
                ## Make it a percent
                PERC_FSI = PERC_FSI * 100,
                psiVar = psiVar * (100^2),
 
-               ## RATIO SE
-               TPA_RATE_SE = sqrt(ctVar) / abs(TPA_RATE) * 100,
-               BA_RATE_SE = sqrt(cbVar) / abs(BA_RATE) * 100,
-               FSI_SE = sqrt(siVar) / abs(FSI) * 100,
+               ## RATIO variance
                FSI_VAR = siVar,
                PERC_FSI_SE = sqrt(psiVar) / abs(PERC_FSI) * 100,
                PERC_FSI_VAR = psiVar,
                TPA_RATE_VAR = ctVar,
                BA_RATE_VAR = cbVar,
+               PREV_RD_VAR = ra1Var,
+               CURR_RD_VAR = ra2Var,
+
                nPlots = plotIn_t,
                N = nh,
                FSI_INT = qt(.975, df=N-1) * (sqrt(siVar)/sqrt(N)),
@@ -911,18 +878,18 @@ fsi <- function(db,
       tOut <- tOut %>%
         select(grpBy, FSI, PERC_FSI, FSI_STATUS,
                FSI_INT, PERC_FSI_INT,
-               TPA_RATE, BA_RATE,
-               FSI_SE, PERC_FSI_SE, TPA_RATE_SE, BA_RATE_SE,
-               FSI_VAR, PERC_FSI_VAR, TPA_RATE_VAR, BA_RATE_VAR,
+               PREV_RD, CURR_RD, TPA_RATE, BA_RATE,
+               FSI_VAR, PERC_FSI_VAR, PREV_RD_VAR, CURR_RD_VAR,
+               TPA_RATE_VAR, BA_RATE_VAR,
                nPlots, N)
 
     } else {
       tOut <- tOut %>%
         select(grpBy, FSI, PERC_FSI, FSI_STATUS,
                FSI_INT, PERC_FSI_INT,
-               TPA_RATE, BA_RATE,
-               FSI_SE, PERC_FSI_SE, TPA_RATE_SE, BA_RATE_SE,
-               FSI_VAR, PERC_FSI_VAR, TPA_RATE_VAR, BA_RATE_VAR,
+               PREV_RD, CURR_RD, TPA_RATE, BA_RATE,
+               FSI_VAR, PERC_FSI_VAR, PREV_RD_VAR, CURR_RD_VAR,
+               TPA_RATE_VAR, BA_RATE_VAR,
                nPlots, N)
     }
 
@@ -964,9 +931,6 @@ fsi <- function(db,
     polys <- as.data.frame(polys)
     tOut <- left_join(tOut, select(polys, -c(geometry)), by = 'polyID')
   }
-
-  ## Cut meanBA if it's there (sizeClass grps)
-  if ('meanBA' %in% names(tOut)) tOut <- tOut %>% ungroup() %>% select(-c(meanBA))
 
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]

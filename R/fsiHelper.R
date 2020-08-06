@@ -632,13 +632,6 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
   aGrps <- unique(grpBy[grpBy %in% names(aAdj)])
 
 
-  ## If 0 at t2 (complete mortality), expectation is TPA at minimum BA
-  ## allowed by sampling design (1 in stems only) if not grouped by size-class
-  ## If grouped by size-class, mean of the interval
-  if (!c('sizeClass' %in% grpBy)){
-    t$meanBA <- 0.08333333 ## minimum of 1 inch is assumed - be careful with treeDomain and DIA
-  }
-
   ## Strata level estimates
   tEst <- t %>%
     ## Rejoin with population tables
@@ -663,7 +656,7 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
       PREV_TPA = PREV_TPA * tAdj,
       PREV_BAA = PREV_BAA * tAdj) %>%
     ## Extra step for variance issues - summing micro, subp, and macr components
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, meanBA, .dots = unique(c(grpBy[!c(grpBy %in% 'meanBA')], scaleBy))) %>%
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = unique(c(grpBy, scaleBy))) %>%
     summarize(CURR_TPA = sum(CURR_TPA, na.rm = TRUE),
               CURR_BAA = sum(CURR_BAA, na.rm = TRUE),
               CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
@@ -695,23 +688,20 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
     mutate(CHNG_BAA = CHNG_BAA / REMPER,
            CHNG_TPA = CHNG_TPA / REMPER,
            CHNG_BA = CHNG_BA / REMPER) %>%
+           ## Maximum density that could be acheived (from model, stand-level)
     mutate(tmax1 = int * (PREV_BA^rate),
-           ## If 0 at t2, expectation is TPA at minimum BA allowed by sampling design (1 in stems only)
-           tmax2 = if_else(CURR_BA > 0, int * (CURR_BA^rate), int * (meanBA^rate)),
-           ## abundance of the population at first measurement relative to tmax1
-           ## if tmax1 is zero, ra has no effect (equals one)
-           ra = if_else(tmax1 > 0, PREV_TPA / tmax1, 1),
-           texpect = tmax2 * ra) %>%
-    ## FSI is difference between observed and expected values (quantitative)
-    mutate(si = (CURR_TPA - texpect) / REMPER) %>%
+           tmax2 = int * (CURR_BA^rate),
+           ## Relative abundance of the population (relative to maximum stand density)
+           ra1 = if_else(tmax1 > 0, PREV_TPA / tmax1, 0),
+           ra2 = if_else(tmax2 > 0, CURR_TPA / tmax2, 0)) %>%
     ## Summing across scaleBy
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy) %>%
     summarize(PREV_TPA = sum(PREV_TPA, na.rm = TRUE),
               PREV_BA = sum(PREV_BA, na.rm = TRUE),
               CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
               CHNG_BA = sum(CHNG_BA, na.rm = TRUE),
-              si = sum(si, na.rm = TRUE),
-              texpect = sum(texpect, na.rm = TRUE),
+              ra1 = mean(ra1, na.rm = TRUE),
+              ra2 = mean(ra2, na.rm = TRUE),
               plotIn_t = ifelse(sum(plotIn_t >  0, na.rm = TRUE), 1,0),
               nh = first(nh),
               p2eu = first(p2eu),
@@ -721,7 +711,9 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
 
     left_join(select(aAdj, PLT_CN, aGrps, fa), by = c('PLT_CN', aGrps)) %>%
     ## SI is area adjusted
-    mutate(si = si * fa) %>% ## area adjusted, use in raw FSI
+    mutate(si = (ra2 - ra1) / REMPER * fa,
+           ra1 = ra1 * fa,
+           ra2 = ra2 * fa) %>%
     ungroup() %>%
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
     summarize(r_t = length(unique(PLT_CN)) / first(nh),
@@ -730,8 +722,8 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
               ptStrat = mean(PREV_TPA * r_t, na.rm = TRUE),
               pbStrat = mean(PREV_BA * r_t, na.rm = TRUE),
               siStrat = mean(si * r_t, na.rm = TRUE),
-              si1Strat = mean(si * r_t, na.rm = TRUE),
-              teStrat = mean(texpect * r_t, na.rm = TRUE),
+              ra1Strat = mean(ra1 * r_t, na.rm = TRUE),
+              ra2Strat = mean(ra2 * r_t, na.rm = TRUE),
               faStrat = mean(fa * r_t, na.rm = TRUE),
               plotIn_t = sum(plotIn_t, na.rm = TRUE),
 
@@ -748,15 +740,17 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
               ptv = stratVar(ESTN_METHOD, PREV_TPA, ptStrat, ndif, a, nh),
               pbv = stratVar(ESTN_METHOD, PREV_BA, pbStrat, ndif, a, nh),
               siv = stratVar(ESTN_METHOD, si, siStrat, ndif, a, nh),
-              si1v = stratVar(ESTN_METHOD, si, si1Strat, ndif, a, nh),
+              ra1v = stratVar(ESTN_METHOD, ra1, ra1Strat, ndif, a, nh),
+              ra2v = stratVar(ESTN_METHOD, ra2, ra2Strat, ndif, a, nh),
               fav = stratVar(ESTN_METHOD, fa, faStrat, ndif, a, nh),
-              tev = stratVar(ESTN_METHOD, texpect, teStrat, ndif, a, nh),
 
               # Strata level covariances
               cvStrat_ct = stratVar(ESTN_METHOD, CHNG_TPA, ctStrat, ndif, a, nh, PREV_TPA, ptStrat),
               cvStrat_cb = stratVar(ESTN_METHOD, CHNG_BA, cbStrat, ndif, a, nh, PREV_BA, pbStrat),
               cvStrat_si = stratVar(ESTN_METHOD, si, siStrat, ndif, a, nh, fa, faStrat),
-              cvStrat_psi = stratVar(ESTN_METHOD, si, si1Strat, ndif, a, nh, texpect, teStrat)) %>%
+              cvStrat_ra1 = stratVar(ESTN_METHOD, ra1, ra1Strat, ndif, a, nh, fa, faStrat),
+              cvStrat_ra2 = stratVar(ESTN_METHOD, ra2, ra2Strat, ndif, a, nh, fa, faStrat),
+              cvStrat_psi = stratVar(ESTN_METHOD, si, siStrat, ndif, a, nh, ra1, ra1Strat)) %>%
 
     ## Estimation unit
     group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
@@ -765,9 +759,9 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
               ptEst = unitMean(ESTN_METHOD, a, nh, w, ptStrat),
               pbEst = unitMean(ESTN_METHOD, a, nh, w, pbStrat),
               siEst = unitMean(ESTN_METHOD, a, nh, w, siStrat),
-              si1Est = unitMean(ESTN_METHOD, a, nh, w, si1Strat),
+              ra1Est = unitMean(ESTN_METHOD, a, nh, w, ra1Strat),
+              ra2Est = unitMean(ESTN_METHOD, a, nh, w, ra2Strat),
               faEst = unitMean(ESTN_METHOD, a, nh, w, faStrat),
-              teEst = unitMean(ESTN_METHOD, a, nh, w, teStrat),
 
               nh = first(nh),
               # Estimation of unit variance
@@ -776,15 +770,17 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
               ptVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ptv, ptStrat, ptEst),
               pbVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, pbv, pbStrat, pbEst),
               siVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, siv, siStrat, siEst),
-              si1Var = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, si1v, si1Strat, si1Est),
+              ra1Var = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ra1v, ra1Strat, ra1Est),
+              ra2Var = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ra2v, ra2Strat, ra2Est),
               faVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, fav, faStrat, faEst),
-              teVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tev, teStrat, teEst),
 
               ## Covariances
               cvEst_ct = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_ct, ctStrat, ctEst, ptStrat, ptEst),
               cvEst_cb = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_cb, cbStrat, cbEst, pbStrat, pbEst),
               cvEst_si = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_si, siStrat, siEst, faStrat, faEst),
-              cvEst_psi = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_psi, si1Strat, si1Est, teStrat, teEst),
+              cvEst_ra1 = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_ra1, ra1Strat, ra1Est, faStrat, faEst),
+              cvEst_ra2 = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_ra2, ra2Strat, ra2Est, faStrat, faEst),
+              cvEst_psi = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_psi, siStrat, siEst, ra1Strat, ra1Est),
 
               plotIn_t = sum(plotIn_t, na.rm = TRUE)) %>%
     ungroup()
