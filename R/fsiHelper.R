@@ -715,8 +715,7 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
 
     left_join(select(aAdj, PLT_CN, aGrps, fa), by = c('PLT_CN', aGrps)) %>%
     ## SI is area adjusted
-    mutate(si1 = si, ## NOT area adjusted, use in percent change
-           si = si * fa) %>% ## area adjusted, use in raw FSI
+    mutate(si = si * fa) %>% ## area adjusted, use in raw FSI
     ungroup() %>%
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
     summarize(r_t = length(unique(PLT_CN)) / first(nh),
@@ -725,7 +724,7 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
               ptStrat = mean(PREV_TPA * r_t, na.rm = TRUE),
               pbStrat = mean(PREV_BA * r_t, na.rm = TRUE),
               siStrat = mean(si * r_t, na.rm = TRUE),
-              si1Strat = mean(si1 * r_t, na.rm = TRUE),
+              si1Strat = mean(si * r_t, na.rm = TRUE),
               teStrat = mean(texpect * r_t, na.rm = TRUE),
               faStrat = mean(fa * r_t, na.rm = TRUE),
               plotIn_t = sum(plotIn_t, na.rm = TRUE),
