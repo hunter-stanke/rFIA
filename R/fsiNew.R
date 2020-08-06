@@ -936,7 +936,7 @@ fsi <- function(db,
 
 
   if (returnBetas) {
-    tOut <- list(results = tOut, betas = betas, scales = sds)
+    tOut <- list(results = tOut, betas = betas)
   }
 
   return(tOut)

@@ -742,7 +742,7 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
               ptv = stratVar(ESTN_METHOD, PREV_TPA, ptStrat, ndif, a, nh),
               pbv = stratVar(ESTN_METHOD, PREV_BA, pbStrat, ndif, a, nh),
               siv = stratVar(ESTN_METHOD, si, siStrat, ndif, a, nh),
-              si1v = stratVar(ESTN_METHOD, si, siStrat, ndif, a, nh),
+              si1v = stratVar(ESTN_METHOD, si, si1Strat, ndif, a, nh),
               fav = stratVar(ESTN_METHOD, fa, faStrat, ndif, a, nh),
               tev = stratVar(ESTN_METHOD, texpect, teStrat, ndif, a, nh),
 
@@ -750,7 +750,7 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
               cvStrat_ct = stratVar(ESTN_METHOD, CHNG_TPA, ctStrat, ndif, a, nh, PREV_TPA, ptStrat),
               cvStrat_cb = stratVar(ESTN_METHOD, CHNG_BA, cbStrat, ndif, a, nh, PREV_BA, pbStrat),
               cvStrat_si = stratVar(ESTN_METHOD, si, siStrat, ndif, a, nh, fa, faStrat),
-              cvStrat_psi = stratVar(ESTN_METHOD, si, s1Strat, ndif, a, nh, texpect, teStrat)) %>%
+              cvStrat_psi = stratVar(ESTN_METHOD, si, si1Strat, ndif, a, nh, texpect, teStrat)) %>%
 
     ## Estimation unit
     group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
