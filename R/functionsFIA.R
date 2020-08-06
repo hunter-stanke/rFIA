@@ -555,7 +555,7 @@ str.Remote.FIA.Database <- function(object, ...) {
 #' @importFrom parallel makeCluster detectCores mclapply parLapply stopCluster clusterEvalQ
 #' @import tidyr
 #' @importFrom sp over proj4string<- coordinates<- spTransform proj4string
-#' @importFrom stats cov var coef lm
+#' @importFrom stats cov var coef lm na.omit
 #' @importFrom utils object.size read.csv tail globalVariables type.convert download.file unzip
 #' @import dtplyr
 #' @importFrom lqmm lqmm lqm coef.lqmm  coef.lqm ranef.lqmm lqmmControl
