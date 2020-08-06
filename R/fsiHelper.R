@@ -15,22 +15,6 @@ fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
   db$PLOT <- plts[[x]]
 
 
-  ## Any evidence of disturbance or treatment on the plot?
-  ## Excluding natural regeneration
-  disturb <- db$COND %>%
-    mutate(TRTCD1 = case_when(TRTCD1 == 40 ~ 0,
-                              TRUE ~ as.double(TRTCD1)),
-           TRTCD2 = case_when(TRTCD2 == 40 ~ 0,
-                             TRUE ~ as.double(TRTCD2)),
-           TRTCD3 = case_when(TRTCD3 == 40 ~ 0,
-                             TRUE ~ as.double(TRTCD3))) %>%
-    rowwise() %>%
-    mutate(disturb = sum(DSTRBCD1, DSTRBCD2, DSTRBCD3, TRTCD1, TRTCD2, TRTCD3, na.rm = TRUE),
-           disturb = tidyr::replace_na(disturb, 0)) %>%
-    filter(disturb > 0) %>%
-    select(PLT_CN, disturb) %>%
-    left_join(select(db$PLOT, PLT_CN, pltID), by = 'PLT_CN')
-
   ## Which grpByNames are in which table? Helps us subset below
   grpP <- names(db$PLOT)[names(db$PLOT) %in% c(grpBy, scaleBy)]
   grpC <- names(db$COND)[names(db$COND) %in% c(grpBy, scaleBy) & names(db$COND) %in% grpP == FALSE]
@@ -122,17 +106,16 @@ fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
 
   ## Total trees for the size-density scaling
   t1 <- data %>%
-    ## Removing plots w/ evidence of disturbance
-    filter(!c(pltID %in% disturb$pltID)) %>%
-    ## Previous only
-    filter(ONEORTWO == 1) %>%
-    distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
+    distinct(PLT_CN, SUBP, TREE, ONEORTWO, .keep_all = TRUE) %>%
     group_by(.dots = scaleBy, PLT_CN) %>%
     summarize(REMPER = first(REMPER),
-              BAA = sum(-BAA[STATUSCD == 1] * pDI[STATUSCD == 1], na.rm = TRUE),
-              TPA1 = sum(-TPA_UNADJ[STATUSCD == 1] * pDI[STATUSCD == 1], na.rm = TRUE)) %>%
+              BAA1 = sum(-BAA[STATUSCD == 1 & ONEORTWO == 1] * pDI[STATUSCD == 1 & ONEORTWO == 1], na.rm = TRUE),
+              TPA1 = sum(-TPA_UNADJ[STATUSCD == 1 & ONEORTWO == 1] * pDI[STATUSCD == 1 & ONEORTWO == 1], na.rm = TRUE),
+              BAA2 = sum(BAA[STATUSCD == 1 & ONEORTWO == 2] * pDI[STATUSCD == 1 & ONEORTWO == 2], na.rm = TRUE),
+              TPA2 = sum(TPA_UNADJ[STATUSCD == 1 & ONEORTWO == 2] * pDI[STATUSCD == 1 & ONEORTWO == 2], na.rm = TRUE)) %>%
     ## Change in average tree BA and QMD
-    mutate(BA1 = if_else(TPA1 != 0, BAA / TPA1, 0))
+    mutate(BA1 = if_else(TPA1 != 0, BAA1 / TPA1, 0),
+           BA2 = if_else(TPA2 != 0, BAA2 / TPA2, 0))
 
 
   if (byPlot){
@@ -255,22 +238,6 @@ fsiHelper1_lm <- function(x, plts, db, grpBy, scaleBy, byPlot){
 
   # Only subplots from cond change matrix
   #db$SUBP_COND_CHNG_MTRX <- filter(db$SUBP_COND_CHNG_MTRX, SUBPTYP == 1)
-
-  ## Any evidence of disturbance or treatment on the plot?
-  ## Excluding natural regeneration
-  disturb <- db$COND %>%
-    mutate(TRTCD1 = case_when(TRTCD1 == 40 ~ 0,
-                              TRUE ~ as.double(TRTCD1)),
-           TRTCD2 = case_when(TRTCD2 == 40 ~ 0,
-                              TRUE ~ as.double(TRTCD2)),
-           TRTCD3 = case_when(TRTCD3 == 40 ~ 0,
-                              TRUE ~ as.double(TRTCD3))) %>%
-    rowwise() %>%
-    mutate(disturb = sum(DSTRBCD1, DSTRBCD2, DSTRBCD3, TRTCD1, TRTCD2, TRTCD3, na.rm = TRUE),
-           disturb = tidyr::replace_na(disturb, 0)) %>%
-    filter(disturb > 0) %>%
-    select(PLT_CN, disturb) %>%
-    left_join(select(db$PLOT, PLT_CN, pltID), by = 'PLT_CN')
 
 
   ## Which grpByNames are in which table? Helps us subset below
@@ -654,7 +621,9 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
       CHNG_TPA = CHNG_TPA * tAdj,
       CHNG_BAA = CHNG_BAA * tAdj,
       PREV_TPA = PREV_TPA * tAdj,
-      PREV_BAA = PREV_BAA * tAdj) %>%
+      PREV_BAA = PREV_BAA * tAdj,
+      BA1 = BA1 * tAdj,
+      BA2 = BA2 * tAdj) %>%
     ## Extra step for variance issues - summing micro, subp, and macr components
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = unique(c(grpBy, scaleBy))) %>%
     summarize(CURR_TPA = sum(CURR_TPA, na.rm = TRUE),
@@ -671,7 +640,9 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
               REMPER = first(REMPER),
               grps = first(grps),
               int = first(int),
-              rate = first(rate)) %>%
+              rate = first(rate),
+              BA1 = first(BA1),
+              BA2 = first(BA2)) %>%
     ## Replace any NAs with zeros
     mutate(PREV_BAA = replace_na(PREV_BAA, 0),
            PREV_TPA = replace_na(PREV_TPA, 0),
@@ -679,7 +650,10 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
            CHNG_TPA = replace_na(CHNG_TPA, 0),
            ## T2 attributes
            CURR_BAA = replace_na(CURR_BAA, 0),
-           CURR_TPA = replace_na(CURR_TPA, 0)) %>%
+           CURR_TPA = replace_na(CURR_TPA, 0),
+
+           BA1 = replace_na(BA1, 0),
+           BA2 = replace_na(BA2, 0)) %>%
     ## Change in average tree BA
     mutate(PREV_BA = if_else(PREV_TPA != 0, PREV_BAA / PREV_TPA, 0),
            CURR_BA = if_else(CURR_TPA != 0, CURR_BAA / CURR_TPA, 0),
@@ -689,8 +663,8 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
            CHNG_TPA = CHNG_TPA / REMPER,
            CHNG_BA = CHNG_BA / REMPER) %>%
            ## Maximum density that could be acheived (from model, stand-level)
-    mutate(tmax1 = int * (PREV_BA^rate),
-           tmax2 = int * (CURR_BA^rate),
+    mutate(tmax1 = int * (BA1^rate),
+           tmax2 = int * (BA2^rate),
            ## Relative abundance of the population (relative to maximum stand density)
            ra1 = if_else(tmax1 > 0, PREV_TPA / tmax1, 0),
            ra2 = if_else(tmax2 > 0, CURR_TPA / tmax2, 0)) %>%

@@ -625,6 +625,10 @@ fsi <- function(db,
   t <- t %>%
     left_join(betas, by = 'grps')
 
+  ## Add stand-level indices onto t
+  t <- t %>%
+    left_join(select(t1, PLT_CN, !!!scaleSyms, BA1, BA2), by = c('PLT_CN', scaleBy))
+
 
 
   if (byPlot){
@@ -633,8 +637,8 @@ fsi <- function(db,
     tOut <- t
 
     tOut <- tOut %>%
-      mutate(tmax1 = int * (PREV_BA^rate),
-             tmax2 = int * (CURR_BA^rate),
+      mutate(tmax1 = int * (BA1^rate),
+             tmax2 = int * (BA2^rate),
              ## Relative abundance of the population (relative to maximum stand density)
              ra1 = if_else(tmax1 > 0, PREV_TPA / tmax1, 0),
              ra2 = if_else(tmax2 > 0, CURR_TPA / tmax2, 0)) %>%
