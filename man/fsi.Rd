@@ -5,10 +5,10 @@
 \description{Estimate forest population performance from the FIADB using the Forest Stability Index. This function is experimental, please check back soon for updated documentation. }
 \usage{
 fsi(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
-    bySpecies = FALSE, bySizeClass = FALSE, landType = "forest",
-    treeType = "live", method = "sma", lambda = 0.5,
-    treeDomain = NULL, areaDomain = NULL, totals = TRUE,
-    byPlot = FALSE, useLM = FALSE, scaleBy = NULL,
+    bySpecies = FALSE, bySizeClass = FALSE, scPercentile = FALSE,
+    landType = "forest", treeType = "live", method = "sma",
+    lambda = 0.5, treeDomain = NULL, areaDomain = NULL,
+    totals = TRUE, byPlot = FALSE, useLM = FALSE, scaleBy = NULL,
     returnBetas = FALSE, nCores = 1)
 }
 %- maybe also 'usage' for other objects documented here.
@@ -24,6 +24,8 @@ fsi(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
 \item{bySpecies}{logical; if TRUE, returns estimates grouped by species.}
 
   \item{bySizeClass}{logical; if TRUE, returns estimates grouped by size class (2-inch intervals, see \code{\link{makeClasses}} to compute different size class intervals).}
+
+  \item{scPercentile}{logical; should size classes be represented as percentiles (10\%) instead of absolute size intervals when \code{bySizeClass = TRUE}?}
 
   \item{landType}{character ('forest' or 'timber'); Type of land which estimates will be produced for. Timberland is a subset of forestland (default) which has high site potential and non-reserve status (see details).}
 

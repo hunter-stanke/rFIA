@@ -6,6 +6,7 @@ fsiStarter <- function(x,
                        returnSpatial = FALSE,
                        bySpecies = FALSE,
                        bySizeClass = FALSE,
+                       scPercentile = FALSE,
                        landType = 'forest',
                        treeType = 'live',
                        method = 'sma',
@@ -362,11 +363,43 @@ fsiStarter <- function(x,
 
   ## Break into size classes
   if (bySizeClass){
-    grpBy <- c(grpBy, 'sizeClass')
-    grpByOrig <- c(grpByOrig, 'sizeClass')
-    db$TREE$sizeClass <- makeClasses(db$TREE$DIA, interval = 2, numLabs = TRUE)
-    db$TREE <- db$TREE[!is.na(db$TREE$sizeClass),]
+    if (scPercentile){
+
+      ## make size classes
+      spPercentiles <- db$TREE %>%
+        select(PLT_CN, SUBP, TREE, DIA, .dots = grpBy[!c(grpBy %in% c('PLT_CN', 'SUBP', 'TREE', 'DIA'))]) %>%
+        group_by(.dots = grpBy) %>%
+        mutate(spSC = percent_rank(DIA),
+               spSC = case_when(spSC >= 1 ~ .9999,
+                                TRUE ~ spSC))
+      ## Panics in a mutate, sorry
+      spPercentiles$percentile <- makeClasses(spPercentiles$spSC, lower = 0, interval = .1, numLabs = TRUE) + .05
+
+      ## Get tree size associated with these percentiles
+      spPercentiles <- spPercentiles %>%
+        mutate(sizeClass = quantile(DIA, probs = percentile, na.rm = TRUE),
+               meanBA = basalArea(sizeClass)) %>%
+        select(-c(spSC, DIA))
+
+      ## Join on the rankings
+      db$TREE <- db$TREE %>%
+        left_join(spPercentiles, by = c('PLT_CN', 'SUBP', 'TREE', grpBy[!c(grpBy %in% c('PLT_CN', 'SUBP', 'TREE'))]))
+
+      grpBy <- c(grpBy, 'sizeClass', 'percentile', 'meanBA')
+      grpByOrig <- c(grpByOrig, 'sizeClass', 'percentile')
+
+    } else {
+      grpBy <- c(grpBy, 'sizeClass', 'meanBA')
+      grpByOrig <- c(grpByOrig, 'sizeClass')
+      db$TREE$sizeClass <- makeClasses(db$TREE$DIA, interval = 2, numLabs = TRUE)
+      db$TREE$meanBA <- basalArea(db$TREE$sizeClass)
+      db$TREE <- db$TREE[!is.na(db$TREE$sizeClass),]
+    }
+
+
   }
+
+
 
   ## Only the necessary plots for EVAL of interest
   remPltList <- unique(c(remPlts$PLT_CN, remPlts$PREV_PLT_CN))
@@ -456,6 +489,7 @@ fsi <- function(db,
                    returnSpatial = FALSE,
                    bySpecies = FALSE,
                    bySizeClass = FALSE,
+                   scPercentile = FALSE,
                    landType = 'forest',
                    treeType = 'live',
                    method = 'sma',
@@ -524,7 +558,7 @@ fsi <- function(db,
   ## Run the main portion
   out <- lapply(X = iter, FUN = fsiStarter, db,
                 grpBy_quo = grpBy_quo, scaleBy_quo, polys, returnSpatial,
-                bySpecies, bySizeClass,
+                bySpecies, bySizeClass, scPercentile,
                 landType, treeType, method,
                 lambda, treeDomain, areaDomain,
                 totals, byPlot, useLM,
@@ -629,12 +663,18 @@ fsi <- function(db,
     ## back to dataframes
     tOut <- t
 
+    ## If 0 at t2 (complete mortality), expectation is TPA at minimum BA
+    ## allowed by sampling design (1 in stems only) if not grouped by size-class
+    ## If grouped by size-class, mean of the interval
+    if (!c('sizeClass' %in% grpBy)){
+      tOut$meanBA <- 0.08333333 ## minimum of 1 inch is assumed - be careful with treeDomain and DIA
+    }
 
     tOut <- tOut %>%
              ## If 0 previously, expectation is 0
       mutate(tmax1 = int * (PREV_BA^rate),
              ## If 0 at t2, expectation is TPA at minimum BA allowed by sampling design (1 in stems only)
-             tmax2 = if_else(CURR_BA > 0, int * (CURR_BA^rate), int * (0.08333333^rate)),
+             tmax2 = if_else(CURR_BA > 0, int * (CURR_BA^rate), int * (meanBA^rate)),
              ## abundance of the population at first measurement relative to tmax1
              ## if tmax1 is zero, ra has no effect (equals one)
              ra = if_else(tmax1 > 0, PREV_TPA / tmax1, 1),
@@ -925,6 +965,8 @@ fsi <- function(db,
     tOut <- left_join(tOut, select(polys, -c(geometry)), by = 'polyID')
   }
 
+  ## Cut meanBA if it's there (sizeClass grps)
+  if ('meanBA' %in% names(tOut)) tOut <- tOut %>% ungroup() %>% select(-c(meanBA))
 
   ## For spatial plots
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]

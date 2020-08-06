@@ -632,6 +632,12 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
   aGrps <- unique(grpBy[grpBy %in% names(aAdj)])
 
 
+  ## If 0 at t2 (complete mortality), expectation is TPA at minimum BA
+  ## allowed by sampling design (1 in stems only) if not grouped by size-class
+  ## If grouped by size-class, mean of the interval
+  if (!c('sizeClass' %in% grpBy)){
+    t$meanBA <- 0.08333333 ## minimum of 1 inch is assumed - be careful with treeDomain and DIA
+  }
 
   ## Strata level estimates
   tEst <- t %>%
@@ -657,7 +663,7 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
       PREV_TPA = PREV_TPA * tAdj,
       PREV_BAA = PREV_BAA * tAdj) %>%
     ## Extra step for variance issues - summing micro, subp, and macr components
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = unique(c(grpBy, scaleBy))) %>%
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, meanBA, .dots = unique(c(grpBy[!c(grpBy %in% 'meanBA')], scaleBy))) %>%
     summarize(CURR_TPA = sum(CURR_TPA, na.rm = TRUE),
               CURR_BAA = sum(CURR_BAA, na.rm = TRUE),
               CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
@@ -691,7 +697,7 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
            CHNG_BA = CHNG_BA / REMPER) %>%
     mutate(tmax1 = int * (PREV_BA^rate),
            ## If 0 at t2, expectation is TPA at minimum BA allowed by sampling design (1 in stems only)
-           tmax2 = if_else(CURR_BA > 0, int * (CURR_BA^rate), int * (0.08333333^rate)),
+           tmax2 = if_else(CURR_BA > 0, int * (CURR_BA^rate), int * (meanBA^rate)),
            ## abundance of the population at first measurement relative to tmax1
            ## if tmax1 is zero, ra has no effect (equals one)
            ra = if_else(tmax1 > 0, PREV_TPA / tmax1, 1),
