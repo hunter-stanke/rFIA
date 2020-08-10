@@ -688,6 +688,10 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
     mutate(si = (ra2 - ra1) / REMPER * fa,
            ra1 = ra1 * fa,
            ra2 = ra2 * fa) %>%
+    ## Replace NAN w/ zeros
+    mutate(si = replace_na(si, 0),
+           ra1 = replace_na(ra1, 0),
+           ra2 = replace_na(ra2, 0)) %>%
     ungroup() %>%
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
     summarize(r_t = length(unique(PLT_CN)) / first(nh),
@@ -700,7 +704,6 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
               ra2Strat = mean(ra2 * r_t, na.rm = TRUE),
               faStrat = mean(fa * r_t, na.rm = TRUE),
               plotIn_t = sum(plotIn_t, na.rm = TRUE),
-
               n = n(),
               ## We don't want a vector of these values, since they are repeated
               nh = first(nh),
