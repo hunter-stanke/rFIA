@@ -1133,6 +1133,10 @@ writeFIA <- function(db,
     stop('Cannot write remote database.')
   }
 
+  if (byState & !c('SURVEY' %in% names(db))){
+    stop('Need survey table for state abbreviations.')
+  }
+
   #cat(sys.call()$dir)
   if (!is.null(dir)){
     # Add a slash to end of directory name if missing
