@@ -600,6 +600,8 @@ fsi <- function(db,
       betas <- bind_cols(beta1, beta2) %>%
         mutate(grps = row.names(.))
       names(betas) <- c('int', 'rate', 'grps')
+      betas$int <- exp(betas$int)
+
     })
 
 
@@ -627,7 +629,7 @@ fsi <- function(db,
 
   ## Add stand-level indices onto t
   t <- t %>%
-    left_join(select(t1, PLT_CN, !!!scaleSyms, BA1, BA2), by = c('PLT_CN', scaleBy))
+    left_join(select(t1, PLT_CN, !!!scaleSyms, BA1, BA2, TPA1, TPA2), by = c('PLT_CN', scaleBy))
 
 
 
@@ -656,7 +658,11 @@ fsi <- function(db,
                 CURR_BA = sum(CURR_BA, na.rm = TRUE),
                 ## Mean of relative abundance across scaleBy within plot
                 ra1 = mean(ra1, na.rm = TRUE),
-                ra2 = mean(ra2, na.rm = TRUE)) %>%
+                ra2 = mean(ra2, na.rm = TRUE),
+                PREV_STAND_BA = first(BA1),
+                CURR_STAND_BA = first(BA2),
+                PREV_STAND_TPA = first(TPA1),
+                CURR_STAND_TPA = first(TPA2)) %>%
       ## FSI is difference in relative abundance between t2 and t1
       ## % FSI is the above expressed as a percentage (relative measure)
       mutate(FSI = (ra2 - ra1) / REMPER,
