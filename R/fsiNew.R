@@ -591,7 +591,7 @@ fsi <- function(db,
     ## Run lmm at the 99 percentile of the distribution
     mod <- lqmm(t ~ b, random = ~b, group = grps, data = grpRates,
                 control = lqmmControl(method = 'df', startQR = TRUE),
-                tau = .99, na.action = na.omit)
+                tau = .975, na.action = na.omit)
 
     suppressWarnings({
       ## Summarize results
@@ -609,7 +609,7 @@ fsi <- function(db,
 
     suppressWarnings({
       ## Run lqm
-      mod <- lqmm::lqm(t ~ b, data = grpRates, tau = .99, na.action = na.omit)
+      mod <- lqmm::lqm(t ~ b, data = grpRates, tau = .975, na.action = na.omit)
 
       ## Summarize results
       beta1 <- lqmm::coef.lqm(mod)[1]
