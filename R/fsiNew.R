@@ -663,18 +663,26 @@ fsi <- function(db,
     tOut <- t
 
     tOut <- tOut %>%
-      ## Summing across scaleBy
-      group_by(.dots = grpBy[!c(grpBy %in% 'YEAR')], YEAR, PLT_CN, PLOT_STATUS_CD, PREV_PLT_CN,
+      ## Summing within scaleBy
+      group_by(.dots = unique(c(grpBy[!c(grpBy %in% 'YEAR')], scaleBy)), YEAR, PLT_CN, PLOT_STATUS_CD, PREV_PLT_CN,
                REMPER) %>%
-      summarize(FSI = sum(rd * tDI, na.rm = TRUE) / REMPER,
-                PREV_RD = -sum(rd[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
+      summarize(PREV_RD = -sum(rd[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
                 CURR_RD = sum(rd[ONEORTWO == 2] * tDI[ONEORTWO == 2], na.rm = TRUE),
-                PERC_FSI = FSI / PREV_RD * 100,
                 PREV_TPA = -sum(TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
                 PREV_BAA = -sum(BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
                 CURR_TPA = sum(TPA_UNADJ[ONEORTWO == 2] * tDI[ONEORTWO == 2], na.rm = TRUE),
-                CURR_BAA = sum(BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2], na.rm = TRUE))
-
+                CURR_BAA = sum(BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2], na.rm = TRUE)) %>%
+      ## Summing across scaleBy
+      group_by(.dots = grpBy[!c(grpBy %in% 'YEAR')], YEAR, PLT_CN, PLOT_STATUS_CD, PREV_PLT_CN,
+               REMPER) %>%
+      summarize(PREV_RD = mean(PREV_RD, na.rm = TRUE),
+                CURR_RD = mean(CURR_RD, na.rm = TRUE),
+                FSI = (CURR_RD - PREV_RD) / REMPER,
+                PERC_FSI = FSI / PREV_RD * 100,
+                PREV_TPA = sum(PREV_TPA, na.rm = TRUE),
+                PREV_BAA = sum(PREV_BAA, na.rm = TRUE),
+                CURR_TPA = sum(CURR_TPA, na.rm = TRUE),
+                CURR_BAA = sum(CURR_BAA, na.rm = TRUE))
 
     ## Make it spatial
     if (returnSpatial){

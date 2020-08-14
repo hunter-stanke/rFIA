@@ -620,16 +620,23 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
     ungroup() %>%
     ## Converting to average tree size
     mutate(BA = if_else(ONEORTWO == 1, -BAA / TPA_UNADJ, BAA / TPA_UNADJ)) %>%
-    ## Summing across scaleBy - get's us to the plot-level
-    group_by(.dots = grpBy[!c(grpBy %in% c('YEAR', 'INVYR'))], PLT_CN, PLOT_BASIS) %>%
-    summarize(FSI = sum(rd * tDI, na.rm = TRUE) / first(REMPER),
-              PREV_RD = -sum(rd[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
+    ## Summing within scaleBy
+    group_by(.dots = unique(c(grpBy[!c(grpBy %in% c('YEAR', 'INVYR'))], scaleBy)), PLT_CN, REMPER, PLOT_BASIS) %>%
+    summarize(PREV_RD = -sum(rd[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
               CURR_RD = sum(rd[ONEORTWO == 2] * tDI[ONEORTWO == 2], na.rm = TRUE),
               PREV_TPA = -sum(TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
               PREV_BA = -sum(BA[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
               CHNG_TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE) / first(REMPER),
               CHNG_BA = sum(BA * tDI, na.rm = TRUE) / first(REMPER),
               plotIn_t = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0)) %>%
+    # summarize(FSI = sum(rd * tDI, na.rm = TRUE) / first(REMPER),
+    #           PREV_RD = -sum(rd[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
+    #           CURR_RD = sum(rd[ONEORTWO == 2] * tDI[ONEORTWO == 2], na.rm = TRUE),
+    #           PREV_TPA = -sum(TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
+    #           PREV_BA = -sum(BA[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
+    #           CHNG_TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE) / first(REMPER),
+    #           CHNG_BA = sum(BA * tDI, na.rm = TRUE) / first(REMPER),
+    #           plotIn_t = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0)) %>%
     ## Rejoin with population tables
     right_join(select(ungroup(popState[[x]]), -c(STATECD)), by = 'PLT_CN') %>%
     ungroup() %>%
@@ -650,25 +657,33 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
       CURR_RD = CURR_RD * tAdj,
       PREV_TPA = PREV_TPA * tAdj,
       PREV_BA = PREV_BA * tAdj,
-      PREV_RD = PREV_RD * tAdj,
-      FSI = FSI * tAdj) %>%
+      PREV_RD = PREV_RD * tAdj) %>%
     ## Extra step for variance issues - summing micro, subp, and macr components
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy) %>%
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, REMPER, .dots = unique(c(grpBy, scaleBy))) %>%
     summarize(CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
               CHNG_BA = sum(CHNG_BA, na.rm = TRUE),
               PREV_TPA = sum(PREV_TPA, na.rm = TRUE),
               PREV_BA = sum(PREV_BA, na.rm = TRUE),
               PREV_RD = sum(PREV_RD, na.rm = TRUE),
               CURR_RD = sum(CURR_RD, na.rm = TRUE),
-              FSI = sum(FSI, na.rm = TRUE),
               plotIn_t = ifelse(sum(plotIn_t, na.rm = TRUE) >  0, 1,0),
               nh = first(P2POINTCNT),
               p2eu = first(p2eu),
               a = first(AREA_USED),
               w = first(P1POINTCNT) / first(P1PNTCNT_EU)) %>%
+    ## Summing across scaleBy
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN,
+             nh, p2eu, a, w, REMPER, .dots = grpBy) %>%
+    summarize(CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
+              CHNG_BA = sum(CHNG_BA, na.rm = TRUE),
+              PREV_TPA = sum(PREV_TPA, na.rm = TRUE),
+              PREV_BA = sum(PREV_BA, na.rm = TRUE),
+              PREV_RD = mean(PREV_RD, na.rm = TRUE),
+              CURR_RD = mean(CURR_RD, na.rm = TRUE),
+              plotIn_t = ifelse(sum(plotIn_t, na.rm = TRUE) >  0, 1,0)) %>%
     left_join(select(aAdj, PLT_CN, aGrps, fa), by = c('PLT_CN', aGrps)) %>%
-    ## SI is area adjusted
-    mutate(si = FSI * fa,
+    ## FSI is area adjusted
+    mutate(si = (CURR_RD - PREV_RD) / REMPER * fa,
            ra1 = PREV_RD * fa,
            ra2 = CURR_RD * fa) %>%
     ## Replace NAN w/ zeros
