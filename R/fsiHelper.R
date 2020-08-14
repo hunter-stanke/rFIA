@@ -138,7 +138,7 @@ fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
     t <- data %>%
       mutate(YEAR = MEASYEAR) %>%
       distinct(PLT_CN, SUBP, TREE, ONEORTWO, .keep_all = TRUE) %>%
-      select(all_of(grpBy), PLT_CN, PREV_PLT_CN, REMPER, SUBP, TREE,
+      select(all_of(grpBy), PLT_CN, PREV_PLT_CN, PLOT_STATUS_CD, REMPER, SUBP, TREE,
              ONEORTWO, tDI, TPA_UNADJ, BAA)
       # # Compute estimates at plot level
       # group_by(.dots = grpBy, PLT_CN, PREV_PLT_CN) %>%
