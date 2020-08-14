@@ -15,6 +15,19 @@ fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
   db$PLOT <- plts[[x]]
 
 
+  ## Disturbance or treatment ever happen on the plot remeasurement? If so
+  ## we want to cut it before we model the max size-density curve
+  disturb <- select(db$PLOT, PLT_CN, pltID) %>%
+    left_join(select(db$COND, PLT_CN, DSTRBCD1, TRTCD1), by = 'PLT_CN') %>%
+    mutate(DSTRBCD1 = replace_na(DSTRBCD1, 0),
+           TRTCD1 = replace_na(TRTCD1, 0)) %>%
+    filter(DSTRBCD1 > 0) %>%
+    ## Natural regen is ok
+    filter(TRTCD1 > 0 & !c(TRTCD1 %in% 40)) %>%
+    ## These plots were disturbed or treated
+    distinct(PLT_CN, pltID)
+
+
   ## Which grpByNames are in which table? Helps us subset below
   grpP <- names(db$PLOT)[names(db$PLOT) %in% c(grpBy, scaleBy)]
   grpC <- names(db$COND)[names(db$COND) %in% c(grpBy, scaleBy) & names(db$COND) %in% grpP == FALSE]
@@ -98,14 +111,15 @@ fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
       DIA >= 5 & DIA < MACRO_BREAKPOINT_DIA ~ 'SUBP',
       DIA >= MACRO_BREAKPOINT_DIA ~ 'MACR'))
 
-  ## Under Daves reformulation, we cannot have NAs as absence values
-  ## Change all NA's to zeros for TPA and BAA
+  ## No zeros
   data <- data %>%
     mutate(TPA_UNADJ = replace_na(TPA_UNADJ, replace = 0),
            BAA = replace_na(BAA, replace = 0))
 
   ## Total trees for the size-density scaling
   t1 <- data %>%
+    ## No disturbance/treatment plots
+    filter(!c(pltID %in% disturb$pltID)) %>%
     distinct(PLT_CN, SUBP, TREE, ONEORTWO, .keep_all = TRUE) %>%
     group_by(.dots = scaleBy, PLT_CN) %>%
     summarize(REMPER = first(REMPER),
@@ -113,7 +127,7 @@ fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
               TPA1 = sum(-TPA_UNADJ[STATUSCD == 1 & ONEORTWO == 1] * pDI[STATUSCD == 1 & ONEORTWO == 1], na.rm = TRUE),
               BAA2 = sum(BAA[STATUSCD == 1 & ONEORTWO == 2] * pDI[STATUSCD == 1 & ONEORTWO == 2], na.rm = TRUE),
               TPA2 = sum(TPA_UNADJ[STATUSCD == 1 & ONEORTWO == 2] * pDI[STATUSCD == 1 & ONEORTWO == 2], na.rm = TRUE)) %>%
-    ## Change in average tree BA and QMD
+    ## Mean BA
     mutate(BA1 = if_else(TPA1 != 0, BAA1 / TPA1, 0),
            BA2 = if_else(TPA2 != 0, BAA2 / TPA2, 0))
 
@@ -124,45 +138,47 @@ fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
     t <- data %>%
       mutate(YEAR = MEASYEAR) %>%
       distinct(PLT_CN, SUBP, TREE, ONEORTWO, .keep_all = TRUE) %>%
-      # Compute estimates at plot level
-      group_by(.dots = grpBy, PLT_CN, PREV_PLT_CN) %>%
-      summarize(nLive = length(which(tDI[ONEORTWO == 1] > 0)), ## Number of live trees in domain of interest at previous measurement
-                REMPER = first(REMPER),
-                PREV_BAA = sum(-BAA[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1& STATUSCD == 1], na.rm = TRUE),
-                PREV_TPA = sum(-TPA_UNADJ[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE),
-                CHNG_TPA = sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
-                ## Sum here to avoid issues w/ zeros
-                CHNG_BAA = sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
-                PLOT_STATUS_CD = if_else(any(PLOT_STATUS_CD == 1), 1, 2)) %>%
-      ## Replace any NAs with zeros
-      mutate(PREV_BAA = replace_na(PREV_BAA, 0),
-             PREV_TPA = replace_na(PREV_TPA, 0),
-             CHNG_BAA = replace_na(CHNG_BAA, 0),
-             CHNG_TPA = replace_na(CHNG_TPA, 0),
-             ## T2 attributes
-             CURR_BAA = PREV_BAA + CHNG_BAA,
-             CURR_TPA = PREV_TPA + CHNG_TPA) %>%
-      ## Change in average tree BA and QMD
-      mutate(PREV_BA = if_else(PREV_TPA != 0, PREV_BAA / PREV_TPA, 0),
-             CURR_BA = if_else(CURR_TPA != 0, CURR_BAA / CURR_TPA, 0),
-             CHNG_BA = CURR_BA - PREV_BA,
-             PREV_QMD = sqrt(PREV_BA / 0.005454154),
-             CURR_QMD = sqrt(CURR_BA / 0.005454154),
-             CHNG_QMD = CURR_QMD - PREV_QMD) %>%
-      ## All CHNG becomes an annual rate
-      mutate(CHNG_BAA = CHNG_BAA / REMPER,
-             CHNG_TPA = CHNG_TPA / REMPER,
-             CHNG_BA = CHNG_BA / REMPER,
-             CHNG_QMD = CHNG_QMD / REMPER) %>%
-      #left_join(stems, by = c('PLT_CN', grpBy[!(grpBy %in% c('pltID', 'PLOT_STATUS_CD', 'YEAR'))])) %>%
-      ### Then divide by number of unique stems for an average
-      #mutate(CHNG_BAA = CHNG_BAA / n) %>%
-      ungroup() %>%
-      select(PLT_CN, PREV_PLT_CN, PLOT_STATUS_CD, REMPER, grpBy,
-             PREV_TPA, PREV_BAA, PREV_BA, PREV_QMD,
-             CHNG_TPA, CHNG_BAA, CHNG_BA, CHNG_QMD,
-             CURR_TPA, CURR_BAA, CURR_BA, CURR_QMD,
-             nLive)
+      select(all_of(grpBy), PLT_CN, PREV_PLT_CN, REMPER, SUBP, TREE,
+             ONEORTWO, tDI, TPA_UNADJ, BAA)
+      # # Compute estimates at plot level
+      # group_by(.dots = grpBy, PLT_CN, PREV_PLT_CN) %>%
+      # summarize(nLive = length(which(tDI[ONEORTWO == 1] > 0)), ## Number of live trees in domain of interest at previous measurement
+      #           REMPER = first(REMPER),
+      #           PREV_BAA = sum(-BAA[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1& STATUSCD == 1], na.rm = TRUE),
+      #           PREV_TPA = sum(-TPA_UNADJ[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE),
+      #           CHNG_TPA = sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
+      #           ## Sum here to avoid issues w/ zeros
+      #           CHNG_BAA = sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
+      #           PLOT_STATUS_CD = if_else(any(PLOT_STATUS_CD == 1), 1, 2)) %>%
+      # ## Replace any NAs with zeros
+      # mutate(PREV_BAA = replace_na(PREV_BAA, 0),
+      #        PREV_TPA = replace_na(PREV_TPA, 0),
+      #        CHNG_BAA = replace_na(CHNG_BAA, 0),
+      #        CHNG_TPA = replace_na(CHNG_TPA, 0),
+      #        ## T2 attributes
+      #        CURR_BAA = PREV_BAA + CHNG_BAA,
+      #        CURR_TPA = PREV_TPA + CHNG_TPA) %>%
+      # ## Change in average tree BA and QMD
+      # mutate(PREV_BA = if_else(PREV_TPA != 0, PREV_BAA / PREV_TPA, 0),
+      #        CURR_BA = if_else(CURR_TPA != 0, CURR_BAA / CURR_TPA, 0),
+      #        CHNG_BA = CURR_BA - PREV_BA,
+      #        PREV_QMD = sqrt(PREV_BA / 0.005454154),
+      #        CURR_QMD = sqrt(CURR_BA / 0.005454154),
+      #        CHNG_QMD = CURR_QMD - PREV_QMD) %>%
+      # ## All CHNG becomes an annual rate
+      # mutate(CHNG_BAA = CHNG_BAA / REMPER,
+      #        CHNG_TPA = CHNG_TPA / REMPER,
+      #        CHNG_BA = CHNG_BA / REMPER,
+      #        CHNG_QMD = CHNG_QMD / REMPER) %>%
+      # #left_join(stems, by = c('PLT_CN', grpBy[!(grpBy %in% c('pltID', 'PLOT_STATUS_CD', 'YEAR'))])) %>%
+      # ### Then divide by number of unique stems for an average
+      # #mutate(CHNG_BAA = CHNG_BAA / n) %>%
+      # ungroup() %>%
+      # select(PLT_CN, PREV_PLT_CN, PLOT_STATUS_CD, REMPER, grpBy,
+      #        PREV_TPA, PREV_BAA, PREV_BA, PREV_QMD,
+      #        CHNG_TPA, CHNG_BAA, CHNG_BA, CHNG_QMD,
+      #        CURR_TPA, CURR_BAA, CURR_BA, CURR_QMD,
+      #        nLive)
 
     a = NULL
 
@@ -198,21 +214,21 @@ fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
 
     ### Compute total TREES in domain of interest
     t <- data %>%
-      ## Need to count number of trees in each
-      mutate(treID = paste(pltID, SUBP, TREE)) %>%
       distinct(PLT_CN, TRE_CN, ONEORTWO, .keep_all = TRUE) %>%
-      # Compute estimates at plot level
-      group_by(PLT_CN, PLOT_BASIS, .dots = grpBy) %>%
-      summarize(nLive = length(which(tDI[ONEORTWO == 1] > 0)), ## Number of live trees in domain of interest at previous measurement
-                REMPER = first(REMPER),
-                MEASYEAR = first(MEASYEAR),
-                PREV_TPA = sum(-TPA_UNADJ[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE),
-                PREV_BAA = sum(-BAA[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE),
-                CHNG_TPA = sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
-                CHNG_BAA = sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
-                CURR_TPA = PREV_TPA + CHNG_TPA,
-                CURR_BAA = PREV_BAA + CHNG_BAA,
-                plotIn = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0))
+      select(all_of(grpBy), PLT_CN, PLOT_BASIS, REMPER, TRE_CN,
+             ONEORTWO, tDI, TPA_UNADJ, BAA)
+      # # Compute estimates at plot level
+      # group_by(PLT_CN, PLOT_BASIS, .dots = grpBy) %>%
+      # summarize(nLive = length(which(tDI[ONEORTWO == 1] > 0)), ## Number of live trees in domain of interest at previous measurement
+      #           REMPER = first(REMPER),
+      #           MEASYEAR = first(MEASYEAR),
+      #           PREV_TPA = sum(-TPA_UNADJ[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE),
+      #           PREV_BAA = sum(-BAA[ONEORTWO == 1 & STATUSCD == 1] * tDI[ONEORTWO == 1 & STATUSCD == 1], na.rm = TRUE),
+      #           CHNG_TPA = sum(TPA_UNADJ[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
+      #           CHNG_BAA = sum(BAA[STATUSCD == 1] * tDI[STATUSCD == 1], na.rm = TRUE),
+      #           CURR_TPA = PREV_TPA + CHNG_TPA,
+      #           CURR_BAA = PREV_BAA + CHNG_BAA,
+      #           plotIn = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0))
   }
 
   pltOut <- list(t = t, a = a, t1 = t1)
@@ -601,6 +617,19 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
 
   ## Strata level estimates
   tEst <- t %>%
+    ungroup() %>%
+    ## Converting to average tree size
+    mutate(BA = if_else(ONEORTWO == 1, -BAA / TPA_UNADJ, BAA / TPA_UNADJ)) %>%
+    ## Summing across scaleBy - get's us to the plot-level
+    group_by(.dots = grpBy[!c(grpBy %in% c('YEAR', 'INVYR'))], PLT_CN, PLOT_BASIS) %>%
+    summarize(FSI = sum(rd, na.rm = TRUE) / first(REMPER),
+              PREV_RD = -sum(rd[ONEORTWO == 1], na.rm = TRUE),
+              CURR_RD = sum(rd[ONEORTWO == 2], na.rm = TRUE),
+              PREV_TPA = -sum(TPA_UNADJ[ONEORTWO == 1], na.rm = TRUE),
+              PREV_BA = -sum(BA[ONEORTWO == 1], na.rm = TRUE),
+              CHNG_TPA = sum(TPA_UNADJ, na.rm = TRUE) / first(REMPER),
+              CHNG_BA = sum(BA, na.rm = TRUE) / first(REMPER),
+              plotIn_t = if_else(sum(tDI, na.rm = TRUE) > 0, 1, 0)) %>%
     ## Rejoin with population tables
     right_join(select(ungroup(popState[[x]]), -c(STATECD)), by = 'PLT_CN') %>%
     ungroup() %>%
@@ -616,78 +645,32 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, betas, sds){
       ## Otherwise, use the subpplot value
       PLOT_BASIS == 'SUBP' ~ as.numeric(ADJ_FACTOR_SUBP),
       PLOT_BASIS == 'MICR' ~ as.numeric(ADJ_FACTOR_MICR)),
-      CURR_TPA = CURR_TPA * tAdj,
-      CURR_BAA = CURR_BAA * tAdj,
       CHNG_TPA = CHNG_TPA * tAdj,
-      CHNG_BAA = CHNG_BAA * tAdj,
+      CHNG_BA = CHNG_BA * tAdj,
+      CURR_RD = CURR_RD * tAdj,
       PREV_TPA = PREV_TPA * tAdj,
-      PREV_BAA = PREV_BAA * tAdj,
-      BA1 = BA1 * tAdj,
-      BA2 = BA2 * tAdj) %>%
+      PREV_BA = PREV_BA * tAdj,
+      PREV_RD = PREV_RD * tAdj,
+      FSI = FSI * tAdj) %>%
     ## Extra step for variance issues - summing micro, subp, and macr components
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = unique(c(grpBy, scaleBy))) %>%
-    summarize(CURR_TPA = sum(CURR_TPA, na.rm = TRUE),
-              CURR_BAA = sum(CURR_BAA, na.rm = TRUE),
-              CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
-              CHNG_BAA = sum(CHNG_BAA, na.rm = TRUE),
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy) %>%
+    summarize(CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
+              CHNG_BA = sum(CHNG_BA, na.rm = TRUE),
               PREV_TPA = sum(PREV_TPA, na.rm = TRUE),
-              PREV_BAA = sum(PREV_BAA, na.rm = TRUE),
-              plotIn_t = ifelse(sum(plotIn >  0, na.rm = TRUE), 1,0),
+              PREV_BA = sum(PREV_BA, na.rm = TRUE),
+              PREV_RD = sum(PREV_RD, na.rm = TRUE),
+              CURR_RD = sum(CURR_RD, na.rm = TRUE),
+              FSI = sum(FSI, na.rm = TRUE),
+              plotIn_t = ifelse(sum(plotIn_t, na.rm = TRUE) >  0, 1,0),
               nh = first(P2POINTCNT),
               p2eu = first(p2eu),
               a = first(AREA_USED),
-              w = first(P1POINTCNT) / first(P1PNTCNT_EU),
-              REMPER = first(REMPER),
-              grps = first(grps),
-              int = first(int),
-              rate = first(rate),
-              BA1 = first(BA1),
-              BA2 = first(BA2)) %>%
-    ## Replace any NAs with zeros
-    mutate(PREV_BAA = replace_na(PREV_BAA, 0),
-           PREV_TPA = replace_na(PREV_TPA, 0),
-           CHNG_BAA = replace_na(CHNG_BAA, 0),
-           CHNG_TPA = replace_na(CHNG_TPA, 0),
-           ## T2 attributes
-           CURR_BAA = replace_na(CURR_BAA, 0),
-           CURR_TPA = replace_na(CURR_TPA, 0),
-
-           BA1 = replace_na(BA1, 0),
-           BA2 = replace_na(BA2, 0)) %>%
-    ## Change in average tree BA
-    mutate(PREV_BA = if_else(PREV_TPA != 0, PREV_BAA / PREV_TPA, 0),
-           CURR_BA = if_else(CURR_TPA != 0, CURR_BAA / CURR_TPA, 0),
-           CHNG_BA = CURR_BA - PREV_BA) %>%
-    ## All CHNG becomes an annual rate
-    mutate(CHNG_BAA = CHNG_BAA / REMPER,
-           CHNG_TPA = CHNG_TPA / REMPER,
-           CHNG_BA = CHNG_BA / REMPER) %>%
-           ## Maximum density that could be acheived (from model, stand-level)
-    mutate(tmax1 = int * (BA1^rate),
-           tmax2 = int * (BA2^rate),
-           ## Relative abundance of the population (relative to maximum stand density)
-           ra1 = if_else(tmax1 > 0, PREV_TPA / tmax1, 0),
-           ra2 = if_else(tmax2 > 0, CURR_TPA / tmax2, 0)) %>%
-    ## Summing across scaleBy
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy) %>%
-    summarize(PREV_TPA = sum(PREV_TPA, na.rm = TRUE),
-              PREV_BA = sum(PREV_BA, na.rm = TRUE),
-              CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
-              CHNG_BA = sum(CHNG_BA, na.rm = TRUE),
-              ra1 = mean(ra1, na.rm = TRUE),
-              ra2 = mean(ra2, na.rm = TRUE),
-              plotIn_t = ifelse(sum(plotIn_t >  0, na.rm = TRUE), 1,0),
-              nh = first(nh),
-              p2eu = first(p2eu),
-              a = first(a),
-              w = first(w),
-              REMPER = first(REMPER)) %>%
-
+              w = first(P1POINTCNT) / first(P1PNTCNT_EU)) %>%
     left_join(select(aAdj, PLT_CN, aGrps, fa), by = c('PLT_CN', aGrps)) %>%
     ## SI is area adjusted
-    mutate(si = (ra2 - ra1) / REMPER * fa,
-           ra1 = ra1 * fa,
-           ra2 = ra2 * fa) %>%
+    mutate(si = FSI * fa,
+           ra1 = PREV_RD * fa,
+           ra2 = CURR_RD * fa) %>%
     ## Replace NAN w/ zeros
     mutate(si = replace_na(si, 0),
            ra1 = replace_na(ra1, 0),

@@ -445,6 +445,7 @@ fsiStarter <- function(x,
   t1 <- bind_rows(out[names(out) == 't1'])
   a <- bind_rows(out[names(out) == 'a'])
 
+
   out <- list(t = t, t1 = t1, a = a, grpBy = grpBy, scaleBy = scaleBy, grpByOrig = grpByOrig, pops = pops)
 
 }
@@ -551,13 +552,6 @@ fsi <- function(db,
     t$PREV_PLT_CN = NA
   }
 
-  ## For easier subset below
-  if (byPlot){
-    t <- mutate(t, cut = if_else(PREV_TPA == 0 & CURR_TPA == 0, 1, 0),
-                plotIn = if_else(cut < 1 & PLOT_STATUS_CD == 1, 1, 0))
-  }
-
-
 
   ## Prep the data for modeling the size-density curve
   scaleSyms <- syms(scaleBy)
@@ -579,6 +573,14 @@ fsi <- function(db,
     grpRates <- mutate(grpRates, grps = as.factor(paste(!!!scaleSyms)))
     t <- mutate(t, grps = as.factor(paste(!!!scaleSyms)))
 
+    ## Remove groups with less than 10 obs
+    nGrps <- grpRates %>%
+      group_by(grps) %>%
+      summarise(n = n())
+    grpRates <- grpRates %>%
+      left_join(nGrps, by = 'grps') %>%
+      filter(n > 9)
+
   } else {
 
     grpRates$grps <- 1
@@ -590,7 +592,10 @@ fsi <- function(db,
 
     ## Run lmm at the 99 percentile of the distribution
     mod <- lqmm(t ~ b, random = ~b, group = grps, data = grpRates,
-                control = lqmmControl(method = 'df', startQR = TRUE),
+                covariance = 'pdDiag',
+                control = lqmmControl(method = 'df', startQR = TRUE,
+                                      LP_max_iter = 5000,
+                                      check_theta = TRUE),
                 tau = .975, na.action = na.omit)
 
     suppressWarnings({
@@ -598,9 +603,15 @@ fsi <- function(db,
       beta1 <- lqmm::coef.lqmm(mod)[1] + lqmm::ranef.lqmm(mod)[1]
       beta2 <- lqmm::coef.lqmm(mod)[2] + lqmm::ranef.lqmm(mod)[2]
       betas <- bind_cols(beta1, beta2) %>%
-        mutate(grps = row.names(.))
-      names(betas) <- c('int', 'rate', 'grps')
+        mutate(grps = row.names(.)) %>%
+        mutate(int_fixed = lqmm::coef.lqmm(mod)[1],
+               rate_fixed = lqmm::coef.lqmm(mod)[2])
+      names(betas) <- c('int', 'rate', 'grps', 'int_fixed', 'rate_fixed')
       betas$int <- exp(betas$int)
+
+      ## Adding on N in each group
+      betas <- betas %>%
+        left_join(nGrps, by = 'grps')
 
     })
 
@@ -615,21 +626,34 @@ fsi <- function(db,
       beta1 <- lqmm::coef.lqm(mod)[1]
       beta2 <- lqmm::coef.lqm(mod)[2]
       betas <- data.frame(beta1, beta2) %>%
-        mutate(grps = 1)
-      names(betas) <- c('int', 'rate', 'grps')
+        mutate(grps = 1,
+               int_fixed = lqmm::coef.lqm(mod)[1],
+               rate_fixed = lqmm::coef.lqm(mod)[2])
+      names(betas) <- c('int', 'rate', 'grps', 'int_fixed', 'rate_fixed')
       betas$int <- exp(betas$int)
+      betas$n <- nrow(grpRates)
 
     })
+
 
   }
 
   ## Add the betas onto t
   t <- t %>%
-    left_join(betas, by = 'grps')
+    left_join(select(betas, -c(int_fixed, rate_fixed)), by = 'grps') %>%
+    ## If group is not present in the t1 sample, forced
+    ## to assume the fixed effect
+    mutate(int = case_when(is.na(int) ~ exp(betas$int_fixed[1]),
+                           TRUE ~ int),
+           rate = case_when(is.na(rate) ~ betas$rate_fixed[2],
+                           TRUE ~ rate)) %>%
+    mutate(ba = BAA / TPA_UNADJ,
+           tmax = int * (ba^rate),
+           rd = TPA_UNADJ / tmax)
 
   ## Add stand-level indices onto t
-  t <- t %>%
-    left_join(select(t1, PLT_CN, !!!scaleSyms, BA1, BA2, TPA1, TPA2), by = c('PLT_CN', scaleBy))
+  #t <- t %>%
+  #  left_join(select(t1, PLT_CN, !!!scaleSyms, BA1, BA2, TPA1, TPA2), by = c('PLT_CN', scaleBy))
 
 
 
@@ -639,37 +663,17 @@ fsi <- function(db,
     tOut <- t
 
     tOut <- tOut %>%
-      mutate(tmax1 = int * (BA1^rate),
-             tmax2 = int * (BA2^rate),
-             ## Relative abundance of the population (relative to maximum stand density)
-             ra1 = if_else(tmax1 > 0, PREV_TPA / tmax1, 0),
-             ra2 = if_else(tmax2 > 0, CURR_TPA / tmax2, 0)) %>%
       ## Summing across scaleBy
       group_by(.dots = grpBy[!c(grpBy %in% 'YEAR')], YEAR, PLT_CN, PLOT_STATUS_CD, PREV_PLT_CN,
                REMPER) %>%
-      summarize(PREV_TPA = sum(PREV_TPA, na.rm = TRUE),
-                PREV_BAA = sum(PREV_BAA, na.rm = TRUE),
-                PREV_BA = sum(PREV_BA, na.rm = TRUE),
-                CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
-                CHNG_BAA = sum(CHNG_BAA, na.rm = TRUE),
-                CHNG_BA = sum(CHNG_BA, na.rm = TRUE),
-                CURR_TPA = sum(CURR_TPA, na.rm = TRUE),
-                CURR_BAA = sum(CURR_BAA, na.rm = TRUE),
-                CURR_BA = sum(CURR_BA, na.rm = TRUE),
-                ## Mean of relative abundance across scaleBy within plot
-                ra1 = mean(ra1, na.rm = TRUE),
-                ra2 = mean(ra2, na.rm = TRUE),
-                PREV_STAND_BA = first(BA1),
-                CURR_STAND_BA = first(BA2),
-                PREV_STAND_TPA = first(TPA1),
-                CURR_STAND_TPA = first(TPA2)) %>%
-      ## FSI is difference in relative abundance between t2 and t1
-      ## % FSI is the above expressed as a percentage (relative measure)
-      mutate(FSI = (ra2 - ra1) / REMPER,
-             PERC_FSI = FSI / ra1 * 100,
-             PREV_RD = ra1,
-             CURR_RD = ra2)
-
+      summarize(FSI = sum(rd, na.rm = TRUE) / REMPER,
+                PREV_RD = -sum(rd[ONEORTWO == 1], na.rm = TRUE),
+                CURR_RD = sum(rd[ONEORTWO == 2], na.rm = TRUE),
+                PERC_FSI = FSI / PREV_RD * 100,
+                PREV_TPA = -sum(TPA_UNADJ[ONEORTWO == 1], na.rm = TRUE),
+                PREV_BAA = -sum(BAA[ONEORTWO == 1], na.rm = TRUE),
+                CURR_TPA = sum(TPA_UNADJ[ONEORTWO == 2], na.rm = TRUE),
+                CURR_BAA = sum(BAA[ONEORTWO == 2], na.rm = TRUE))
 
 
     ## Make it spatial
@@ -684,8 +688,7 @@ fsi <- function(db,
 
 
     tOut <- select(tOut, YEAR, PLT_CN, any_of('PREV_PLT_CN'), PLOT_STATUS_CD, grpBy[grpBy != 'YEAR'],
-                   FSI, PERC_FSI, REMPER, PREV_RD, CURR_RD, everything()) %>%
-      select(-c(ra1, ra2))
+                   REMPER, FSI, PERC_FSI, PREV_RD, CURR_RD, PREV_TPA, CURR_TPA, PREV_BAA, CURR_BAA)
 
 
 
