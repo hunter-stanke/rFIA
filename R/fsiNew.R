@@ -666,14 +666,14 @@ fsi <- function(db,
       ## Summing across scaleBy
       group_by(.dots = grpBy[!c(grpBy %in% 'YEAR')], YEAR, PLT_CN, PLOT_STATUS_CD, PREV_PLT_CN,
                REMPER) %>%
-      summarize(FSI = sum(rd, na.rm = TRUE) / REMPER,
-                PREV_RD = -sum(rd[ONEORTWO == 1], na.rm = TRUE),
-                CURR_RD = sum(rd[ONEORTWO == 2], na.rm = TRUE),
+      summarize(FSI = sum(rd * tDI, na.rm = TRUE) / REMPER,
+                PREV_RD = -sum(rd[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
+                CURR_RD = sum(rd[ONEORTWO == 2] * tDI[ONEORTWO == 2], na.rm = TRUE),
                 PERC_FSI = FSI / PREV_RD * 100,
-                PREV_TPA = -sum(TPA_UNADJ[ONEORTWO == 1], na.rm = TRUE),
-                PREV_BAA = -sum(BAA[ONEORTWO == 1], na.rm = TRUE),
-                CURR_TPA = sum(TPA_UNADJ[ONEORTWO == 2], na.rm = TRUE),
-                CURR_BAA = sum(BAA[ONEORTWO == 2], na.rm = TRUE))
+                PREV_TPA = -sum(TPA_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
+                PREV_BAA = -sum(BAA[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE),
+                CURR_TPA = sum(TPA_UNADJ[ONEORTWO == 2] * tDI[ONEORTWO == 2], na.rm = TRUE),
+                CURR_BAA = sum(BAA[ONEORTWO == 2] * tDI[ONEORTWO == 2], na.rm = TRUE))
 
 
     ## Make it spatial
