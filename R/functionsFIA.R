@@ -387,6 +387,7 @@ unitMean <- function(ESTN_METHOD, a, nh, w, stratMean){
 #   )
 # }
 
+
 ## Replace current attributes with midpoint attributes depending on component
 vrAttHelper <- function(attribute, attribute.prev, attribute.mid, attribute.beg, component, remper, oneortwo){
 
