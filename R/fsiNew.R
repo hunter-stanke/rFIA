@@ -470,6 +470,7 @@ fsi <- function(db,
                    byPlot = FALSE,
                    useLM = FALSE,
                    scaleBy = NULL,
+                   betas = NULL,
                    returnBetas = FALSE,
                    nCores = 1) {
 
@@ -578,82 +579,174 @@ fsi <- function(db,
       group_by(grps) %>%
       summarise(n = n())
     grpRates <- grpRates %>%
-      left_join(nGrps, by = 'grps') %>%
-      filter(n > 9)
+      left_join(nGrps, by = 'grps')
 
   } else {
 
     grpRates$grps <- 1
     t$grps = 1
+
   }
 
-  ## If more than one group use a mixed model
-  if (length(unique(grpRates$grps)) > 1){
 
-    ## Run lmm at the 99 percentile of the distribution
-    mod <- lqmm(t ~ b, random = ~b, group = grps, data = grpRates,
-                covariance = 'pdDiag',
-                control = lqmmControl(method = 'df', startQR = TRUE,
-                                      LP_max_iter = 5000,
-                                      check_theta = TRUE),
-                tau = .975, na.action = na.omit)
+  if (is.null(betas)){
+    ## Prep data for model
+    prep <- grpRates %>%
+      ungroup() %>%
+      arrange(grps) %>%
+      ## Need numeric group-level assignments
+      mutate(grp_index = as.numeric(as.factor(grps)))
 
-    suppressWarnings({
-      ## Summarize results
-      beta1 <- lqmm::coef.lqmm(mod)[1] + lqmm::ranef.lqmm(mod)[1]
-      beta2 <- lqmm::coef.lqmm(mod)[2] + lqmm::ranef.lqmm(mod)[2]
-      betas <- bind_cols(beta1, beta2) %>%
-        mutate(grps = row.names(.)) %>%
-        mutate(int_fixed = lqmm::coef.lqmm(mod)[1],
-               rate_fixed = lqmm::coef.lqmm(mod)[2])
-      names(betas) <- c('int', 'rate', 'grps', 'int_fixed', 'rate_fixed')
-      betas$int <- exp(betas$int)
 
-      ## Adding on N in each group
+
+
+    ## If more than one group use a mixed model
+    if (length(unique(grpRates$grps)) > 1){
+
+      modFile <- system.file("extdata", "qrLMM.jag", package = "rFIA")
+      # Parameters to estimate
+      params <- c('fe_alpha', 'fe_beta', 'alpha', 'beta')
+      ## Set up in a list
+      data <- list(I = nrow(prep), ## number of obs
+                   J = length(unique(prep$grp_index)), # Number of groups
+                   y = prep$t, ## log scale TPA
+                   x = prep$b, ## log scale BA
+                   p = .99, ## Percentile for qr
+                   grp_index = prep$grp_index) # Numeric ID for groups
+
+    } else {
+
+      modFile <- system.file("extdata", "qrLM.jag", package = "rFIA")
+      # Parameters to estimate
+      params <- c('alpha', 'beta')
+      ## Set up in a list
+      data <- list(I = nrow(prep), ## number of obs
+                   y = prep$t, ## log scale TPA
+                   x = prep$b, ## log scale BA
+                   p = .99) ## Percentile for qr
+
+    }
+
+    # MCMC settings
+    ni <- 1000
+    nc <- 3
+
+    print('Modeling maximum size-density curve(s)...')
+
+    # Start Gibbs sampling
+    jags_mod_start <- R2jags::jags(data,
+                                   parameters.to.save=params,
+                                   model.file=modFile,
+                                   n.chains=nc,
+                                   n.iter=ni)
+    jags_mod <- R2jags::autojags(jags_mod_start, n.iter = 1000)
+
+
+    ## Convert to mcmc list
+    jags_mcmc <- coda::as.mcmc(jags_mod)
+
+    chains <- jags_mcmc
+    ## Convert to data.frame
+    for (i in 1:length(jags_mcmc)){
+      chains[[i]] <- as.data.frame(jags_mcmc[[i]])
+      names(chains)[i] <- i
+    }
+    class(chains) <- 'list'
+
+
+    if (length(unique(grpRates$grps)) > 1){
+      ## Make it tidy
+      betas <- bind_rows(chains) %>%
+        pivot_longer(cols = everything(), names_to = 'var', values_to = 'estimate') %>%
+        filter(str_detect(var, 'fe_beta|fe_alpha|deviance', negate = TRUE)) %>%
+        mutate(grp_index = unlist(regmatches(var, gregexpr("\\[.+?\\]", var))),
+               grp_index = as.numeric(str_sub(grp_index, 2, -2)),
+               term = case_when(str_detect(var, 'alpha') ~ 'int',
+                                TRUE ~ 'rate')) %>%
+        left_join(distinct(prep, grp_index, grps, n), by = 'grp_index') %>%
+        select(grps, term, estimate, n) %>%
+        mutate(estimate = case_when(term == 'int' ~ exp(estimate),
+                                    TRUE ~ estimate)) %>%
+        group_by(grps, term) %>%
+        summarise(mean = mean(estimate),
+                  upper = quantile(estimate, probs = .975),
+                  lower = quantile(estimate, probs = .025),
+                  n = first(n)) %>%
+        pivot_wider(id_cols = c(grps, n), names_from = term, values_from = mean:lower) %>%
+        rename(int = mean_int,
+               rate = mean_rate)
+
+      ## Fixed effect for missing groups
+      post_fe <- bind_rows(chains) %>%
+        pivot_longer(cols = everything(), names_to = 'var', values_to = 'estimate') %>%
+        filter(str_detect(var, 'fe_beta|fe_alpha')) %>%
+        mutate(term = case_when(str_detect(var, 'alpha') ~ 'fe_int',
+                                TRUE ~ 'fe_rate')) %>%
+        select(term, estimate) %>%
+        mutate(estimate = case_when(term == 'fe_int' ~ exp(estimate),
+                                    TRUE ~ estimate)) %>%
+        group_by(term) %>%
+        summarise(mean = mean(estimate),
+                  upper = quantile(estimate, probs = .975),
+                  lower = quantile(estimate, probs = .025))%>%
+        pivot_wider(names_from = term, values_from = mean:lower) %>%
+        rename(fe_int = mean_fe_int,
+               fe_rate = mean_fe_rate)
+
+      ## Adding fixed effect info
       betas <- betas %>%
-        left_join(nGrps, by = 'grps')
+        mutate(fe_int = post_fe$fe_int,
+               fe_rate = post_fe$fe_rate,
+               upper_fe_int = post_fe$upper_fe_int,
+               upper_fe_rate = post_fe$upper_fe_rate,
+               lower_fe_int = post_fe$lower_fe_int,
+               lower_fe_rate = post_fe$lower_fe_int)
 
-    })
-
-
-  } else {
-
-    suppressWarnings({
-      ## Run lqm
-      mod <- lqmm::lqm(t ~ b, data = grpRates, tau = .975, na.action = na.omit)
-
-      ## Summarize results
-      beta1 <- lqmm::coef.lqm(mod)[1]
-      beta2 <- lqmm::coef.lqm(mod)[2]
-      betas <- data.frame(beta1, beta2) %>%
-        mutate(grps = 1,
-               int_fixed = lqmm::coef.lqm(mod)[1],
-               rate_fixed = lqmm::coef.lqm(mod)[2])
-      names(betas) <- c('int', 'rate', 'grps', 'int_fixed', 'rate_fixed')
-      betas$int <- exp(betas$int)
+    } else {
+      ## Make it tidy
+      betas <- bind_rows(chains) %>%
+        pivot_longer(cols = everything(), names_to = 'var', values_to = 'estimate') %>%
+        filter(str_detect(var, 'deviance', negate = TRUE)) %>%
+        mutate(term = case_when(str_detect(var, 'alpha') ~ 'int',
+                                TRUE ~ 'rate')) %>%
+        select(term, estimate) %>%
+        mutate(estimate = case_when(term == 'int' ~ exp(estimate),
+                                    TRUE ~ estimate)) %>%
+        group_by(term) %>%
+        summarise(mean = mean(estimate),
+                  upper = quantile(estimate, probs = .975),
+                  lower = quantile(estimate, probs = .025)) %>%
+        pivot_wider(names_from = term, values_from = mean:lower) %>%
+        rename(int = mean_int,
+               rate = mean_rate)
       betas$n <- nrow(grpRates)
+      betas$grps = 1
 
-    })
-
-
+    }
   }
 
-  ## Add the betas onto t
-  t <- t %>%
-    left_join(select(betas, -c(int_fixed, rate_fixed)), by = 'grps') %>%
-    ## If group is not present in the t1 sample, forced
-    ## to assume the fixed effect
-    mutate(int = case_when(is.na(int) ~ exp(betas$int_fixed[1]),
-                           TRUE ~ int),
-           rate = case_when(is.na(rate) ~ betas$rate_fixed[2],
-                           TRUE ~ rate)) %>%
-    mutate(ba = BAA / TPA_UNADJ,
-           tmax = int * (ba^rate),
-           rd = TPA_UNADJ / tmax)
 
-  ## Add stand-level indices onto t
-  #t <- t %>%
-  #  left_join(select(t1, PLT_CN, !!!scaleSyms, BA1, BA2, TPA1, TPA2), by = c('PLT_CN', scaleBy))
+  ## If groups are missing, assume the fixed effects
+  if ('fe_int' %in% names(betas)) {
+    t <- t %>%
+      left_join(select(betas, c(grps, int, fe_int, fe_rate, rate)), by = 'grps') %>%
+      mutate(int = case_when(!is.na(int) ~ fe_int,
+                             TRUE ~ int),
+             rate = case_when(!is.na(rate) ~ fe_rate,
+                             TRUE ~ rate)) %>%
+      mutate(ba = BAA / TPA_UNADJ,
+             tmax = int * (ba^rate),
+             rd = TPA_UNADJ / tmax)
+  } else {
+    ## Add the betas onto t
+    t <- t %>%
+      left_join(select(betas, c(grps, int, rate)), by = 'grps') %>%
+      mutate(ba = BAA / TPA_UNADJ,
+             tmax = int * (ba^rate),
+             rd = TPA_UNADJ / tmax)
+  }
+
+
 
 
 

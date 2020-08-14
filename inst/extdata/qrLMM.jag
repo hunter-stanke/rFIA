@@ -1,0 +1,42 @@
+
+model {
+
+  ## Priors on the fixed effects
+  fe_alpha ~ dnorm(0, pow(1000, -2))
+  fe_beta ~ dnorm(-.8025, pow(.1, -2))
+
+  ## Hyperpriors on random effect SD
+  re_alpha_tau ~ dgamma(0.01 , 0.01)
+  re_beta_tau ~ dgamma(0.01, 0.01)
+
+  ## Priors on the random effects
+  for (j in 1:J){
+    re_alpha[j] ~ dnorm(0, re_alpha_tau)
+    re_beta[j] ~ dnorm(0, re_beta_tau)
+  }
+
+  ## Priors on the residual SD
+  sigma_res ~ dunif(0, 100) # Residual standard deviation
+  tau_res <- 1 / (sigma_res*sigma_res) # Residual precision
+
+  ## Likelihood
+  for (i in 1:I){
+
+    ## Linear predictor
+    mu[i] <- fe_alpha + re_alpha[grp_index[i]] + fe_beta*x[i] + re_beta[grp_index[i]]*x[i]
+
+    ## Quantile regression parameters
+    w[i]  ~ dexp(tau_res)
+    me[i] <- (1 - 2 * p) / (p * (1 - p)) * w[i] + mu[i]
+    pe[i] <- (p * (1 - p) * tau_res) / (2 * w[i])
+    y[i]  ~ dnorm(me[i], pe[i])
+
+  }
+
+  for (j in 1:J){
+    ## Cleaner output
+    alpha[j] <- re_alpha[j] + fe_alpha
+    beta[j] <- re_beta[j] + fe_beta
+  }
+
+}

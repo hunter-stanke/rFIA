@@ -9,7 +9,7 @@ fsi(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
     landType = "forest", treeType = "live", method = "sma",
     lambda = 0.5, treeDomain = NULL, areaDomain = NULL,
     totals = TRUE, byPlot = FALSE, useLM = FALSE, scaleBy = NULL,
-    returnBetas = FALSE, nCores = 1)
+    betas = NULL, returnBetas = FALSE, nCores = 1)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -44,6 +44,7 @@ fsi(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
   \item{useLM}{logical; If TRUE, use a linear model to estimate change in TPA & BA on each plot, allowing more than 2 measurements to be used.}
 
   \item{scaleBy}{variables from PLOT or COND tables to use as 'random effects' in model of size-density relationships.Multiple variables should be combined with \code{c()}, and grouping will occur heirarchically. For example, to produce seperate estimates for each ownership group within ecoregion subsections, specify \code{c(FORTYPCD, SITECLCD)}.}
+  \item{betas}{more soon.}
 
   \item{returnBetas}{more soon.}
 
