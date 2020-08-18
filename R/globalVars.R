@@ -219,6 +219,6 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'cvEst_ra2', 'cvStrat_ra1', 'cvStrat_ra2', 'ra1', 'ra1Est', 'ra1Strat', 'ra1Var', 'ra1v', 'ra2', 'ra2Est',
                          'ra2Strat', 'ra2Var', 'ra2v', 'TPA2', 'disturb', 'int_fixed', 'rate_fixed', 'rd', 'tmax',
                          'estimate', 'fe_int', 'fe_rate', 'grp_index', 'lower', 'mean_fe_int',  'mean_fe_rate',
-                         'mean_int', 'mean_rate', 'quantile', 'term'
+                         'mean_int', 'mean_rate', 'quantile', 'term', 'skew2'
 
 ))

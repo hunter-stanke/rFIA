@@ -2,7 +2,7 @@
 model {
 
   ## Priors on the coefficients
-  alpha ~ dnorm(0, pow(1000, -2))
+  alpha ~ dnorm(6, pow(1, -2))
   beta ~ dnorm(-.8025, pow(.1, -2))
 
   ## Priors on the residual SD

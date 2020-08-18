@@ -121,15 +121,23 @@ fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
     ## No disturbance/treatment plots
     filter(!c(pltID %in% disturb$pltID)) %>%
     distinct(PLT_CN, SUBP, TREE, ONEORTWO, .keep_all = TRUE) %>%
+    filter(STATUSCD == 1) %>%
+    filter(pDI == 1) %>%
     group_by(.dots = scaleBy, PLT_CN) %>%
     summarize(REMPER = first(REMPER),
-              BAA1 = sum(-BAA[STATUSCD == 1 & ONEORTWO == 1] * pDI[STATUSCD == 1 & ONEORTWO == 1], na.rm = TRUE),
-              TPA1 = sum(-TPA_UNADJ[STATUSCD == 1 & ONEORTWO == 1] * pDI[STATUSCD == 1 & ONEORTWO == 1], na.rm = TRUE),
-              BAA2 = sum(BAA[STATUSCD == 1 & ONEORTWO == 2] * pDI[STATUSCD == 1 & ONEORTWO == 2], na.rm = TRUE),
-              TPA2 = sum(TPA_UNADJ[STATUSCD == 1 & ONEORTWO == 2] * pDI[STATUSCD == 1 & ONEORTWO == 2], na.rm = TRUE)) %>%
+              BAA1 = sum(-BAA[ONEORTWO == 1], na.rm = TRUE),
+              TPA1 = sum(-TPA_UNADJ[ONEORTWO == 1], na.rm = TRUE),
+              BAA2 = sum(BAA[ONEORTWO == 2], na.rm = TRUE),
+              TPA2 = sum(TPA_UNADJ[ONEORTWO == 2], na.rm = TRUE),
+              #times1 = round(TPA_UNADJ[ONEORTWO == 1]),
+              skew1 = skewness(rep(DIA[ONEORTWO == 1], round(-TPA_UNADJ[ONEORTWO == 1]))),
+              skew2 = skewness(rep(DIA[ONEORTWO == 2], round(TPA_UNADJ[ONEORTWO == 2])))
+              ) %>%
     ## Mean BA
     mutate(BA1 = if_else(TPA1 != 0, BAA1 / TPA1, 0),
-           BA2 = if_else(TPA2 != 0, BAA2 / TPA2, 0))
+           BA2 = if_else(TPA2 != 0, BAA2 / TPA2, 0)) %>%
+    ## Remove plots with high skewness
+    filter(skew2 >= -1 & skew2 <= 1)
 
 
   if (byPlot){

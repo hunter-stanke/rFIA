@@ -559,13 +559,13 @@ fsi <- function(db,
   grpSyms <- syms(grpBy)
 
   ## Get groups prepped to fit model
-  grpRates <- select(t1, PLT_CN, !!!scaleSyms, BA1, TPA1) %>%
+  grpRates <- select(t1, PLT_CN, !!!scaleSyms, BA2, TPA2) %>%
     ungroup() %>%
-    filter(TPA1 > 0) %>%
+    filter(TPA2 > 0) %>%
     tidyr::drop_na(!!!scaleSyms) %>%
     ## Stand-level variables here
-    mutate(t = log(TPA1),
-           b = log(BA1)) %>%
+    mutate(t = log(TPA2),
+           b = log(BA2)) %>%
     select(t, b, PLT_CN, !!!scaleSyms)
 
 
@@ -696,11 +696,11 @@ fsi <- function(db,
       ## Adding fixed effect info
       betas <- betas %>%
         mutate(fe_int = post_fe$fe_int,
-               fe_rate = post_fe$fe_rate,
                upper_fe_int = post_fe$upper_fe_int,
-               upper_fe_rate = post_fe$upper_fe_rate,
                lower_fe_int = post_fe$lower_fe_int,
-               lower_fe_rate = post_fe$lower_fe_int)
+               fe_rate = post_fe$fe_rate,
+               upper_fe_rate = post_fe$upper_fe_rate,
+               lower_fe_rate = post_fe$lower_fe_rate)
 
     } else {
       ## Make it tidy

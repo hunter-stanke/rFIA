@@ -4,6 +4,21 @@
   #packageStartupMessage('Download FIA Data Here: https://apps.fs.usda.gov/fia/datamart/datamart.html')
 }
 
+## Estimate skewness in a distribution of values
+skewness <- function(x, na.rm = TRUE){
+
+  ## Cut any NA
+  if (na.rm) x <- x[!is.na(x)]
+
+  ## Sample size
+  n <- length(x)
+
+  ## Estimate the skewness
+  skew <- (sum((x-mean(x))^3)/n)/(sum((x-mean(x))^2)/n)^(3/2)
+
+  return(skew)
+}
+
 projectPnts <- function(x, y, slope = NULL, yint = NULL){
   if (is.null(slope)){
     P = data.frame(xOrig = x, yOrig = y)
