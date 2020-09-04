@@ -14,7 +14,7 @@ fsiStarter <- function(x,
                        areaDomain = NULL,
                        totals = FALSE,
                        byPlot = FALSE,
-                       useLM = FALSE,
+                       useSeries = FALSE,
                        nCores = 1,
                        remote,
                        mr){
@@ -400,44 +400,24 @@ fsiStarter <- function(x,
   ## Merging state and county codes
   plts <- split(db$PLOT, as.factor(paste(db$PLOT$COUNTYCD, db$PLOT$STATECD, sep = '_')))
 
+  ## Summarize to plot-level
+  suppressWarnings({
+    ## Compute estimates in parallel -- Clusters in windows, forking otherwise
+    if (Sys.info()['sysname'] == 'Windows'){
+      cl <- makeCluster(nCores)
+      clusterEvalQ(cl, {
+        library(dplyr)
+        library(stringr)
+        library(rFIA)
+        library(tidyr)
+      })
+      out <- parLapply(cl, X = names(plts), fun = fsiHelper1, plts, db, grpBy, scaleBy, byPlot)
+      #stopCluster(cl) # Keep the cluster active for the next run
+    } else { # Unix systems
+      out <- mclapply(names(plts), FUN = fsiHelper1, plts, db, grpBy, scaleBy, byPlot, mc.cores = nCores)
+    }
+  })
 
-  ## Use the linear model procedures or strictly t2-t1 / remper?
-  if (useLM){
-    suppressWarnings({
-      ## Compute estimates in parallel -- Clusters in windows, forking otherwise
-      if (Sys.info()['sysname'] == 'Windows'){
-        cl <- makeCluster(nCores)
-        clusterEvalQ(cl, {
-          library(dplyr)
-          library(stringr)
-          library(rFIA)
-          library(tidyr)
-          library(purrr)
-        })
-        out <- parLapply(cl, X = names(plts), fun = fsiHelper1_lm, plts, db, grpBy, scaleBy, byPlot)
-        #stopCluster(cl) # Keep the cluster active for the next run
-      } else { # Unix systems
-        out <- mclapply(names(plts), FUN = fsiHelper1_lm, plts, db, grpBy, scaleBy, byPlot, mc.cores = nCores)
-      }
-    })
-  } else {
-    suppressWarnings({
-      ## Compute estimates in parallel -- Clusters in windows, forking otherwise
-      if (Sys.info()['sysname'] == 'Windows'){
-        cl <- makeCluster(nCores)
-        clusterEvalQ(cl, {
-          library(dplyr)
-          library(stringr)
-          library(rFIA)
-          library(tidyr)
-        })
-        out <- parLapply(cl, X = names(plts), fun = fsiHelper1, plts, db, grpBy, scaleBy, byPlot)
-        #stopCluster(cl) # Keep the cluster active for the next run
-      } else { # Unix systems
-        out <- mclapply(names(plts), FUN = fsiHelper1, plts, db, grpBy, scaleBy, byPlot, mc.cores = nCores)
-      }
-    })
-  }
 
   ## back to dataframes
   out <- unlist(out, recursive = FALSE)
@@ -467,8 +447,9 @@ fsi <- function(db,
                    treeDomain = NULL,
                    areaDomain = NULL,
                    totals = TRUE,
+                   variance = TRUE,
                    byPlot = FALSE,
-                   useLM = FALSE,
+                   useSeries = FALSE,
                    scaleBy = NULL,
                    betas = NULL,
                    returnBetas = FALSE,
@@ -532,7 +513,7 @@ fsi <- function(db,
                 bySpecies, bySizeClass,
                 landType, treeType, method,
                 lambda, treeDomain, areaDomain,
-                totals, byPlot, useLM,
+                totals, byPlot, useSeries,
                 nCores, remote, mr)
 
   ## Bring the results back
@@ -543,15 +524,6 @@ fsi <- function(db,
   grpBy <- out[names(out) == 'grpBy'][[1]]
   scaleBy <- out[names(out) == 'scaleBy'][[1]]
   grpByOrig <- out[names(out) == 'grpByOrig'][[1]]
-
-  ## Have to update the PLT_CNs if useLM = TRUE
-  if (useLM){
-    t1 <- t1 %>%
-      ungroup() %>%
-      select(-c(PLT_CN)) %>%
-      left_join(distinct(select(t, PLT_CN, pltID)), by = 'pltID')
-    t$PREV_PLT_CN = NA
-  }
 
 
   ## Prep the data for modeling the size-density curve
@@ -777,6 +749,65 @@ fsi <- function(db,
                 CURR_TPA = sum(CURR_TPA, na.rm = TRUE),
                 CURR_BAA = sum(CURR_BAA, na.rm = TRUE))
 
+    ## If we want to use multiple remeasurements to estimate change,
+    ## handle that here
+    if (useSeries) {
+      ## Get a unique ID for each remeasurement in the series
+      nMeas <- tOut %>%
+        distinct(pltID, PLT_CN, YEAR, REMPER) %>%
+        group_by(pltID) %>%
+        mutate(n = length(unique(PLT_CN)),
+               series = min_rank(YEAR)) %>%
+        ungroup() %>%
+        select(pltID, PLT_CN, REMPER, n, series)
+
+      ## Only if more than one remeasurement available
+      if (any(nMeas$n > 1)){
+
+        ## Now we loop over the unique values of n
+        ## Basically have to chunk up the data each time
+        ## in order to get intermediate estimates
+        nRems <- unique(nMeas$n)
+        remsList <- list()
+        for (i in 1:length(nRems)){
+          ## Temporal weights for each plot
+          wgts <- nMeas %>%
+            filter(series <= nRems[i] & n >= nRems[i]) %>%
+            group_by(pltID) %>%
+            ## Total remeasurement interval and weights for
+            ## individual remeasurements
+            mutate(fullRemp = sum(REMPER, na.rm = TRUE),
+                   wgt = REMPER / fullRemp) %>%
+            ungroup() %>%
+            select(PLT_CN, n, series, wgt)
+
+          dat <- tOut %>%
+            left_join(wgts, by = c('PLT_CN')) %>%
+            filter(series <= nRems[i] & n >= nRems[i]) %>%
+            group_by(.dots = grpBy[grpBy %in% c('YEAR', 'INVYR', 'MEASYEAR') == FALSE]) %>%
+            summarize(FSI = sum(FSI*wgt, na.rm = TRUE),
+                      PLT_CN = PLT_CN[which.max(series)],
+                      CURR_RD = CURR_RD[which.max(series)],
+                      PREV_RD = PREV_RD[which.min(series)],
+                      PREV_TPA = PREV_TPA[which.min(series)],
+                      PREV_BAA = PREV_BAA[which.min(series)],
+                      CURR_TPA = CURR_TPA[which.max(series)],
+                      CURR_BAA = CURR_BAA[which.max(series)]) %>%
+            ungroup()# %>%
+           # select(-c(pltID))
+          remsList[[i]] <- dat
+        }
+        ## Bring it all back together
+        dat <- bind_rows(remsList)
+
+        ## Update columns in tEst
+        tOut <- tOut %>%
+          select(-c(PREV_RD:CURR_BAA)) %>%
+          left_join(dat, by = c('PLT_CN', grpBy[!c(grpBy %in% c('YEAR', 'INVYR', 'MEASYEAR'))])) %>%
+          mutate(PERC_FSI = FSI / PREV_RD * 100)
+        }
+    }
+
     ## Make it spatial
     if (returnSpatial){
       tOut <- tOut %>%
@@ -813,10 +844,10 @@ fsi <- function(db,
           library(rFIA)
           library(tidyr)
         })
-        out <- parLapply(cl, X = names(popState), fun = fsiHelper2, popState, t, a, grpBy, scaleBy, method)
+        out <- parLapply(cl, X = names(popState), fun = fsiHelper2, popState, t, a, grpBy, scaleBy, method, useSeries)
         stopCluster(cl)
       } else { # Unix systems
-        out <- mclapply(names(popState), FUN = fsiHelper2, popState, t, a, grpBy, scaleBy, method, mc.cores = nCores)
+        out <- mclapply(names(popState), FUN = fsiHelper2, popState, t, a, grpBy, scaleBy, method, useSeries, mc.cores = nCores)
       }
     })
     ## back to dataframes

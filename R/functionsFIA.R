@@ -563,9 +563,7 @@ str.Remote.FIA.Database <- function(object, ...) {
 #' @import gganimate
 #' @import ggplot2
 #' @import bit64
-#' @import progress
 #' @import tidyselect
-#' @import purrr
 #' @importFrom rlang eval_tidy enquo enquos quos quo
 #' @importFrom data.table fread fwrite rbindlist
 #' @importFrom parallel makeCluster detectCores mclapply parLapply stopCluster clusterEvalQ
@@ -573,7 +571,6 @@ str.Remote.FIA.Database <- function(object, ...) {
 #' @importFrom sp over proj4string<- coordinates<- spTransform proj4string
 #' @importFrom stats cov var coef lm na.omit quantile
 #' @importFrom utils object.size read.csv tail globalVariables type.convert download.file unzip
-#' @import dtplyr
 #' @importFrom R2jags autojags jags
 #' @importFrom coda as.mcmc
 NULL

@@ -8,8 +8,9 @@ fsi(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
     bySpecies = FALSE, bySizeClass = FALSE,
     landType = "forest", treeType = "live", method = "sma",
     lambda = 0.5, treeDomain = NULL, areaDomain = NULL,
-    totals = TRUE, byPlot = FALSE, useLM = FALSE, scaleBy = NULL,
-    betas = NULL, returnBetas = FALSE, nCores = 1)
+    totals = TRUE, variance = TRUE, byPlot = FALSE,
+    useSeries = FALSE, scaleBy = NULL, betas = NULL,
+    returnBetas = FALSE, nCores = 1)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -39,9 +40,11 @@ fsi(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
 
   \item{totals}{logical; if TRUE, return population estimates (e.g. total area, total biomass) along with ratio estimates (e.g. mean biomass per acre).}
 
+  \item{variance}{logical; if TRUE, return estimates of uncertainty as variance instead of sampling error (default). Sampling error cannot be used to estimate confidence intervals.}
+
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations (population totals not returned).}
 
-  \item{useLM}{logical; If TRUE, use a linear model to estimate change in TPA & BA on each plot, allowing more than 2 measurements to be used.}
+  \item{useSeries}{logical; If TRUE, use multiple remeasurements to estimate change in TPA & BA on each plot, when available.}
 
   \item{scaleBy}{variables from PLOT or COND tables to use as 'random effects' in model of size-density relationships.Multiple variables should be combined with \code{c()}, and grouping will occur heirarchically. For example, to produce seperate estimates for each ownership group within ecoregion subsections, specify \code{c(FORTYPCD, SITECLCD)}.}
   \item{betas}{more soon.}
