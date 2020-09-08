@@ -779,12 +779,14 @@ fsi <- function(db,
             mutate(fullRemp = sum(REMPER, na.rm = TRUE),
                    wgt = REMPER / fullRemp) %>%
             ungroup() %>%
-            select(PLT_CN, n, series, wgt)
+            select(PLT_CN, n, series, wgt, fullRemp)
 
           dat <- tOut %>%
             left_join(wgts, by = c('PLT_CN')) %>%
             filter(series <= nRems[i] & n >= nRems[i]) %>%
-            group_by(.dots = grpBy[grpBy %in% c('YEAR', 'INVYR', 'MEASYEAR') == FALSE]) %>%
+            group_by(.dots = grpBy[grpBy %in% c('YEAR', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD') == FALSE]) %>%
+            mutate(PLOT_STATUS_CD = case_when(any(PLOT_STATUS_CD == 1) ~ as.double(1),
+                                              TRUE ~ as.double(PLOT_STATUS_CD))) %>%
             summarize(FSI = sum(FSI*wgt, na.rm = TRUE),
                       PLT_CN = PLT_CN[which.max(series)],
                       CURR_RD = CURR_RD[which.max(series)],
@@ -792,7 +794,9 @@ fsi <- function(db,
                       PREV_TPA = PREV_TPA[which.min(series)],
                       PREV_BAA = PREV_BAA[which.min(series)],
                       CURR_TPA = CURR_TPA[which.max(series)],
-                      CURR_BAA = CURR_BAA[which.max(series)]) %>%
+                      CURR_BAA = CURR_BAA[which.max(series)],
+                      REMPER = first(fullRemp),
+                      PLOT_STATUS_CD = first(PLOT_STATUS_CD)) %>%
             ungroup()# %>%
            # select(-c(pltID))
           remsList[[i]] <- dat
@@ -802,8 +806,9 @@ fsi <- function(db,
 
         ## Update columns in tEst
         tOut <- tOut %>%
-          select(-c(PREV_RD:CURR_BAA)) %>%
-          left_join(dat, by = c('PLT_CN', grpBy[!c(grpBy %in% c('YEAR', 'INVYR', 'MEASYEAR'))])) %>%
+          ungroup() %>%
+          select(-c(PREV_RD:CURR_BAA, REMPER, PLOT_STATUS_CD)) %>%
+          left_join(dat, by = c('PLT_CN', grpBy[!c(grpBy %in% c('YEAR', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD'))])) %>%
           mutate(PERC_FSI = FSI / PREV_RD * 100)
         }
     }
