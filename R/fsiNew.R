@@ -742,7 +742,7 @@ fsi <- function(db,
                REMPER) %>%
       summarize(PREV_RD = mean(PREV_RD, na.rm = TRUE),
                 CURR_RD = mean(CURR_RD, na.rm = TRUE),
-                FSI = (CURR_RD - PREV_RD) / REMPER,
+                FSI = (CURR_RD - PREV_RD) / first(REMPER),
                 PERC_FSI = FSI / PREV_RD * 100,
                 PREV_TPA = sum(PREV_TPA, na.rm = TRUE),
                 PREV_BAA = sum(PREV_BAA, na.rm = TRUE),
