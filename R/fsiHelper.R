@@ -199,6 +199,8 @@ fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
       aGrps <- aGrps[aGrps %in% names(aData)]
     }
 
+    aSyms <- syms(aGrps)
+
 
     ### Plot-level estimates
     a <- aData %>%
@@ -207,7 +209,7 @@ fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
              date = as.Date(date, "%Y-%m-%d")) %>%
       ## Will be lots of trees here, so CONDPROP listed multiple times
       ## Adding PROP_BASIS so we can handle adjustment factors at strata level
-      distinct(PLT_CN, pltID, date, PROP_BASIS, CONDID, all_of(aGrps), .keep_all = TRUE) %>%
+      distinct(PLT_CN, pltID, date, PROP_BASIS, CONDID, !!!aGrps, .keep_all = TRUE) %>%
       group_by(PLT_CN, pltID, date, PROP_BASIS, CONDID, .dots = aGrps) %>%
       summarize(CONDPROP_UNADJ = first(CONDPROP_UNADJ * aDI)) %>%
       mutate(CONDPROP_UNADJ = replace_na(CONDPROP_UNADJ, 0)) %>%
