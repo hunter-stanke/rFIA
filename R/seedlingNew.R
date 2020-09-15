@@ -541,6 +541,7 @@ seedling <- function(db,
                    treeDomain = NULL,
                    areaDomain = NULL,
                    totals = FALSE,
+                   variance = FALSE,
                    byPlot = FALSE,
                    nCores = 1) {
 
@@ -659,6 +660,7 @@ seedling <- function(db,
       summarize(AREA_TOTAL = sum(aEst, na.rm = TRUE),
                 aVar = sum(aVar, na.rm = TRUE),
                 AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
+                AREA_TOTAL_VAR = aVar,
                 nPlots_AREA = sum(plotIn_AREA, na.rm = TRUE))
     # Tree
     tTotal <- tEst %>%
@@ -667,8 +669,10 @@ seedling <- function(db,
       summarize(TREE_TOTAL = sum(tEst, na.rm = TRUE),
                 ## Variances
                 treeVar = sum(tVar, na.rm = TRUE),
+                TREE_VAR = treeVar,
                 #aVar = first(aVar),
                 cvT = sum(cvEst_t, na.rm = TRUE),
+                N = sum(N, na.rm = TRUE),
                 ## Sampling Errors
                 TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
                 nPlots_SEEDLING = sum(plotIn_TREE, na.rm = TRUE)) #%>%
@@ -693,21 +697,37 @@ seedling <- function(db,
         left_join(tpTotal, by = unique(propGrp)) %>%
         mutate(TPA = TREE_TOTAL / AREA_TOTAL,
                tpaVar = (1/AREA_TOTAL^2) * (treeVar + (TPA^2 * aVar) - 2 * TPA * cvT),
+               TPA_VAR = tpaVar,
                TPA_SE = sqrt(tpaVar) / TPA * 100,
                TPA_PERC = TREE_TOTAL / (TREE_TOTAL_full) * 100,
                tpVar = (1/TREE_TOTAL_full^2) * (treeVar + (TPA_PERC^2 * tTVar) - 2 * TPA_PERC * cvTT),
+               TPA_PERC_VAR = tpVar,
                TPA_PERC_SE = sqrt(tpVar) / TPA_PERC * 100)
     })
 
 
     if (totals) {
-      tOut <- tTotal %>%
-        select(grpBy, TPA, TPA_PERC, TREE_TOTAL, AREA_TOTAL, TPA_SE,
-               TPA_PERC_SE, TREE_SE, AREA_TOTAL_SE, nPlots_SEEDLING, nPlots_AREA)
+      if (variance){
+        tOut <- tTotal %>%
+          select(grpBy, TPA, TPA_PERC, TREE_TOTAL, AREA_TOTAL, TPA_VAR,
+                 TPA_PERC_VAR, TREE_VAR, AREA_TOTAL_VAR, nPlots_SEEDLING, nPlots_AREA, N)
+      } else {
+        tOut <- tTotal %>%
+          select(grpBy, TPA, TPA_PERC, TREE_TOTAL, AREA_TOTAL, TPA_SE,
+                 TPA_PERC_SE, TREE_SE, AREA_TOTAL_SE, nPlots_SEEDLING, nPlots_AREA)
+      }
+
     } else {
-      tOut <- tTotal %>%
-        select(grpBy, TPA, TPA_PERC,  TPA_SE,
-               TPA_PERC_SE, nPlots_SEEDLING, nPlots_AREA)
+      if (variance){
+        tOut <- tTotal %>%
+          select(grpBy, TPA, TPA_PERC,  TPA_VAR,
+                 TPA_PERC_VAR, nPlots_SEEDLING, nPlots_AREA, N)
+      } else {
+        tOut <- tTotal %>%
+          select(grpBy, TPA, TPA_PERC,  TPA_SE,
+                 TPA_PERC_SE, nPlots_SEEDLING, nPlots_AREA)
+      }
+
     }
 
     # Snag the names

@@ -656,6 +656,7 @@ growMort <- function(db,
                      treeDomain = NULL,
                      areaDomain = NULL,
                      totals = FALSE,
+                     variance = FALSE,
                      byPlot = FALSE,
                      nCores = 1) {
 
@@ -816,12 +817,25 @@ growMort <- function(db,
                RECR_PERC_SE = sqrt(rpVar) / RECR_PERC * 100,
                MORT_PERC_SE = sqrt(mpVar) / MORT_PERC * 100,
                REMV_PERC_SE = sqrt(hpVar) / REMV_PERC * 100,
+               ## Var ratio
+               RECR_TPA_VAR = raVar,
+               MORT_TPA_VAR = maVar,
+               REMV_TPA_VAR = haVar,
+               RECR_PERC_VAR = rpVar,
+               MORT_PERC_VAR = mpVar,
+               REMV_PERC_VAR = hpVar,
                ## SE TOTAL
                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL *100,
                TREE_TOTAL_SE = sqrt(tVar) / TREE_TOTAL *100,
                RECR_TOTAL_SE = sqrt(rVar) / RECR_TOTAL *100,
                MORT_TOTAL_SE = sqrt(mVar) / MORT_TOTAL *100,
                REMV_TOTAL_SE = sqrt(hVar) / REMV_TOTAL *100,
+               ## VAR TOTAL
+               AREA_TOTAL_VAR = aVar,
+               TREE_TOTAL_VAR = tVar,
+               RECR_TOTAL_VAR = rVar,
+               MORT_TOTAL_VAR = mVar,
+               REMV_TOTAL_VAR = hVar,
                ## nPlots
                # Non-zero plots
                nPlots_TREE = plotIn_t,
@@ -833,17 +847,35 @@ growMort <- function(db,
 
     # Make some columns go away
     if (totals) {
-      tOut <- tOut %>%
-        select(grpBy, RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC,
-               TREE_TOTAL, RECR_TOTAL, MORT_TOTAL, REMV_TOTAL, AREA_TOTAL,
-               RECR_TPA_SE, MORT_TPA_SE, REMV_TPA_SE, RECR_PERC_SE, MORT_PERC_SE, REMV_PERC_SE,
-               TREE_TOTAL_SE, RECR_TOTAL_SE, MORT_TOTAL_SE, REMV_TOTAL_SE, AREA_TOTAL_SE,
-               nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV, nPlots_AREA)
+      if (variance){
+        tOut <- tOut %>%
+          select(grpBy, RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC,
+                 TREE_TOTAL, RECR_TOTAL, MORT_TOTAL, REMV_TOTAL, AREA_TOTAL,
+                 RECR_TPA_VAR, MORT_TPA_VAR, REMV_TPA_VAR, RECR_PERC_VAR, MORT_PERC_VAR, REMV_PERC_VAR,
+                 TREE_TOTAL_VAR, RECR_TOTAL_VAR, MORT_TOTAL_VAR, REMV_TOTAL_VAR, AREA_TOTAL_VAR,
+                 nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV, nPlots_AREA, N)
+      } else {
+        tOut <- tOut %>%
+          select(grpBy, RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC,
+                 TREE_TOTAL, RECR_TOTAL, MORT_TOTAL, REMV_TOTAL, AREA_TOTAL,
+                 RECR_TPA_SE, MORT_TPA_SE, REMV_TPA_SE, RECR_PERC_SE, MORT_PERC_SE, REMV_PERC_SE,
+                 TREE_TOTAL_SE, RECR_TOTAL_SE, MORT_TOTAL_SE, REMV_TOTAL_SE, AREA_TOTAL_SE,
+                 nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV, nPlots_AREA)
+      }
+
     } else {
-      tOut <- tOut %>%
-        select(grpBy, RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC,
-               RECR_TPA_SE, MORT_TPA_SE, REMV_TPA_SE, RECR_PERC_SE, MORT_PERC_SE, REMV_PERC_SE,
-               nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV,nPlots_AREA)
+      if (variance){
+        tOut <- tOut %>%
+          select(grpBy, RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC,
+                 RECR_TPA_VAR, MORT_TPA_VAR, REMV_TPA_VAR, RECR_PERC_VAR, MORT_PERC_VAR, REMV_PERC_VAR,
+                 nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV,nPlots_AREA, N)
+      } else {
+        tOut <- tOut %>%
+          select(grpBy, RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC,
+                 RECR_TPA_SE, MORT_TPA_SE, REMV_TPA_SE, RECR_PERC_SE, MORT_PERC_SE, REMV_PERC_SE,
+                 nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV,nPlots_AREA)
+      }
+
     }
 
     # Snag the names

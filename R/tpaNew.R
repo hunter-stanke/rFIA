@@ -577,6 +577,7 @@ tpa <- function(db,
                 treeDomain = NULL,
                 areaDomain = NULL,
                 totals = FALSE,
+                variance = FALSE,
                 byPlot = FALSE,
                 nCores = 1) {
 
@@ -693,6 +694,7 @@ tpa <- function(db,
       summarize(AREA_TOTAL = sum(aEst, na.rm = TRUE),
                 aVar = sum(aVar, na.rm = TRUE),
                 AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
+                AREA_TOTAL_VAR = aVar,
                 nPlots_AREA = sum(plotIn_AREA, na.rm = TRUE))
     # # Tree
     # tTotal <- tEst %>%
@@ -723,9 +725,13 @@ tpa <- function(db,
             cvB = cvEst_b,
             ## Sampling Errors
             TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
+            TREE_VAR = treeVar,
             BA_SE = sqrt(baVar) / BA_TOTAL * 100,
+            BA_VAR = baVar,
+            N = sum(N, na.rm = TRUE),
             nPlots_TREE = plotIn_TREE) %>%
-      select(grpBy, TREE_TOTAL, BA_TOTAL, treeVar, baVar, cvT, cvB, TREE_SE, BA_SE, nPlots_TREE)
+      select(grpBy, TREE_TOTAL, BA_TOTAL, treeVar, baVar, cvT, cvB, TREE_SE, BA_SE, TREE_VAR, BA_VAR,
+             nPlots_TREE, N)
 
     ## IF using polys, we treat each zone as a unique population
     if (!is.null(polys)){
@@ -755,25 +761,43 @@ tpa <- function(db,
                baaVar = (1/AREA_TOTAL^2) * (baVar + (BAA^2 * aVar) - (2 * BAA * cvB)),
                TPA_SE = sqrt(tpaVar) / TPA * 100,
                BAA_SE = sqrt(baaVar) / BAA * 100,
+               TPA_VAR = tpaVar,
+               BAA_VAR = baaVar,
                TPA_PERC = TREE_TOTAL / (TREE_TOTAL_full) * 100,
                BAA_PERC = BA_TOTAL / (BA_TOTAL_full) * 100,
                tpVar = (1/TREE_TOTAL_full^2) * (treeVar + (TPA_PERC^2 * tTVar) - 2 * TPA_PERC * cvTT),
                bpVar = (1/BA_TOTAL_full^2) * (baVar + (BAA_PERC^2 * bTVar) - (2 * BAA_PERC * cvBT)),
                TPA_PERC_SE = sqrt(tpVar) / TPA_PERC * 100,
-               BAA_PERC_SE = sqrt(bpVar) / BAA_PERC * 100)
+               BAA_PERC_SE = sqrt(bpVar) / BAA_PERC * 100,
+               TPA_PERC_VAR = tpVar,
+               BAA_PERC_VAR = bpVar)
 
 
     })
 
 
     if (totals) {
-      tOut <- tTotal %>%
-        select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC, TREE_TOTAL, BA_TOTAL, AREA_TOTAL, TPA_SE, BAA_SE,
-               TPA_PERC_SE, BAA_PERC_SE, TREE_SE, BA_SE, AREA_TOTAL_SE, nPlots_TREE, nPlots_AREA)
+      if (variance){
+        tOut <- tTotal %>%
+          select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC, TREE_TOTAL, BA_TOTAL, AREA_TOTAL, TPA_VAR, BAA_VAR,
+                 TPA_PERC_VAR, BAA_PERC_VAR, TREE_VAR, BA_VAR, AREA_TOTAL_VAR, nPlots_TREE, nPlots_AREA, N)
+      } else {
+        tOut <- tTotal %>%
+          select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC, TREE_TOTAL, BA_TOTAL, AREA_TOTAL, TPA_SE, BAA_SE,
+                 TPA_PERC_SE, BAA_PERC_SE, TREE_SE, BA_SE, AREA_TOTAL_SE, nPlots_TREE, nPlots_AREA)
+      }
+
     } else {
-      tOut <- tTotal %>%
-        select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC,  TPA_SE, BAA_SE,
-               TPA_PERC_SE, BAA_PERC_SE, nPlots_TREE, nPlots_AREA)
+      if (variance) {
+        tOut <- tTotal %>%
+          select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC,  TPA_VAR, BAA_VAR,
+                 TPA_PERC_VAR, BAA_PERC_VAR, nPlots_TREE, nPlots_AREA, N)
+      } else {
+        tOut <- tTotal %>%
+          select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC,  TPA_SE, BAA_SE,
+                 TPA_PERC_SE, BAA_PERC_SE, nPlots_TREE, nPlots_AREA)
+      }
+
     }
 
     # Snag the names

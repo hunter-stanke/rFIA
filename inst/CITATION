@@ -1,0 +1,26 @@
+
+
+if (!exists("meta") || is.null(meta)) meta <- packageDescription("rFIA")
+
+citHeader("To cite package", sQuote(meta$Package), "in publications use:")
+
+year <- sub(".*(2[[:digit:]]{3})-.*", "\\1", meta$Date, perl = TRUE)
+vers <- paste("R package version", meta$Version)
+
+citEntry(entry = "Article",
+  title        = "{rFIA}: An R package for estimation of forest attributes with the US Forest Inventory and Analysis database",
+  author       = personList(as.person("Hunter Stanke"), as.person("Andrew O Finley"), as.person("Aaron S Weed"), as.person("Brian F Walters"), as.person("Grant M Domke")),
+  journal      = "Environmental Modelling & Software",
+  year         = "2020",
+  volume       = "127",
+  number       = "",
+  pages        = "104664",
+  url          = "https://www.sciencedirect.com/science/article/abs/pii/S1364815219311089?via%3Dihub",
+
+  textVersion  =
+  paste("Stanke, H., Finley, A. O., Weed, A. S., Walters, B. F., & Domke, G. M. (2020).",
+        "rFIA: An R package for estimation of forest attributes with the US Forest Inventory and Analysis database.",
+        "Environmental Modelling & Software, 127, 104664.")
+)
+
+

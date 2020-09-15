@@ -320,6 +320,8 @@ vrHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
               gaEst = unitMean(ESTN_METHOD, a, nh, w, gaStrat),
               bioEst = unitMean(ESTN_METHOD, a, nh, w, bioStrat),
               bioAEst = unitMean(ESTN_METHOD, a, nh, w, bioAStrat),
+
+              N = first(p2eu),
               #aEst = first(aEst),
               # Estimation of unit variance
               tVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tv, tStrat, tEst),

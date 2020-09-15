@@ -574,6 +574,7 @@ biomass <- function(db,
                        treeDomain = NULL,
                        areaDomain = NULL,
                        totals = FALSE,
+                       variance = FALSE,
                        byPlot = FALSE,
                        nCores = 1) {
 
@@ -751,6 +752,26 @@ biomass <- function(db,
                CARB_AG_TOTAL_SE = sqrt(cagVar) / CARB_AG_TOTAL *100,
                CARB_BG_TOTAL_SE = sqrt(cbgVar) / CARB_BG_TOTAL *100,
                CARB_TOTAL_SE = sqrt(ctVar) / CARB_TOTAL *100,
+
+               ## VAR RATIO
+               NETVOL_ACRE_VAR = nvaVar,
+               SAWVOL_ACRE_VAR = svaVar,
+               BIO_AG_ACRE_VAR = baaVar,
+               BIO_BG_ACRE_VAR = bbaVar,
+               BIO_ACRE_VAR = btaVar,
+               CARB_AG_ACRE_VAR = caaVar,
+               CARB_BG_ACRE_VAR = cbaVar,
+               CARB_ACRE_VAR = ctaVar,
+               ## VAR TOTAL
+               AREA_TOTAL_VAR = aVar,
+               NETVOL_TOTAL_VAR = nvVar,
+               SAWVOL_TOTAL_VAR = svVar,
+               BIO_AG_TOTAL_VAR = bagVar,
+               BIO_BG_TOTAL_VAR = bbgVar,
+               BIO_TOTAL_VAR = btVar,
+               CARB_AG_TOTAL_VAR = cagVar,
+               CARB_BG_TOTAL_VAR = cbgVar,
+               CARB_TOTAL_VAR = ctVar,
                ## nPlots
                nPlots_TREE = plotIn_TREE,
                nPlots_AREA = plotIn_AREA)
@@ -759,24 +780,50 @@ biomass <- function(db,
 
     if (totals) {
 
-      tOut <- tOut %>%
-        select(grpBy, "NETVOL_ACRE","SAWVOL_ACRE","BIO_AG_ACRE","BIO_BG_ACRE",
-               "BIO_ACRE","CARB_AG_ACRE","CARB_BG_ACRE","CARB_ACRE","NETVOL_TOTAL",
-               "SAWVOL_TOTAL","BIO_AG_TOTAL","BIO_BG_TOTAL","BIO_TOTAL","CARB_AG_TOTAL",
-               "CARB_BG_TOTAL","CARB_TOTAL", "AREA_TOTAL","NETVOL_ACRE_SE",
-               "SAWVOL_ACRE_SE","BIO_AG_ACRE_SE", "BIO_BG_ACRE_SE", "BIO_ACRE_SE",
-               "CARB_AG_ACRE_SE","CARB_BG_ACRE_SE","CARB_ACRE_SE","NETVOL_TOTAL_SE",
-               "SAWVOL_TOTAL_SE",  "BIO_AG_TOTAL_SE",  "BIO_BG_TOTAL_SE",
-               "BIO_TOTAL_SE", "CARB_AG_TOTAL_SE", "CARB_BG_TOTAL_SE", "CARB_TOTAL_SE",
-               "AREA_TOTAL_SE","nPlots_TREE","nPlots_AREA")
+      if (variance){
+        tOut <- tOut %>%
+          select(grpBy, "NETVOL_ACRE","SAWVOL_ACRE","BIO_AG_ACRE","BIO_BG_ACRE",
+                 "BIO_ACRE","CARB_AG_ACRE","CARB_BG_ACRE","CARB_ACRE","NETVOL_TOTAL",
+                 "SAWVOL_TOTAL","BIO_AG_TOTAL","BIO_BG_TOTAL","BIO_TOTAL","CARB_AG_TOTAL",
+                 "CARB_BG_TOTAL","CARB_TOTAL", "AREA_TOTAL","NETVOL_ACRE_VAR",
+                 "SAWVOL_ACRE_VAR","BIO_AG_ACRE_VAR", "BIO_BG_ACRE_VAR", "BIO_ACRE_VAR",
+                 "CARB_AG_ACRE_VAR","CARB_BG_ACRE_VAR","CARB_ACRE_VAR","NETVOL_TOTAL_VAR",
+                 "SAWVOL_TOTAL_VAR",  "BIO_AG_TOTAL_VAR",  "BIO_BG_TOTAL_VAR",
+                 "BIO_TOTAL_VAR", "CARB_AG_TOTAL_VAR", "CARB_BG_TOTAL_VAR", "CARB_TOTAL_VAR",
+                 "AREA_TOTAL_VAR","nPlots_TREE","nPlots_AREA", 'N')
+
+      } else {
+        tOut <- tOut %>%
+          select(grpBy, "NETVOL_ACRE","SAWVOL_ACRE","BIO_AG_ACRE","BIO_BG_ACRE",
+                 "BIO_ACRE","CARB_AG_ACRE","CARB_BG_ACRE","CARB_ACRE","NETVOL_TOTAL",
+                 "SAWVOL_TOTAL","BIO_AG_TOTAL","BIO_BG_TOTAL","BIO_TOTAL","CARB_AG_TOTAL",
+                 "CARB_BG_TOTAL","CARB_TOTAL", "AREA_TOTAL","NETVOL_ACRE_SE",
+                 "SAWVOL_ACRE_SE","BIO_AG_ACRE_SE", "BIO_BG_ACRE_SE", "BIO_ACRE_SE",
+                 "CARB_AG_ACRE_SE","CARB_BG_ACRE_SE","CARB_ACRE_SE","NETVOL_TOTAL_SE",
+                 "SAWVOL_TOTAL_SE",  "BIO_AG_TOTAL_SE",  "BIO_BG_TOTAL_SE",
+                 "BIO_TOTAL_SE", "CARB_AG_TOTAL_SE", "CARB_BG_TOTAL_SE", "CARB_TOTAL_SE",
+                 "AREA_TOTAL_SE","nPlots_TREE","nPlots_AREA")
+      }
+
+
 
     } else {
-      tOut <- tOut %>%
-        select(grpBy, "NETVOL_ACRE","SAWVOL_ACRE","BIO_AG_ACRE","BIO_BG_ACRE",
-               "BIO_ACRE","CARB_AG_ACRE","CARB_BG_ACRE","CARB_ACRE","NETVOL_ACRE_SE",
-               "SAWVOL_ACRE_SE","BIO_AG_ACRE_SE", "BIO_BG_ACRE_SE", "BIO_ACRE_SE",
-               "CARB_AG_ACRE_SE","CARB_BG_ACRE_SE","CARB_ACRE_SE","nPlots_TREE",
-               "nPlots_AREA")
+      if (variance){
+        tOut <- tOut %>%
+          select(grpBy, "NETVOL_ACRE","SAWVOL_ACRE","BIO_AG_ACRE","BIO_BG_ACRE",
+                 "BIO_ACRE","CARB_AG_ACRE","CARB_BG_ACRE","CARB_ACRE","NETVOL_ACRE_VAR",
+                 "SAWVOL_ACRE_VAR","BIO_AG_ACRE_VAR", "BIO_BG_ACRE_VAR", "BIO_ACRE_VAR",
+                 "CARB_AG_ACRE_VAR","CARB_BG_ACRE_VAR","CARB_ACRE_VAR","nPlots_TREE",
+                 "nPlots_AREA", 'N')
+      } else {
+        tOut <- tOut %>%
+          select(grpBy, "NETVOL_ACRE","SAWVOL_ACRE","BIO_AG_ACRE","BIO_BG_ACRE",
+                 "BIO_ACRE","CARB_AG_ACRE","CARB_BG_ACRE","CARB_ACRE","NETVOL_ACRE_SE",
+                 "SAWVOL_ACRE_SE","BIO_AG_ACRE_SE", "BIO_BG_ACRE_SE", "BIO_ACRE_SE",
+                 "CARB_AG_ACRE_SE","CARB_BG_ACRE_SE","CARB_ACRE_SE","nPlots_TREE",
+                 "nPlots_AREA")
+      }
+
     }
 
     # Snag the names

@@ -84,7 +84,7 @@ vegStructHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
         PROP_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
         ## Otherwise, use the subpplot value
         PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
-      fa = fa * aAdj) #%>%
+      fa = fa * aAdj) %>%
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = aGrpBy) %>%
     summarize(a_t = length(unique(PLT_CN)) / first(P2POINTCNT),
               aStrat = mean(fa * a_t, na.rm = TRUE),
@@ -149,6 +149,7 @@ vegStructHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
     group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
     summarize(cEst = unitMean(ESTN_METHOD, a, nh,  w, cStrat),
               plotIn_VEG = sum(plotIn_VEG, na.rm = TRUE),
+              N = first(p2eu),
               cVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, cv, aStrat, aEst),
               # Unit Covariance
               cvEst_c = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_c, cStrat, cEst, cTStrat, cTEst))

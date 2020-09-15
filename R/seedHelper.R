@@ -198,6 +198,7 @@ seedHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
     summarize(tEst = unitMean(ESTN_METHOD, a, nh,  w, tStrat),
               tTEst = unitMean(ESTN_METHOD, a, nh,  w, tTStrat),
               plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE),
+              N = first(p2eu),
               tVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tv, tStrat, tEst),
               tTVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tTv, tTStrat, tTEst),
               # Unit Covariance

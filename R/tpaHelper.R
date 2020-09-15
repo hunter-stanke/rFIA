@@ -230,6 +230,7 @@ tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
               tTEst = unitMean(ESTN_METHOD, a, nh,  w, tTStrat),
               bTEst = unitMean(ESTN_METHOD, a, nh,  w, bTStrat),
               plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE),
+              N = first(p2eu),
               tVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tv, tStrat, tEst),
               bVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bv, bStrat, bEst),
               tTVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tTv, tTStrat, tTEst),

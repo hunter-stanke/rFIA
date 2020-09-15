@@ -241,6 +241,7 @@ bioHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
               cagEst = unitMean(ESTN_METHOD, a, nh, w, cagStrat),
               cbgEst = unitMean(ESTN_METHOD, a, nh, w, cbgStrat),
               ctEst = unitMean(ESTN_METHOD, a, nh, w, ctStrat),
+              N = first(p2eu),
               # Estimation of unit variance
               nvVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, nvv, nvStrat, nvEst),
               svVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, svv, svStrat, svEst),

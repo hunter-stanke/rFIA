@@ -1,8 +1,11 @@
 
 #### A Start up Message ------------
-.onAttach <- function(libname, pkgname){
-  #packageStartupMessage('Download FIA Data Here: https://apps.fs.usda.gov/fia/datamart/datamart.html')
+.onAttach <- function(lib, pkg) {
+  if(interactive() || getOption("verbose"))
+    packageStartupMessage(sprintf("Package %s (%s) loaded. Check out our website at https://rfia.netlify.app/.\nType citation(\"%s\") for examples of how to cite rFIA.\n", pkg,
+                                  packageDescription(pkg)$Version, pkg))
 }
+
 
 ## Estimate skewness in a distribution of values
 skewness <- function(x, na.rm = TRUE){

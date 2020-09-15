@@ -553,8 +553,9 @@ invasive <- function(db,
                      method = 'TI',
                      lambda = .5,
                      areaDomain = NULL,
-                     byPlot = FALSE,
                      totals = FALSE,
+                     variance = FALSE,
+                     byPlot = FALSE,
                      nCores = 1) {
   ##  don't have to change original code
   grpBy_quo <- rlang::enquo(grpBy)
@@ -668,6 +669,7 @@ invasive <- function(db,
         summarize(AREA_TOTAL = sum(aEst, na.rm = TRUE),
                   aVar = sum(aVar, na.rm = TRUE),
                   AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
+                  AREA_TOTAL_VAR = aVar,
                   nPlots_AREA = sum(plotIn_AREA, na.rm = TRUE))
       # Tree
       tOut <- tEst %>%
@@ -678,23 +680,40 @@ invasive <- function(db,
                   cvEst_i = sum(cvEst_i, na.rm = TRUE),
                   ## Sampling Errors
                   INV_AREA_TOTAL_SE = sqrt(iVar) / INV_AREA_TOTAL * 100,
+                  INV_AREA_TOTAL_VAR = iVar,
+                  N = sum(N, na.rm = TRUE),
                   nPlots_INV = sum(plotIn_INV, na.rm = TRUE)) %>%
         left_join(aTotal, by = aGrpBy) %>%
         mutate(COVER_PCT = INV_AREA_TOTAL / AREA_TOTAL * 100,
                cpVar = (1/AREA_TOTAL^2) * (iVar + (COVER_PCT^2 * aVar) - 2 * COVER_PCT * cvEst_i),
-               COVER_PCT_SE = sqrt(cpVar) / COVER_PCT * 100) %>%
+               COVER_PCT_SE = sqrt(cpVar) / COVER_PCT * 100,
+               COVER_PCT_VAR = cpVar) %>%
         filter(COVER_PCT > 0)
 
     })
 
     if (totals) {
-      tOut <- tOut %>%
-        select(grpBy, "COVER_PCT","INV_AREA_TOTAL", "AREA_TOTAL",
-               "COVER_PCT_SE","INV_AREA_TOTAL_SE", "AREA_TOTAL_SE",
-               "nPlots_INV", "nPlots_AREA")
+      if (variance){
+        tOut <- tOut %>%
+          select(grpBy, "COVER_PCT","INV_AREA_TOTAL", "AREA_TOTAL",
+                 "COVER_PCT_VAR","INV_AREA_TOTAL_VAR", "AREA_TOTAL_VAR",
+                 "nPlots_INV", "nPlots_AREA", "N")
+      } else {
+        tOut <- tOut %>%
+          select(grpBy, "COVER_PCT","INV_AREA_TOTAL", "AREA_TOTAL",
+                 "COVER_PCT_SE","INV_AREA_TOTAL_SE", "AREA_TOTAL_SE",
+                 "nPlots_INV", "nPlots_AREA")
+      }
+
     } else {
-      tOut <- tOut %>%
-        select(grpBy,"COVER_PCT","COVER_PCT_SE","nPlots_INV", "nPlots_AREA")
+      if (variance){
+        tOut <- tOut %>%
+          select(grpBy,"COVER_PCT","COVER_PCT_VAR","nPlots_INV", "nPlots_AREA", 'N')
+      } else {
+        tOut <- tOut %>%
+          select(grpBy,"COVER_PCT","COVER_PCT_SE","nPlots_INV", "nPlots_AREA")
+      }
+
     }
 
     # Snag the names

@@ -148,6 +148,7 @@ invHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
     left_join(select(aEst, ESTN_UNIT_CN, aEst, aVar, aGrpBy), by = c('ESTN_UNIT_CN', aGrpBy)) %>%
     group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
     summarize(iEst = unitMean(ESTN_METHOD, a, nh,  w, iStrat),
+              N = first(p2eu),
               plotIn_INV = sum(plotIn_INV, na.rm = TRUE),
               iVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, iv, iStrat, iEst),
               # Unit Covariance

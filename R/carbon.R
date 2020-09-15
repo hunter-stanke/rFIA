@@ -530,6 +530,7 @@ carbon <- function(db,
                     lambda = .5,
                     areaDomain = NULL,
                     totals = FALSE,
+                    variance = FALSE,
                     byPlot = FALSE,
                     nCores = 1) {
 
@@ -646,11 +647,15 @@ carbon <- function(db,
                CARB_ACRE = CARB_TOTAL / AREA_TOTAL,
                ## Ratio Var
                caVar = (1/AREA_TOTAL^2) * (cVar + (CARB_ACRE^2 * aVar) - 2 * CARB_ACRE * cvEst_c),
+               CARB_ACRE_VAR = caVar,
                ## SE RATIO
                CARB_ACRE_SE = sqrt(caVar) / CARB_ACRE *100,
                ## SE TOTAL
                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL *100,
                CARB_TOTAL_SE = sqrt(caVar) / CARB_TOTAL *100,
+               ## Var total
+               AREA_TOTAL_VAR = aVar,
+               CARB_TOTAL_VAR = caVar,
                ## nPlots
                nPlots_TREE = plotIn_TREE,
                nPlots_AREA = plotIn_AREA)
@@ -659,14 +664,30 @@ carbon <- function(db,
 
     if (totals) {
 
-      tOut <- tOut %>%
-        select(grpBy, "CARB_ACRE","CARB_TOTAL", "AREA_TOTAL","CARB_ACRE_SE", "CARB_TOTAL_SE",
-               "AREA_TOTAL_SE","nPlots_TREE","nPlots_AREA")
+      if (variance){
+        tOut <- tOut %>%
+          select(grpBy, "CARB_ACRE","CARB_TOTAL", "AREA_TOTAL","CARB_ACRE_VAR", "CARB_TOTAL_VAR",
+                 "AREA_TOTAL_VAR","nPlots_TREE","nPlots_AREA", 'N')
+      } else {
+        tOut <- tOut %>%
+          select(grpBy, "CARB_ACRE","CARB_TOTAL", "AREA_TOTAL","CARB_ACRE_SE", "CARB_TOTAL_SE",
+                 "AREA_TOTAL_SE","nPlots_TREE","nPlots_AREA")
+      }
+
+
 
     } else {
-      tOut <- tOut %>%
-        select(grpBy, "CARB_ACRE","CARB_ACRE_SE",
-               "nPlots_TREE","nPlots_AREA")
+
+      if (variance){
+        tOut <- tOut %>%
+          select(grpBy, "CARB_ACRE","CARB_ACRE_VAR",
+                 "nPlots_TREE","nPlots_AREA", 'N')
+      } else {
+        tOut <- tOut %>%
+          select(grpBy, "CARB_ACRE","CARB_ACRE_SE",
+                 "nPlots_TREE","nPlots_AREA")
+      }
+
     }
 
     # Snag the names

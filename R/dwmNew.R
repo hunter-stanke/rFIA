@@ -506,8 +506,9 @@ dwm <- function(db,
                            method = 'TI',
                            lambda = .5,
                            areaDomain = NULL,
-                           byPlot = FALSE,
                            totals = FALSE,
+                           variance = FALSE,
+                           byPlot = FALSE,
                            tidy = TRUE,
                            nCores = 1) {
 
@@ -687,6 +688,33 @@ dwm <- function(db,
                CARB_1000HR_SE = sqrt(ccVar) / CARB_1000HR * 100,
                CARB_PILE_SE = sqrt(cpVar) / CARB_PILE * 100,
                CARB_SE = sqrt(cVar) / CARB * 100,
+               # variance totals
+               AREA_TOTAL_VAR = aVar,
+               VOL_DUFF_VAR = NA,
+               VOL_LITTER_VAR = NA,
+               VOL_1HR_VAR = vsmVar,
+               VOL_10HR_VAR = vmdVar,
+               VOL_100HR_VAR = vlgVar,
+               VOL_1000HR_VAR = vcVar,
+               VOL_PILE_VAR = vpVar,
+               VOL_VAR = vVar,
+               BIO_DUFF_VAR = bdVar,
+               BIO_LITTER_VAR = blVar,
+               BIO_1HR_VAR = bsmVar,
+               BIO_10HR_VAR = bmdVar,
+               BIO_100HR_VAR = blgVar,
+               BIO_1000HR_VAR = bcVar,
+               BIO_PILE_VAR = bpVar,
+               BIO_VAR = bVar,
+               CARB_DUFF_VAR = cdVar,
+               CARB_LITTER_VAR = clVar,
+               CARB_1HR_VAR = csmVar,
+               CARB_10HR_VAR = cmdVar,
+               CARB_100HR_VAR = clgVar,
+               CARB_1000HR_VAR = ccVar,
+               CARB_PILE_VAR = cpVar,
+               CARB_VAR = cVar,
+
                # Per Acre variances
                vsmVar = (1/AREA_TOTAL^2) * (vsmVar + (VOL_1HR_ACRE^2 * aVar - 2 * VOL_1HR_ACRE * cvEst_vsm)),
                vmdVar = (1/AREA_TOTAL^2) * (vmdVar + (VOL_10HR_ACRE^2 * aVar - 2 * VOL_10HR_ACRE * cvEst_vmd)),
@@ -710,6 +738,32 @@ dwm <- function(db,
                ccVar = (1/AREA_TOTAL^2) * (ccVar + (CARB_1000HR_ACRE^2 * aVar - 2 * CARB_1000HR_ACRE * cvEst_cc)),
                cpVar = (1/AREA_TOTAL^2) * (cpVar + (CARB_PILE_ACRE^2 * aVar - 2 * CARB_PILE_ACRE * cvEst_cp)),
                cVar = (1/AREA_TOTAL^2) * (cVar + (CARB_ACRE^2 * aVar - 2 * CARB_ACRE * cvEst_c)),
+               # Per Acre variances -- for output
+               VOL_DUFF_ACRE_VAR = NA,
+               VOL_LITTER_ACRE_VAR = NA,
+               VOL_1HR_ACRE_VAR = vsmVar,
+               VOL_10HR_ACRE_VAR = vmdVar,
+               VOL_100HR_ACRE_VAR = vlgVar,
+               VOL_1000HR_ACRE_VAR = vcVar,
+               VOL_PILE_ACRE_VAR = vpVar,
+               VOL_ACRE_VAR = vVar,
+               BIO_DUFF_ACRE_VAR = bdVar,
+               BIO_LITTER_ACRE_VAR = blVar,
+               BIO_1HR_ACRE_VAR = bsmVar,
+               BIO_10HR_ACRE_VAR = bmdVar,
+               BIO_100HR_ACRE_VAR = blgVar,
+               BIO_1000HR_ACRE_VAR = bcVar,
+               BIO_PILE_ACRE_VAR = bpVar,
+               BIO_ACRE_VAR = bVar,
+               CARB_DUFF_ACRE_VAR = cdVar,
+               CARB_LITTER_ACRE_VAR = clVar,
+               CARB_1HR_ACRE_VAR = csmVar,
+               CARB_10HR_ACRE_VAR = cmdVar,
+               CARB_100HR_ACRE_VAR = clgVar,
+               CARB_1000HR_ACRE_VAR = ccVar,
+               CARB_PILE_ACRE_VAR = cpVar,
+               CARB_ACRE_VAR = cVar,
+
                # Per acre sampling errors
                VOL_DUFF_ACRE_SE = NA,
                VOL_LITTER_ACRE_SE = NA,
@@ -739,25 +793,51 @@ dwm <- function(db,
     })
     # Remove the total values if told to do so
     if (totals) {
-      tOut <- tOut %>%
-        select(grpBy, names(tOut)[str_detect(names(tOut), 'Var', negate = TRUE) &
-                                    str_detect(names(tOut), 'cvEst', negate = TRUE) &
-                                    str_detect(names(tOut), 'Est', negate = TRUE)], nPlots_DWM)
+      if (variance){
+        tOut <- tOut %>%
+          select(grpBy, names(tOut)[str_detect(names(tOut), 'Var', negate = TRUE) &
+                                      str_detect(names(tOut), 'cvEst', negate = TRUE) &
+                                      str_detect(names(tOut), 'SE', negate = TRUE) &
+                                      str_detect(names(tOut), 'Est', negate = TRUE)], nPlots_DWM, N)
+      } else {
+        tOut <- tOut %>%
+          select(grpBy, names(tOut)[str_detect(names(tOut), 'Var', negate = TRUE) &
+                                      str_detect(names(tOut), 'cvEst', negate = TRUE) &
+                                      str_detect(names(tOut), 'VAR', negate = TRUE) &
+                                      str_detect(names(tOut), 'Est', negate = TRUE)], nPlots_DWM, N)
+      }
+
     } else {
-      tOut <- tOut %>%
-        select(grpBy, names(tOut)[str_detect(names(tOut), 'Var', negate = TRUE) &
-                                    str_detect(names(tOut), 'cvEst', negate = TRUE) &
-                                    str_detect(names(tOut), 'Est', negate = TRUE) &
-                                    str_detect(names(tOut), 'ACRE')], nPlots_DWM)
+      if (variance){
+        tOut <- tOut %>%
+          select(grpBy, names(tOut)[str_detect(names(tOut), 'Var', negate = TRUE) &
+                                      str_detect(names(tOut), 'cvEst', negate = TRUE) &
+                                      str_detect(names(tOut), 'Est', negate = TRUE) &
+                                      str_detect(names(tOut), 'SE', negate = TRUE) &
+                                      str_detect(names(tOut), 'ACRE')], nPlots_DWM, N)
+      } else {
+        tOut <- tOut %>%
+          select(grpBy, names(tOut)[str_detect(names(tOut), 'Var', negate = TRUE) &
+                                      str_detect(names(tOut), 'cvEst', negate = TRUE) &
+                                      str_detect(names(tOut), 'Est', negate = TRUE) &
+                                      str_detect(names(tOut), 'VAR', negate = TRUE) &
+                                      str_detect(names(tOut), 'ACRE')], nPlots_DWM, N)
+      }
     }
 
     # Snag the names
     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
 
+
     ## Tidy things up if they didn't specify polys, returnSpatial
     if (tidy & is.null(polys) & returnSpatial == FALSE){
+
+      ## Writing the variance options after the below, and don't want to change below
+      ## So instead, do a temporary name swap
+      if (variance) names(tOut) <- str_replace(names(tOut), '_VAR', '_SE')
+
       ## pivot longer
-      bio <- pivot_longer(select(tOut, grpBy, BIO_DUFF_ACRE:BIO_ACRE, nPlots_DWM), names_to = 'FUEL_TYPE', values_to = 'BIO_ACRE', cols = BIO_DUFF_ACRE:BIO_ACRE) %>%
+      bio <- pivot_longer(select(tOut, grpBy, BIO_DUFF_ACRE:BIO_ACRE, nPlots_DWM, N), names_to = 'FUEL_TYPE', values_to = 'BIO_ACRE', cols = BIO_DUFF_ACRE:BIO_ACRE) %>%
         mutate(FUEL_TYPE = str_split(FUEL_TYPE,pattern= '_', simplify = TRUE,)[,2])
       bio_SE <-pivot_longer(select(tOut, grpBy, BIO_DUFF_ACRE_SE:BIO_ACRE_SE), names_to = 'FUEL_TYPE', values_to = 'BIO_ACRE_SE', cols = BIO_DUFF_ACRE_SE:BIO_ACRE_SE) %>%
         mutate(FUEL_TYPE = str_split(FUEL_TYPE,pattern= '_', simplify = TRUE,)[,2])
@@ -775,7 +855,7 @@ dwm <- function(db,
         left_join(vol_SE, by = c(grpBy, 'FUEL_TYPE')) %>%
         left_join(carb, by = c(grpBy, 'FUEL_TYPE')) %>%
         left_join(carb_SE, by = c(grpBy, 'FUEL_TYPE')) %>%
-        select(grpBy, FUEL_TYPE, VOL_ACRE, BIO_ACRE, CARB_ACRE, VOL_ACRE_SE, BIO_ACRE_SE, CARB_ACRE_SE, nPlots_DWM) %>%
+        select(grpBy, FUEL_TYPE, VOL_ACRE, BIO_ACRE, CARB_ACRE, VOL_ACRE_SE, BIO_ACRE_SE, CARB_ACRE_SE, nPlots_DWM, N) %>%
         filter(FUEL_TYPE %in% 'ACRE' == FALSE)
 
       if (totals){
@@ -804,10 +884,14 @@ dwm <- function(db,
           select(grpBy, FUEL_TYPE, VOL_ACRE, BIO_ACRE, CARB_ACRE, VOL_TOTAL, BIO_TOTAL, CARB_TOTAL,
                  AREA_TOTAL, VOL_ACRE_SE, BIO_ACRE_SE, CARB_ACRE_SE,
                  VOL_TOTAL_SE, BIO_TOTAL_SE, CARB_TOTAL_SE,
-                  AREA_TOTAL_SE, nPlots_DWM) %>%
+                  AREA_TOTAL_SE, nPlots_DWM, N) %>%
           filter(FUEL_TYPE %in% 'ACRE' == FALSE)
       }
       tOut <- fuel
+
+      ## Writing the variance options after the below, and don't want to change below
+      ## So instead, do a temporary name swap
+      if (variance) names(tOut) <- str_replace(names(tOut), '_SE', '_VAR')
 
     }
   } # End byPlot

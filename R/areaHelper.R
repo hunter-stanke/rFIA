@@ -92,6 +92,7 @@ areaHelper2 <- function(x, popState, t, grpBy, method){
     group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
     summarize(aEst = unitMean(ESTN_METHOD, a, nh,  w, aStrat),
               aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, av, aStrat, aEst),
+              N = first(p2eu),
               plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
 
   out <- list(tEst = tEst)

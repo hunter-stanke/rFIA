@@ -119,6 +119,7 @@ ssHelper2 <- function(x, popState, t, grpBy, method){
               maEst = unitMean(ESTN_METHOD, a, nh,  w, maStrat),
               lEst = unitMean(ESTN_METHOD, a, nh,  w, lStrat),
               moEst = unitMean(ESTN_METHOD, a, nh,  w, moStrat),
+              N = first(p2eu),
               aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, av, aStrat, aEst),
               pVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, pv, pStrat, pEst),
               maVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, mav, maStrat, maEst),

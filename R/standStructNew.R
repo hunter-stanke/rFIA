@@ -7,8 +7,8 @@ standStructStarter <- function(x,
                                method = 'TI',
                                lambda = .5,
                                areaDomain = NULL,
-                               byPlot = FALSE,
                                totals = FALSE,
+                               byPlot = FALSE,
                                tidy = TRUE,
                                nCores = 1,
                                remote,
@@ -502,8 +502,9 @@ standStruct <- function(db,
                           method = 'TI',
                           lambda = .5,
                           areaDomain = NULL,
-                          byPlot = FALSE,
                           totals = FALSE,
+                          variance = FALSE,
+                          byPlot = FALSE,
                           tidy = TRUE,
                           nCores = 1) {
 
@@ -563,7 +564,7 @@ standStruct <- function(db,
                 grpBy_quo = grpBy_quo, polys, returnSpatial,
                 landType, method,
                 lambda, areaDomain,
-                byPlot, totals, tidy, nCores, remote, mr)
+                totals, byPlot, tidy, nCores, remote, mr)
   ## Bring the results back
   out <- unlist(out, recursive = FALSE)
   tEst <- bind_rows(out[names(out) == 'tEst'])
@@ -627,28 +628,57 @@ standStruct <- function(db,
                MATURE_PERC_SE = sqrt(mapVar) / MATURE_PERC * 100,
                LATE_PERC_SE = sqrt(lpVar) / LATE_PERC * 100,
                MOSAIC_PERC_SE = sqrt(mopVar) / MOSAIC_PERC * 100,
+               ## VAR RATIO
+               POLE_PERC_VAR = ppVar,
+               MATURE_PERC_VAR = mapVar,
+               LATE_PERC_VAR = lpVar,
+               MOSAIC_PERC_VAR = mopVar,
                ## SE TOTAL
                POLE_AREA_SE = sqrt(pVar) / POLE_AREA * 100,
                MATURE_AREA_SE = sqrt(maVar) / MATURE_AREA * 100,
                LATE_AREA_SE = sqrt(lVar) / LATE_AREA * 100,
                MOSAIC_AREA_SE = sqrt(moVar) / MOSAIC_AREA * 100,
                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL *100,
+               ## VAR TOTAL
+               POLE_AREA_VAR = pVar,
+               MATURE_AREA_VAR = maVar,
+               LATE_AREA_VAR = lVar,
+               MOSAIC_AREA_VAR = moVar,
+               AREA_TOTAL_VAR = aVar,
                ## nPlots
                nPlots_AREA = plotIn_AREA)
     })
 
     if (totals) {
-      tOut <- tOut %>%
-        select(grpBy,"POLE_PERC","MATURE_PERC", "LATE_PERC", "MOSAIC_PERC",
-               "POLE_AREA","MATURE_AREA","LATE_AREA","MOSAIC_AREA","AREA_TOTAL",
-               "POLE_PERC_SE","MATURE_PERC_SE","LATE_PERC_SE",   "MOSAIC_PERC_SE",
-               "POLE_AREA_SE",   "MATURE_AREA_SE", "LATE_AREA_SE",   "MOSAIC_AREA_SE",
-               "AREA_TOTAL_SE","nPlots_AREA")
+      if (variance) {
+        tOut <- tOut %>%
+          select(grpBy,"POLE_PERC","MATURE_PERC", "LATE_PERC", "MOSAIC_PERC",
+                 "POLE_AREA","MATURE_AREA","LATE_AREA","MOSAIC_AREA","AREA_TOTAL",
+                 "POLE_PERC_VAR","MATURE_PERC_VAR","LATE_PERC_VAR",   "MOSAIC_PERC_VAR",
+                 "POLE_AREA_VAR",   "MATURE_AREA_VAR", "LATE_AREA_VAR",   "MOSAIC_AREA_VAR",
+                 "AREA_TOTAL_VAR","nPlots_AREA", 'N')
+      } else {
+        tOut <- tOut %>%
+          select(grpBy,"POLE_PERC","MATURE_PERC", "LATE_PERC", "MOSAIC_PERC",
+                 "POLE_AREA","MATURE_AREA","LATE_AREA","MOSAIC_AREA","AREA_TOTAL",
+                 "POLE_PERC_SE","MATURE_PERC_SE","LATE_PERC_SE",   "MOSAIC_PERC_SE",
+                 "POLE_AREA_SE",   "MATURE_AREA_SE", "LATE_AREA_SE",   "MOSAIC_AREA_SE",
+                 "AREA_TOTAL_SE","nPlots_AREA")
+      }
+
     } else {
-      tOut <- tOut %>%
-        select(grpBy,"POLE_PERC","MATURE_PERC", "LATE_PERC", "MOSAIC_PERC",
-               "POLE_PERC_SE","MATURE_PERC_SE","LATE_PERC_SE",   "MOSAIC_PERC_SE",
-               "nPlots_AREA")
+      if (variance){
+        tOut <- tOut %>%
+          select(grpBy,"POLE_PERC","MATURE_PERC", "LATE_PERC", "MOSAIC_PERC",
+                 "POLE_PERC_VAR","MATURE_PERC_VAR","LATE_PERC_VAR",   "MOSAIC_PERC_VAR",
+                 "nPlots_AREA", 'N')
+      } else {
+        tOut <- tOut %>%
+          select(grpBy,"POLE_PERC","MATURE_PERC", "LATE_PERC", "MOSAIC_PERC",
+                 "POLE_PERC_SE","MATURE_PERC_SE","LATE_PERC_SE",   "MOSAIC_PERC_SE",
+                 "nPlots_AREA")
+      }
+
     }
 
     # Snag the names
@@ -657,6 +687,10 @@ standStruct <- function(db,
 
     ## Tidy things up if they didn't specify polys, returnSpatial
     if (tidy & is.null(polys) & returnSpatial == FALSE){
+      ## Writing the variance options after the below, and don't want to change below
+      ## So instead, do a temporary name swap
+      if (variance) names(tOut) <- str_replace(names(tOut), '_VAR', '_SE')
+
       ## pivot longer
       stagePERC <- pivot_longer(select(tOut, grpBy, POLE_PERC:MOSAIC_PERC, nPlots_AREA), names_to = 'STAGE', values_to = 'PERC', cols = POLE_PERC:MOSAIC_PERC) %>%
         mutate(STAGE = str_split(STAGE,pattern= '_', simplify = TRUE,)[,1])
@@ -678,6 +712,10 @@ standStruct <- function(db,
           select(grpBy, STAGE, PERC, AREA, PERC_SE, AREA_SE, nPlots_AREA)
       }
       tOut <- stage
+
+      ## Writing the variance options after the below, and don't want to change below
+      ## So instead, do a temporary name swap
+      if (variance) names(tOut) <- str_replace(names(tOut), '_SE', '_VAR')
 
       }
     } # End byPlot

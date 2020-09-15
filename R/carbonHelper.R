@@ -316,6 +316,7 @@ carbonHelper2 <- function(x, popState, t, a, grpBy, method, byPool, byComponent,
     group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
     summarize(cEst = unitMean(ESTN_METHOD, a, nh, w, cStrat),
               aEst = unitMean(ESTN_METHOD, a, nh,  w, aStrat),
+              N = first(p2eu),
               # Estimation of unit variance
               cVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, cv, cStrat, cEst),
               aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, av, aStrat, aEst),

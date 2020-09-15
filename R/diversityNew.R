@@ -543,6 +543,7 @@ diversity <- function(db,
                       areaDomain = NULL,
                       byPlot = FALSE,
                       totals = FALSE,
+                      variance = FALSE,
                       nCores = 1) {
 
   ##  don't have to change original code
@@ -657,11 +658,15 @@ diversity <- function(db,
                haVar = (1/AREA_TOTAL^2) * (hVar + (H_a^2 * aVar) - 2 * H_a * cvEst_h),
                ehaVar = (1/AREA_TOTAL^2) * (ehVar + (Eh_a^2 * aVar) - (2 * Eh_a * cvEst_eh)),
                saVar = (1/AREA_TOTAL^2) * (sVar + (S_a^2 * aVar) - 2 * S_a * cvEst_s),
+               H_a_VAR = haVar,
+               Eh_a_VAR = ehaVar,
+               S_a_VAR = saVar,
                ## RATIO SE
                H_a_SE = sqrt(haVar) / H_a * 100,
                Eh_a_SE = sqrt(ehaVar) / Eh_a * 100,
                S_a_SE = sqrt(saVar) / S_a * 100,
                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
+               AREA_TOTAL_VAR = aVar,
                nPlots = plotIn_AREA)
     })
 
@@ -680,34 +685,25 @@ diversity <- function(db,
              S_b = S_g - S_a)
 
 
-    ## Which grpByNames are in which table? Helps us subset below
-    #grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
-    #grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
-    #grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
-    #### REALLY DON'T LIKE WORKING WITH FULL TABLES, WORK ON A FIX
-    #### Only joining tables necessary to produce plot level estimates, adjusted for non-response
-    ##fullArea <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', grpP, 'aD_p', 'sp')) %>%
-    #  left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
-    #  left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'grp', 'state', 'SUBP', 'TREE', grpT, 'tD', 'typeD')), by = c('PLT_CN', 'CONDID')) %>%
-    #  left_join(select(pops, PLT_CN, YEAR), by = 'PLT_CN') %>%
-    #  mutate(tDI = landD * aD_p * aD_c * tD * typeD * sp) %>%
-    #  group_by(.dots = grpBy) %>%
-    #  summarize(H_g = divIndex(grp, state * tDI, index = 'H'),
-    #            Eh_g = divIndex(grp, state * tDI, index = 'Eh'),
-    #            S_g = divIndex(grp, state * tDI, index = 'S'))#
-
-    #tOut <- left_join(tOut, fullArea, by = grpBy) %>%
-    #  mutate(H_b = H_g - H_a,
-    #         Eh_b = Eh_g - Eh_a,
-    #         S_b = S_g - S_a)
-
     if (totals) {
-      tOut <- tOut %>%
-        select(grpBy, H_a, H_b, H_g, Eh_a, Eh_b, Eh_g, S_a, S_b, S_g, AREA_TOTAL, H_a_SE, Eh_a_SE, S_a_SE, AREA_TOTAL_SE, nPlots)
+      if (variance){
+        tOut <- tOut %>%
+          select(grpBy, H_a, H_b, H_g, Eh_a, Eh_b, Eh_g, S_a, S_b, S_g, AREA_TOTAL, H_a_VAR, Eh_a_VAR, S_a_VAR, AREA_TOTAL_VAR, nPlots, N)
+
+      } else {
+        tOut <- tOut %>%
+          select(grpBy, H_a, H_b, H_g, Eh_a, Eh_b, Eh_g, S_a, S_b, S_g, AREA_TOTAL, H_a_SE, Eh_a_SE, S_a_SE, AREA_TOTAL_SE, nPlots)
+      }
 
     } else {
-      tOut <- tOut %>%
-        select(grpBy, H_a, H_b, H_g, Eh_a, Eh_b, Eh_g, S_a, S_b, S_g, nPlots)
+      if (variance){
+        tOut <- tOut %>%
+          select(grpBy, H_a, H_b, H_g, Eh_a, Eh_b, Eh_g, S_a, S_b, S_g,  H_a_VAR, Eh_a_VAR, S_a_VAR,  nPlots, N)
+
+      } else {
+        tOut <- tOut %>%
+          select(grpBy, H_a, H_b, H_g, Eh_a, Eh_b, Eh_g, S_a, S_b, S_g,  H_a_SE, Eh_a_SE, S_a_SE,  nPlots)
+      }
     }
 
     # Snag the names

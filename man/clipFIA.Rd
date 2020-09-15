@@ -12,7 +12,7 @@ clipFIA(db, mostRecent = TRUE, mask = NULL, matchEval = FALSE,
 }
 
 \arguments{
-  \item{db}{FIA.Database or \code{Remote.FIA.Database} produced from \code{\link{readFIA}}.}
+  \item{db}{\code{FIA.Database} or \code{Remote.FIA.Database} object produced from \code{\link{readFIA}} or \code{\link{getFIA}}. If a \code{Remote.FIA.Database}, data will be read in and processed state-by-state to conserve RAM (see details for an example).}
 
   \item{mostRecent}{logical; if TRUE, returns only data for most recent inventory.}
 

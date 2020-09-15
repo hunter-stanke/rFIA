@@ -547,6 +547,7 @@ area <- function(db,
                  treeDomain = NULL,
                  areaDomain = NULL,
                  totals = FALSE,
+                 variance = FALSE,
                  byPlot = FALSE,
                  nCores = 1) {
 
@@ -657,12 +658,22 @@ area <- function(db,
         # Renaming, computing ratios, and SE
         mutate(AREA_TOTAL = aEst,
                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL *100,
+               N = sum(N),
+               AREA_TOTAL_VAR = aVar,
                nPlots_AREA = plotIn_AREA) %>%
-        select(grpBy, AREA_TOTAL, AREA_TOTAL_SE, nPlots_AREA)
+        select(grpBy, AREA_TOTAL, AREA_TOTAL_SE, AREA_TOTAL_VAR, nPlots_AREA, N)
     })
 
     # Snag the names
     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
+
+    if (variance) {
+      tOut <- tOut %>%
+        select(-c(AREA_TOTAL_SE))
+    } else {
+      tOut <- tOut %>%
+        select(-c(AREA_TOTAL_VAR, N))
+    }
 
   }
   ## Pretty output
