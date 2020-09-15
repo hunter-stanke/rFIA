@@ -464,7 +464,7 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, useSeries){
               ra1Est = unitMean(ESTN_METHOD, a, nh, w, ra1Strat),
               ra2Est = unitMean(ESTN_METHOD, a, nh, w, ra2Strat),
               faEst = unitMean(ESTN_METHOD, a, nh, w, faStrat),
-
+              p2eu = first(p2eu),
               nh = first(nh),
               # Estimation of unit variance
               ctVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ctv, ctStrat, ctEst),

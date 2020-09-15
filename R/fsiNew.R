@@ -974,7 +974,7 @@ fsi <- function(db,
     # Tree
     tTotal <- tEst %>%
       group_by(.dots = grpBy) %>%
-      summarize_all(sum,na.rm = TRUE)
+      summarize_all(sum, na.rm = TRUE)
 
 
 
@@ -1012,7 +1012,7 @@ fsi <- function(db,
                CURR_RD_VAR = ra2Var,
 
                nPlots = plotIn_t,
-               N = nh,
+               N = p2eu,
                FSI_INT = qt(.975, df=N-1) * (sqrt(siVar)/sqrt(N)),
                PERC_FSI_INT = qt(.975, df=N-1) * (sqrt(psiVar)/sqrt(N))) %>%
         mutate(FSI_STATUS = case_when(
