@@ -775,6 +775,8 @@ readFIA <- function(dir,
     # Grab all the file names in directory
     files <- list.files(dir)
 
+
+
   if (inMemory){
 
       inTables <- list()
@@ -804,6 +806,13 @@ readFIA <- function(dir,
 
     # Only csvs
     files <- files[str_sub(files,-4,-1) == '.csv']
+
+    ## Only csvs that have FIA names
+    if (any(str_sub(files, 3, 3) == '_')){
+      files <- files[str_sub(files,4,-5) %in% intData$fiaTableNames]
+    } else{
+      files <- files[str_sub(files,1,-5) %in% intData$fiaTableNames]
+    }
 
     # Only extract the tables needed to run functions in rFIA
     if (common){
@@ -836,6 +845,18 @@ readFIA <- function(dir,
       files <- files[str_to_upper(str_sub(files, 1, 2)) %in% states]
 
 
+    } else {
+      ## Checking if state files and merged state files are mixed in the directory.
+      states <- unique(str_to_upper(str_sub(files, 1, 3)))
+      trueStates <- states[str_sub(states, 3,3) == '_']
+
+      ## If length is zero, then all merged states - great
+      ## If length states is the same as true States, then all state files - great
+      ## Otherwise, they're probably mixed. Throw a warning and read only the states
+      if (length(trueStates) > 0 & length(trueStates) < length(states)) {
+        warning('Found data from merged states and individual states in same directory. Reading only individual states files.')
+        files <- files[str_sub(files, 3,3) == '_']
+      }
     }
 
 
@@ -895,6 +916,8 @@ readFIA <- function(dir,
       states <- unique(str_to_upper(str_sub(files, 1, 3)))
       states <- states[str_sub(states, 3,3) == '_']
       states <- str_sub(states, 1, 2)
+      ## Only states where abbreviations make sense
+      states <- states[states %in% intData$stateNames$STATEAB]
       ## Don't fail if states have been merged
       if (length(states) < 1) states <- 1
     }
@@ -1150,9 +1173,9 @@ writeFIA <- function(db,
     stop('Cannot write remote database.')
   }
 
-  if (byState & !c('SURVEY' %in% names(db))){
-    stop('Need survey table for state abbreviations.')
-  }
+  # if (byState & !c('SURVEY' %in% names(db))){
+  #   stop('Need survey table for state abbreviations.')
+  # }
 
   #cat(sys.call()$dir)
   if (!is.null(dir)){
@@ -1171,9 +1194,9 @@ writeFIA <- function(db,
   ## Method to chunk up the database into states before writing it out
   if (byState){
 
-    stateNames <- distinct(db$SURVEY, STATECD, STATEAB)
     db$PLOT <- db$PLOT %>%
-      left_join(stateNames, by = 'STATECD')
+      select(-c(any_of('STATEAB'))) %>%
+      left_join(rFIA:::intData$stateNames, by = 'STATECD')
 
     ## Unique state abbreviations
     states <- unique(db$PLOT$STATEAB)
