@@ -220,6 +220,13 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'ra2Strat', 'ra2Var', 'ra2v', 'TPA2', 'disturb', 'int_fixed', 'rate_fixed', 'rd', 'tmax',
                          'estimate', 'fe_int', 'fe_rate', 'grp_index', 'lower', 'mean_fe_int',  'mean_fe_rate',
                          'mean_int', 'mean_rate', 'quantile', 'term', 'skew2',
-                         'fsiHelper1_lm',  'fullRemp',  'series'
+                         'fsiHelper1_lm',  'fullRemp',  'series',
+                         'AREA_TOTAL_VAR', 'BAA_PERC_VAR', 'BAA_TOTAL_VAR', 'BAA_VAR', 'BA_GROW_AC_VAR',
+                         'BA_GROW_VAR', 'BA_TOTAL_VAR', 'BA_VAR', 'BIOA_TOTAL_VAR', 'BIO_GROW_AC_VAR',
+                         'BIO_GROW_VAR', 'BIO_TOTAL_VAR', 'DIA_GROW_VAR', 'DIA_TOTAL_VAR', 'Eh_a_VAR',
+                         'H_a_VAR', 'MORT_PERC_VAR', 'MORT_TOTAL_VAR', 'MORT_TPA_VAR', 'NETVOLA_TOTAL_VAR',
+                         'NETVOL_GROW_AC_VAR', 'NETVOL_GROW_VAR', 'NETVOL_TOTAL_VAR', 'RECR_PERC_VAR',
+                         'RECR_TOTAL_VAR', 'RECR_TPA_VAR', 'REMV_PERC_VAR', 'REMV_TOTAL_VAR', 'REMV_TPA_VAR',
+                         'S_a_VAR', 'TPA_PERC_VAR', 'TPA_VAR', 'TREE_TOTAL_VAR', 'TREE_VAR'
 
 ))

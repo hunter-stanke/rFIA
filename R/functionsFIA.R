@@ -573,7 +573,7 @@ str.Remote.FIA.Database <- function(object, ...) {
 #' @import tidyr
 #' @importFrom sp over proj4string<- coordinates<- spTransform proj4string
 #' @importFrom stats cov var coef lm na.omit quantile
-#' @importFrom utils object.size read.csv tail globalVariables type.convert download.file unzip
+#' @importFrom utils object.size read.csv tail globalVariables type.convert download.file unzip packageDescription
 #' @importFrom R2jags autojags jags
 #' @importFrom coda as.mcmc
 NULL
@@ -1196,7 +1196,7 @@ writeFIA <- function(db,
 
     db$PLOT <- db$PLOT %>%
       select(-c(any_of('STATEAB'))) %>%
-      left_join(rFIA:::intData$stateNames, by = 'STATECD')
+      left_join(intData$stateNames, by = 'STATECD')
 
     ## Unique state abbreviations
     states <- unique(db$PLOT$STATEAB)
