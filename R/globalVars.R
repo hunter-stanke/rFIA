@@ -227,6 +227,7 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'H_a_VAR', 'MORT_PERC_VAR', 'MORT_TOTAL_VAR', 'MORT_TPA_VAR', 'NETVOLA_TOTAL_VAR',
                          'NETVOL_GROW_AC_VAR', 'NETVOL_GROW_VAR', 'NETVOL_TOTAL_VAR', 'RECR_PERC_VAR',
                          'RECR_TOTAL_VAR', 'RECR_TPA_VAR', 'REMV_PERC_VAR', 'REMV_TOTAL_VAR', 'REMV_TPA_VAR',
-                         'S_a_VAR', 'TPA_PERC_VAR', 'TPA_VAR', 'TREE_TOTAL_VAR', 'TREE_VAR'
+                         'S_a_VAR', 'TPA_PERC_VAR', 'TPA_VAR', 'TREE_TOTAL_VAR', 'TREE_VAR',
+                         'mr'
 
 ))
