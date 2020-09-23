@@ -114,7 +114,7 @@ growMortStarter <- function(x,
 
   ### DEAL WITH TEXAS
   if (any(db$POP_EVAL$STATECD %in% 48)){
-    ## Will require manual updates, fix your shit texas
+    ## Will require manual updates
     txIDS <- db$POP_EVAL %>%
       filter(STATECD %in% 48) %>%
       filter(END_INVYR < 2017) %>%

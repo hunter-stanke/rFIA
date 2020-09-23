@@ -132,7 +132,7 @@ fsiStarter <- function(x,
 
   ### DEAL WITH TEXAS
   if (any(db$POP_EVAL$STATECD %in% 48)){
-    ## Will require manual updates, fix your shit texas
+    ## Will require manual updates
     txIDS <- db$POP_EVAL %>%
       filter(STATECD %in% 48) %>%
       filter(END_INVYR < 2017) %>%
@@ -256,28 +256,31 @@ fsiStarter <- function(x,
   remPlts <- db$PLOT %>%
     select(PLT_CN, PREV_PLT_CN, DESIGNCD, REMPER, PLOT_STATUS_CD) %>%
     ## Has to have a remeasurement, be in the current sample, and of the national design
-    filter(!is.na(REMPER) & !is.na(PREV_PLT_CN) & PLOT_STATUS_CD != 3 & DESIGNCD == 1) %>%
+    filter(!is.na(REMPER) & !is.na(PREV_PLT_CN) & PLOT_STATUS_CD != 3 & DESIGNCD %in% c(1, 501:505)) %>%
     left_join(select(db$PLOT, PLT_CN, DESIGNCD, PLOT_STATUS_CD), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
     ## past emasurement must be in the previous sample and of national design
-    filter(PLOT_STATUS_CD.prev != 3 & DESIGNCD.prev == 1)
+    filter(PLOT_STATUS_CD.prev != 3 & DESIGNCD.prev %in% c(1, 501:505))
 
   ### Snag the EVALIDs that are needed
   db$POP_EVAL<- db$POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID', 'ESTN_METHOD') %>%
+    select('CN', 'END_INVYR', 'EVALID', 'ESTN_METHOD', STATECD) %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
     filter(EVAL_TYP == 'EXPVOL') %>%
     filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
     distinct(END_INVYR, EVALID, .keep_all = TRUE)
 
+
   ## If a most-recent subset, make sure that we don't get two reporting years in
   ## western states
   if (mr) {
     db$POP_EVAL <- db$POP_EVAL %>%
-      group_by(EVAL_TYP) %>%
-      filter(END_INVYR == max(END_INVYR, na.rm = TRUE))
+      group_by(EVAL_TYP, STATECD) %>%
+      filter(END_INVYR == max(END_INVYR, na.rm = TRUE)) %>%
+      ungroup()
   }
 
-  ## Make an annual panel ID, associated with an INVYR
+  ## Cut STATECD
+  db$POP_EVAL <- select(db$POP_EVAL, -c(STATECD))
 
   ### The population tables
   pops <- select(db$POP_EVAL, c('EVALID', 'ESTN_METHOD', 'CN', 'END_INVYR', 'EVAL_TYP')) %>%

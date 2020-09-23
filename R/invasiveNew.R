@@ -114,7 +114,7 @@ invasiveStarter <- function(x,
 
   ### DEAL WITH TEXAS
   if (any(db$POP_EVAL$STATECD %in% 48)){
-    ## Will require manual updates, fix your shit texas
+    ## Will require manual updates
     txIDS <- db$POP_EVAL %>%
       filter(STATECD %in% 48) %>%
       filter(END_INVYR < 2017) %>%
@@ -227,7 +227,7 @@ invasiveStarter <- function(x,
 
   ### Snag the EVALIDs that are needed
   db$POP_EVAL <- db$POP_EVAL %>%
-    select('CN', 'END_INVYR', 'EVALID', 'ESTN_METHOD') %>%
+    select('CN', 'END_INVYR', 'EVALID', 'ESTN_METHOD', STATECD) %>%
     inner_join(select(db$POP_EVAL_TYP, c('EVAL_CN', 'EVAL_TYP')), by = c('CN' = 'EVAL_CN')) %>%
     filter(EVAL_TYP == 'EXPCURR') %>%
     filter(!is.na(END_INVYR) & !is.na(EVALID) & END_INVYR >= 2003) %>%
@@ -235,15 +235,18 @@ invasiveStarter <- function(x,
   #group_by(END_INVYR) %>%
   #summarise(id = list(EVALID)
 
+
   ## If a most-recent subset, make sure that we don't get two reporting years in
   ## western states
   if (mr) {
     db$POP_EVAL <- db$POP_EVAL %>%
-      group_by(EVAL_TYP) %>%
-      filter(END_INVYR == max(END_INVYR, na.rm = TRUE))
+      group_by(EVAL_TYP, STATECD) %>%
+      filter(END_INVYR == max(END_INVYR, na.rm = TRUE)) %>%
+      ungroup()
   }
 
-  ## Make an annual panel ID, associated with an INVYR
+  ## Cut STATECD
+  db$POP_EVAL <- select(db$POP_EVAL, -c(STATECD))
 
   ### The population tables
   pops <- select(db$POP_EVAL, c('EVALID', 'ESTN_METHOD', 'CN', 'END_INVYR')) %>%

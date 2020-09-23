@@ -38,13 +38,13 @@ fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   data <- db$PLOT %>%
-    filter(DESIGNCD == 1 & PLOT_STATUS_CD != 3 & !is.na(REMPER) & !is.na(PREV_PLT_CN)) %>%
+    filter(DESIGNCD %in% c(1, 501:505) & PLOT_STATUS_CD != 3 & !is.na(REMPER) & !is.na(PREV_PLT_CN)) %>%
     left_join(db$COND, by = c('PLT_CN')) %>%
     left_join(db$TREE, by = c('PLT_CN', 'CONDID')) %>%
     left_join(select(db$PLOT, c('PLT_CN', 'sp', 'aD_p', 'DESIGNCD', 'PLOT_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('2', '1')) %>%
     left_join(select(db$TREE, c('TRE_CN', all_of(grpT), treID, 'typeD', 'tD', 'TPA_UNADJ', 'BAA', 'DIA', 'STATUSCD', SPCD)), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
-    filter(DESIGNCD1 == 1 & PLOT_STATUS_CD1 != 3) %>%
+    filter(DESIGNCD1 %in% c(1, 501:505) & PLOT_STATUS_CD1 != 3) %>%
     mutate_if(is.factor,
               as.character)
 
@@ -65,7 +65,7 @@ fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
   ## Save a copy for area calculations
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   aData <- select(db$PLOT, c('PLT_CN', 'PREV_PLT_CN', 'pltID', 'DESIGNCD', 'REMPER', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'MEASMON', 'MEASDAY', 'PLOT_STATUS_CD', all_of(grpP), 'aD_p', 'sp')) %>%
-    filter(DESIGNCD == 1 & PLOT_STATUS_CD != 3) %>%
+    filter(DESIGNCD %in% c(1, 501:505) & PLOT_STATUS_CD != 3) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
     mutate(aDI = landD * aD_p * aD_c * sp)
 
