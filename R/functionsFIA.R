@@ -871,8 +871,14 @@ readFIA <- function(dir,
     # }
     inTables <- list()
     for (n in 1:length(files)){
-      # Read in and append each file to a list
-      file <- fread(paste(dir, files[n], sep = ""), showProgress = FALSE, integer64 = 'double', logical01 = FALSE, nThread = nCores, ...)
+      ## If MODIFIED_DATE is not present, will warn
+      suppressWarnings({
+        # Read in and append each file to a list
+        file <- fread(paste(dir, files[n], sep = ""), showProgress = FALSE,
+                      integer64 = 'double', logical01 = FALSE, nThread = nCores,
+                      drop = c('MODIFIED_DATE'), ...)
+      })
+
       # We don't want data.table formats
       #file <- as.data.frame(file)
       fileName <- str_sub(files[n], 1, -5)
@@ -893,7 +899,7 @@ readFIA <- function(dir,
     uniqueNames <- unique(names(inTables))
     ## Works regardless of whether or not there are duplicate names (multiple states)
     for (i in 1:length(uniqueNames)){
-      outTables[[uniqueNames[i]]] <- rbindlist(inTables[names(inTables) == uniqueNames[i]])
+      outTables[[uniqueNames[i]]] <- rbindlist(inTables[names(inTables) == uniqueNames[i]], fill = TRUE)
     }
 
     # NEW CLASS NAME FOR FIA DATABASE OBJECTS
