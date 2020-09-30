@@ -627,6 +627,7 @@ readFHM <- function(dir, tables = NULL, nCores = 1){
   uniqueNames <- unique(names(inTables))
   ## Works regardless of whether or not there are duplicate names (multiple states)
   for (i in 1:length(uniqueNames)){
+    cat(uniqueNames[i])
     outTables[[uniqueNames[i]]] <- rbindlist(inTables[names(inTables) == uniqueNames[i]], fill=TRUE)
   }
 
@@ -884,9 +885,11 @@ readFIA <- function(dir,
       #file <- as.data.frame(file)
       fileName <- str_sub(files[n], 1, -5)
 
-      inTables[[fileName]] <- file
+      # Skip over files that are empty
+      if(nrow(file) > 0){
+        inTables[[fileName]] <- file
+      }
     }
-
 
     # Give them some names
     #names(inTables) <- files
