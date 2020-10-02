@@ -627,7 +627,6 @@ readFHM <- function(dir, tables = NULL, nCores = 1){
   uniqueNames <- unique(names(inTables))
   ## Works regardless of whether or not there are duplicate names (multiple states)
   for (i in 1:length(uniqueNames)){
-    cat(uniqueNames[i])
     outTables[[uniqueNames[i]]] <- rbindlist(inTables[names(inTables) == uniqueNames[i]], fill=TRUE)
   }
 
