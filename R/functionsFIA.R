@@ -909,9 +909,11 @@ readFIA <- function(dir,
       #file <- as.data.frame(file)
       fileName <- str_sub(files[n], 1, -5)
 
-      inTables[[fileName]] <- file
+      # Skip over files that are empty
+      if(nrow(file) > 0){
+        inTables[[fileName]] <- file
+      }
     }
-
 
     # Give them some names
     #names(inTables) <- files
