@@ -8,6 +8,7 @@
 
 
 
+
 ## Estimate skewness in a distribution of values
 skewness <- function(x, na.rm = TRUE){
 
@@ -209,11 +210,14 @@ basalArea <- function(diameter, DIA_MID = NULL){
   # }
   # ba = diameter^2 * .005454 # SQ FT, consistency with FIA EVALIDator
 
-  ba <- case_when(
-    is.na(diameter) ~ NA_real_,
-    ## Growth accounting only
-    diameter < 0 ~ -(diameter^2 * .005454),
-    TRUE ~ diameter^2 * .005454)
+  # ba <- case_when(
+  #   is.na(diameter) ~ NA_real_,
+  #   ## Growth accounting only
+  #   diameter < 0 ~ -(diameter^2 * .005454),
+  #   TRUE ~ diameter^2 * .005454)
+
+  negative <- data.table::fifelse(diameter < 0, -1, 1)
+  ba <- diameter^2 * .005454 * negative
 
 
   return(ba)
@@ -313,19 +317,19 @@ grmAdj <- function(subtyp, adjMicr, adjSubp, adjMacr) {
 #   }
 #
 # }
-stratVar <- function(ESTN_METHOD, x, xStrat, ndif, a, nh, y = NULL, yStrat = NULL){
-  ## Variance
-  if (is.null(y)){
-    v <- ifelse(first(ESTN_METHOD == 'simple'),
-                var(c(x, numeric(ndif)) * first(a) / nh),
-                (sum((c(x, numeric(ndif))^2), na.rm = TRUE) - nh * xStrat^2) / (nh * (nh-1)))
-    ## Covariance
-  } else {
-    v <- ifelse(first(ESTN_METHOD == 'simple'),
-                cov(x,y),
-                (sum(x*y, na.rm = TRUE) - sum(nh * xStrat *yStrat, na.rm = TRUE)) / (nh * (nh-1)))
-  }
-}
+# stratVar <- function(ESTN_METHOD, x, xStrat, ndif, a, nh, y = NULL, yStrat = NULL){
+#   ## Variance
+#   if (is.null(y)){
+#     v <- ifelse(first(ESTN_METHOD == 'simple'),
+#                 var(c(x, numeric(ndif)) * first(a) / nh),
+#                 (sum((c(x, numeric(ndif))^2), na.rm = TRUE) - nh * xStrat^2) / (nh * (nh-1)))
+#     ## Covariance
+#   } else {
+#     v <- ifelse(first(ESTN_METHOD == 'simple'),
+#                 cov(x,y),
+#                 (sum(x*y, na.rm = TRUE) - sum(nh * xStrat *yStrat, na.rm = TRUE)) / (nh * (nh-1)))
+#   }
+# }
 
 # Helper function to compute variance for estimation units (manages different estimation methods)
 unitVarDT <- function(method, ESTN_METHOD, a, nh, w, v, stratMean, stratMean1 = NULL){
@@ -423,7 +427,19 @@ vrAttHelper <- function(attribute, attribute.prev, attribute.mid, attribute.beg,
   return(at)
 }
 
-
+stratVar <- function(ESTN_METHOD, x, xStrat, ndif, a, nh, y = NULL, yStrat = NULL){
+  ## Variance
+  if (is.null(y)){
+    v <- ifelse(first(ESTN_METHOD == 'simple'),
+                var(c(x, numeric(ndif)) * first(a) / nh),
+                (sum((c(x, numeric(ndif))^2), na.rm = TRUE) - nh * xStrat^2) / (nh * (nh-1)))
+    ## Covariance
+  } else {
+    v <- ifelse(first(ESTN_METHOD == 'simple'),
+                cov(x,y),
+                (sum(x*y, na.rm = TRUE) - sum(nh * xStrat *yStrat, na.rm = TRUE)) / (nh * (nh-1)))
+  }
+}
 
 
 
@@ -560,6 +576,7 @@ str.Remote.FIA.Database <- function(object, ...) {
   cat(paste('Remote.FIA.Database', "\n"))
 }
 
+#' @import dtplyr
 #' @import dplyr
 #' @import methods
 #' @import sf
@@ -569,7 +586,7 @@ str.Remote.FIA.Database <- function(object, ...) {
 #' @import bit64
 #' @import tidyselect
 #' @importFrom rlang eval_tidy enquo enquos quos quo
-#' @importFrom data.table fread fwrite rbindlist
+#' @importFrom data.table fread fwrite rbindlist fifelse
 #' @importFrom parallel makeCluster detectCores mclapply parLapply stopCluster clusterEvalQ
 #' @import tidyr
 #' @importFrom sp over proj4string<- coordinates<- spTransform proj4string
@@ -578,6 +595,14 @@ str.Remote.FIA.Database <- function(object, ...) {
 #' @importFrom R2jags autojags jags
 #' @importFrom coda as.mcmc
 NULL
+
+
+
+
+
+
+
+
 
 #globalVariables(c('.'))
 

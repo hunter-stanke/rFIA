@@ -352,8 +352,10 @@ tpaStarter <- function(x,
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   db$PLOT <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', grpP, 'aD_p', 'sp'))
-  db$COND <- select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD'))
-  db$TREE <- select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT, 'tD', 'typeD'))
+  db$COND <- select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')) %>%
+    filter(PLT_CN %in% db$PLOT$PLT_CN)
+  db$TREE <- select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT, 'tD', 'typeD')) %>%
+    filter(PLT_CN %in% db$PLOT$PLT_CN)
 
 
   ## Merging state and county codes
@@ -369,10 +371,14 @@ tpaStarter <- function(x,
         library(stringr)
         library(rFIA)
       })
-      out <- parLapply(cl, X = names(plts), fun = tpaHelper1, plts, db, grpBy, aGrpBy, byPlot)
+      out <- parLapply(cl, X = names(plts), fun = tpaHelper1, plts,
+                       db[names(db) %in% c('COND', 'TREE')],
+                       grpBy, aGrpBy, byPlot)
       #stopCluster(cl) # Keep the cluster active for the next run
     } else { # Unix systems
-      out <- mclapply(names(plts), FUN = tpaHelper1, plts, db, grpBy, aGrpBy, byPlot, mc.cores = nCores)
+      out <- mclapply(names(plts), FUN = tpaHelper1, plts,
+                      db[names(db) %in% c('COND', 'TREE')],
+                      grpBy, aGrpBy, byPlot, mc.cores = nCores)
     }
   })
 
@@ -398,7 +404,6 @@ tpaStarter <- function(x,
     out <- unlist(out, recursive = FALSE)
     a <- bind_rows(out[names(out) == 'a'])
     t <- bind_rows(out[names(out) == 't'])
-
 
     ## Adding YEAR to groups
     grpBy <- c('YEAR', grpBy)

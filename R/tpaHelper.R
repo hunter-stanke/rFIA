@@ -14,7 +14,7 @@ tpaHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
     left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT, 'tD', 'typeD')), by = c('PLT_CN', 'CONDID')) %>%
     ## Need a code that tells us where the tree was measured
     ## macroplot, microplot, subplot
-    mutate(PLOT_BASIS = case_when(
+    mutate(PLOT_BASIS = dplyr::case_when(
       ## When DIA is na, adjustment is NA
       is.na(DIA) ~ NA_character_,
       ## When DIA is less than 5", use microplot value
@@ -50,8 +50,10 @@ tpaHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
     a = NULL
 
   } else {
+
     ### Plot-level estimates
     a <- data %>%
+      filter(aDI > 0) %>%
       ## Will be lots of trees here, so CONDPROP listed multiple times
       ## Adding PROP_BASIS so we can handle adjustment factors at strata level
       distinct(PLT_CN, CONDID, .keep_all = TRUE) %>%
@@ -59,15 +61,18 @@ tpaHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
       summarize(fa = sum(CONDPROP_UNADJ * aDI, na.rm = TRUE),
                 plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
 
+    grpSyms <- syms(grpBy)
     ## Tree plts
     t <- data %>%
-      #filter(!is.na(PLOT_BASIS)) %>%
-      group_by(PLT_CN, PLOT_BASIS, .dots = grpBy) %>%
+      lazy_dt() %>%
+      filter(pDI > 0) %>%
+      group_by(PLT_CN, PLOT_BASIS, !!!grpSyms) %>%
       summarize(tPlot = sum(TPA_UNADJ * tDI, na.rm = TRUE),
                 bPlot = sum(basalArea(DIA) * TPA_UNADJ * tDI, na.rm = TRUE),
                 tTPlot = sum(TPA_UNADJ * pDI, na.rm = TRUE),
                 bTPlot = sum(basalArea(DIA) * TPA_UNADJ * pDI, na.rm = TRUE),
-                plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0))
+                plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0)) %>%
+      as.data.frame()
   }
 
 
@@ -91,55 +96,57 @@ tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
 
   }
 
+  aGrpSyms <- syms(aGrpBy)
+
   ## Strata level estimates
   aStrat <- a %>%
+    lazy_dt() %>%
     ## Rejoin with population tables
-    right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
+    inner_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
     mutate(
       ## AREA
-      aAdj = case_when(
+      aAdj = dplyr::case_when(
         ## When NA, stay NA
         is.na(PROP_BASIS) ~ NA_real_,
         ## If the proportion was measured for a macroplot,
         ## use the macroplot value
         PROP_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
-        ## Otherwise, use the subpplot value
+        ## Otherwise, use the subplot value
         PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
       fa = fa * aAdj) %>%
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = aGrpBy) %>%
-    summarize(a_t = length(unique(PLT_CN)) / first(P2POINTCNT),
-              aStrat = mean(fa * a_t, na.rm = TRUE),
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, !!!aGrpSyms) %>%
+    summarize(nh = first(P2POINTCNT),
+              aStrat = sum(fa, na.rm = TRUE),
               plotIn_AREA = sum(plotIn, na.rm = TRUE),
-              n = n(),
-              ## We don't want a vector of these values, since they are repeated
-              nh = first(P2POINTCNT),
               a = first(AREA_USED),
               w = first(P1POINTCNT) / first(P1PNTCNT_EU),
               p2eu = first(p2eu),
-              ndif = nh - n,
-              ## Strata level variances
-              av = ifelse(first(ESTN_METHOD == 'simple'),
-                          var(c(fa, numeric(ndif)) * first(a) / nh),
-                          (sum((c(fa, numeric(ndif))^2)) - nh * aStrat^2) / (nh * (nh-1))))
+              av = sum(fa^2, na.rm = TRUE)) %>%
+    mutate(aStrat = aStrat / nh,
+           av = (av - (nh * aStrat^2)) / (nh * (nh-1))) %>%
+    as.data.frame()
+
   ## Estimation unit
   aEst <- aStrat %>%
-    group_by(ESTN_UNIT_CN, .dots = aGrpBy) %>%
+    group_by(ESTN_UNIT_CN, !!!aGrpSyms) %>%
     summarize(aEst = unitMean(ESTN_METHOD, a, nh,  w, aStrat),
               aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, av, aStrat, aEst),
               plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
 
-  ######## ------------------ TREE ESTIMATES + CV
 
+  ######## ------------------ TREE ESTIMATES + CV
+  grpSyms <- syms(grpBy)
   ## Strata level estimates
   tEst <- t %>%
+    lazy_dt() %>%
     ## Rejoin with population tables
-    right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
+    inner_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
     ## Need this for covariance later on
     left_join(select(a, fa, PLT_CN, PROP_BASIS, aGrpBy[aGrpBy %in% c('YEAR', 'INVYR') == FALSE]), by = c('PLT_CN', aGrpBy[aGrpBy %in% c('YEAR', 'INVYR') == FALSE])) %>%
     #Add adjustment factors
     mutate(
       ## AREA
-      tAdj = case_when(
+      tAdj = dplyr::case_when(
         ## When NA, stay NA
         is.na(PLOT_BASIS) ~ NA_real_,
         ## If the proportion was measured for a macroplot,
@@ -149,7 +156,7 @@ tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
         PLOT_BASIS == 'SUBP' ~ as.numeric(ADJ_FACTOR_SUBP),
         PLOT_BASIS == 'MICR' ~ as.numeric(ADJ_FACTOR_MICR)),
       ## AREA
-      aAdj = case_when(
+      aAdj = dplyr::case_when(
         ## When NA, stay NA
         is.na(PROP_BASIS) ~ NA_real_,
         ## If the proportion was measured for a macroplot,
@@ -163,68 +170,67 @@ tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
       tTPlot = tTPlot * tAdj,
       bTPlot = bTPlot * tAdj) %>%
     ## Extra step for variance issues
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy) %>%
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, !!!grpSyms) %>%
     summarize(tPlot = sum(tPlot, na.rm = TRUE),
               bPlot = sum(bPlot, na.rm = TRUE),
               tTPlot = sum(tTPlot, na.rm = TRUE),
               bTPlot = sum(bTPlot, na.rm = TRUE),
-              fa = first(fa),
+              fa = dplyr::first(fa),
               plotIn = ifelse(sum(plotIn >  0, na.rm = TRUE), 1,0),
-              nh = first(P2POINTCNT),
-              p2eu = first(p2eu),
-              a = first(AREA_USED),
-              w = first(P1POINTCNT) / first(P1PNTCNT_EU)) %>%
+              nh = dplyr::first(P2POINTCNT),
+              p2eu = dplyr::first(p2eu),
+              a = dplyr::first(AREA_USED),
+              w = dplyr::first(P1POINTCNT) / dplyr::first(P1PNTCNT_EU)) %>%
     ## Joining area data so we can compute ratio variances
     left_join(select(aStrat, aStrat, av, ESTN_UNIT_CN, STRATUM_CN, ESTN_METHOD, aGrpBy), by = c('ESTN_UNIT_CN', 'ESTN_METHOD', 'STRATUM_CN', aGrpBy)) %>%
     ## Strata level
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
-    summarize(r_t = length(unique(PLT_CN)) / first(nh),
-              tStrat = mean(tPlot * r_t, na.rm = TRUE),
-              bStrat = mean(bPlot * r_t, na.rm = TRUE),
-              tTStrat = mean(tTPlot * r_t, na.rm = TRUE),
-              bTStrat = mean(bTPlot * r_t, na.rm = TRUE),
-              aStrat = first(aStrat),
-              plotIn_TREE = sum(plotIn, na.rm = TRUE),
-              n = n(),
-              ## We don't want a vector of these values, since they are repeated
-              nh = first(nh),
-              a = first(a),
-              w = first(w),
-              p2eu = first(p2eu),
-              ndif = nh - n,
-              ## Strata level variances
-              #aVar = (sum(forArea^2) - sum(P2POINTCNT * aStrat^2)) / (P2POINTCNT * (P2POINTCNT-1)),
-              tv = ifelse(first(ESTN_METHOD == 'simple'),
-                          var(c(tPlot, numeric(ndif)) * first(a) / nh),
-                          (sum(c(tPlot, numeric(ndif))^2, na.rm = TRUE) - sum(nh * tStrat^2, na.rm = TRUE)) / (nh * (nh-1))), # Stratified and double cases
-              tv = stratVar(ESTN_METHOD, tPlot, tStrat, ndif, a, nh),
-              bv = ifelse(first(ESTN_METHOD == 'simple'),
-                          var(c(tPlot, numeric(ndif))* first(a) / nh),
-                          (sum(c(bPlot, numeric(ndif))^2) - sum(nh * bStrat^2)) / (nh * (nh-1))),
-              tTv = ifelse(first(ESTN_METHOD == 'simple'),
-                           var(c(tTPlot, numeric(ndif)) * first(a) / nh),
-                           (sum(c(tTPlot, numeric(ndif))^2) - sum(nh * tTStrat^2)) / (nh * (nh-1))), # Stratified and double cases
-              bTv = ifelse(first(ESTN_METHOD == 'simple'),
-                           var(c(bTPlot, numeric(ndif)) * first(a) / nh),
-                           (sum(c(bTPlot, numeric(ndif))^2) - sum(nh * bTStrat^2)) / (nh * (nh-1))),
-              # Strata level covariances
-              cvStrat_t = ifelse(first(ESTN_METHOD == 'simple'),
-                                 cov(fa,tPlot),
-                                 (sum(fa*tPlot, na.rm = TRUE) - sum(nh * aStrat *tStrat)) / (nh * (nh-1))), # Stratified and double cases
-              cvStrat_t = stratVar(ESTN_METHOD, tPlot, tStrat, ndif, a, nh, fa, aStrat),
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, !!!grpSyms) %>%
+    summarize(nh = dplyr::first(nh),
+              a = dplyr::first(a),
+              w = dplyr::first(w),
+              p2eu = dplyr::first(p2eu),
 
-              cvStrat_b = ifelse(first(ESTN_METHOD == 'simple'),
-                                 cov(fa,bPlot),
-                                 (sum(fa*bPlot, na.rm = TRUE) - sum(nh * aStrat *bStrat)) / (nh * (nh-1))),
-              cvStrat_tT = ifelse(first(ESTN_METHOD == 'simple'),
-                                  cov(tTPlot,tPlot),
-                                  (sum(tTPlot*tPlot, na.rm = TRUE) - sum(nh * tTStrat *tStrat)) / (nh * (nh-1))), # Stratified and double cases
-              cvStrat_bT = ifelse(first(ESTN_METHOD == 'simple'),
-                                  cov(bTPlot,bPlot),
-                                  (sum(bTPlot*bPlot, na.rm = TRUE) - sum(nh * bTStrat *bStrat)) / (nh * (nh-1)))) %>%
+              ## dtplyr is fast, but requires a few extra steps, so we'll finish
+              ## means and variances in subseqent mutate step
+
+              ## Strata means
+              tStrat = sum(tPlot, na.rm = TRUE),
+              bStrat = sum(bPlot, na.rm = TRUE),
+              tTStrat = sum(tTPlot, na.rm = TRUE),
+              bTStrat = sum(bTPlot, na.rm = TRUE),
+              aStrat = dplyr::first(aStrat),
+              plotIn_TREE = sum(plotIn, na.rm = TRUE),
+
+              ## Strata level variances
+              tv = sum(tPlot^2, na.rm = TRUE),
+              bv = sum(bPlot^2, na.rm = TRUE),
+              tTv = sum(tTPlot^2, na.rm = TRUE),
+              bTv = sum(bTPlot^2, na.rm = TRUE),
+
+              ## Strata level covariances
+              cvStrat_t = sum(fa*tPlot, na.rm = TRUE),
+              cvStrat_b = sum(fa*bPlot, na.rm = TRUE),
+              cvStrat_tT = sum(tPlot*tTPlot,na.rm = TRUE),
+              cvStrat_bT = sum(bPlot*bTPlot,na.rm = TRUE)) %>%
+    mutate(tStrat = tStrat / nh,
+           bStrat = bStrat / nh,
+           tTStrat = tTStrat / nh,
+           bTStrat = bTStrat / nh,
+           adj = nh * (nh-1),
+           tv = (tv - (nh*tStrat^2)) / adj,
+           bv = (bv - (nh*bStrat^2)) / adj,
+           tTv = (tTv - (nh*tTStrat^2)) / adj,
+           bTv = (bTv - (nh*bTStrat^2)) / adj,
+           cvStrat_t = (cvStrat_t - (nh * tStrat * aStrat)) / adj,
+           cvStrat_b = (cvStrat_b - (nh * bStrat * aStrat)) / adj,
+           cvStrat_tT = (cvStrat_tT - (nh * tStrat * tTStrat)) / adj,
+           cvStrat_bT = (cvStrat_bT - (nh * bStrat * bTStrat)) / adj) %>%
+    as.data.frame() %>%
+
+
     ## Estimation unit
     left_join(select(aEst, ESTN_UNIT_CN, aEst, aVar, aGrpBy), by = c('ESTN_UNIT_CN', aGrpBy)) %>%
-    group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+    group_by(ESTN_UNIT_CN, !!!grpSyms) %>%
     summarize(tEst = unitMean(ESTN_METHOD, a, nh,  w, tStrat),
               bEst = unitMean(ESTN_METHOD, a, nh,  w, bStrat),
               tTEst = unitMean(ESTN_METHOD, a, nh,  w, tTStrat),
@@ -248,961 +254,3 @@ tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
 }
 
 
-
-
-tpaHelper1_test <- function(x, plts, db, grpBy, aGrpBy, byPlot){
-
-  ## Selecting the plots for one county
-  db$PLOT <- plts[[x]]
-
-  ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
-  data <- db$PLOT %>%
-    left_join(db$COND, by = c('PLT_CN')) %>%
-    left_join(db$TREE, by = c('PLT_CN', 'CONDID')) %>%
-    ## Need a code that tells us where the tree was measured
-    ## macroplot, microplot, subplot
-    mutate(PLOT_BASIS = case_when(
-      ## When DIA is na, adjustment is NA
-      is.na(DIA) ~ NA_character_,
-      ## When DIA is less than 5", use microplot value
-      DIA < 5 ~ 'MICR',
-      ## When DIA is greater than 5", use subplot value
-      DIA >= 5 & is.na(MACRO_BREAKPOINT_DIA) ~ 'SUBP',
-      DIA >= 5 & DIA < MACRO_BREAKPOINT_DIA ~ 'SUBP',
-      DIA >= MACRO_BREAKPOINT_DIA ~ 'MACR')) #%>%
-  #filter(!is.na(PLOT_BASIS))
-  # rename(YEAR = INVYR) %>%
-  # mutate_if(is.factor,
-  #           as.character) %>%
-  # filter(!is.na(YEAR))
-
-  ## Comprehensive indicator function
-  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
-  data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
-  data$pDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$sp
-
-
-  if (byPlot){
-    grpBy <- c('YEAR', grpBy, 'PLOT_STATUS_CD')
-    t <- data %>%
-      mutate(YEAR = MEASYEAR) %>%
-      distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
-      group_by(.dots = grpBy, PLT_CN) %>%
-      summarize(TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE),
-                BAA = sum(basalArea(DIA) * TPA_UNADJ * tDI, na.rm = TRUE),
-                TPA_PERC = TPA / sum(TPA_UNADJ * pDI, na.rm = TRUE) * 100,
-                BAA_PERC = BAA / sum(basalArea(DIA) * TPA_UNADJ * pDI, na.rm = TRUE) * 100,
-                nStems = length(which(tDI == 1)))
-
-    a = NULL
-
-  } else {
-    grpBy_quo <- syms(grpBy)
-    aGrpBy_quo <- syms(aGrpBy)
-
-    ### Plot-level estimates
-    a <- data %>%
-      ## Will be lots of trees here, so CONDPROP listed multiple times
-      ## Adding PROP_BASIS so we can handle adjustment factors at strata level
-      distinct(PLT_CN, CONDID, .keep_all = TRUE) %>%
-      lazy_dt() %>%
-      group_by(PLT_CN, PROP_BASIS, !!!aGrpBy_quo) %>%
-      summarize(fa = sum(CONDPROP_UNADJ * aDI, na.rm = TRUE),
-                plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0)) %>%
-      as.data.frame()
-
-    ## Tree plts
-    t <- data %>%
-      #filter(!is.na(PLOT_BASIS)) %>%
-      lazy_dt() %>%
-      group_by(PLT_CN, PLOT_BASIS, !!!grpBy_quo) %>%
-      summarize(tPlot = sum(TPA_UNADJ * tDI, na.rm = TRUE),
-                bPlot = sum(basalArea(DIA) * TPA_UNADJ * tDI, na.rm = TRUE),
-                tTPlot = sum(TPA_UNADJ * pDI, na.rm = TRUE),
-                bTPlot = sum(basalArea(DIA) * TPA_UNADJ * pDI, na.rm = TRUE),
-                plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0)) %>%
-      as.data.frame()
-  }
-
-
-
-
-  pltOut <- list(a = a, t = t)
-  return(pltOut)
-
-}
-
-
-## X is numerator
-## Y is optional denominator
-## grpBy_x is the domain ID for the numerator
-## grpBy_y is the domain ID for the denominator
-## ._basis is the column that I
-#popEst <- function(x, y, grpBy_x, grpBy_y, basis_x, basis_y)
-
-
-
-tpaHelper2_test <- function(x, popState, a, t, grpBy, aGrpBy, method){
-
-  ## DOES NOT MODIFY OUTSIDE ENVIRONMENT
-  if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
-    grpBy <- c(grpBy, 'INVYR')
-    aGrpBy <- c(aGrpBy, 'INVYR')
-    popState[[x]]$P2POINTCNT <- popState[[x]]$P2POINTCNT_INVYR
-    popState[[x]]$p2eu <- popState[[x]]$p2eu_INVYR
-
-  }
-
-
-  grpBy_quo <- syms(grpBy)
-  aGrpBy_quo <- syms(aGrpBy)
-
-
-
-  #####  ADJUSTMENT FACTORS -----------------
-  ## Area adjustment
-  aAdj <- a %>%
-    ## Rejoin with population tables
-    right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
-    lazy_dt() %>%
-    mutate(
-      ## AREA
-      aAdj = case_when(
-        ## When NA, stay NA
-        is.na(PROP_BASIS) ~ NA_real_,
-        ## If the proportion was measured for a macroplot,
-        ## use the macroplot value
-        PROP_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
-        ## Otherwise, use the subpplot value
-        PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
-      fa = fa * aAdj) %>%
-    as.data.frame()
-
-  ## Tree adjustments
-  tAdj <- t %>%
-    ## Rejoin with population tables
-    right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
-    lazy_dt() %>%
-    #Add adjustment factors
-    mutate(
-      ## AREA
-      tAdj = case_when(
-        ## When NA, stay NA
-        is.na(PLOT_BASIS) ~ NA_real_,
-        ## If the proportion was measured for a macroplot,
-        ## use the macroplot value
-        PLOT_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
-        ## Otherwise, use the subpplot value
-        PLOT_BASIS == 'SUBP' ~ as.numeric(ADJ_FACTOR_SUBP),
-        PLOT_BASIS == 'MICR' ~ as.numeric(ADJ_FACTOR_MICR)),
-      tPlot = tPlot * tAdj,
-      bPlot = bPlot * tAdj,
-      tTPlot = tTPlot * tAdj,
-      bTPlot = bTPlot * tAdj) %>%
-    ## Sum subplot, microplot, macroplot values to plot level
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, !!!grpBy_quo) %>%
-    summarize(tPlot = sum(tPlot, na.rm = TRUE),
-              bPlot = sum(bPlot, na.rm = TRUE),
-              tTPlot = sum(tTPlot, na.rm = TRUE),
-              bTPlot = sum(bTPlot, na.rm = TRUE),
-              plotIn = ifelse(sum(plotIn >  0, na.rm = TRUE), 1,0),
-              nh = first(P2POINTCNT),
-              p2eu = first(p2eu),
-              a = first(AREA_USED),
-              w = first(P1POINTCNT) / first(P1PNTCNT_EU)) %>%
-    as.data.frame()
-
-
-  #### STRATA, EST UNIT MEANS --------------
-  ## Area ----
-  ## Strata
-  aStratMean <- aAdj %>%
-    lazy_dt() %>%
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, !!!aGrpBy_quo) %>%
-    summarize(#a_t = length(unique(PLT_CN)) / first(P2POINTCNT),
-              aStrat = mean(fa * length(unique(PLT_CN)) / first(P2POINTCNT), na.rm = TRUE),
-              plotIn_AREA = sum(plotIn, na.rm = TRUE),
-              n = n(),
-              nh = first(P2POINTCNT),
-              a = first(AREA_USED),
-              w = first(P1POINTCNT) / first(P1PNTCNT_EU),
-              p2eu = first(p2eu)
-              ) %>%
-    mutate(ndif = nh - n) %>%
-    as.data.frame()
-
-  # Estimation unit
-  aEstMean <- aStratMean %>%
-    lazy_dt() %>%
-    group_by(ESTN_UNIT_CN, !!!aGrpBy_quo) %>%
-    summarize(aEst = unitMean(ESTN_METHOD, a, nh,  w, aStrat),
-              plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE)) %>%
-    as.data.frame()
-
-  ### TREE ----
-  # Strata
-  tStratMean <- tAdj %>%
-    lazy_dt() %>%
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, !!!grpBy_quo) %>%
-    summarize(r_t = length(unique(PLT_CN)) / first(nh),
-              tStrat = mean(tPlot * (length(unique(PLT_CN)) / first(nh)), na.rm = TRUE),
-              bStrat = mean(bPlot * (length(unique(PLT_CN)) / first(nh)), na.rm = TRUE),
-              tTStrat = mean(tTPlot * (length(unique(PLT_CN)) / first(nh)), na.rm = TRUE),
-              bTStrat = mean(bTPlot * (length(unique(PLT_CN)) / first(nh)), na.rm = TRUE),
-              plotIn_TREE = sum(plotIn, na.rm = TRUE),
-              n = n(),
-              ## We don't want a vector of these values, since they are repeated
-              nh = first(nh),
-              a = first(a),
-              w = first(w),
-              p2eu = first(p2eu)) %>%
-    mutate(ndif = nh - n) %>%
-    as.data.frame()
-
-  # Estimation unit
-  tEstMean <- tStratMean %>%
-    group_by(ESTN_UNIT_CN, !!!grpBy_quo) %>%
-    summarize(tEst = unitMean(ESTN_METHOD, a, nh,  w, tStrat),
-              bEst = unitMean(ESTN_METHOD, a, nh,  w, bStrat),
-              tTEst = unitMean(ESTN_METHOD, a, nh,  w, tTStrat),
-              bTEst = unitMean(ESTN_METHOD, a, nh,  w, bTStrat),
-              plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE))
-
-
-
-  #### STRATA, EST UNIT VAR & COV
-  ## Variance - covariance do not depend on one another, so no need to replicate anything
-  aVar <- aAdj %>%
-    lazy_dt() %>%
-    left_join(lazy_dt(aStratMean), by = c('ESTN_UNIT_CN', 'STRATUM_CN', aGrpBy), suffix = c('', '.cut')) %>%
-    #as.data.frame()
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, !!!aGrpBy_quo) %>%
-    summarise(av = stratVar(ESTN_METHOD, fa, first(aStrat), first(ndif), first(a), first(nh)),
-              a = first(a),
-              aStrat = first(aStrat),
-              w = first(w),
-              nh = first(nh),
-              p2eu = first(p2eu)) %>%
-    left_join(lazy_dt(aEstMean), by = c('ESTN_UNIT_CN', aGrpBy)) %>%
-    group_by(ESTN_UNIT_CN, !!!aGrpBy_quo) %>%
-    summarise(aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, av, aStrat, aEst)) %>%
-    as.data.frame()
-
-  tVar <- tAdj %>%
-    lazy_dt() %>%
-    left_join(lazy_dt(aAdj), by = c('PLT_CN', aGrpBy), suffix = c('', '.a')) %>%
-    left_join(lazy_dt(aStratMean), by = c('ESTN_UNIT_CN', 'STRATUM_CN', aGrpBy)) %>%
-    left_join(lazy_dt(tStratMean), by = c('ESTN_UNIT_CN', 'STRATUM_CN', grpBy), suffix = c('.a', '')) %>%
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, !!!grpBy_quo) %>%
-    summarize(tv = stratVar(ESTN_METHOD, tPlot, first(tStrat), first(ndif), first(a), first(nh)),
-              bv = stratVar(ESTN_METHOD, bPlot, first(bStrat), first(ndif), first(a), first(nh)),
-              tTv = stratVar(ESTN_METHOD, tTPlot, first(tTStrat), first(ndif), first(a), first(nh)),
-              bTv = stratVar(ESTN_METHOD, bTPlot, first(bTStrat), first(ndif), first(a), first(nh)),
-              cvStrat_t = stratVar(ESTN_METHOD, tPlot, first(tStrat), first(ndif), first(a), first(nh), fa, first(aStrat)),
-              cvStrat_b = stratVar(ESTN_METHOD, bPlot, first(bStrat), first(ndif), first(a), first(nh), fa, first(aStrat)),
-              cvStrat_tT = stratVar(ESTN_METHOD, tPlot, first(tStrat), first(ndif), first(a), first(nh), tTPlot, first(tTStrat)),
-              cvStrat_bT = stratVar(ESTN_METHOD, bPlot, first(bStrat), first(ndif), first(a), first(nh), bTPlot, first(bTStrat)),
-              tStrat = first(tStrat),
-              bStrat = first(bStrat),
-              tTStrat = first(tTStrat),
-              bTStrat = first(bTStrat),
-              nh = first(nh),
-              a = first(a),
-              w = first(w),
-              p2eu = first(p2eu)) %>%
-    left_join(lazy_dt(aEstMean), by = c('ESTN_UNIT_CN', aGrpBy)) %>%
-    left_join(lazy_dt(tEstMean), by = c('ESTN_UNIT_CN', grpBy), suffix = c('.a', '')) %>%
-    group_by(ESTN_UNIT_CN, !!!grpBy_quo) %>%
-    summarise(tVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tv, tStrat, tEst),
-              bVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bv, bStrat, bEst),
-              tTVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tTv, tTStrat, tTEst),
-              bTVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bTv, bTStrat, bTEst),
-              # Unit Covariance
-              cvEst_t = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_t, tStrat, tEst, aStrat, aEst),
-              cvEst_b = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_b, bStrat, bEst, aStrat, aEst),
-              cvEst_tT = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_t, tStrat, tEst, tTStrat, tTEst),
-              cvEst_bT = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_b, bStrat, bEst, bTStrat, bTEst)) %>%
-    as.data.frame()
-
-
-  aEst <- left_join(aEstMean, aVar, by = c('ESTN_UNIT_CN', aGrpBy))
-  tEst <- left_join(tEstMean, tVar, by = c('ESTN_UNIT_CN', grpBy))
-
-
-
-
-
-
-
-
-
-
-
-
-#
-#   ## Strata level estimates
-#   aStrat <- a %>%
-#     ## Rejoin with population tables
-#     right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
-#     mutate(
-#       ## AREA
-#       aAdj = case_when(
-#         ## When NA, stay NA
-#         is.na(PROP_BASIS) ~ NA_real_,
-#         ## If the proportion was measured for a macroplot,
-#         ## use the macroplot value
-#         PROP_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
-#         ## Otherwise, use the subpplot value
-#         PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
-#       fa = fa * aAdj) %>%
-#     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = aGrpBy) %>%
-#     summarize(a_t = length(unique(PLT_CN)) / first(P2POINTCNT),
-#               aStrat = mean(fa * a_t, na.rm = TRUE),
-#               plotIn_AREA = sum(plotIn, na.rm = TRUE),
-#               n = n(),
-#               ## We don't want a vector of these values, since they are repeated
-#               nh = first(P2POINTCNT),
-#               a = first(AREA_USED),
-#               w = first(P1POINTCNT) / first(P1PNTCNT_EU),
-#               p2eu = first(p2eu),
-#               ndif = nh - n,
-#               ## Strata level variances
-#               av = ifelse(first(ESTN_METHOD == 'simple'),
-#                           var(c(fa, numeric(ndif)) * first(a) / nh),
-#                           (sum((c(fa, numeric(ndif))^2)) - nh * aStrat^2) / (nh * (nh-1))))
-#   ## Estimation unit
-#   aEst <- aStrat %>%
-#     group_by(ESTN_UNIT_CN, .dots = aGrpBy) %>%
-#     summarize(aEst = unitMean(ESTN_METHOD, a, nh,  w, aStrat),
-#               aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, av, aStrat, aEst),
-#               plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
-#
-#   ######## ------------------ TREE ESTIMATES + CV
-#
-#   ## Strata level estimates
-#   tEst <- t %>%
-#     ## Rejoin with population tables
-#     right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
-#     ## Need this for covariance later on
-#     left_join(select(a, fa, PLT_CN, PROP_BASIS, aGrpBy[aGrpBy %in% c('YEAR', 'INVYR') == FALSE]), by = c('PLT_CN', aGrpBy[aGrpBy %in% c('YEAR', 'INVYR') == FALSE])) %>%
-#     #Add adjustment factors
-#     mutate(
-#       ## AREA
-#       tAdj = case_when(
-#         ## When NA, stay NA
-#         is.na(PLOT_BASIS) ~ NA_real_,
-#         ## If the proportion was measured for a macroplot,
-#         ## use the macroplot value
-#         PLOT_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
-#         ## Otherwise, use the subpplot value
-#         PLOT_BASIS == 'SUBP' ~ as.numeric(ADJ_FACTOR_SUBP),
-#         PLOT_BASIS == 'MICR' ~ as.numeric(ADJ_FACTOR_MICR)),
-#       ## AREA
-#       aAdj = case_when(
-#         ## When NA, stay NA
-#         is.na(PROP_BASIS) ~ NA_real_,
-#         ## If the proportion was measured for a macroplot,
-#         ## use the macroplot value
-#         PROP_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
-#         ## Otherwise, use the subpplot value
-#         PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
-#       fa = fa * aAdj,
-#       tPlot = tPlot * tAdj,
-#       bPlot = bPlot * tAdj,
-#       tTPlot = tTPlot * tAdj,
-#       bTPlot = bTPlot * tAdj) %>%
-#     ## Extra step for variance issues
-#     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy) %>%
-#     summarize(tPlot = sum(tPlot, na.rm = TRUE),
-#               bPlot = sum(bPlot, na.rm = TRUE),
-#               tTPlot = sum(tTPlot, na.rm = TRUE),
-#               bTPlot = sum(bTPlot, na.rm = TRUE),
-#               fa = first(fa),
-#               plotIn = ifelse(sum(plotIn >  0, na.rm = TRUE), 1,0),
-#               nh = first(P2POINTCNT),
-#               p2eu = first(p2eu),
-#               a = first(AREA_USED),
-#               w = first(P1POINTCNT) / first(P1PNTCNT_EU)) %>%
-#     ## Joining area data so we can compute ratio variances
-#     left_join(select(aStrat, aStrat, av, ESTN_UNIT_CN, STRATUM_CN, ESTN_METHOD, aGrpBy), by = c('ESTN_UNIT_CN', 'ESTN_METHOD', 'STRATUM_CN', aGrpBy)) %>%
-#     ## Strata level
-#     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
-#     summarize(r_t = length(unique(PLT_CN)) / first(nh),
-#               tStrat = mean(tPlot * r_t, na.rm = TRUE),
-#               bStrat = mean(bPlot * r_t, na.rm = TRUE),
-#               tTStrat = mean(tTPlot * r_t, na.rm = TRUE),
-#               bTStrat = mean(bTPlot * r_t, na.rm = TRUE),
-#               aStrat = first(aStrat),
-#               plotIn_TREE = sum(plotIn, na.rm = TRUE),
-#               n = n(),
-#               ## We don't want a vector of these values, since they are repeated
-#               nh = first(nh),
-#               a = first(a),
-#               w = first(w),
-#               p2eu = first(p2eu),
-#               ndif = nh - n,
-#               ## Strata level variances
-#               #aVar = (sum(forArea^2) - sum(P2POINTCNT * aStrat^2)) / (P2POINTCNT * (P2POINTCNT-1)),
-#               tv = ifelse(first(ESTN_METHOD == 'simple'),
-#                           var(c(tPlot, numeric(ndif)) * first(a) / nh),
-#                           (sum(c(tPlot, numeric(ndif))^2, na.rm = TRUE) - sum(nh * tStrat^2, na.rm = TRUE)) / (nh * (nh-1))), # Stratified and double cases
-#               tv = stratVar(ESTN_METHOD, tPlot, tStrat, ndif, a, nh),
-#               bv = ifelse(first(ESTN_METHOD == 'simple'),
-#                           var(c(tPlot, numeric(ndif))* first(a) / nh),
-#                           (sum(c(bPlot, numeric(ndif))^2) - sum(nh * bStrat^2)) / (nh * (nh-1))),
-#               tTv = ifelse(first(ESTN_METHOD == 'simple'),
-#                            var(c(tTPlot, numeric(ndif)) * first(a) / nh),
-#                            (sum(c(tTPlot, numeric(ndif))^2) - sum(nh * tTStrat^2)) / (nh * (nh-1))), # Stratified and double cases
-#               bTv = ifelse(first(ESTN_METHOD == 'simple'),
-#                            var(c(bTPlot, numeric(ndif)) * first(a) / nh),
-#                            (sum(c(bTPlot, numeric(ndif))^2) - sum(nh * bTStrat^2)) / (nh * (nh-1))),
-#               # Strata level covariances
-#               cvStrat_t = ifelse(first(ESTN_METHOD == 'simple'),
-#                                  cov(fa,tPlot),
-#                                  (sum(fa*tPlot, na.rm = TRUE) - sum(nh * aStrat *tStrat)) / (nh * (nh-1))), # Stratified and double cases
-#               cvStrat_t = stratVar(ESTN_METHOD, tPlot, tStrat, ndif, a, nh, fa, aStrat),
-#
-#               cvStrat_b = ifelse(first(ESTN_METHOD == 'simple'),
-#                                  cov(fa,bPlot),
-#                                  (sum(fa*bPlot, na.rm = TRUE) - sum(nh * aStrat *bStrat)) / (nh * (nh-1))),
-#               cvStrat_tT = ifelse(first(ESTN_METHOD == 'simple'),
-#                                   cov(tTPlot,tPlot),
-#                                   (sum(tTPlot*tPlot, na.rm = TRUE) - sum(nh * tTStrat *tStrat)) / (nh * (nh-1))), # Stratified and double cases
-#               cvStrat_bT = ifelse(first(ESTN_METHOD == 'simple'),
-#                                   cov(bTPlot,bPlot),
-#                                   (sum(bTPlot*bPlot, na.rm = TRUE) - sum(nh * bTStrat *bStrat)) / (nh * (nh-1)))) %>%
-#     ## Estimation unit
-#     left_join(select(aEst, ESTN_UNIT_CN, aEst, aVar, aGrpBy), by = c('ESTN_UNIT_CN', aGrpBy)) %>%
-#     group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
-#     summarize(tEst = unitMean(ESTN_METHOD, a, nh,  w, tStrat),
-#               bEst = unitMean(ESTN_METHOD, a, nh,  w, bStrat),
-#               tTEst = unitMean(ESTN_METHOD, a, nh,  w, tTStrat),
-#               bTEst = unitMean(ESTN_METHOD, a, nh,  w, bTStrat),
-#               plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE),
-#               tVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tv, tStrat, tEst),
-#               bVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bv, bStrat, bEst),
-#               tTVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tTv, tTStrat, tTEst),
-#               bTVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bTv, bTStrat, bTEst),
-#               # Unit Covariance
-#               cvEst_t = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_t, tStrat, tEst, aStrat, aEst),
-#               cvEst_b = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_b, bStrat, bEst, aStrat, aEst),
-#               cvEst_tT = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_t, tStrat, tEst, tTStrat, tTEst),
-#               cvEst_bT = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_b, bStrat, bEst, bTStrat, bTEst))
-#
-
-
-  out <- list(tEst = tEst, aEst = aEst)
-
-  return(out)
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-tpaHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
-
-  # Update domain indicator for each each column speficed in grpBy
-  td = 1 # Start both at 1, update as we iterate through
-  ad = 1
-  pd = 1
-  for (n in 1:ncol(combos[[x]])){
-    # Tree domain indicator for each column in
-    tObs <- as.character(combos[[x]][[grpBy[n]]]) == as.character(data[[grpBy[n]]])
-    if (length(which(is.na(tObs))) == length(tObs)) tObs <- 1
-    td <- data$tDI * tObs * td
-    # Area domain indicator for each column in
-    if(grpBy[n] %in% aGrpBy){
-      aObs <- as.character(combos[[x]][[aGrpBy[n]]]) == as.character(data[[aGrpBy[n]]])
-      if (length(which(is.na(aObs))) == length(aObs)) aObs <- 1
-      aObs[is.na(aObs)] <- 0
-      ad <- data$aDI * aObs * ad
-      pd <- data$pDI * pd * aObs
-
-    }
-  }
-
-
-  if(SE){
-    data$tDI <- td
-    data$tDI[is.na(data$tDI)] <- 0
-    data$aDI <- ad
-    data$aDI[is.na(data$aDI)] <- 0
-    data$pDI <- pd
-    data$pDI[is.na(data$pDI)] <- 0
-    ## We produce an intermediate object in this chain as it is needed to compute the ratio of means variance
-    ## Numerator and denominator are in different domains of interest, and may be grouped by different variables
-    ## see covariance estimation below
-    ### Compute total TREES in domain of interest
-    tInt <- data %>%
-      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
-      #filter(EVALID %in% tID) %>%
-      # Compute estimates at plot level
-      group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-      summarize(tPlot = sum(TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                bPlot = sum(basalArea(DIA) * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-                tTPlot = sum(TPA_UNADJ * tAdj * pDI, na.rm = TRUE),
-                bTPlot = sum(basalArea(DIA) * TPA_UNADJ * tAdj * pDI, na.rm = TRUE),
-                plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0),
-                a = first(AREA_USED),
-                p1EU = first(P1PNTCNT_EU),
-                p1 = first(P1POINTCNT),
-                p2 = first(P2POINTCNT))
-    ### Compute total AREA in the domain of interest
-    aInt <- data %>%
-      #filter(EVALID %in% aID) %>%
-      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, .keep_all = TRUE) %>%
-      group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-      summarize(fa = sum(CONDPROP_UNADJ * aDI * aAdj, na.rm = TRUE),
-                plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0),
-                a = first(AREA_USED),
-                p1EU = first(P1PNTCNT_EU),
-                p1 = first(P1POINTCNT),
-                p2 = first(P2POINTCNT))
-
-    # Continue through totals
-    t <- tInt %>%
-      inner_join(aInt, by = c('PLT_CN', 'ESTN_UNIT_CN', 'ESTN_METHOD', 'STRATUM_CN'), suffix = c('_t', '_a')) %>%
-      group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN) %>%
-      summarize(aStrat = mean(fa, na.rm = TRUE),
-                tStrat = mean(tPlot, na.rm = TRUE),
-                bStrat = mean(bPlot, na.rm = TRUE),
-                tTStrat = mean(tTPlot, na.rm = TRUE),
-                bTStrat = mean(bTPlot, na.rm = TRUE),
-                plotIn_TREE = sum(plotIn_t, na.rm = TRUE),
-                plotIn_AREA = sum(plotIn_a, na.rm = TRUE),
-                a = first(a_t),
-                w = first(p1_t) / first(p1EU_a), # Stratum weight
-                nh = first(p2_t), # Number plots in stratum
-                # Strata level variances
-                tv = ifelse(first(ESTN_METHOD == 'simple'),
-                            var(tPlot * first(a) / nh),
-                            (sum(tPlot^2) - sum(nh * tStrat^2)) / (nh * (nh-1))), # Stratified and double cases
-                bv = ifelse(first(ESTN_METHOD == 'simple'),
-                            var(bPlot * first(a) / nh),
-                            (sum(bPlot^2) - sum(nh * bStrat^2)) / (nh * (nh-1))),
-                tTv = ifelse(first(ESTN_METHOD == 'simple'),
-                             var(tTPlot * first(a) / nh),
-                             (sum(tTPlot^2) - sum(nh * tTStrat^2)) / (nh * (nh-1))), # Stratified and double cases
-                bTv = ifelse(first(ESTN_METHOD == 'simple'),
-                             var(bTPlot * first(a) / nh),
-                             (sum(bTPlot^2) - sum(nh * bTStrat^2)) / (nh * (nh-1))),
-                av = ifelse(first(ESTN_METHOD == 'simple'),
-                            var(fa * first(a) / nh),
-                            (sum(fa^2) - sum(nh * aStrat^2)) / (nh * (nh-1))),
-                # Strata level covariances
-                cvStrat_t = ifelse(first(ESTN_METHOD == 'simple'),
-                                   cov(fa,tPlot),
-                                   (sum(fa*tPlot) - sum(nh * aStrat *tStrat)) / (nh * (nh-1))), # Stratified and double cases
-                cvStrat_b = ifelse(first(ESTN_METHOD == 'simple'),
-                                   cov(fa,bPlot),
-                                   (sum(fa*bPlot) - sum(nh * aStrat *bStrat)) / (nh * (nh-1))),
-                cvStrat_tT = ifelse(first(ESTN_METHOD == 'simple'),
-                                    cov(tTPlot,tPlot),
-                                    (sum(tTPlot*tPlot) - sum(nh * tTStrat *tStrat)) / (nh * (nh-1))), # Stratified and double cases
-                cvStrat_bT = ifelse(first(ESTN_METHOD == 'simple'),
-                                    cov(bTPlot,bPlot),
-                                    (sum(bTPlot*bPlot) - sum(nh * bTStrat *bStrat)) / (nh * (nh-1)))) %>% # Stratified and double cases
-      group_by(ESTN_UNIT_CN) %>%
-      summarize(aEst = unitMean(ESTN_METHOD, a, nh, w, aStrat),
-                tEst = unitMean(ESTN_METHOD, a, nh, w, tStrat),
-                bEst = unitMean(ESTN_METHOD, a, nh, w, bStrat),
-                tTEst = unitMean(ESTN_METHOD, a, nh, w, tTStrat),
-                bTEst = unitMean(ESTN_METHOD, a, nh, w, bTStrat),
-                plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE),
-                plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE),
-                # Estimation of unit variance
-                aVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, av, aStrat, aEst),
-                tVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, tv, tStrat, tEst),
-                bVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, bv, bStrat, bEst),
-                tTVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, tTv, tTStrat, tTEst),
-                bTVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, bTv, bTStrat, bTEst),
-                # Unit Covariance
-                cvEst_t = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_t, tStrat, tEst, aStrat, aEst),
-                cvEst_b = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_b, bStrat, bEst, aStrat, aEst),
-                cvEst_tT = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_t, tStrat, tEst, tTStrat, tTEst),
-                cvEst_bT = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_b, bStrat, bEst, bTStrat, bTEst)
-                ) %>%
-      # Compute totals
-      summarize(TREE_TOTAL = sum(tEst, na.rm = TRUE),
-                BA_TOTAL = sum(bEst, na.rm = TRUE),
-                TREE_TOTAL_full = sum(tTEst, na.rm = TRUE),
-                BA_TOTAL_full = sum(bTEst, na.rm = TRUE),
-                AREA_TOTAL = sum(aEst, na.rm = TRUE),
-                ## Ratios
-                TPA = TREE_TOTAL / AREA_TOTAL,
-                BAA = BA_TOTAL / AREA_TOTAL,
-                TPA_PERC = TREE_TOTAL / TREE_TOTAL_full * 100,
-                BAA_PERC = BA_TOTAL / BA_TOTAL_full * 100,
-                ## Variances
-                treeVar = sum(tVar, na.rm = TRUE),
-                baVar = sum(bVar, na.rm = TRUE),
-                tTVar = sum(tTVar, na.rm = TRUE),
-                bTVar = sum(bTVar, na.rm = TRUE),
-                aVar = sum(aVar, na.rm = TRUE),
-                cvT = sum(cvEst_t, na.rm = TRUE),
-                cvB = sum(cvEst_b, na.rm = TRUE),
-                cvTT = sum(cvEst_tT, na.rm = TRUE),
-                cvBT = sum(cvEst_bT, na.rm = TRUE),
-                tpaVar = (1/AREA_TOTAL^2) * (treeVar + (TPA^2 * aVar) - 2 * TPA * cvT),
-                baaVar = (1/AREA_TOTAL^2) * (baVar + (BAA^2 * aVar) - (2 * BAA * cvB)),
-                tpVar = (1/TREE_TOTAL_full^2) * (treeVar + (TPA_PERC^2 * tTVar) - 2 * TPA_PERC * cvTT),
-                bpVar = (1/BA_TOTAL_full^2) * (baVar + (BAA_PERC^2 * bTVar) - (2 * BAA_PERC * cvBT)),
-                ## Sampling Errors
-                TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
-                BA_SE = sqrt(baVar) / BA_TOTAL * 100,
-                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
-                TPA_SE = sqrt(tpaVar) / TPA * 100,
-                BAA_SE = sqrt(baaVar) / BAA * 100,
-                TPA_PERC_SE = sqrt(tpVar) / TPA_PERC * 100,
-                BAA_PERC_SE = sqrt(bpVar) / BAA_PERC * 100,
-                nPlots_TREE = sum(plotIn_TREE, na.rm = TRUE),
-                nPlots_AREA = sum(plotIn_AREA, na.rm = TRUE))
-
-    if (totals) {
-      t <- t %>%
-        select(TPA, BAA, TPA_PERC, BAA_PERC, TREE_TOTAL, BA_TOTAL, AREA_TOTAL, TPA_SE, BAA_SE,
-               TPA_PERC_SE, BAA_PERC_SE, TREE_SE, BA_SE, AREA_TOTAL_SE, nPlots_TREE, nPlots_AREA)
-    } else {
-      t <- t %>%
-        select(TPA, BAA, TPA_PERC, BAA_PERC,  TPA_SE, BAA_SE,
-               TPA_PERC_SE, BAA_PERC_SE, nPlots_TREE, nPlots_AREA)
-    }
-    #names(combos) <- 1:length(combos)
-    #combosDF <- bind_rows(combos)
-
-    #names(t) <- 1:length(t)
-    # Convert from list to dataframe
-    # t <- setNames(t, 1:length(t)) %>%
-    #   bind_rows(t, .id = "column_label")
-    #t <- bind_rows(t, .id = NULL)
-    # Snag the names
-    #tNames <- names(t)
-    # Rejoin with grpBY
-    t <- data.frame(combos[[x]], t) #%>%
-    #filter(!is.na(YEAR))
-
-  } else { # IF SE is FALSE
-    ### BELOW DOES NOT PRODUCE SAMPLING ERRORS, use EXPNS instead (much quicker)
-    t <- data %>%
-      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
-      # Compute estimates at plot level
-      group_by(.dots = grpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-      summarize(tPlot = sum(TPA_UNADJ * tAdj * tDI * EXPNS, na.rm = TRUE),
-                bPlot = sum(basalArea(DIA) * TPA_UNADJ * tAdj * tDI * EXPNS, na.rm = TRUE),
-                plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0)) %>%
-      group_by(.dots = grpBy) %>%
-      summarize(TREE_TOTAL = sum(tPlot, na.rm = TRUE),
-                BA_TOTAL = sum(bPlot, na.rm = TRUE),
-                nPlots_TREE = sum(plotIn, na.rm = TRUE))
-    tT <- data %>%
-      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
-      # Compute estimates at plot level
-      group_by(.dots = aGrpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-      summarize(tTPlot = sum(TPA_UNADJ * tAdj * pDI * EXPNS, na.rm = TRUE),
-                bTPlot = sum(basalArea(DIA) * TPA_UNADJ * tAdj * pDI * EXPNS, na.rm = TRUE)) %>%
-      group_by(.dots = aGrpBy) %>%
-      summarize(TREE_TOTAL_full = sum(tTPlot, na.rm = TRUE),
-                BA_TOTAL_full = sum(bTPlot, na.rm = TRUE))
-    a <- data %>%
-      distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, .keep_all = TRUE) %>%
-      group_by(.dots = aGrpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-      summarize(fa = sum(CONDPROP_UNADJ * aDI * aAdj * EXPNS, na.rm = TRUE),
-                plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0)) %>%
-      group_by(.dots = aGrpBy) %>%
-      summarize(AREA_TOTAL = sum(fa, na.rm = TRUE),
-                nPlots_AREA = sum(plotIn, na.rm = TRUE))
-
-    suppressMessages({
-      t <- inner_join(t, tT) %>%
-        inner_join(a) %>%
-        mutate(TPA = TREE_TOTAL / AREA_TOTAL,
-               BAA = BA_TOTAL / AREA_TOTAL,
-               TPA_PERC = TREE_TOTAL / TREE_TOTAL_full * 100,
-               BAA_PERC = BA_TOTAL / BA_TOTAL_full * 100)
-
-      if (totals) {
-        t <- t %>%
-          select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC, TREE_TOTAL, BA_TOTAL, AREA_TOTAL, nPlots_TREE, nPlots_AREA)
-      } else {
-        t <- t %>%
-          select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC, nPlots_TREE, nPlots_AREA)
-      }
-    })
-
-  } # End SE conditional
-
-  # Do some cleanup
-  gc()
-
-  #Return a dataframe
-  t
-}
-
-
-
-
-
-tpaNewHelper <- function(x, combos, data, totals, SE){
-
-  ## Make a zero-one column that indicates which data is to be summarized
-  ## Test that value of combos matches value of data
-  domain <- 1
-  comboNames <- names(combos[[x]])
-  for(n in 1:ncol(combos[[x]])){
-    obs <- as.character(combos[[x]][n]) == as.character(data[[comboNames[n]]])
-    if (length(which(is.na(obs))) == length(obs)) obs <- 1
-    domain <- obs * domain
-  }
-
-
-  if(SE){
-    data$domain <- domain
-    data$domain[is.na(data$domain)] <- 0
-    ## We produce an intermediate object in this chain as it is needed to compute the ratio of means variance
-    ## Numerator and denominator are in different domains of interest, and may be grouped by different variables
-    ## see covariance estimation below
-    ### Compute total TREES in domain of interest
-    # tInt <- data %>%
-    #   distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
-    #   #filter(EVALID %in% tID) %>%
-    #   # Compute estimates at plot level
-    #   group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-    #   summarize(tPlot = sum(TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-    #             bPlot = sum(basalArea(DIA) * TPA_UNADJ * tAdj * tDI, na.rm = TRUE),
-    #             tTPlot = sum(TPA_UNADJ * tAdj * pDI, na.rm = TRUE),
-    #             bTPlot = sum(basalArea(DIA) * TPA_UNADJ * tAdj * pDI, na.rm = TRUE),
-    #             plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0),
-    #             a = first(AREA_USED),
-    #             p1EU = first(P1PNTCNT_EU),
-    #             p1 = first(P1POINTCNT),
-    #             p2 = first(P2POINTCNT))
-    # ### Compute total AREA in the domain of interest
-    # aInt <- data %>%
-    #   #filter(EVALID %in% aID) %>%
-    #   distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, .keep_all = TRUE) %>%
-    #   group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-    #   summarize(fa = sum(CONDPROP_UNADJ * aDI * aAdj, na.rm = TRUE),
-    #             plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0),
-    #             a = first(AREA_USED),
-    #             p1EU = first(P1PNTCNT_EU),
-    #             p1 = first(P1POINTCNT),
-    #             p2 = first(P2POINTCNT))
-    #
-    # # Continue through totals
-    # t <- tInt %>%
-    #   inner_join(aInt, by = c('PLT_CN', 'ESTN_UNIT_CN', 'ESTN_METHOD', 'STRATUM_CN'), suffix = c('_t', '_a')) #%>%
-
-    t <- data %>%
-      #distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, EVALID, .keep_all = TRUE) %>%
-      mutate(fa = fa * domain,
-             tPlot = tPlot * domain,
-             bPlot = bPlot * domain,
-             tTPlot = tTPlot * domain,
-             bTPlot = bTPlot * domain,
-             plotIn_t = plotIn_t* domain,
-             plotIn_a = plotIn_a* domain) %>%
-      group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN) %>%
-      summarize(nPlots = n(),
-                aStrat = mean(fa, na.rm = TRUE),
-                tStrat = mean(tPlot, na.rm = TRUE)* nPlots/first(totalPlots),
-                bStrat = mean(bPlot, na.rm = TRUE)* nPlots/first(totalPlots),
-                tTStrat = mean(tTPlot, na.rm = TRUE)* nPlots/first(totalPlots),
-                bTStrat = mean(bTPlot, na.rm = TRUE)* nPlots/first(totalPlots),
-                plotIn_TREE = sum(plotIn_t, na.rm = TRUE),
-                plotIn_AREA = sum(plotIn_a, na.rm = TRUE),
-                a = first(a),
-                w = first(p1) / first(p1_eu), # Stratum weight
-                nh = first(p2), # Number plots in stratum
-                # Strata level variances
-                tv = ifelse(first(ESTN_METHOD == 'simple'),
-                            var(tPlot * first(a) / nh),
-                            (sum(tPlot^2) - sum(nh * tStrat^2)) / (nh * (nh-1))), # Stratified and double cases
-                bv = ifelse(first(ESTN_METHOD == 'simple'),
-                            var(bPlot * first(a) / nh),
-                            (sum(bPlot^2) - sum(nh * bStrat^2)) / (nh * (nh-1))),
-                tTv = ifelse(first(ESTN_METHOD == 'simple'),
-                             var(tTPlot * first(a) / nh),
-                             (sum(tTPlot^2) - sum(nh * tTStrat^2)) / (nh * (nh-1))), # Stratified and double cases
-                bTv = ifelse(first(ESTN_METHOD == 'simple'),
-                             var(bTPlot * first(a) / nh),
-                             (sum(bTPlot^2) - sum(nh * bTStrat^2)) / (nh * (nh-1))),
-                av = ifelse(first(ESTN_METHOD == 'simple'),
-                            var(fa * first(a) / nh),
-                            (sum(fa^2) - sum(nh * aStrat^2)) / (nh * (nh-1))),
-                # Strata level covariances
-                cvStrat_t = ifelse(first(ESTN_METHOD == 'simple'),
-                                   cov(fa,tPlot),
-                                   (sum(fa*tPlot) - sum(nh * aStrat *tStrat)) / (nh * (nh-1))), # Stratified and double cases
-                cvStrat_b = ifelse(first(ESTN_METHOD == 'simple'),
-                                   cov(fa,bPlot),
-                                   (sum(fa*bPlot) - sum(nh * aStrat *bStrat)) / (nh * (nh-1))),
-                cvStrat_tT = ifelse(first(ESTN_METHOD == 'simple'),
-                                    cov(tTPlot,tPlot),
-                                    (sum(tTPlot*tPlot) - sum(nh * tTStrat *tStrat)) / (nh * (nh-1))), # Stratified and double cases
-                cvStrat_bT = ifelse(first(ESTN_METHOD == 'simple'),
-                                    cov(bTPlot,bPlot),
-                                    (sum(bTPlot*bPlot) - sum(nh * bTStrat *bStrat)) / (nh * (nh-1)))) %>% # Stratified and double cases
-      group_by(ESTN_UNIT_CN) %>%
-      summarize(aEst = unitMean(ESTN_METHOD, a, nh, w, aStrat),
-                tEst = unitMean(ESTN_METHOD, a, nh, w, tStrat),
-                bEst = unitMean(ESTN_METHOD, a, nh, w, bStrat),
-                tTEst = unitMean(ESTN_METHOD, a, nh, w, tTStrat),
-                bTEst = unitMean(ESTN_METHOD, a, nh, w, bTStrat),
-                plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE),
-                plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE),
-                # Estimation of unit variance
-                aVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, av, aStrat, aEst),
-                tVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, tv, tStrat, tEst),
-                bVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, bv, bStrat, bEst),
-                tTVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, tTv, tTStrat, tTEst),
-                bTVar = unitVar(method = 'var', ESTN_METHOD, a, nh, w, bTv, bTStrat, bTEst),
-                # Unit Covariance
-                cvEst_t = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_t, tStrat, tEst, aStrat, aEst),
-                cvEst_b = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_b, bStrat, bEst, aStrat, aEst),
-                cvEst_tT = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_t, tStrat, tEst, tTStrat, tTEst),
-                cvEst_bT = unitVar(method = 'cov', ESTN_METHOD, a, nh, w, cvStrat_b, bStrat, bEst, bTStrat, bTEst)) %>%
-      # Compute totals
-      summarize(TREE_TOTAL = sum(tEst, na.rm = TRUE),
-                BA_TOTAL = sum(bEst, na.rm = TRUE),
-                TREE_TOTAL_full = sum(tTEst, na.rm = TRUE),
-                BA_TOTAL_full = sum(bTEst, na.rm = TRUE),
-                AREA_TOTAL = sum(aEst, na.rm = TRUE),
-                ## Ratios
-                TPA = TREE_TOTAL / AREA_TOTAL,
-                BAA = BA_TOTAL / AREA_TOTAL,
-                TPA_PERC = TREE_TOTAL / TREE_TOTAL_full * 100,
-                BAA_PERC = BA_TOTAL / BA_TOTAL_full * 100,
-                ## Variances
-                treeVar = sum(tVar, na.rm = TRUE),
-                baVar = sum(bVar, na.rm = TRUE),
-                tTVar = sum(tTVar, na.rm = TRUE),
-                bTVar = sum(bTVar, na.rm = TRUE),
-                aVar = sum(aVar, na.rm = TRUE),
-                cvT = sum(cvEst_t, na.rm = TRUE),
-                cvB = sum(cvEst_b, na.rm = TRUE),
-                cvTT = sum(cvEst_tT, na.rm = TRUE),
-                cvBT = sum(cvEst_bT, na.rm = TRUE),
-                tpaVar = (1/AREA_TOTAL^2) * (treeVar + (TPA^2 * aVar) - 2 * TPA * cvT),
-                baaVar = (1/AREA_TOTAL^2) * (baVar + (BAA^2 * aVar) - (2 * BAA * cvB)),
-                tpVar = (1/TREE_TOTAL_full^2) * (treeVar + (TPA_PERC^2 * tTVar) - 2 * TPA_PERC * cvTT),
-                bpVar = (1/BA_TOTAL_full^2) * (baVar + (BAA_PERC^2 * bTVar) - (2 * BAA_PERC * cvBT)),
-                ## Sampling Errors
-                TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
-                BA_SE = sqrt(baVar) / BA_TOTAL * 100,
-                TREE_SE = sqrt(treeVar) / TREE_TOTAL * 100,
-                BA_SE = sqrt(baVar) / BA_TOTAL * 100,
-                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
-                TPA_SE = sqrt(tpaVar) / TPA * 100,
-                BAA_SE = sqrt(baaVar) / BAA * 100,
-                TPA_PERC_SE = sqrt(tpVar) / TPA_PERC * 100,
-                BAA_PERC_SE = sqrt(bpVar) / BAA_PERC * 100,
-                nPlots_TREE = sum(plotIn_TREE, na.rm = TRUE),
-                nPlots_AREA = sum(plotIn_AREA, na.rm = TRUE))
-
-    if (totals) {
-      t <- t %>%
-        select(TPA, BAA, TPA_PERC, BAA_PERC, TREE_TOTAL, BA_TOTAL, AREA_TOTAL, TPA_SE, BAA_SE,
-               TPA_PERC_SE, BAA_PERC_SE, TREE_SE, BA_SE, AREA_TOTAL_SE, nPlots_TREE, nPlots_AREA)
-    } else {
-      t <- t %>%
-        select(TPA, BAA, TPA_PERC, BAA_PERC, TPA_SE, BAA_SE,
-               TPA_PERC_SE, BAA_PERC_SE, nPlots_TREE, nPlots_AREA)
-    }
-    #names(combos) <- 1:length(combos)
-    #combosDF <- bind_rows(combos)
-
-    #names(t) <- 1:length(t)
-    # Convert from list to dataframe
-    # t <- setNames(t, 1:length(t)) %>%
-    #   bind_rows(t, .id = "column_label")
-    #t <- bind_rows(t, .id = NULL)
-    # Snag the names
-    #tNames <- names(t)
-    # Rejoin with grpBY
-    t <- data.frame(combos[[x]], t) #%>%
-    #filter(!is.na(YEAR))
-
-  } else { # IF SE is FALSE
-    # ### BELOW DOES NOT PRODUCE SAMPLING ERRORS, use EXPNS instead (much quicker)
-    # t <- data %>%
-    #   distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
-    #   # Compute estimates at plot level
-    #   group_by(.dots = grpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-    #   summarize(tPlot = sum(TPA_UNADJ * tAdj * tDI * EXPNS, na.rm = TRUE),
-    #             bPlot = sum(basalArea(DIA) * TPA_UNADJ * tAdj * tDI * EXPNS, na.rm = TRUE),
-    #             plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0)) %>%
-    #   group_by(.dots = grpBy) %>%
-    #   summarize(TREE_TOTAL = sum(tPlot, na.rm = TRUE),
-    #             BA_TOTAL = sum(bPlot, na.rm = TRUE),
-    #             nPlots_TREE = sum(plotIn, na.rm = TRUE))
-    # tT <- data %>%
-    #   distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, SUBP, TREE, EVALID, COND_STATUS_CD, .keep_all = TRUE) %>%
-    #   # Compute estimates at plot level
-    #   group_by(.dots = aGrpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-    #   summarize(tTPlot = sum(TPA_UNADJ * tAdj * pDI * EXPNS, na.rm = TRUE),
-    #             bTPlot = sum(basalArea(DIA) * TPA_UNADJ * tAdj * pDI * EXPNS, na.rm = TRUE)) %>%
-    #   group_by(.dots = aGrpBy) %>%
-    #   summarize(TREE_TOTAL_full = sum(tTPlot, na.rm = TRUE),
-    #             BA_TOTAL_full = sum(bTPlot, na.rm = TRUE))
-    # a <- data %>%
-    #   distinct(ESTN_UNIT_CN, STRATUM_CN, PLT_CN, CONDID, .keep_all = TRUE) %>%
-    #   group_by(.dots = aGrpBy, ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
-    #   summarize(fa = sum(CONDPROP_UNADJ * aDI * aAdj * EXPNS, na.rm = TRUE),
-    #             plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0)) %>%
-    #   group_by(.dots = aGrpBy) %>%
-    #   summarize(AREA_TOTAL = sum(fa, na.rm = TRUE),
-    #             nPlots_AREA = sum(plotIn, na.rm = TRUE))
-    #
-    # suppressMessages({
-    #   t <- inner_join(t, tT) %>%
-    #     inner_join(a) %>%
-    #     mutate(TPA = TREE_TOTAL / AREA_TOTAL,
-    #            BAA = BA_TOTAL / AREA_TOTAL,
-    #            TPA_PERC = TREE_TOTAL / TREE_TOTAL_full * 100,
-    #            BAA_PERC = BA_TOTAL / BA_TOTAL_full * 100)
-    #
-    #   if (totals) {
-    #     t <- t %>%
-    #       select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC, TREE_TOTAL, BA_TOTAL, AREA_TOTAL, nPlots_TREE, nPlots_AREA)
-    #   } else {
-    #     t <- t %>%
-    #       select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC, nPlots_TREE, nPlots_AREA)
-    #   }
-    # })
-
-  } # End SE conditional
-
-  # Do some cleanup
-  #gc()
-
-  #Return a dataframe
-  t
-}

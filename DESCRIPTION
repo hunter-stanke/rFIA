@@ -14,4 +14,4 @@ Imports: dplyr, stringr, sp, sf, tidyr (>= 1.0.0), parallel, ggplot2, gganimate,
 Suggests: 
     knitr,
     rmarkdown
-RoxygenNote: 7.1.0
+RoxygenNote: 7.1.1
