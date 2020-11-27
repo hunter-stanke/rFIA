@@ -2,9 +2,6 @@ bioHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
 
   ## Selecting the plots for one county
   db$PLOT <- plts[[x]]
-  ## Carrying out filter across all tables
-  #db <- clipFIA(db, mostRecent = FALSE)
-
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   data <- db$PLOT %>%
@@ -12,7 +9,7 @@ bioHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
     left_join(db$TREE, by = c('PLT_CN', 'CONDID')) %>%
     ## Need a code that tells us where the tree was measured
     ## macroplot, microplot, subplot
-    mutate(PLOT_BASIS = case_when(
+    mutate(PLOT_BASIS = dplyr::case_when(
       ## When DIA is na, adjustment is NA
       is.na(DIA) ~ NA_character_,
       ## When DIA is less than 5", use microplot value
@@ -20,38 +17,40 @@ bioHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
       ## When DIA is greater than 5", use subplot value
       DIA >= 5 & is.na(MACRO_BREAKPOINT_DIA) ~ 'SUBP',
       DIA >= 5 & DIA < MACRO_BREAKPOINT_DIA ~ 'SUBP',
-      DIA >= MACRO_BREAKPOINT_DIA ~ 'MACR')) #%>%
-  #filter(!is.na(PLOT_BASIS))
-  # rename(YEAR = INVYR) %>%
-  # mutate_if(is.factor,
-  #           as.character) %>%
-  # filter(!is.na(YEAR))
+      DIA >= MACRO_BREAKPOINT_DIA ~ 'MACR'))
 
   ## Comprehensive indicator function
   data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
   data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
-  data$pDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$sp
 
 
   if (byPlot){
+
     grpBy <- c('YEAR', grpBy, 'PLOT_STATUS_CD')
+    grpSyms <- syms(grpBy)
+
     t <- data %>%
       mutate(YEAR = MEASYEAR) %>%
       distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
-      group_by(.dots = grpBy, PLT_CN) %>%
+      lazy_dt() %>%
+      group_by(!!!grpSyms, PLT_CN) %>%
       summarize(NETVOL_ACRE = sum(VOLCFNET * TPA_UNADJ * tDI, na.rm = TRUE),
                 SAWVOL_ACRE = sum(VOLCSNET * TPA_UNADJ * tDI, na.rm = TRUE),
                 BIO_AG_ACRE = sum(DRYBIO_AG * TPA_UNADJ * tDI, na.rm = TRUE) / 2000,
                 BIO_BG_ACRE = sum(DRYBIO_BG * TPA_UNADJ * tDI, na.rm = TRUE) / 2000,
-                BIO_ACRE = sum(BIO_AG_ACRE, BIO_BG_ACRE, na.rm = TRUE),
                 CARB_AG_ACRE = sum(CARBON_AG * TPA_UNADJ * tDI, na.rm = TRUE) / 2000,
                 CARB_BG_ACRE = sum(CARBON_BG * TPA_UNADJ * tDI, na.rm = TRUE) / 2000,
-                CARB_ACRE = sum(CARB_AG_ACRE, CARB_BG_ACRE, na.rm = TRUE),
-                nStems = length(which(tDI == 1)))
+                nStems = length(which(tDI == 1))) %>%
+      mutate(BIO_ACRE = BIO_AG_ACRE + BIO_BG_ACRE,
+             CARB_ACRE = CARB_AG_ACRE + CARB_BG_ACRE) %>%
+      as.data.frame()
 
     a = NULL
 
   } else {
+
+    grpSyms <- syms(grpBy)
+
     ### Plot-level estimates
     a <- data %>%
       ## Will be lots of trees here, so CONDPROP listed multiple times
@@ -63,17 +62,19 @@ bioHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
 
     ## Tree plts
     t <- data %>%
+      lazy_dt() %>%
       filter(!is.na(PLOT_BASIS)) %>%
-      group_by(PLT_CN, PLOT_BASIS, .dots = grpBy) %>%
+      group_by(PLT_CN, PLOT_BASIS, !!!grpSyms) %>%
       summarize(nvPlot = sum(VOLCFNET * TPA_UNADJ * tDI, na.rm = TRUE),
                 svPlot = sum(VOLCSNET * TPA_UNADJ *  tDI, na.rm = TRUE),
                 bagPlot = sum(DRYBIO_AG * TPA_UNADJ  * tDI  / 2000, na.rm = TRUE),
                 bbgPlot = sum(DRYBIO_BG * TPA_UNADJ * tDI  / 2000, na.rm = TRUE),
-                btPlot = sum(bagPlot, bbgPlot, na.rm = TRUE),
                 cagPlot = sum(CARBON_AG * TPA_UNADJ * tDI / 2000, na.rm = TRUE),
                 cbgPlot = sum(CARBON_BG * TPA_UNADJ * tDI / 2000, na.rm = TRUE),
-                ctPlot = sum(cagPlot, cbgPlot, na.rm = TRUE),
-                plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0))
+                plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0)) %>%
+      mutate(btPlot = bagPlot + bbgPlot,
+             ctPlot = cagPlot + cbgPlot) %>%
+      as.data.frame()
   }
 
 
@@ -93,59 +94,60 @@ bioHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
     grpBy <- c(grpBy, 'INVYR')
     aGrpBy <- c(aGrpBy, 'INVYR')
     popState[[x]]$P2POINTCNT <- popState[[x]]$P2POINTCNT_INVYR
+    popState[[x]]$P1POINTCNT <- popState[[x]]$P1POINTCNT_INVYR
     popState[[x]]$p2eu <- popState[[x]]$p2eu_INVYR
-
   }
+
+  aGrpSyms <- syms(aGrpBy)
 
   ## Strata level estimates
   aStrat <- a %>%
+    lazy_dt() %>%
     ## Rejoin with population tables
-    right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
+    inner_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
     mutate(
       ## AREA
-      aAdj = case_when(
+      aAdj = dplyr::case_when(
         ## When NA, stay NA
         is.na(PROP_BASIS) ~ NA_real_,
         ## If the proportion was measured for a macroplot,
         ## use the macroplot value
         PROP_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
-        ## Otherwise, use the subpplot value
+        ## Otherwise, use the subplot value
         PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
       fa = fa * aAdj) %>%
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = aGrpBy) %>%
-    summarize(a_t = length(unique(PLT_CN)) / first(P2POINTCNT),
-              aStrat = mean(fa * a_t, na.rm = TRUE),
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, !!!aGrpSyms) %>%
+    summarize(nh = dplyr::first(P2POINTCNT),
+              aStrat = sum(fa, na.rm = TRUE),
               plotIn_AREA = sum(plotIn, na.rm = TRUE),
-              n = n(),
-              ## We don't want a vector of these values, since they are repeated
-              nh = first(P2POINTCNT),
-              a = first(AREA_USED),
-              w = first(P1POINTCNT) / first(P1PNTCNT_EU),
-              p2eu = first(p2eu),
-              ndif = nh - n,
-              ## Strata level variances
-              av_correct = ifelse(first(ESTN_METHOD == 'simple'),
-                          var(c(fa, numeric(ndif)) * first(a) / nh),
-                          (sum((c(fa, numeric(ndif))^2), na.rm = TRUE) - nh * aStrat^2) / (nh * (nh-1))),
-              ## Strata level variances
-              av = stratVar(ESTN_METHOD, fa, aStrat, ndif, a, nh))
+              a = dplyr::first(AREA_USED),
+              w = dplyr::first(P1POINTCNT) / dplyr::first(P1PNTCNT_EU),
+              p2eu = dplyr::first(p2eu),
+              av = sum(fa^2, na.rm = TRUE)) %>%
+    mutate(aStrat = aStrat / nh,
+           av = (av - (nh * aStrat^2)) / (nh * (nh-1))) %>%
+    as.data.frame()
+
   ## Estimation unit
   aEst <- aStrat %>%
-    group_by(ESTN_UNIT_CN, .dots = aGrpBy) %>%
+    group_by(ESTN_UNIT_CN, !!!aGrpSyms) %>%
     summarize(aEst = unitMean(ESTN_METHOD, a, nh,  w, aStrat),
-              aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, av, aStrat, aEst),
+              aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, av, aStrat, aEst),
               plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
 
-  ######## ------------------ TREE ESTIMATES + CV
 
+
+  ######## ------------------ TREE ESTIMATES + CV
+  grpSyms <- syms(grpBy)
   ## Strata level estimates
   tEst <- t %>%
+    lazy_dt() %>%
     ## Rejoin with population tables
-    right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
+    inner_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
     ## Need this for covariance later on
     left_join(select(a, fa, PLT_CN, PROP_BASIS, aGrpBy[aGrpBy %in% c('YEAR', 'INVYR') == FALSE]), by = c('PLT_CN', aGrpBy[aGrpBy %in% c('YEAR', 'INVYR') == FALSE])) %>%
     #Add adjustment factors
-    mutate(tAdj = case_when(
+    mutate(tAdj = dplyr::case_when(
         ## When NA, stay NA
         is.na(PLOT_BASIS) ~ NA_real_,
         ## If the proportion was measured for a macroplot,
@@ -155,7 +157,7 @@ bioHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
         PLOT_BASIS == 'SUBP' ~ as.numeric(ADJ_FACTOR_SUBP),
         PLOT_BASIS == 'MICR' ~ as.numeric(ADJ_FACTOR_MICR)),
       ## AREA
-      aAdj = case_when(
+      aAdj = dplyr::case_when(
         ## When NA, stay NA
         is.na(PROP_BASIS) ~ NA_real_,
         ## If the proportion was measured for a macroplot,
@@ -173,7 +175,7 @@ bioHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
       cbgPlot = cbgPlot* tAdj,
       ctPlot = ctPlot* tAdj) %>%
     ## Extra step for variance issues
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy) %>%
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, !!!grpSyms) %>%
     summarize(nvPlot = sum(nvPlot, na.rm = TRUE),
               svPlot = sum(svPlot, na.rm = TRUE),
               bagPlot = sum(bagPlot, na.rm = TRUE),
@@ -182,53 +184,82 @@ bioHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
               cagPlot = sum(cagPlot, na.rm = TRUE),
               cbgPlot = sum(cbgPlot, na.rm = TRUE),
               ctPlot = sum(ctPlot, na.rm = TRUE),
-              fa = first(fa),
+              fa = dplyr::first(fa),
               plotIn = ifelse(sum(plotIn >  0, na.rm = TRUE), 1,0),
-              nh = first(P2POINTCNT),
-              p2eu = first(p2eu),
-              a = first(AREA_USED),
-              w = first(P1POINTCNT) / first(P1PNTCNT_EU)) %>%
+              nh = dplyr::first(P2POINTCNT),
+              p2eu = dplyr::first(p2eu),
+              a = dplyr::first(AREA_USED),
+              w = dplyr::first(P1POINTCNT) / dplyr::first(P1PNTCNT_EU)) %>%
     ## Joining area data so we can compute ratio variances
     left_join(select(aStrat, aStrat, av, ESTN_UNIT_CN, STRATUM_CN, ESTN_METHOD, aGrpBy), by = c('ESTN_UNIT_CN', 'ESTN_METHOD', 'STRATUM_CN', aGrpBy)) %>%
     ## Strata level
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
-    summarize(r_t = length(unique(PLT_CN)) / first(nh),
-              nvStrat = mean(nvPlot * r_t, na.rm = TRUE),
-              svStrat = mean(svPlot * r_t, na.rm = TRUE),
-              bagStrat = mean(bagPlot * r_t, na.rm = TRUE),
-              bbgStrat = mean(bbgPlot * r_t, na.rm = TRUE),
-              btStrat = mean(btPlot * r_t, na.rm = TRUE),
-              cagStrat = mean(cagPlot * r_t, na.rm = TRUE),
-              cbgStrat = mean(cbgPlot * r_t, na.rm = TRUE),
-              ctStrat = mean(ctPlot * r_t, na.rm = TRUE),
-              aStrat = first(aStrat),
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, !!!grpSyms) %>%
+    summarize(nh = dplyr::first(nh),
+              a = dplyr::first(a),
+              w = dplyr::first(w),
+              p2eu = dplyr::first(p2eu),
+
+              ## dtplyr is fast, but requires a few extra steps, so we'll finish
+              ## means and variances in subsequent mutate step
+              ## Strata sums
+              nvStrat = sum(nvPlot, na.rm = TRUE),
+              svStrat = sum(svPlot, na.rm = TRUE),
+              bagStrat = sum(bagPlot, na.rm = TRUE),
+              bbgStrat = sum(bbgPlot, na.rm = TRUE),
+              btStrat = sum(btPlot, na.rm = TRUE),
+              cagStrat = sum(cagPlot, na.rm = TRUE),
+              cbgStrat = sum(cbgPlot, na.rm = TRUE),
+              ctStrat = sum(ctPlot, na.rm = TRUE),
+              aStrat = dplyr::first(aStrat),
               plotIn_TREE = sum(plotIn, na.rm = TRUE),
-              n = n(),
-              ## We don't want a vector of these values, since they are repeated
-              nh = first(nh),
-              a = first(a),
-              w = first(w),
-              p2eu = first(p2eu),
-              ndif = nh - n,
-              # ## Strata level variances
-              nvv = stratVar(ESTN_METHOD, nvPlot, nvStrat, ndif, a, nh),
-              svv = stratVar(ESTN_METHOD, svPlot, svStrat, ndif, a, nh),
-              bagv = stratVar(ESTN_METHOD, bagPlot, bagStrat, ndif, a, nh),
-              bbgv = stratVar(ESTN_METHOD, bbgPlot, bbgStrat, ndif, a, nh),
-              btv = stratVar(ESTN_METHOD, btPlot, btStrat, ndif, a, nh),
-              cagv = stratVar(ESTN_METHOD, cagPlot, cagStrat, ndif, a, nh),
-              cbgv = stratVar(ESTN_METHOD, cbgPlot, cbgStrat, ndif, a, nh),
-              ctv = stratVar(ESTN_METHOD, ctPlot, ctStrat, ndif, a, nh),
-              # Strata level covariances
-              cvStrat_nv = stratVar(ESTN_METHOD, nvPlot, nvStrat, ndif, a, nh, fa, aStrat),
-              cvStrat_sv = stratVar(ESTN_METHOD, svPlot, svStrat, ndif, a, nh, fa, aStrat),
-              cvStrat_bag = stratVar(ESTN_METHOD, bagPlot, bagStrat, ndif, a, nh, fa, aStrat),
-              cvStrat_bbg = stratVar(ESTN_METHOD, bbgPlot, bbgStrat, ndif, a, nh, fa, aStrat),
-              cvStrat_bt = stratVar(ESTN_METHOD, btPlot, btStrat, ndif, a, nh, fa, aStrat),
-              cvStrat_cag = stratVar(ESTN_METHOD, cagPlot, cagStrat, ndif, a, nh, fa, aStrat),
-              cvStrat_cbg = stratVar(ESTN_METHOD, cagPlot, cagStrat, ndif, a, nh, fa, aStrat),
-              cvStrat_ct = stratVar(ESTN_METHOD, cagPlot, cagStrat, ndif, a, nh, fa, aStrat)
-              ) %>%
+
+              ## Strata level variances
+              nvv = sum(nvPlot^2, na.rm = TRUE),
+              svv = sum(svPlot^2, na.rm = TRUE),
+              bagv = sum(bagPlot^2, na.rm = TRUE),
+              bbgv = sum(bbgPlot^2, na.rm = TRUE),
+              btv = sum(btPlot^2, na.rm = TRUE),
+              cagv = sum(cagPlot^2, na.rm = TRUE),
+              cbgv = sum(cbgPlot^2, na.rm = TRUE),
+              ctv = sum(ctPlot^2, na.rm = TRUE),
+
+              ## Strata level covariances
+              cvStrat_nv =sum(fa* nvPlot, na.rm = TRUE),
+              cvStrat_sv =sum(fa* svPlot, na.rm = TRUE),
+              cvStrat_bag =sum(fa* bagPlot, na.rm = TRUE),
+              cvStrat_bbg =sum(fa* bbgPlot, na.rm = TRUE),
+              cvStrat_bt =sum(fa* btPlot, na.rm = TRUE),
+              cvStrat_cag =sum(fa* cagPlot, na.rm = TRUE),
+              cvStrat_cbg =sum(fa* cbgPlot, na.rm = TRUE),
+              cvStrat_ct =sum(fa* ctPlot, na.rm = TRUE)) %>%
+    mutate(nvStrat = nvStrat / nh,
+           svStrat = svStrat / nh,
+           bagStrat = bagStrat / nh,
+           bbgStrat = bbgStrat / nh,
+           btStrat = btStrat / nh,
+           cagStrat = cagStrat / nh,
+           cbgStrat = cbgStrat / nh,
+           ctStrat = ctStrat / nh,
+           ## Variances
+           adj = nh * (nh-1),
+           nvv = (nvv - (nh*nvStrat^2)) / adj,
+           svv = (svv - (nh*svStrat^2)) / adj,
+           bagv = (bagv - (nh*bagStrat^2)) / adj,
+           bbgv = (bbgv - (nh*bbgStrat^2)) / adj,
+           btv = (btv - (nh*btStrat^2)) / adj,
+           cagv = (cagv - (nh*cagStrat^2)) / adj,
+           cbgv = (cbgv - (nh*cbgStrat^2)) / adj,
+           ctv = (ctv - (nh*ctStrat^2)) / adj,
+           ## Covariances
+           cvStrat_nv = (cvStrat_nv - (nh * nvStrat * aStrat)) / adj,
+           cvStrat_sv = (cvStrat_sv - (nh * svStrat * aStrat)) / adj,
+           cvStrat_bag =  (cvStrat_bag - (nh * bagStrat * aStrat)) / adj,
+           cvStrat_bbg = (cvStrat_bbg - (nh * bbgStrat * aStrat)) / adj,
+           cvStrat_bt = (cvStrat_bt - (nh * btStrat * aStrat)) / adj,
+           cvStrat_cag = (cvStrat_cag - (nh * cagStrat * aStrat)) / adj,
+           cvStrat_cbg = (cvStrat_cbg - (nh * cbgStrat * aStrat)) / adj,
+           cvStrat_ct = (cvStrat_ct - (nh * ctStrat * aStrat)) / adj) %>%
+    as.data.frame() %>%
 
     ## Estimation unit
     left_join(select(aEst, ESTN_UNIT_CN, aEst, aVar, aGrpBy), by = c('ESTN_UNIT_CN', aGrpBy)) %>%
@@ -241,24 +272,24 @@ bioHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
               cagEst = unitMean(ESTN_METHOD, a, nh, w, cagStrat),
               cbgEst = unitMean(ESTN_METHOD, a, nh, w, cbgStrat),
               ctEst = unitMean(ESTN_METHOD, a, nh, w, ctStrat),
-              N = first(p2eu),
+              N = dplyr::first(p2eu),
               # Estimation of unit variance
-              nvVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, nvv, nvStrat, nvEst),
-              svVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, svv, svStrat, svEst),
-              bagVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bagv, bagStrat, bagEst),
-              bbgVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bbgv, bbgStrat, bbgEst),
-              btVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, btv, btStrat, btEst),
-              cagVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, cagv, cagStrat, cagEst),
-              cbgVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, cbgv, cbgStrat, cbgEst),
-              ctVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ctv, ctStrat, ctEst),
-              cvEst_nv = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_nv, nvStrat, nvEst, aStrat, aEst),
-              cvEst_sv = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_sv, svStrat, svEst, aStrat, aEst),
-              cvEst_bag = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_bag, bagStrat, bagEst, aStrat, aEst),
-              cvEst_bbg = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_bbg, bbgStrat, bbgEst, aStrat, aEst),
-              cvEst_bt = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_bt, btStrat, btEst, aStrat, aEst),
-              cvEst_cag = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_cag, cagStrat, cagEst, aStrat, aEst),
-              cvEst_cbg = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_cbg, cbgStrat, cbgEst, aStrat, aEst),
-              cvEst_ct = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_ct, ctStrat, ctEst, aStrat, aEst),
+              nvVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, nvv, nvStrat, nvEst),
+              svVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, svv, svStrat, svEst),
+              bagVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, bagv, bagStrat, bagEst),
+              bbgVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, bbgv, bbgStrat, bbgEst),
+              btVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, btv, btStrat, btEst),
+              cagVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cagv, cagStrat, cagEst),
+              cbgVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cbgv, cbgStrat, cbgEst),
+              ctVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, ctv, ctStrat, ctEst),
+              cvEst_nv = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_nv, nvStrat, nvEst, aStrat, aEst),
+              cvEst_sv = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_sv, svStrat, svEst, aStrat, aEst),
+              cvEst_bag = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_bag, bagStrat, bagEst, aStrat, aEst),
+              cvEst_bbg = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_bbg, bbgStrat, bbgEst, aStrat, aEst),
+              cvEst_bt = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_bt, btStrat, btEst, aStrat, aEst),
+              cvEst_cag = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_cag, cagStrat, cagEst, aStrat, aEst),
+              cvEst_cbg = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_cbg, cbgStrat, cbgEst, aStrat, aEst),
+              cvEst_ct = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_ct, ctStrat, ctEst, aStrat, aEst),
               plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE))
 
   out <- list(tEst = tEst, aEst = aEst)
@@ -315,10 +346,10 @@ biomassHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
                 cbgPlot = sum(CARBON_BG * TPA_UNADJ * tAdj * tDI / 2000, na.rm = TRUE),
                 ctPlot = sum(cagPlot, cbgPlot, na.rm = TRUE),
                 plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0),
-                a = first(AREA_USED),
-                p1EU = first(P1PNTCNT_EU),
-                p1 = first(P1POINTCNT),
-                p2 = first(P2POINTCNT))
+                a = dplyr::first(AREA_USED),
+                p1EU = dplyr::first(P1PNTCNT_EU),
+                p1 = dplyr::first(P1POINTCNT),
+                p2 = dplyr::first(P2POINTCNT))
     # Continue through totals
     b <- bInt %>%
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN) %>%
@@ -331,33 +362,33 @@ biomassHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
                 cbgStrat = mean(cbgPlot, na.rm = TRUE),
                 ctStrat = mean(ctPlot, na.rm = TRUE),
                 plotIn = sum(plotIn, na.rm = TRUE),
-                a = first(a),
-                w = first(p1) / first(p1EU), # Stratum weight
-                nh = first(p2), # Number plots in stratum
+                a = dplyr::first(a),
+                w = dplyr::first(p1) / dplyr::first(p1EU), # Stratum weight
+                nh = dplyr::first(p2), # Number plots in stratum
                 # Strata level variances
                 nvv = ifelse(first(ESTN_METHOD == 'simple'),
-                             var(nvPlot * first(a) / nh),
+                             var(nvPlot * dplyr::first(a) / nh),
                              (sum(nvPlot^2) - sum(nh * nvStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 svv = ifelse(first(ESTN_METHOD == 'simple'),
-                             var(svPlot * first(a) / nh),
+                             var(svPlot * dplyr::first(a) / nh),
                              (sum(svPlot^2) - sum(nh * svStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 bagv = ifelse(first(ESTN_METHOD == 'simple'),
-                              var(bagPlot * first(a) / nh),
+                              var(bagPlot * dplyr::first(a) / nh),
                               (sum(bagPlot^2) - sum(nh * bagStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 bbgv = ifelse(first(ESTN_METHOD == 'simple'),
-                              var(bbgPlot * first(a) / nh),
+                              var(bbgPlot * dplyr::first(a) / nh),
                               (sum(bbgPlot^2) - sum(nh * bbgStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 btv = ifelse(first(ESTN_METHOD == 'simple'),
-                             var(btPlot * first(a) / nh),
+                             var(btPlot * dplyr::first(a) / nh),
                              (sum(btPlot^2) - sum(nh * btStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 cagv = ifelse(first(ESTN_METHOD == 'simple'),
-                              var(cagPlot * first(a) / nh),
+                              var(cagPlot * dplyr::first(a) / nh),
                               (sum(cagPlot^2) - sum(nh * cagStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 cbgv = ifelse(first(ESTN_METHOD == 'simple'),
-                              var(cbgPlot * first(a) / nh),
+                              var(cbgPlot * dplyr::first(a) / nh),
                               (sum(cbgPlot^2) - sum(nh * cbgStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 ctv = ifelse(first(ESTN_METHOD == 'simple'),
-                             var(ctPlot * first(a) / nh),
+                             var(ctPlot * dplyr::first(a) / nh),
                              (sum(ctPlot^2) - sum(nh * ctStrat^2)) / (nh * (nh-1)))) %>% # Stratified and double cases
       group_by(ESTN_UNIT_CN) %>%
       summarize(nvEst = unitMean(ESTN_METHOD, a, nh, w, nvStrat),
@@ -413,21 +444,21 @@ biomassHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN) %>%
       summarize(fa = sum(CONDPROP_UNADJ * aDI * aAdj, na.rm = TRUE),
                 plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0),
-                a = first(AREA_USED),
-                p1EU = first(P1PNTCNT_EU),
-                p1 = first(P1POINTCNT),
-                p2 = first(P2POINTCNT)) #%>%
+                a = dplyr::first(AREA_USED),
+                p1EU = dplyr::first(P1PNTCNT_EU),
+                p1 = dplyr::first(P1POINTCNT),
+                p2 = dplyr::first(P2POINTCNT)) #%>%
     #distinct(PLT_CN, .keep_all = TRUE)
     a <- aInt %>%
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN) %>%
       summarize(aStrat = mean(fa, na.rm = TRUE),
                 plotIn = sum(plotIn, na.rm = TRUE),
-                a = first(a),
-                w = first(p1) / first(p1EU), # Stratum weight
-                nh = first(p2), # Number plots in stratum
+                a = dplyr::first(a),
+                w = dplyr::first(p1) / dplyr::first(p1EU), # Stratum weight
+                nh = dplyr::first(p2), # Number plots in stratum
                 # Strata level variance
                 av = ifelse(first(ESTN_METHOD == 'simple'),
-                            var(fa * first(a) / nh),
+                            var(fa * dplyr::first(a) / nh),
                             (sum(fa^2) - sum(nh * aStrat^2)) / (nh * (nh-1)))) %>% # Stratified and double cases
       group_by(ESTN_UNIT_CN) %>%
       summarize(aEst = unitMean(ESTN_METHOD, a, nh, w, aStrat),
@@ -453,9 +484,9 @@ biomassHelper <- function(x, combos, data, grpBy, aGrpBy, totals, SE){
                 cagStrat = mean(cagPlot, na.rm = TRUE),
                 cbgStrat = mean(cbgPlot, na.rm = TRUE),
                 ctStrat = mean(ctPlot, na.rm = TRUE),
-                a = first(a_b),
-                w = first(p1_b) / first(p1EU_a), # Stratum weight
-                nh = first(p2_b), # Number plots in stratum
+                a = dplyr::first(a_b),
+                w = dplyr::first(p1_b) / dplyr::first(p1EU_a), # Stratum weight
+                nh = dplyr::first(p2_b), # Number plots in stratum
                 # Strata level covariances
                 cvStrat_nv = ifelse(first(ESTN_METHOD == 'simple'),
                                     cov(fa,nvPlot),

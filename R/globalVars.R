@@ -228,6 +228,18 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'NETVOL_GROW_AC_VAR', 'NETVOL_GROW_VAR', 'NETVOL_TOTAL_VAR', 'RECR_PERC_VAR',
                          'RECR_TOTAL_VAR', 'RECR_TPA_VAR', 'REMV_PERC_VAR', 'REMV_TOTAL_VAR', 'REMV_TPA_VAR',
                          'S_a_VAR', 'TPA_PERC_VAR', 'TPA_VAR', 'TREE_TOTAL_VAR', 'TREE_VAR',
-                         'mr', 'adj', 'cvStrat_bT', 'cvStrat_tT', 'tpaHelper1_test', 'tpaHelper2_test'
+                         'mr', 'adj', 'cvStrat_bT', 'cvStrat_tT', 'tpaHelper1_test', 'tpaHelper2_test',
+                         'P1POINTCNT_INVYR', 'PLOT_STATUS', 'STRATUM_DESCR', 'adist', 'aes', 'anim_save', 'bT',
+                         'buff', 'cvStrat_bc', 'cvStrat_bd', 'cvStrat_bl', 'cvStrat_blg',
+                         'cvStrat_bmd', 'cvStrat_bp', 'cvStrat_bsm', 'cvStrat_cc', 'cvStrat_cd', 'cvStrat_cl',
+                         'cvStrat_clg', 'cvStrat_cmd', 'cvStrat_cp', 'cvStrat_csm', 'cvStrat_v', 'cvStrat_vc',
+                         'cvStrat_vlg', 'cvStrat_vmd', 'cvStrat_vp', 'cvStrat_vsm', 'element_rect',
+                         'element_text', 'facet_wrap', 'geom_errorbar', 'geom_line', 'geom_sf', 'ggplot', 'ggsave',
+                         'ggtitle', 'installed.packages', 'labs', 'nsum', 'plotIn_', 'proj4string<-',
+                           'propSampled', 'scale_colour_viridis_c', 'scale_colour_viridis_d',
+                         'scale_fill_viridis_c', 'stratID', 'stratWgt', 'stratWgt_INVYR', 'tD', 'tT', 'theme',
+                         'theme_bw', 'theme_minimal', 'transition_manual', 'unit', 'waiver', 'xlab', 'ylab',
+                         'lower_fe_int', 'lower_fe_rate', 'lower_int', 'lower_rate', 'upper_fe_int',
+                         'upper_fe_rate', 'upper_int', 'upper_rate'
 
 ))

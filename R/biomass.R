@@ -1,22 +1,25 @@
-vegStructStarter <- function(x,
-                            db,
-                            grpBy_quo = NULL,
-                            polys = NULL,
-                            returnSpatial = FALSE,
-                            landType = 'forest',
-                            method = 'TI',
-                            lambda = .5,
-                            areaDomain = NULL,
-                            byPlot = FALSE,
-                            totals = FALSE,
-                            nCores = 1,
-                            remote = NULL,
-                            mr){
-
+bioStarter <- function(x,
+                       db,
+                       grpBy_quo = NULL,
+                       polys = NULL,
+                       returnSpatial = FALSE,
+                       bySpecies = FALSE,
+                       bySizeClass = FALSE,
+                       landType = 'forest',
+                       treeType = 'live',
+                       method = 'TI',
+                       lambda = .5,
+                       treeDomain = NULL,
+                       areaDomain = NULL,
+                       totals = FALSE,
+                       byPlot = FALSE,
+                       nCores = 1,
+                       remote,
+                       mr){
 
   ## Read required data, prep the database -------------------------------------
-  reqTables <- c('PLOT', 'P2VEG_SUBP_STRUCTURE', 'SUBP_COND', 'COND',
-                 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
+  reqTables <- c('PLOT', 'TREE', 'COND', 'POP_PLOT_STRATUM_ASSGN',
+                 'POP_ESTN_UNIT', 'POP_EVAL',
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
 
   ## If remote, read in state by state. Otherwise, drop all unnecessary tables
@@ -44,6 +47,9 @@ vegStructStarter <- function(x,
   if (landType %in% c('timber', 'forest') == FALSE){
     stop('landType must be one of: "forest" or "timber".')
   }
+  if (treeType %in% c('live', 'dead', 'gs', 'all') == FALSE){
+    stop('treeType must be one of: "live", "dead", "gs", or "all".')
+  }
   if (any(reqTables %in% names(db) == FALSE)){
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '),
@@ -61,37 +67,14 @@ vegStructStarter <- function(x,
     mutate(PLT_CN = CN,
            pltID = paste(UNITCD, STATECD, COUNTYCD, PLOT, sep = '_'))
 
-  ## Reduce our sample right off the bat, only plots sampled for veg
-  db$PLOT <- filter(db$PLOT, P2VEG_SAMPLING_STATUS_CD %in% 1:3)
-
   ## Convert grpBy to character
-  grpBy <- grpByToChar(db[!c(names(db) %in% c('TREE'))], grpBy_quo)
+  grpBy <- grpByToChar(db, grpBy_quo)
 
   # Save original grpBy for pretty return with spatial objects
   grpByOrig <- grpBy
 
-
   # I like a unique ID for a plot through time
   if (byPlot) {grpBy <- c('pltID', grpBy)}
-
-  ## Add variables to grouping
-  grpBy <- c(grpBy, 'LAYER', 'GROWTH_HABIT')
-
-  ## ADDING names of id columns for layer and growth habit
-  db$P2VEG_SUBP_STRUCTURE <- db$P2VEG_SUBP_STRUCTURE %>%
-    mutate(LAYER = case_when(is.na(LAYER) ~ NA_character_,
-                             LAYER == 1 ~ '0 to 2.0 feet',
-                             LAYER == 2 ~ '2.1 to 6.0 feet',
-                             LAYER == 3 ~ '6.1 to 16.0 feet',
-                             LAYER == 4 ~ 'Greater than 16 feet',
-                             LAYER == 5 ~ 'Areal: all layers'),
-           GROWTH_HABIT = case_when(is.na(GROWTH_HABIT_CD) ~ NA_character_,
-                                    GROWTH_HABIT_CD == 'TT' ~ 'Tally tree',
-                                    GROWTH_HABIT_CD == 'NT' ~ 'Non-tally tree',
-                                    GROWTH_HABIT_CD == 'SH' ~ 'Tally Tree',
-                                    GROWTH_HABIT_CD == 'SH' ~ 'Shrubs/ vines',
-                                    GROWTH_HABIT_CD == 'FB' ~ 'Forbs',
-                                    GROWTH_HABIT_CD == 'GR' ~ 'Graminoids'))
 
 
   ## Intersect plots with polygons if polygons are given
@@ -119,6 +102,11 @@ vegStructStarter <- function(x,
                                   db$COND$COND_STATUS_CD,
                                   db$COND$SITECLCD,
                                   db$COND$RESERVCD)
+  ## Tree type
+  db$TREE$typeD <- treeTypeDomain(treeType,
+                                  db$TREE$STATUSCD,
+                                  db$TREE$DIA,
+                                  db$TREE$TREECLCD)
 
   ## Spatial boundary
   if(!is.null(polys)){
@@ -130,7 +118,8 @@ vegStructStarter <- function(x,
   # User defined domain indicator for area (ex. specific forest type)
   db <- udAreaDomain(db, areaDomain)
 
-
+  # User defined domain indicator for tree (ex. trees > 20 ft tall)
+  db <- udTreeDomain(db, treeDomain)
 
 
 
@@ -139,7 +128,7 @@ vegStructStarter <- function(x,
   ## Filtering out all inventories that are not relevant to the current estimation
   ## type. If using estimator other than TI, handle the differences in P2POINTCNT
   ## and in assigning YEAR column (YEAR = END_INVYR if method = 'TI')
-  pops <- handlePops(db, evalType = c('EXPCURR'), method, mr)
+  pops <- handlePops(db, evalType = c('EXPVOL', 'EXPCURR'), method, mr)
 
   ## A lot of states do their stratification in such a way that makes it impossible
   ## to estimate variance of annual panels w/ post-stratified estimator. That is,
@@ -149,6 +138,29 @@ vegStructStarter <- function(x,
     pops <- mergeSmallStrata(db, pops)
   }
 
+
+
+
+  ## Canned groups -------------------------------------------------------------
+  ## Add species to groups
+  if (bySpecies) {
+    db$TREE <- db$TREE %>%
+      left_join(select(intData$REF_SPECIES_2018,
+                       c('SPCD','COMMON_NAME', 'GENUS', 'SPECIES')), by = 'SPCD') %>%
+      mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' ')) %>%
+      mutate_if(is.factor,
+                as.character)
+    grpBy <- c(grpBy, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
+    grpByOrig <- c(grpByOrig, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
+  }
+
+  ## Break into size classes
+  if (bySizeClass){
+    grpBy <- c(grpBy, 'sizeClass')
+    grpByOrig <- c(grpByOrig, 'sizeClass')
+    db$TREE$sizeClass <- makeClasses(db$TREE$DIA, interval = 2, numLabs = TRUE)
+    db$TREE <- db$TREE[!is.na(db$TREE$sizeClass),]
+  }
 
 
 
@@ -165,6 +177,8 @@ vegStructStarter <- function(x,
   grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
   grpC <- names(db$COND)[names(db$COND) %in% grpBy &
                            !c(names(db$COND) %in% grpP)]
+  grpT <- names(db$TREE)[names(db$TREE) %in% grpBy &
+                           !c(names(db$TREE) %in% c(grpP, grpC))]
 
   ### Only joining tables necessary to produce plot level estimates
   db$PLOT <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA',
@@ -174,11 +188,10 @@ vegStructStarter <- function(x,
                                'COND_STATUS_CD', 'CONDID',
                                all_of(grpC), 'aD_c', 'landD')) %>%
     filter(PLT_CN %in% db$PLOT$PLT_CN)
-  db$SUBP_COND <- select(db$SUBP_COND, c(PLT_CN, SUBP, CONDID, SUBPCOND_PROP))%>%
-    filter(PLT_CN %in% db$PLOT$PLT_CN)
-  db$P2VEG_SUBP_STRUCTURE <- select(db$P2VEG_SUBP_STRUCTURE,
-                                    c('PLT_CN', 'COVER_PCT', 'SUBP', 'CONDID',
-                                      'LAYER', 'GROWTH_HABIT')) %>%
+  db$TREE <- select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ',
+                               'SUBP', 'TREE', all_of(grpT), 'tD', 'typeD',
+                               'VOLCFNET', 'VOLCSNET', 'DRYBIO_AG', 'DRYBIO_BG',
+                               'CARBON_AG', 'CARBON_BG')) %>%
     filter(PLT_CN %in% db$PLOT$PLT_CN)
 
   # Separate area grouping names from tree grouping names
@@ -189,9 +202,11 @@ vegStructStarter <- function(x,
   }
 
 
+
   ## Compute plot-level summaries ----------------------------------------------
   ## An iterator for plot-level summaries
   plts <- split(db$PLOT, as.factor(paste(db$PLOT$COUNTYCD, db$PLOT$STATECD, sep = '_')))
+
   suppressWarnings({
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
@@ -201,16 +216,17 @@ vegStructStarter <- function(x,
         library(stringr)
         library(rFIA)
       })
-      out <- parLapply(cl, X = names(plts), fun = vegStructHelper1, plts,
-                       db[names(db) %in% c('COND', 'SUBP_COND', 'P2VEG_SUBP_STRUCTURE')],
+      out <- parLapply(cl, X = names(plts), fun = bioHelper1, plts,
+                       db[names(db) %in% c('COND', 'TREE')],
                        grpBy, aGrpBy, byPlot)
       #stopCluster(cl) # Keep the cluster active for the next run
     } else { # Unix systems
-      out <- mclapply(names(plts), FUN = vegStructHelper1, plts,
-                      db[names(db) %in% c('COND', 'SUBP_COND', 'P2VEG_SUBP_STRUCTURE')],
+      out <- mclapply(names(plts), FUN = bioHelper1, plts,
+                      db[names(db) %in% c('COND', 'TREE')],
                       grpBy, aGrpBy, byPlot, mc.cores = nCores)
     }
   })
+
 
 
 
@@ -235,7 +251,7 @@ vegStructStarter <- function(x,
 
     out <- list(tEst = tOut, grpBy = grpBy, aGrpBy = aGrpBy, grpByOrig = grpByOrig)
 
-  ## Population estimation
+    ## Population estimation
   } else {
     ## back to dataframes
     out <- unlist(out, recursive = FALSE)
@@ -246,22 +262,23 @@ vegStructStarter <- function(x,
     grpBy <- c('YEAR', grpBy)
     aGrpBy <- c('YEAR', aGrpBy)
 
+
     ## An iterator for population estimation
     popState <- split(pops, as.factor(pops$STATECD))
-
     suppressWarnings({
       ## Compute estimates in parallel -- Clusters in windows, forking otherwise
       if (Sys.info()['sysname'] == 'Windows'){
-        out <- parLapply(cl, X = names(popState), fun = vegStructHelper2, popState, a, t, grpBy, aGrpBy, method)
+        out <- parLapply(cl, X = names(popState), fun = bioHelper2, popState, a, t, grpBy, aGrpBy, method)
         stopCluster(cl)
       } else { # Unix systems
-        out <- mclapply(names(popState), FUN = vegStructHelper2, popState, a, t, grpBy, aGrpBy, method, mc.cores = nCores)
+        out <- mclapply(names(popState), FUN = bioHelper2, popState, a, t, grpBy, aGrpBy, method, mc.cores = nCores)
       }
     })
     ## back to dataframes
     out <- unlist(out, recursive = FALSE)
     aEst <- bind_rows(out[names(out) == 'aEst'])
     tEst <- bind_rows(out[names(out) == 'tEst'])
+
 
 
 
@@ -294,10 +311,10 @@ vegStructStarter <- function(x,
       tEst <- tEst %>%
         left_join(select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN')) %>%
         left_join(wgts, by = joinCols) %>%
-        mutate(across(cEst, ~(.*wgt))) %>%
-        mutate(across(cVar:cvEst_c, ~(.*(wgt^2)))) %>%
+        mutate(across(nvEst:ctEst, ~(.*wgt))) %>%
+        mutate(across(nvVar:cvEst_ct, ~(.*(wgt^2)))) %>%
         group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
-        summarize(across(cEst:cvEst_c, sum, na.rm = TRUE))
+        summarize(across(nvEst:plotIn_TREE, sum, na.rm = TRUE))
 
 
 
@@ -315,6 +332,7 @@ vegStructStarter <- function(x,
         summarize(across(.cols = everything(),  sum, na.rm = TRUE)) %>%
         filter(YEAR == INVYR)%>%
         mutate(YEAR = INVYR)
+
 
 
       ## Rather than choose the annual panel estimate when INVYR = END_INVYR,
@@ -359,22 +377,29 @@ vegStructStarter <- function(x,
 
 
 
+
 #' @export
-vegStruct <- function(db,
-                         grpBy = NULL,
-                         polys = NULL,
-                         returnSpatial = FALSE,
-                         landType = 'forest',
-                         method = 'TI',
-                         lambda = .5,
-                         areaDomain = NULL,
-                         totals = FALSE,
-                         variance = FALSE,
-                         byPlot = FALSE,
-                         nCores = 1) {
+biomass <- function(db,
+                       grpBy = NULL,
+                       polys = NULL,
+                       returnSpatial = FALSE,
+                       bySpecies = FALSE,
+                       bySizeClass = FALSE,
+                       landType = 'forest',
+                       treeType = 'live',
+                       method = 'TI',
+                       lambda = .5,
+                       treeDomain = NULL,
+                       areaDomain = NULL,
+                       totals = FALSE,
+                       variance = FALSE,
+                       byPlot = FALSE,
+                       nCores = 1) {
+
   ##  don't have to change original code
   grpBy_quo <- rlang::enquo(grpBy)
   areaDomain <- rlang::enquo(areaDomain)
+  treeDomain <- rlang::enquo(treeDomain)
 
 
   ## Handle iterator if db is remote
@@ -390,11 +415,12 @@ vegStruct <- function(db,
 
 
   ## Run the main portion
-  out <- lapply(X = iter, FUN = vegStructStarter, db,
+  out <- lapply(X = iter, FUN = bioStarter, db,
                 grpBy_quo = grpBy_quo, polys, returnSpatial,
-                landType, method,
-                lambda, areaDomain,
-                byPlot, totals, nCores, remote, mr)
+                bySpecies, bySizeClass,
+                landType, treeType, method,
+                lambda, treeDomain, areaDomain,
+                totals, byPlot, nCores, remote, mr)
   ## Bring the results back
   out <- unlist(out, recursive = FALSE)
   aEst <- bind_rows(out[names(out) == 'aEst'])
@@ -402,6 +428,7 @@ vegStruct <- function(db,
   grpBy <- out[names(out) == 'grpBy'][[1]]
   aGrpBy <- out[names(out) == 'aGrpBy'][[1]]
   grpByOrig <- out[names(out) == 'grpByOrig'][[1]]
+
 
 
 
@@ -427,53 +454,136 @@ vegStruct <- function(db,
 
 
     ## Totals and ratios -------------------------------------------------------
-    suppressWarnings({
-      aTotal <- aEst %>%
-        group_by(.dots = aGrpBy) %>%
-        summarize(AREA_TOTAL = sum(aEst, na.rm = TRUE),
-                  aVar = sum(aVar, na.rm = TRUE),
-                  AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
-                  AREA_TOTAL_VAR = aVar,
-                  nPlots_AREA = sum(plotIn_AREA, na.rm = TRUE))
-      tOut <- tEst %>%
-        group_by(.dots = grpBy) %>%
-        #left_join(aTotal, by = c(aGrpBy)) %>%
-        summarize(TOTAL_COVER_AREA = sum(cEst, na.rm = TRUE),
-                  cVar = sum(cVar, na.rm = TRUE),
-                  cvEst_c = sum(cvEst_c, na.rm = TRUE),
-                  ## Sampling Errors
-                  TOTAL_COVER_AREA_SE = sqrt(cVar) / TOTAL_COVER_AREA * 100,
-                  TOTAL_COVER_AREA_VAR = cVar,
-                  N = sum(N, na.rm = TRUE),
-                  nPlots_VEG = sum(plotIn_VEG, na.rm = TRUE)) %>%
-        left_join(aTotal, by = aGrpBy) %>%
-        mutate(COVER_PCT = TOTAL_COVER_AREA / AREA_TOTAL * 100,
-               cpVar = (1/AREA_TOTAL^2) * (cVar + (COVER_PCT^2 * aVar) - 2 * COVER_PCT * cvEst_c),
-               COVER_PCT_SE = sqrt(cpVar) / COVER_PCT * 100,
-               COVER_PCT_VAR = cpVar)
+    aTotal <- aEst %>%
+      group_by(.dots = aGrpBy) %>%
+      summarize_all(sum,na.rm = TRUE)
 
+    tTotal <- tEst %>%
+      group_by(.dots = grpBy) %>%
+      summarize_all(sum,na.rm = TRUE)
+
+
+    suppressWarnings({
+      ## Bring them together
+      tOut <- tTotal %>%
+        left_join(aTotal, by = aGrpBy) %>%
+        # Renaming, computing ratios, and SE
+        mutate(AREA_TOTAL = aEst,
+               NETVOL_TOTAL = nvEst,
+               SAWVOL_TOTAL = svEst,
+               BIO_AG_TOTAL = bagEst,
+               BIO_BG_TOTAL = bbgEst,
+               BIO_TOTAL = btEst,
+               CARB_AG_TOTAL = cagEst,
+               CARB_BG_TOTAL = cbgEst,
+               CARB_TOTAL = ctEst,
+               ## Ratios
+               NETVOL_ACRE = NETVOL_TOTAL / AREA_TOTAL,
+               SAWVOL_ACRE = SAWVOL_TOTAL / AREA_TOTAL,
+               BIO_AG_ACRE = BIO_AG_TOTAL / AREA_TOTAL,
+               BIO_BG_ACRE = BIO_BG_TOTAL / AREA_TOTAL,
+               BIO_ACRE = BIO_TOTAL / AREA_TOTAL,
+               CARB_AG_ACRE = CARB_AG_TOTAL / AREA_TOTAL,
+               CARB_BG_ACRE = CARB_BG_TOTAL / AREA_TOTAL,
+               CARB_ACRE = CARB_TOTAL / AREA_TOTAL,
+               ## Ratio Var
+               nvaVar = (1/AREA_TOTAL^2) * (nvVar + (NETVOL_ACRE^2 * aVar) - 2 * NETVOL_ACRE * cvEst_nv),
+               svaVar = (1/AREA_TOTAL^2) * (svVar + (SAWVOL_ACRE^2 * aVar) - 2 * SAWVOL_ACRE * cvEst_sv),
+               baaVar = (1/AREA_TOTAL^2) * (bagVar + (BIO_AG_ACRE^2 * aVar) - 2 * BIO_AG_ACRE * cvEst_bag),
+               bbaVar = (1/AREA_TOTAL^2) * (bbgVar + (BIO_BG_ACRE^2 * aVar) - 2 * BIO_BG_ACRE * cvEst_bbg),
+               btaVar = (1/AREA_TOTAL^2) * (btVar + (BIO_ACRE^2 * aVar) - 2 * BIO_ACRE * cvEst_bt),
+               caaVar = (1/AREA_TOTAL^2) * (cagVar + (CARB_AG_ACRE^2 * aVar) - 2 * CARB_AG_ACRE * cvEst_cag),
+               cbaVar = (1/AREA_TOTAL^2) * (bbgVar + (CARB_BG_ACRE^2 * aVar) - 2 * CARB_BG_ACRE * cvEst_bbg),
+               ctaVar = (1/AREA_TOTAL^2) * (ctVar + (CARB_ACRE^2 * aVar) - 2 * CARB_ACRE * cvEst_ct),
+               ## SE RATIO
+               NETVOL_ACRE_SE = sqrt(nvaVar) / NETVOL_ACRE *100,
+               SAWVOL_ACRE_SE = sqrt(svaVar) / SAWVOL_ACRE *100,
+               BIO_AG_ACRE_SE = sqrt(baaVar) / BIO_AG_ACRE *100,
+               BIO_BG_ACRE_SE = sqrt(bbaVar) / BIO_BG_ACRE *100,
+               BIO_ACRE_SE = sqrt(btaVar) / BIO_ACRE * 100,
+               CARB_AG_ACRE_SE = sqrt(caaVar) / CARB_AG_ACRE *100,
+               CARB_BG_ACRE_SE = sqrt(cbaVar) / CARB_BG_ACRE *100,
+               CARB_ACRE_SE = sqrt(ctaVar) / CARB_ACRE *100,
+               ## SE TOTAL
+               AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL *100,
+               NETVOL_TOTAL_SE = sqrt(nvVar) / NETVOL_TOTAL *100,
+               SAWVOL_TOTAL_SE = sqrt(svVar) / SAWVOL_TOTAL *100,
+               BIO_AG_TOTAL_SE = sqrt(bagVar) / BIO_AG_TOTAL *100,
+               BIO_BG_TOTAL_SE = sqrt(bbgVar) / BIO_BG_TOTAL *100,
+               BIO_TOTAL_SE = sqrt(btVar) / BIO_TOTAL *100,
+               CARB_AG_TOTAL_SE = sqrt(cagVar) / CARB_AG_TOTAL *100,
+               CARB_BG_TOTAL_SE = sqrt(cbgVar) / CARB_BG_TOTAL *100,
+               CARB_TOTAL_SE = sqrt(ctVar) / CARB_TOTAL *100,
+
+               ## VAR RATIO
+               NETVOL_ACRE_VAR = nvaVar,
+               SAWVOL_ACRE_VAR = svaVar,
+               BIO_AG_ACRE_VAR = baaVar,
+               BIO_BG_ACRE_VAR = bbaVar,
+               BIO_ACRE_VAR = btaVar,
+               CARB_AG_ACRE_VAR = caaVar,
+               CARB_BG_ACRE_VAR = cbaVar,
+               CARB_ACRE_VAR = ctaVar,
+               ## VAR TOTAL
+               AREA_TOTAL_VAR = aVar,
+               NETVOL_TOTAL_VAR = nvVar,
+               SAWVOL_TOTAL_VAR = svVar,
+               BIO_AG_TOTAL_VAR = bagVar,
+               BIO_BG_TOTAL_VAR = bbgVar,
+               BIO_TOTAL_VAR = btVar,
+               CARB_AG_TOTAL_VAR = cagVar,
+               CARB_BG_TOTAL_VAR = cbgVar,
+               CARB_TOTAL_VAR = ctVar,
+               ## nPlots
+               nPlots_TREE = plotIn_TREE,
+               nPlots_AREA = plotIn_AREA)
     })
 
+
     if (totals) {
+
       if (variance){
         tOut <- tOut %>%
-          select(grpBy, "COVER_PCT","TOTAL_COVER_AREA", "AREA_TOTAL",
-                 "COVER_PCT_VAR","TOTAL_COVER_AREA_VAR", "AREA_TOTAL_VAR",
-                 "nPlots_VEG", "nPlots_AREA", N)
+          select(grpBy, "NETVOL_ACRE","SAWVOL_ACRE","BIO_AG_ACRE","BIO_BG_ACRE",
+                 "BIO_ACRE","CARB_AG_ACRE","CARB_BG_ACRE","CARB_ACRE","NETVOL_TOTAL",
+                 "SAWVOL_TOTAL","BIO_AG_TOTAL","BIO_BG_TOTAL","BIO_TOTAL","CARB_AG_TOTAL",
+                 "CARB_BG_TOTAL","CARB_TOTAL", "AREA_TOTAL","NETVOL_ACRE_VAR",
+                 "SAWVOL_ACRE_VAR","BIO_AG_ACRE_VAR", "BIO_BG_ACRE_VAR", "BIO_ACRE_VAR",
+                 "CARB_AG_ACRE_VAR","CARB_BG_ACRE_VAR","CARB_ACRE_VAR","NETVOL_TOTAL_VAR",
+                 "SAWVOL_TOTAL_VAR",  "BIO_AG_TOTAL_VAR",  "BIO_BG_TOTAL_VAR",
+                 "BIO_TOTAL_VAR", "CARB_AG_TOTAL_VAR", "CARB_BG_TOTAL_VAR", "CARB_TOTAL_VAR",
+                 "AREA_TOTAL_VAR","nPlots_TREE","nPlots_AREA", 'N')
+
       } else {
         tOut <- tOut %>%
-          select(grpBy, "COVER_PCT","TOTAL_COVER_AREA", "AREA_TOTAL",
-                 "COVER_PCT_SE","TOTAL_COVER_AREA_SE", "AREA_TOTAL_SE",
-                 "nPlots_VEG", "nPlots_AREA")
+          select(grpBy, "NETVOL_ACRE","SAWVOL_ACRE","BIO_AG_ACRE","BIO_BG_ACRE",
+                 "BIO_ACRE","CARB_AG_ACRE","CARB_BG_ACRE","CARB_ACRE","NETVOL_TOTAL",
+                 "SAWVOL_TOTAL","BIO_AG_TOTAL","BIO_BG_TOTAL","BIO_TOTAL","CARB_AG_TOTAL",
+                 "CARB_BG_TOTAL","CARB_TOTAL", "AREA_TOTAL","NETVOL_ACRE_SE",
+                 "SAWVOL_ACRE_SE","BIO_AG_ACRE_SE", "BIO_BG_ACRE_SE", "BIO_ACRE_SE",
+                 "CARB_AG_ACRE_SE","CARB_BG_ACRE_SE","CARB_ACRE_SE","NETVOL_TOTAL_SE",
+                 "SAWVOL_TOTAL_SE",  "BIO_AG_TOTAL_SE",  "BIO_BG_TOTAL_SE",
+                 "BIO_TOTAL_SE", "CARB_AG_TOTAL_SE", "CARB_BG_TOTAL_SE", "CARB_TOTAL_SE",
+                 "AREA_TOTAL_SE","nPlots_TREE","nPlots_AREA")
       }
+
+
 
     } else {
       if (variance){
         tOut <- tOut %>%
-          select(grpBy,"COVER_PCT","COVER_PCT_VAR","nPlots_VEG", "nPlots_AREA", N)
+          select(grpBy, "NETVOL_ACRE","SAWVOL_ACRE","BIO_AG_ACRE","BIO_BG_ACRE",
+                 "BIO_ACRE","CARB_AG_ACRE","CARB_BG_ACRE","CARB_ACRE","NETVOL_ACRE_VAR",
+                 "SAWVOL_ACRE_VAR","BIO_AG_ACRE_VAR", "BIO_BG_ACRE_VAR", "BIO_ACRE_VAR",
+                 "CARB_AG_ACRE_VAR","CARB_BG_ACRE_VAR","CARB_ACRE_VAR","nPlots_TREE",
+                 "nPlots_AREA", 'N')
       } else {
         tOut <- tOut %>%
-          select(grpBy,"COVER_PCT","COVER_PCT_SE","nPlots_VEG", "nPlots_AREA")
+          select(grpBy, "NETVOL_ACRE","SAWVOL_ACRE","BIO_AG_ACRE","BIO_BG_ACRE",
+                 "BIO_ACRE","CARB_AG_ACRE","CARB_BG_ACRE","CARB_ACRE","NETVOL_ACRE_SE",
+                 "SAWVOL_ACRE_SE","BIO_AG_ACRE_SE", "BIO_BG_ACRE_SE", "BIO_ACRE_SE",
+                 "CARB_AG_ACRE_SE","CARB_BG_ACRE_SE","CARB_ACRE_SE","nPlots_TREE",
+                 "nPlots_AREA")
       }
 
     }
@@ -481,7 +591,7 @@ vegStruct <- function(db,
     # Snag the names
     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
 
-  } # End byPlot
+  }
 
   ## Pretty output
   tOut <- tOut %>%
@@ -490,6 +600,7 @@ vegStruct <- function(db,
     drop_na(grpBy) %>%
     arrange(YEAR) %>%
     as_tibble()
+
 
   ## Make implicit NA explicit for spatial summaries
   ## Not sure if I like this or not, but I'm going with it for now
@@ -515,7 +626,14 @@ vegStruct <- function(db,
   }
 
   return(tOut)
-
 }
+
+
+
+
+
+
+
+
 
 

@@ -1,7 +1,9 @@
 \name{getFIA}
 \alias{getFIA}
 \title{Download FIA Data and Load into R}
-\description{Easiest and most efficient way to access FIA Data in R. Downloads FIA Data from the FIA Datamart, loads the data into R environment, and optionally saves all downloaded tables as .csv files to local directory. Capable of merging multiple state downloads of the FIA database for regional analysis. Requires an internet connection to access and download tables from the FIA Datamart.}
+\description{
+\lifecycle{stable}
+Easiest and most efficient way to access FIA Data in R. Downloads FIA Data from the FIA Datamart, loads the data into R environment, and optionally saves all downloaded tables as .csv files to local directory. Capable of merging multiple state downloads of the FIA database for regional analysis. Requires an internet connection to access and download tables from the FIA Datamart.}
 
 \usage{
 getFIA(states, dir = NULL, common = TRUE, tables = NULL,

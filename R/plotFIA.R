@@ -7,6 +7,13 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet
                     text.size = 1, text.font = '', lab.width = 1, legend.height = 1,
                     legend.width = 1, device = 'png', savePath = NULL, fileName = NULL) {
 
+
+  ## Requires gganimate when animate = TRUE
+  if (animate == TRUE & !c('gganimate' %in% row.names(installed.packages()))) {
+    stop('plotFIA requires package "gganimate" to produce animations. Please install with "install.packages(gganimate)" and try again.')
+  }
+
+
   # Need to quote all variables for NSE
   y_quo = enquo(y)
   x_quo = enquo(x)
@@ -40,10 +47,9 @@ plotFIA <- function(data, y = NULL, grp = NULL, x = NULL, animate = FALSE, facet
   ## Plot plot locations in a database
   if (any(class(data) == 'FIA.Database')){
     pltSF <- data$PLOT %>%
-      drop_na(LON, LAT)
-    coordinates(pltSF) <- ~LON+LAT
-    proj4string(pltSF) <- '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs'
-    pltSF <- as(pltSF, 'sf')
+      drop_na(LON, LAT) %>%
+      st_as_sf(coords = c('LON', 'LAT'))
+    st_crs(pltSF) <- 4326
     # Make the spatial map
     map <- pltSF %>%
       ggplot() +

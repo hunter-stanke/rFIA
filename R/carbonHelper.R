@@ -2,13 +2,6 @@ carbonHelper1 <- function(x, plts, db, grpBy, byPlot, byPool, byComponent, model
 
   ## Selecting the plots for one county
   db$PLOT <- plts[[x]]
-  ## Carrying out filter across all tables
-  #db <- clipFIA(db, mostRecent = FALSE)
-
-
-  ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
-  grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   data <- db$PLOT %>%
@@ -16,7 +9,7 @@ carbonHelper1 <- function(x, plts, db, grpBy, byPlot, byPool, byComponent, model
     left_join(db$TREE, by = c('PLT_CN', 'CONDID')) %>%
     ## Need a code that tells us where the tree was measured
     ## macroplot, microplot, subplot
-    mutate(PLOT_BASIS = case_when(
+    mutate(PLOT_BASIS = dplyr::case_when(
       ## When DIA is na, adjustment is NA
       is.na(DIA) ~ NA_character_,
       ## When DIA is less than 5", use microplot value
@@ -25,17 +18,12 @@ carbonHelper1 <- function(x, plts, db, grpBy, byPlot, byPool, byComponent, model
       DIA >= 5 & is.na(MACRO_BREAKPOINT_DIA) ~ 'SUBP',
       DIA >= 5 & DIA < MACRO_BREAKPOINT_DIA ~ 'SUBP',
       DIA >= MACRO_BREAKPOINT_DIA ~ 'MACR')) %>%
-    mutate(live = case_when(STATUSCD == 1 ~ 1,
+    mutate(live = dplyr::case_when(STATUSCD == 1 ~ 1,
                             is.na(DIA) ~ NA_real_,
                             TRUE ~ 0),
-           dead = case_when(STATUSCD == 2 ~ 1,
+           dead = dplyr::case_when(STATUSCD == 2 ~ 1,
                             is.na(DIA) ~ NA_real_,
                             TRUE ~ 0))
-  #filter(!is.na(PLOT_BASIS))
-  # rename(YEAR = INVYR) %>%
-  # mutate_if(is.factor,
-  #           as.character) %>%
-  # filter(!is.na(YEAR))
 
   ## Comprehensive indicator function
   data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
@@ -44,6 +32,7 @@ carbonHelper1 <- function(x, plts, db, grpBy, byPlot, byPool, byComponent, model
   if (byPlot){
 
     grpBy <- c('YEAR', grpBy, 'PLOT_STATUS_CD')
+    grpSyms <- syms(grpBy)
 
     ### Plot-level estimates
     a <- data %>%
@@ -51,23 +40,27 @@ carbonHelper1 <- function(x, plts, db, grpBy, byPlot, byPool, byComponent, model
       ## Will be lots of trees here, so CONDPROP listed multiple times
       ## Adding PROP_BASIS so we can handle adjustment factors at strata level
       distinct(PLT_CN, CONDID, .keep_all = TRUE) %>%
-      group_by(PLT_CN, .dots = grpBy) %>%
+      lazy_dt() %>%
+      group_by(PLT_CN, !!!grpSyms) %>%
       summarize(AG_UNDER_LIVE = sum(CONDPROP_UNADJ *CARBON_UNDERSTORY_AG * aDI, na.rm = TRUE),
                 BG_UNDER_LIVE = sum(CONDPROP_UNADJ *CARBON_UNDERSTORY_BG * aDI, na.rm = TRUE),
                 DOWN_DEAD = sum(CONDPROP_UNADJ *CARBON_DOWN_DEAD * aDI, na.rm = TRUE),
                 STAND_DEAD_MOD = sum(CONDPROP_UNADJ *CARBON_STANDING_DEAD * aDI, na.rm = TRUE),
                 LITTER = sum(CONDPROP_UNADJ *CARBON_LITTER * aDI, na.rm = TRUE),
-                SOIL_ORG = sum(CONDPROP_UNADJ *CARBON_SOIL_ORG * aDI, na.rm = TRUE))
+                SOIL_ORG = sum(CONDPROP_UNADJ *CARBON_SOIL_ORG * aDI, na.rm = TRUE)) %>%
+      as.data.frame()
 
     ## Tree plts
     t <- data %>%
       mutate(YEAR = MEASYEAR) %>%
       distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
-      group_by(PLT_CN, .dots = grpBy) %>%
+      lazy_dt() %>%
+      group_by(PLT_CN, !!!grpSyms) %>%
       summarize(AG_OVER_LIVE = sum(CARBON_AG * TPA_UNADJ * live * aDI, na.rm = TRUE) / 2000,
                 BG_OVER_LIVE = sum(CARBON_BG * TPA_UNADJ * live * aDI, na.rm = TRUE) / 2000,
                 AG_OVER_DEAD = sum(CARBON_AG * TPA_UNADJ * dead * aDI, na.rm = TRUE) / 2000,
-                BG_OVER_DEAD = sum(CARBON_BG * TPA_UNADJ * dead * aDI, na.rm = TRUE) / 2000)
+                BG_OVER_DEAD = sum(CARBON_BG * TPA_UNADJ * dead * aDI, na.rm = TRUE) / 2000) %>%
+    as.data.frame()
 
     ## Join these back together
     t <- t %>%
@@ -129,12 +122,16 @@ carbonHelper1 <- function(x, plts, db, grpBy, byPlot, byPool, byComponent, model
 
 
   } else {
+
+    grpSyms <- syms(grpBy)
+
     ### Plot-level estimates
     a <- data %>%
       ## Will be lots of trees here, so CONDPROP listed multiple times
       ## Adding PROP_BASIS so we can handle adjustment factors at strata level
       distinct(PLT_CN, CONDID, .keep_all = TRUE) %>%
-      group_by(PLT_CN, PROP_BASIS, .dots = grpBy) %>%
+      lazy_dt() %>%
+      group_by(PLT_CN, PROP_BASIS, !!!grpSyms) %>%
       summarize(fa = sum(CONDPROP_UNADJ * aDI, na.rm = TRUE),
                 AG_UNDER_LIVE = sum(CONDPROP_UNADJ *CARBON_UNDERSTORY_AG * aDI, na.rm = TRUE),
                 BG_UNDER_LIVE = sum(CONDPROP_UNADJ *CARBON_UNDERSTORY_BG * aDI, na.rm = TRUE),
@@ -142,21 +139,21 @@ carbonHelper1 <- function(x, plts, db, grpBy, byPlot, byPool, byComponent, model
                 STAND_DEAD_MOD = sum(CONDPROP_UNADJ *CARBON_STANDING_DEAD * aDI, na.rm = TRUE),
                 LITTER = sum(CONDPROP_UNADJ *CARBON_LITTER * aDI, na.rm = TRUE),
                 SOIL_ORG = sum(CONDPROP_UNADJ *CARBON_SOIL_ORG * aDI, na.rm = TRUE),
-                plotIn_AREA = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
+                plotIn_AREA = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0)) %>%
+      as.data.frame()
 
     ## Tree plts
     t <- data %>%
+      lazy_dt() %>%
       filter(!is.na(PLOT_BASIS)) %>%
-      group_by(PLT_CN, PLOT_BASIS, .dots = grpBy) %>%
+      group_by(PLT_CN, PLOT_BASIS, !!!grpSyms) %>%
       summarize(AG_OVER_LIVE = sum(CARBON_AG * TPA_UNADJ * live * aDI, na.rm = TRUE) / 2000,
                 BG_OVER_LIVE = sum(CARBON_BG * TPA_UNADJ * live * aDI, na.rm = TRUE) / 2000,
                 AG_OVER_DEAD = sum(CARBON_AG * TPA_UNADJ * dead * aDI, na.rm = TRUE) / 2000,
                 BG_OVER_DEAD = sum(CARBON_BG * TPA_UNADJ * dead * aDI, na.rm = TRUE) / 2000,
-                plotIn_TREE = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
+                plotIn_TREE = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0)) %>%
+      as.data.frame()
 
-    # ## Join these back together
-    # t <- t %>%
-    #   left_join(a, by = c('PLT_CN', grpBy))
 
   }
 
@@ -174,15 +171,16 @@ carbonHelper2 <- function(x, popState, t, a, grpBy, method, byPool, byComponent,
   if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
     grpBy <- c(grpBy, 'INVYR')
     popState[[x]]$P2POINTCNT <- popState[[x]]$P2POINTCNT_INVYR
+    popState[[x]]$P1POINTCNT <- popState[[x]]$P1POINTCNT_INVYR
     popState[[x]]$p2eu <- popState[[x]]$p2eu_INVYR
-
   }
 
   ######## ------------------ ADJUSTMENT FACTORS
   aAdjusted <- a %>%
+    lazy_dt() %>%
     ## Rejoin with population tables
-    right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
-    mutate(aAdj = case_when(
+    inner_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
+    mutate(aAdj = dplyr::case_when(
       ## When NA, stay NA
       is.na(PROP_BASIS) ~ NA_real_,
       ## If the proportion was measured for a macroplot,
@@ -197,13 +195,18 @@ carbonHelper2 <- function(x, popState, t, a, grpBy, method, byPool, byComponent,
            STAND_DEAD_MOD = STAND_DEAD_MOD * aAdj,
            LITTER = LITTER * aAdj,
            SOIL_ORG = SOIL_ORG * aAdj) %>%
-    select(YEAR, PLT_CN:plotIn_AREA)
+    select(YEAR, PLT_CN:plotIn_AREA) %>%
+    as.data.frame()
+
+  grpSyms <- syms(grpBy)
+  grpSyms_noCan <- syms(grpBy[!(grpBy %in% c('POOL', 'COMPONENT'))])
 
   t <- t %>%
+    lazy_dt() %>%
     ## Rejoin with population tables
-    right_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
+    inner_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
     #Add adjustment factors
-    mutate(tAdj = case_when(
+    mutate(tAdj = dplyr::case_when(
       ## When NA, stay NA
       is.na(PLOT_BASIS) ~ NA_real_,
       ## If the proportion was measured for a macroplot,
@@ -217,17 +220,18 @@ carbonHelper2 <- function(x, popState, t, a, grpBy, method, byPool, byComponent,
            AG_OVER_DEAD = AG_OVER_DEAD * tAdj,
            BG_OVER_DEAD = BG_OVER_DEAD * tAdj) %>%
     ## Extra step for variance issues
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, .dots = grpBy[!(grpBy %in% c('POOL', 'COMPONENT'))]) %>%
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, !!!grpSyms_noCan) %>%
     summarize(AG_OVER_LIVE = sum(AG_OVER_LIVE, na.rm = TRUE),
               BG_OVER_LIVE = sum(BG_OVER_LIVE, na.rm = TRUE),
               AG_OVER_DEAD = sum(AG_OVER_DEAD, na.rm = TRUE),
               BG_OVER_DEAD = sum(BG_OVER_DEAD, na.rm = TRUE),
               plotIn_TREE = ifelse(sum(plotIn_TREE >  0, na.rm = TRUE), 1,0),
-              nh = first(P2POINTCNT),
-              p2eu = first(p2eu),
-              a = first(AREA_USED),
-              w = first(P1POINTCNT) / first(P1PNTCNT_EU)) %>%
-    left_join(aAdjusted, by = c('PLT_CN', grpBy[!(grpBy %in% c('POOL', 'COMPONENT', 'INVYR'))]))
+              nh = dplyr::first(P2POINTCNT),
+              p2eu = dplyr::first(p2eu),
+              a = dplyr::first(AREA_USED),
+              w = dplyr::first(P1POINTCNT) / dplyr::first(P1PNTCNT_EU)) %>%
+    left_join(aAdjusted, by = c('PLT_CN', grpBy[!(grpBy %in% c('POOL', 'COMPONENT', 'INVYR'))])) %>%
+    as.data.frame()
 
   ######## ------------------ SWAP TO LONG FORMAT
   ## Decide which estimate to use for snags
@@ -292,35 +296,45 @@ carbonHelper2 <- function(x, popState, t, a, grpBy, method, byPool, byComponent,
 
   ## Strata level estimates
   tEst <- t %>%
+    lazy_dt() %>%
     ## Strata level
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
-    summarize(r_t = length(unique(PLT_CN)) / first(nh),
-              aStrat = mean(fa * r_t, na.rm = TRUE),
-              cStrat = mean(CARB_ACRE * r_t, na.rm = TRUE),
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, !!!grpSyms) %>%
+    summarize(nh = dplyr::first(nh),
+              a = dplyr::first(a),
+              w = dplyr::first(w),
+              p2eu = dplyr::first(p2eu),
+
+              ## dtplyr is fast, but requires a few extra steps, so we'll finish
+              ## means and variances in subseqent mutate step
+              aStrat = sum(fa, na.rm = TRUE),
+              cStrat = sum(CARB_ACRE, na.rm = TRUE),
               plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE),
               plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE),
-              n = n(),
-              ## We don't want a vector of these values, since they are repeated
-              nh = first(nh),
-              a = first(a),
-              w = first(w),
-              p2eu = first(p2eu),
-              ndif = nh - n,
+
               ## Strata level variances
-              av = stratVar(ESTN_METHOD, fa, aStrat, ndif, a, nh),
-              cv = stratVar(ESTN_METHOD, CARB_ACRE, cStrat, ndif, a, nh),
+              av = sum(fa^2, na.rm = TRUE),
+              cv = sum(CARB_ACRE^2, na.rm = TRUE),
+
               # Strata level covariances
-              cvStrat_c = stratVar(ESTN_METHOD, CARB_ACRE, cStrat, ndif, a, nh, fa, aStrat)) %>%
+              cvStrat_c = sum(fa*CARB_ACRE, na.rm = TRUE)) %>%
+    mutate(aStrat = aStrat / nh,
+           cStrat = cStrat / nh,
+           adj = nh * (nh-1),
+           av = (av - (nh*aStrat^2)) / adj,
+           cv = (cv - (nh*cStrat^2)) / adj,
+           cvStrat_c = (cvStrat_c - (nh * cStrat * aStrat)) / adj) %>%
+
+    as.data.frame() %>%
 
     ## Estimation unit
     group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
     summarize(cEst = unitMean(ESTN_METHOD, a, nh, w, cStrat),
               aEst = unitMean(ESTN_METHOD, a, nh,  w, aStrat),
-              N = first(p2eu),
+              N = dplyr::first(p2eu),
               # Estimation of unit variance
-              cVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, cv, cStrat, cEst),
-              aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, av, aStrat, aEst),
-              cvEst_c = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_c, cStrat, cEst, aStrat, aEst),
+              cVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cv, cStrat, cEst),
+              aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, av, aStrat, aEst),
+              cvEst_c = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_c, cStrat, cEst, aStrat, aEst),
               plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE),
               plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE))
 

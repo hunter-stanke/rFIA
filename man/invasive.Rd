@@ -5,6 +5,7 @@
 }
 
 \description{
+\lifecycle{experimental}
 Produces estimates of areal coverage of invasive species from the Forest Inventory and Analysis Database. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. All estimates are returned by species although can be grouped by other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}).}
 
 \usage{
@@ -139,13 +140,6 @@ invasive(db = fiaRI_mr,
 ## Estimates on forested mesic sites (all available inventories)
 invasive(fiaRI,
          areaDomain = PHYSCLCD \%in\% 21:29) # Mesic Physiographic classes
-
-## Most recent estimates on forest land grouped by user-defined areal units
-ctSF <- invasive(fiaRI_mr,
-                 polys = countiesRI,
-                 returnSpatial = TRUE)
-plot(ctSF) # Plot multiple variables simultaneously
-plotFIA(ctSF[ctSF$SYMBOL == 'ROMU',], COVER_PCT) # Plot Multiflora rose coverage
 }
 }
 

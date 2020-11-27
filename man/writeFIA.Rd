@@ -3,7 +3,9 @@
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{Write FIA tables to local directory}
 
-\description{Write \code{FIA.Database} object to local directory as a series of .csv files representing each table. Most useful for writing merged states and temporal/spatial subsets of the database. Once written as .csv, files can be reloaded into R with \code{\link{readFIA}}.
+\description{
+\lifecycle{stable}
+Write \code{FIA.Database} object to local directory as a series of .csv files representing each table. Most useful for writing merged states and temporal/spatial subsets of the database. Once written as .csv, files can be reloaded into R with \code{\link{readFIA}}.
 }
 
 \usage{

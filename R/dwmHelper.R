@@ -2,18 +2,12 @@ dwmHelper1 <- function(x, plts, db, grpBy, byPlot){
 
   ## Selecting the plots for one county
   db$PLOT <- plts[[x]]
-  ## Carrying out filter across all tables
-  #db <- clipFIA(db, mostRecent = FALSE)
 
-  ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
-  grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   data <- db$PLOT %>%
     left_join(db$COND, by = c('PLT_CN')) %>%
-    left_join(db$COND_DWM_CALC, by = c('PLT_CN', 'CONDID')) #%>%
-    #filter(DIA >= 5)
+    left_join(db$COND_DWM_CALC, by = c('PLT_CN', 'CONDID'))
 
   ## Comprehensive indicator function
   data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
@@ -21,17 +15,20 @@ dwmHelper1 <- function(x, plts, db, grpBy, byPlot){
 
 
   if (byPlot){
+
     grpBy <- c('YEAR', grpBy, 'PLOT_STATUS_CD')
+    grpSyms <- syms(grpBy)
+
     t <- data %>%
       mutate(YEAR = INVYR) %>%
       distinct(PLT_CN, CONDID, .keep_all = TRUE) %>%
-      group_by(.dots = grpBy, PLT_CN) %>%
+      lazy_dt() %>%
+      group_by(!!!grpSyms, PLT_CN) %>%
       summarize(VOL_1HR = sum(FWD_SM_VOLCF_ADJ * aDI, na.rm = TRUE),
         VOL_10HR = sum(FWD_MD_VOLCF_ADJ * aDI, na.rm = TRUE),
         VOL_100HR = sum(FWD_LG_VOLCF_ADJ * aDI, na.rm = TRUE),
         VOL_1000HR = sum(CWD_VOLCF_ADJ * aDI, na.rm = TRUE),
         VOL_PILE = sum(PILE_VOLCF_ADJ * aDI, na.rm = TRUE),
-        VOL = sum(VOL_1HR, VOL_10HR, VOL_100HR, VOL_1000HR, VOL_PILE, na.rm = TRUE),
         BIO_DUFF = sum(DUFF_BIOMASS* aDI / 2000, na.rm = TRUE),
         BIO_LITTER = sum(LITTER_BIOMASS * aDI / 2000, na.rm = TRUE),
         BIO_1HR = sum(FWD_SM_DRYBIO_ADJ * aDI / 2000, na.rm = TRUE),
@@ -39,27 +36,33 @@ dwmHelper1 <- function(x, plts, db, grpBy, byPlot){
         BIO_100HR = sum(FWD_LG_DRYBIO_ADJ * aDI / 2000, na.rm = TRUE),
         BIO_1000HR = sum(CWD_DRYBIO_ADJ * aDI / 2000, na.rm = TRUE),
         BIO_PILE = sum(PILE_DRYBIO_ADJ * aDI / 2000, na.rm = TRUE),
-        BIO = sum(BIO_LITTER, BIO_DUFF, BIO_1HR, BIO_10HR, BIO_100HR, BIO_1000HR, BIO_PILE, na.rm = TRUE),
         CARB_DUFF = sum(DUFF_CARBON* aDI / 2000, na.rm = TRUE),
         CARB_LITTER = sum(LITTER_CARBON * aDI / 2000, na.rm = TRUE),
         CARB_1HR = sum(FWD_SM_CARBON_ADJ * aDI / 2000, na.rm = TRUE),
         CARB_10HR = sum(FWD_MD_CARBON_ADJ * aDI / 2000, na.rm = TRUE),
         CARB_100HR = sum(FWD_LG_CARBON_ADJ * aDI / 2000, na.rm = TRUE),
         CARB_1000HR = sum(CWD_CARBON_ADJ * aDI / 2000, na.rm = TRUE),
-        CARB_PILE = sum(PILE_CARBON_ADJ * aDI / 2000, na.rm = TRUE),
-        CARB = sum(CARB_LITTER, CARB_DUFF, CARB_1HR, CARB_10HR, CARB_100HR, CARB_1000HR, CARB_PILE, na.rm = TRUE))
+        CARB_PILE = sum(PILE_CARBON_ADJ * aDI / 2000, na.rm = TRUE)) %>%
+      mutate(BIO = BIO_LITTER + BIO_DUFF + BIO_1HR + BIO_10HR + BIO_100HR + BIO_1000HR + BIO_PILE,
+             VOL = VOL_1HR + VOL_10HR+VOL_100HR+VOL_1000HR+VOL_PILE,
+             CARB = CARB_LITTER + CARB_DUFF + CARB_1HR + CARB_10HR + CARB_100HR + CARB_1000HR + CARB_PILE) %>%
+      as.data.frame()
 
   } else {
+
+    grpSyms <- syms(grpBy)
+
+
     # Compute estimates
     t <- data %>%
       distinct(STRATUM_CN, PLT_CN, CONDID, COND_STATUS_CD, .keep_all = TRUE) %>%
-      group_by(STRATUM_CN, PROP_BASIS, PLT_CN, .dots = grpBy) %>%
+      lazy_dt() %>%
+      group_by(STRATUM_CN, PROP_BASIS, PLT_CN, !!!grpSyms) %>%
       summarize(vsmPlot = sum(FWD_SM_VOLCF_ADJ * aDI, na.rm = TRUE),
                 vmdPlot = sum(FWD_MD_VOLCF_ADJ * aDI, na.rm = TRUE),
                 vlgPlot = sum(FWD_LG_VOLCF_ADJ * aDI, na.rm = TRUE),
                 vcPlot = sum(CWD_VOLCF_ADJ * aDI, na.rm = TRUE),
                 vpPlot = sum(PILE_VOLCF_ADJ * aDI, na.rm = TRUE),
-                vPlot = sum(vsmPlot, vmdPlot, vlgPlot, vcPlot, vpPlot, na.rm = TRUE),
                 bdPlot = sum(DUFF_BIOMASS* aDI / 2000, na.rm = TRUE),
                 blPlot = sum(LITTER_BIOMASS * aDI / 2000, na.rm = TRUE),
                 bsmPlot = sum(FWD_SM_DRYBIO_ADJ * aDI / 2000, na.rm = TRUE),
@@ -67,7 +70,6 @@ dwmHelper1 <- function(x, plts, db, grpBy, byPlot){
                 blgPlot = sum(FWD_LG_DRYBIO_ADJ * aDI / 2000, na.rm = TRUE),
                 bcPlot = sum(CWD_DRYBIO_ADJ * aDI / 2000, na.rm = TRUE),
                 bpPlot = sum(PILE_DRYBIO_ADJ * aDI / 2000, na.rm = TRUE),
-                bPlot = sum(bdPlot, blPlot, bsmPlot, bmdPlot, blgPlot, bcPlot, bpPlot, na.rm = TRUE),
                 cdPlot = sum(DUFF_CARBON* aDI / 2000, na.rm = TRUE),
                 clPlot = sum(LITTER_CARBON * aDI / 2000, na.rm = TRUE),
                 csmPlot = sum(FWD_SM_CARBON_ADJ * aDI / 2000, na.rm = TRUE),
@@ -75,9 +77,12 @@ dwmHelper1 <- function(x, plts, db, grpBy, byPlot){
                 clgPlot = sum(FWD_LG_CARBON_ADJ * aDI / 2000, na.rm = TRUE),
                 ccPlot = sum(CWD_CARBON_ADJ * aDI / 2000, na.rm = TRUE),
                 cpPlot = sum(PILE_CARBON_ADJ * aDI / 2000, na.rm = TRUE),
-                cPlot = sum(cdPlot, clPlot, csmPlot, cmdPlot, clgPlot, ccPlot, cpPlot, na.rm = TRUE),
                 fa = sum(CONDPROP_UNADJ * aDI, na.rm = TRUE),
-                plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
+                plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0)) %>%
+      mutate(vPlot = vsmPlot + vmdPlot+ vlgPlot+ vcPlot+ vpPlot,
+             bPlot = bdPlot+ blPlot+ bsmPlot+ bmdPlot+ blgPlot+ bcPlot+ bpPlot,
+             cPlot = cdPlot+ clPlot+ csmPlot+ cmdPlot + clgPlot + ccPlot+ cpPlot) %>%
+      as.data.frame()
   }
 
   pltOut <- list(t = t)
@@ -92,19 +97,21 @@ dwmHelper2 <- function(x, popState, t, grpBy, method){
   ## DOES NOT MODIFY OUTSIDE ENVIRONMENT
   if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
     grpBy <- c(grpBy, 'INVYR')
-    #aGrpBy <- c(aGrpBy, 'INVYR')
     popState[[x]]$P2POINTCNT <- popState[[x]]$P2POINTCNT_INVYR
+    popState[[x]]$P1POINTCNT <- popState[[x]]$P1POINTCNT_INVYR
     popState[[x]]$p2eu <- popState[[x]]$p2eu_INVYR
-
   }
+
+  grpSyms = syms(grpBy)
 
   ## Strata level estimates
   tEst <- t %>%
+    lazy_dt() %>%
     ## Rejoin with population tables
-    right_join(select(popState[[x]], -c(STATECD)), by = c('STRATUM_CN', 'PLT_CN')) %>%
+    inner_join(select(popState[[x]], -c(STATECD)), by = c('STRATUM_CN', 'PLT_CN')) %>%
     mutate(
       ## AREA
-      aAdj = case_when(
+      aAdj = dplyr::case_when(
         ## When NA, stay NA
         is.na(PROP_BASIS) ~ NA_real_,
         ## If the proportion was measured for a macroplot,
@@ -113,86 +120,162 @@ dwmHelper2 <- function(x, popState, t, grpBy, method){
         ## Otherwise, use the subpplot value
         PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
       fa = fa * aAdj) %>%
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, .dots = grpBy) %>%
-    summarize(a_t = length(unique(PLT_CN)) / first(P2POINTCNT),
-              aStrat = mean(fa * a_t, na.rm = TRUE),
-              vsmStrat = mean(vsmPlot * a_t, na.rm = TRUE),
-              vmdStrat = mean(vmdPlot * a_t, na.rm = TRUE),
-              vlgStrat = mean(vlgPlot * a_t, na.rm = TRUE),
-              vcStrat = mean(vcPlot * a_t, na.rm = TRUE),
-              vpStrat = mean(vpPlot * a_t, na.rm = TRUE),
-              vStrat = mean(vPlot * a_t, na.rm = TRUE),
-              bdStrat = mean(bdPlot * a_t, na.rm = TRUE),
-              blStrat = mean(blPlot * a_t, na.rm = TRUE),
-              bsmStrat = mean(bsmPlot * a_t, na.rm = TRUE),
-              bmdStrat = mean(bmdPlot * a_t, na.rm = TRUE),
-              blgStrat = mean(blgPlot * a_t, na.rm = TRUE),
-              bcStrat = mean(bcPlot * a_t, na.rm = TRUE),
-              bpStrat = mean(bpPlot * a_t, na.rm = TRUE),
-              bStrat = mean(bPlot * a_t, na.rm = TRUE),
-              cdStrat = mean(cdPlot * a_t, na.rm = TRUE),
-              clStrat = mean(clPlot * a_t, na.rm = TRUE),
-              csmStrat = mean(csmPlot * a_t, na.rm = TRUE),
-              cmdStrat = mean(cmdPlot * a_t, na.rm = TRUE),
-              clgStrat = mean(clgPlot * a_t, na.rm = TRUE),
-              ccStrat = mean(ccPlot * a_t, na.rm = TRUE),
-              cpStrat = mean(cpPlot * a_t, na.rm = TRUE),
-              cStrat = mean(cPlot * a_t, na.rm = TRUE),
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, !!!grpSyms) %>%
+    summarize(nh = dplyr::first(P2POINTCNT),
+              a = dplyr::first(AREA_USED),
+              w = dplyr::first(P1POINTCNT) / dplyr::first(P1PNTCNT_EU),
+              p2eu = dplyr::first(p2eu),
+
+              ## dtplyr is fast, but requires a few extra steps, so we'll finish
+              ## means and variances in subseqent mutate step
+
+              aStrat = sum(fa , na.rm = TRUE),
+              vsmStrat = sum(vsmPlot , na.rm = TRUE),
+              vmdStrat = sum(vmdPlot , na.rm = TRUE),
+              vlgStrat = sum(vlgPlot , na.rm = TRUE),
+              vcStrat = sum(vcPlot , na.rm = TRUE),
+              vpStrat = sum(vpPlot , na.rm = TRUE),
+              vStrat = sum(vPlot , na.rm = TRUE),
+              bdStrat = sum(bdPlot , na.rm = TRUE),
+              blStrat = sum(blPlot , na.rm = TRUE),
+              bsmStrat = sum(bsmPlot , na.rm = TRUE),
+              bmdStrat = sum(bmdPlot , na.rm = TRUE),
+              blgStrat = sum(blgPlot , na.rm = TRUE),
+              bcStrat = sum(bcPlot , na.rm = TRUE),
+              bpStrat = sum(bpPlot , na.rm = TRUE),
+              bStrat = sum(bPlot , na.rm = TRUE),
+              cdStrat = sum(cdPlot , na.rm = TRUE),
+              clStrat = sum(clPlot , na.rm = TRUE),
+              csmStrat = sum(csmPlot , na.rm = TRUE),
+              cmdStrat = sum(cmdPlot , na.rm = TRUE),
+              clgStrat = sum(clgPlot , na.rm = TRUE),
+              ccStrat = sum(ccPlot , na.rm = TRUE),
+              cpStrat = sum(cpPlot , na.rm = TRUE),
+              cStrat = sum(cPlot , na.rm = TRUE),
               plotIn = sum(plotIn, na.rm = TRUE),
-              n = n(),
-              ## We don't want a vector of these values, since they are repeated
-              nh = first(P2POINTCNT),
-              a = first(AREA_USED),
-              w = first(P1POINTCNT) / first(P1PNTCNT_EU),
-              p2eu = first(p2eu),
-              ndif = nh - n,
+
               # ## Strata level variances
-              av = stratVar(ESTN_METHOD, fa, aStrat, ndif, a, nh),
-              vsmVar = stratVar(ESTN_METHOD, vsmPlot, vsmStrat, ndif, a, nh),
-              vmdVar = stratVar(ESTN_METHOD, vmdPlot, vmdStrat, ndif, a, nh),
-              vlgVar = stratVar(ESTN_METHOD, vlgPlot, vlgStrat, ndif, a, nh),
-              vcVar = stratVar(ESTN_METHOD, vcPlot, vcStrat, ndif, a, nh),
-              vpVar = stratVar(ESTN_METHOD, vpPlot, vpStrat, ndif, a, nh),
-              vVar = stratVar(ESTN_METHOD, vPlot, vStrat, ndif, a, nh),
-              bdVar = stratVar(ESTN_METHOD, bdPlot, bdStrat, ndif, a, nh),
-              blVar = stratVar(ESTN_METHOD, blPlot, blStrat, ndif, a, nh),
-              bsmVar = stratVar(ESTN_METHOD, bsmPlot, bsmStrat, ndif, a, nh),
-              bmdVar = stratVar(ESTN_METHOD, bmdPlot, bmdStrat, ndif, a, nh),
-              blgVar = stratVar(ESTN_METHOD, blgPlot, blgStrat, ndif, a, nh),
-              bcVar = stratVar(ESTN_METHOD, bcPlot, bcStrat, ndif, a, nh),
-              bpVar = stratVar(ESTN_METHOD, bpPlot, bpStrat, ndif, a, nh),
-              bVar = stratVar(ESTN_METHOD, bPlot, bStrat, ndif, a, nh),
-              cdVar = stratVar(ESTN_METHOD, cdPlot, cdStrat, ndif, a, nh),
-              clVar = stratVar(ESTN_METHOD, clPlot, clStrat, ndif, a, nh),
-              csmVar = stratVar(ESTN_METHOD, csmPlot, csmStrat, ndif, a, nh),
-              cmdVar = stratVar(ESTN_METHOD, cmdPlot, cmdStrat, ndif, a, nh),
-              clgVar = stratVar(ESTN_METHOD, clgPlot, clgStrat, ndif, a, nh),
-              ccVar = stratVar(ESTN_METHOD, ccPlot, ccStrat, ndif, a, nh),
-              cpVar = stratVar(ESTN_METHOD, cpPlot, cpStrat, ndif, a, nh),
-              cVar = stratVar(ESTN_METHOD, cPlot, cStrat, ndif, a, nh),
+              av = sum(fa^2, na.rm = TRUE),
+              vsmVar = sum(vsmPlot^2, na.rm = TRUE),
+              vmdVar = sum(vmdPlot^2, na.rm = TRUE),
+              vlgVar = sum(vlgPlot^2, na.rm = TRUE),
+              vcVar = sum(vcPlot^2, na.rm = TRUE),
+              vpVar = sum(vpPlot^2, na.rm = TRUE),
+              vVar = sum(vPlot^2, na.rm = TRUE),
+              bdVar = sum(bdPlot^2, na.rm = TRUE),
+              blVar = sum(blPlot^2, na.rm = TRUE),
+              bsmVar = sum(bsmPlot^2, na.rm = TRUE),
+              bmdVar = sum(bmdPlot^2, na.rm = TRUE),
+              blgVar = sum(blgPlot^2, na.rm = TRUE),
+              bcVar = sum(bcPlot^2, na.rm = TRUE),
+              bpVar = sum(bpPlot^2, na.rm = TRUE),
+              bVar = sum(bPlot^2, na.rm = TRUE),
+              cdVar = sum(cdPlot^2, na.rm = TRUE),
+              clVar = sum(clPlot^2, na.rm = TRUE),
+              csmVar = sum(csmPlot^2, na.rm = TRUE),
+              cmdVar = sum(cmdPlot^2, na.rm = TRUE),
+              clgVar = sum(clgPlot^2, na.rm = TRUE),
+              ccVar = sum(ccPlot^2, na.rm = TRUE),
+              cpVar = sum(cpPlot^2, na.rm = TRUE),
+              cVar = sum(cPlot^2, na.rm = TRUE),
               # ## Strata level co-variances
-              cvEst_vsm = stratVar(ESTN_METHOD, vsmPlot, vsmStrat, ndif, a, nh, fa, aStrat),
-              cvEst_vmd = stratVar(ESTN_METHOD, vmdPlot, vmdStrat, ndif, a, nh, fa, aStrat),
-              cvEst_vlg = stratVar(ESTN_METHOD, vlgPlot, vlgStrat, ndif, a, nh, fa, aStrat),
-              cvEst_vc = stratVar(ESTN_METHOD, vcPlot, vcStrat, ndif, a, nh, fa, aStrat),
-              cvEst_vp = stratVar(ESTN_METHOD, vpPlot, vpStrat, ndif, a, nh, fa, aStrat),
-              cvEst_v = stratVar(ESTN_METHOD, vPlot, vStrat, ndif, a, nh, fa, aStrat),
-              cvEst_bd = stratVar(ESTN_METHOD, bdPlot, bdStrat, ndif, a, nh, fa, aStrat),
-              cvEst_bl = stratVar(ESTN_METHOD, blPlot, blStrat, ndif, a, nh, fa, aStrat),
-              cvEst_bsm = stratVar(ESTN_METHOD, bsmPlot, bsmStrat, ndif, a, nh, fa, aStrat),
-              cvEst_bmd = stratVar(ESTN_METHOD, bmdPlot, bmdStrat, ndif, a, nh, fa, aStrat),
-              cvEst_blg = stratVar(ESTN_METHOD, blgPlot, blgStrat, ndif, a, nh, fa, aStrat),
-              cvEst_bc = stratVar(ESTN_METHOD, bcPlot, bcStrat, ndif, a, nh, fa, aStrat),
-              cvEst_bp = stratVar(ESTN_METHOD, bpPlot, bpStrat, ndif, a, nh, fa, aStrat),
-              cvEst_b = stratVar(ESTN_METHOD, bPlot, bStrat, ndif, a, nh, fa, aStrat),
-              cvEst_cd = stratVar(ESTN_METHOD, cdPlot, cdStrat, ndif, a, nh, fa, aStrat),
-              cvEst_cl = stratVar(ESTN_METHOD, clPlot, clStrat, ndif, a, nh, fa, aStrat),
-              cvEst_csm = stratVar(ESTN_METHOD, csmPlot, csmStrat, ndif, a, nh, fa, aStrat),
-              cvEst_cmd = stratVar(ESTN_METHOD, cmdPlot, cmdStrat, ndif, a, nh, fa, aStrat),
-              cvEst_clg = stratVar(ESTN_METHOD, clgPlot, clgStrat, ndif, a, nh, fa, aStrat),
-              cvEst_cc = stratVar(ESTN_METHOD, ccPlot, ccStrat, ndif, a, nh, fa, aStrat),
-              cvEst_cp = stratVar(ESTN_METHOD, cpPlot, cpStrat, ndif, a, nh, fa, aStrat),
-              cvEst_c = stratVar(ESTN_METHOD, cPlot, cStrat, ndif, a, nh, fa, aStrat)) %>%
+              cvStrat_vsm = sum(vsmPlot*fa, na.rm = TRUE),
+              cvStrat_vmd = sum(vmdPlot*fa, na.rm = TRUE),
+              cvStrat_vlg = sum(vlgPlot*fa, na.rm = TRUE),
+              cvStrat_vc = sum(vcPlot*fa, na.rm = TRUE),
+              cvStrat_vp = sum(vpPlot*fa, na.rm = TRUE),
+              cvStrat_v = sum(vPlot*fa, na.rm = TRUE),
+              cvStrat_bd = sum(bdPlot*fa, na.rm = TRUE),
+              cvStrat_bl = sum(blPlot*fa, na.rm = TRUE),
+              cvStrat_bsm = sum(bsmPlot*fa, na.rm = TRUE),
+              cvStrat_bmd = sum(bmdPlot*fa, na.rm = TRUE),
+              cvStrat_blg = sum(blgPlot*fa, na.rm = TRUE),
+              cvStrat_bc = sum(bcPlot*fa, na.rm = TRUE),
+              cvStrat_bp = sum(bpPlot*fa, na.rm = TRUE),
+              cvStrat_b = sum(bPlot*fa, na.rm = TRUE),
+              cvStrat_cd = sum(cdPlot*fa, na.rm = TRUE),
+              cvStrat_cl = sum(clPlot*fa, na.rm = TRUE),
+              cvStrat_csm = sum(csmPlot*fa, na.rm = TRUE),
+              cvStrat_cmd = sum(cmdPlot*fa, na.rm = TRUE),
+              cvStrat_clg = sum(clgPlot*fa, na.rm = TRUE),
+              cvStrat_cc = sum(ccPlot*fa, na.rm = TRUE),
+              cvStrat_cp = sum(cpPlot*fa, na.rm = TRUE),
+              cvStrat_c = sum(cPlot*fa, na.rm = TRUE)) %>%
+    mutate(aStrat = aStrat / nh,
+           vsmStrat = vsmStrat / nh,
+           vmdStrat = vmdStrat / nh,
+           vlgStrat = vlgStrat / nh,
+           vcStrat = vcStrat / nh,
+           vpStrat = vpStrat / nh,
+           vStrat = vStrat / nh,
+           bdStrat = bdStrat / nh,
+           blStrat = blStrat / nh,
+           bsmStrat = bsmStrat / nh,
+           bmdStrat = bmdStrat / nh,
+           blgStrat = blgStrat / nh,
+           bcStrat = bcStrat / nh,
+           bpStrat = bpStrat / nh,
+           bStrat = bStrat / nh,
+           cdStrat = cdStrat / nh,
+           clStrat = clStrat / nh,
+           csmStrat = csmStrat / nh,
+           cmdStrat = cmdStrat / nh,
+           clgStrat = clgStrat / nh,
+           ccStrat = ccStrat / nh,
+           cpStrat = cpStrat / nh,
+           cStrat = cStrat / nh,
+
+           adj = nh * (nh-1),
+
+           # ## Strata level variances
+           av = (av - (nh*aStrat^2)) / adj,
+           vsmVar = (vsmVar - (nh*vsmStrat^2)) / adj,
+           vmdVar =(vmdVar - (nh*vmdStrat^2)) / adj,
+           vlgVar = (vlgVar - (nh*vlgStrat^2)) / adj,
+           vcVar = (vcVar - (nh*vcStrat^2)) / adj,
+           vpVar = (vpVar - (nh*vpStrat^2)) / adj,
+           vVar = (vVar - (nh*vStrat^2)) / adj,
+           bdVar = (bdVar - (nh*bdStrat^2)) / adj,
+           blVar = (blVar - (nh*blStrat^2)) / adj,
+           bsmVar = (bsmVar - (nh*bsmStrat^2)) / adj,
+           bmdVar = (bmdVar - (nh*bmdStrat^2)) / adj,
+           blgVar = (blgVar - (nh*blgStrat^2)) / adj,
+           bcVar = (bcVar - (nh*bcStrat^2)) / adj,
+           bpVar = (bpVar - (nh*bpStrat^2)) / adj,
+           bVar = (bVar - (nh*bStrat^2)) / adj,
+           cdVar = (cdVar - (nh*cdStrat^2)) / adj,
+           clVar = (clVar - (nh*clStrat^2)) / adj,
+           csmVar = (csmVar - (nh*csmStrat^2)) / adj,
+           cmdVar = (cmdVar - (nh*cmdStrat^2)) / adj,
+           clgVar = (clgVar - (nh*clgStrat^2)) / adj,
+           ccVar = (ccVar - (nh*ccStrat^2)) / adj,
+           cpVar = (cpVar - (nh*cpStrat^2)) / adj,
+           cVar = (cVar - (nh*cStrat^2)) / adj,
+
+           # ## Strata level co-variances
+           cvEst_vsm = (cvStrat_vsm - (nh * vsmStrat * aStrat)) / adj,
+           cvEst_vmd = (cvStrat_vmd - (nh * vmdStrat * aStrat)) / adj,
+           cvEst_vlg = (cvStrat_vlg - (nh * vlgStrat * aStrat)) / adj,
+           cvEst_vc = (cvStrat_vc - (nh * vcStrat * aStrat)) / adj,
+           cvEst_vp = (cvStrat_vp - (nh * vpStrat * aStrat)) / adj,
+           cvEst_v = (cvStrat_v - (nh * vStrat * aStrat)) / adj,
+           cvEst_bd = (cvStrat_bd - (nh * bdStrat * aStrat)) / adj,
+           cvEst_bl = (cvStrat_bl - (nh * blStrat * aStrat)) / adj,
+           cvEst_bsm = (cvStrat_bsm - (nh * bsmStrat * aStrat)) / adj,
+           cvEst_bmd = (cvStrat_bmd - (nh * bmdStrat * aStrat)) / adj,
+           cvEst_blg = (cvStrat_blg - (nh * blgStrat * aStrat)) / adj,
+           cvEst_bc = (cvStrat_bc - (nh * bcStrat * aStrat)) / adj,
+           cvEst_bp = (cvStrat_bp - (nh * bpStrat * aStrat)) / adj,
+           cvEst_b = (cvStrat_b - (nh * bStrat * aStrat)) / adj,
+           cvEst_cd = (cvStrat_cd - (nh * cdStrat * aStrat)) / adj,
+           cvEst_cl = (cvStrat_cl - (nh * clStrat * aStrat)) / adj,
+           cvEst_csm = (cvStrat_csm - (nh * csmStrat * aStrat)) / adj,
+           cvEst_cmd = (cvStrat_cmd - (nh * cmdStrat * aStrat)) / adj,
+           cvEst_clg = (cvStrat_clg - (nh * clgStrat * aStrat)) / adj,
+           cvEst_cc = (cvStrat_cc - (nh * ccStrat * aStrat)) / adj,
+           cvEst_cp = (cvStrat_cp - (nh * cpStrat * aStrat)) / adj,
+           cvEst_c = (cvStrat_c - (nh * cStrat * aStrat)) / adj) %>%
+    as.data.frame() %>%
     ## Estimation unit
     group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
     summarize(aEst = unitMean(ESTN_METHOD, a, nh, w, aStrat),
@@ -219,54 +302,54 @@ dwmHelper2 <- function(x, popState, t, grpBy, method){
               cpEst = unitMean(ESTN_METHOD, a, nh, w, cpStrat),
               cEst = unitMean(ESTN_METHOD, a, nh, w, cStrat),
               plotIn = sum(plotIn, na.rm = TRUE),
-              N = first(p2eu),
+              N = dplyr::first(p2eu),
               # Estimation of unit variance
-              aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, av, aStrat, aEst),
-              vsmVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, vsmVar, vsmStrat, vsmEst),
-              vmdVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, vmdVar, vmdStrat, vmdEst),
-              vlgVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, vlgVar, vlgStrat, vlgEst),
-              vcVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, vcVar, vcStrat, vcEst),
-              vpVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, vpVar, vpStrat, vpEst),
-              vVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, vVar, vStrat, vEst),
-              bdVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bdVar, bdStrat, bdEst),
-              blVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, blVar, blStrat, blEst),
-              bsmVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bsmVar, bsmStrat, bsmEst),
-              bmdVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bmdVar, bmdStrat, bmdEst),
-              blgVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, blgVar, blgStrat, blgEst),
-              bcVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bcVar, bcStrat, bcEst),
-              bpVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bpVar, bpStrat, bpEst),
-              bVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bVar, bStrat, cbEst),
-              cdVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, cdVar, cdStrat, cdEst),
-              clVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, clVar, clStrat, clEst),
-              csmVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, csmVar, csmStrat, csmEst),
-              cmdVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, cmdVar, cmdStrat, cmdEst),
-              clgVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, clgVar, clgStrat, clgEst),
-              ccVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, ccVar, ccStrat, ccEst),
-              cpVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, cpVar, cpStrat, cpEst),
-              cVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, cVar, cStrat, cEst),
+              aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, av, aStrat, aEst),
+              vsmVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, vsmVar, vsmStrat, vsmEst),
+              vmdVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, vmdVar, vmdStrat, vmdEst),
+              vlgVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, vlgVar, vlgStrat, vlgEst),
+              vcVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, vcVar, vcStrat, vcEst),
+              vpVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, vpVar, vpStrat, vpEst),
+              vVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, vVar, vStrat, vEst),
+              bdVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, bdVar, bdStrat, bdEst),
+              blVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, blVar, blStrat, blEst),
+              bsmVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, bsmVar, bsmStrat, bsmEst),
+              bmdVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, bmdVar, bmdStrat, bmdEst),
+              blgVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, blgVar, blgStrat, blgEst),
+              bcVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, bcVar, bcStrat, bcEst),
+              bpVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, bpVar, bpStrat, bpEst),
+              bVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, bVar, bStrat, cbEst),
+              cdVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cdVar, cdStrat, cdEst),
+              clVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, clVar, clStrat, clEst),
+              csmVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, csmVar, csmStrat, csmEst),
+              cmdVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cmdVar, cmdStrat, cmdEst),
+              clgVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, clgVar, clgStrat, clgEst),
+              ccVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, ccVar, ccStrat, ccEst),
+              cpVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cpVar, cpStrat, cpEst),
+              cVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cVar, cStrat, cEst),
               # Estimation of unit covariance
-              cvEst_vsm = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_vsm, vsmStrat, vsmEst, aStrat, aEst),
-              cvEst_vmd = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_vmd, vmdStrat, vmdEst, aStrat, aEst),
-              cvEst_vlg = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_vlg, vlgStrat, vlgEst, aStrat, aEst),
-              cvEst_vc = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_vc, vcStrat, vcEst, aStrat, aEst),
-              cvEst_vp = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_vp, vpStrat, vpEst, aStrat, aEst),
-              cvEst_v = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_v, vStrat, vEst, aStrat, aEst),
-              cvEst_bd = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_bd, bdStrat, bdEst, aStrat, aEst),
-              cvEst_bl = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_bl, blStrat, blEst, aStrat, aEst),
-              cvEst_bsm = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_bsm, bsmStrat, bsmEst, aStrat, aEst),
-              cvEst_bmd = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_bmd, bmdStrat, bmdEst, aStrat, aEst),
-              cvEst_blg = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_blg, blgStrat, blgEst, aStrat, aEst),
-              cvEst_bc = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_bc, bcStrat, bcEst, aStrat, aEst),
-              cvEst_bp = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_bp, bpStrat, bpEst, aStrat, aEst),
-              cvEst_b = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_b, bStrat, cbEst, aStrat, aEst),
-              cvEst_cd = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_cd, cdStrat, cdEst, aStrat, aEst),
-              cvEst_cl = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_cl, clStrat, clEst, aStrat, aEst),
-              cvEst_csm = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_csm, csmStrat, csmEst, aStrat, aEst),
-              cvEst_cmd = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_cmd, cmdStrat, cmdEst, aStrat, aEst),
-              cvEst_clg = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_clg, clgStrat, clgEst, aStrat, aEst),
-              cvEst_cc = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_cc, ccStrat, ccEst, aStrat, aEst),
-              cvEst_cp = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_cp, cpStrat, cpEst, aStrat, aEst),
-              cvEst_c = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvEst_c, cStrat, cEst, aStrat, aEst))
+              cvEst_vsm = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_vsm, vsmStrat, vsmEst, aStrat, aEst),
+              cvEst_vmd = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_vmd, vmdStrat, vmdEst, aStrat, aEst),
+              cvEst_vlg = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_vlg, vlgStrat, vlgEst, aStrat, aEst),
+              cvEst_vc = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_vc, vcStrat, vcEst, aStrat, aEst),
+              cvEst_vp = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_vp, vpStrat, vpEst, aStrat, aEst),
+              cvEst_v = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_v, vStrat, vEst, aStrat, aEst),
+              cvEst_bd = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_bd, bdStrat, bdEst, aStrat, aEst),
+              cvEst_bl = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_bl, blStrat, blEst, aStrat, aEst),
+              cvEst_bsm = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_bsm, bsmStrat, bsmEst, aStrat, aEst),
+              cvEst_bmd = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_bmd, bmdStrat, bmdEst, aStrat, aEst),
+              cvEst_blg = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_blg, blgStrat, blgEst, aStrat, aEst),
+              cvEst_bc = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_bc, bcStrat, bcEst, aStrat, aEst),
+              cvEst_bp = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_bp, bpStrat, bpEst, aStrat, aEst),
+              cvEst_b = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_b, bStrat, cbEst, aStrat, aEst),
+              cvEst_cd = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_cd, cdStrat, cdEst, aStrat, aEst),
+              cvEst_cl = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_cl, clStrat, clEst, aStrat, aEst),
+              cvEst_csm = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_csm, csmStrat, csmEst, aStrat, aEst),
+              cvEst_cmd = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_cmd, cmdStrat, cmdEst, aStrat, aEst),
+              cvEst_clg = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_clg, clgStrat, clgEst, aStrat, aEst),
+              cvEst_cc = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_cc, ccStrat, ccEst, aStrat, aEst),
+              cvEst_cp = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_cp, cpStrat, cpEst, aStrat, aEst),
+              cvEst_c = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvEst_c, cStrat, cEst, aStrat, aEst))
 
   out <- list(tEst = tEst)
 
@@ -325,10 +408,10 @@ dwmHelper <- function(x, combos, data, grpBy, totals, SE){
                 cPlot = sum(cdPlot, clPlot, csmPlot, cmdPlot, clgPlot, ccPlot, cpPlot, na.rm = TRUE),
                 fa = sum(CONDPROP_UNADJ * aDI * aAdj, na.rm = TRUE),
                 plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0),
-                a = first(AREA_USED),
-                p1EU = first(P1PNTCNT_EU),
-                p1 = first(P1POINTCNT),
-                p2 = first(P2POINTCNT)) %>%
+                a = dplyr::first(AREA_USED),
+                p1EU = dplyr::first(P1PNTCNT_EU),
+                p1 = dplyr::first(P1POINTCNT),
+                p2 = dplyr::first(P2POINTCNT)) %>%
       # Stratum level
       group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN) %>%
       summarize(aStrat = mean(fa, na.rm = TRUE),
@@ -355,78 +438,78 @@ dwmHelper <- function(x, combos, data, grpBy, totals, SE){
                 cpStrat = mean(cpPlot, na.rm = TRUE),
                 cStrat = mean(cPlot, na.rm = TRUE),
                 plotIn = sum(plotIn, na.rm = TRUE),
-                a = first(a),
-                w = first(p1) / first(p1EU), # Stratum weight
-                nh = first(p2), # Number plots in stratum
+                a = dplyr::first(a),
+                w = dplyr::first(p1) / dplyr::first(p1EU), # Stratum weight
+                nh = dplyr::first(p2), # Number plots in stratum
                 # Strata level variances
                 av = ifelse(first(ESTN_METHOD == 'simple'),
-                            var(fa * first(a) / nh),
+                            var(fa * dplyr::first(a) / nh),
                             (sum(fa^2) - sum(nh * aStrat^2)) / (nh * (nh-1))),
                 vsmV = ifelse(first(ESTN_METHOD == 'simple'),
-                              var(vsmPlot * first(a) / nh),
+                              var(vsmPlot * dplyr::first(a) / nh),
                               (sum(vsmPlot^2) - sum(nh * vsmStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 vmdV = ifelse(first(ESTN_METHOD == 'simple'),
-                              var(vmdPlot * first(a) / nh),
+                              var(vmdPlot * dplyr::first(a) / nh),
                               (sum(vmdPlot^2) - sum(nh * vmdStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 vlgV = ifelse(first(ESTN_METHOD == 'simple'),
-                              var(vlgPlot * first(a) / nh),
+                              var(vlgPlot * dplyr::first(a) / nh),
                               (sum(vlgPlot^2) - sum(nh * vlgStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 vcV = ifelse(first(ESTN_METHOD == 'simple'),
-                             var(vcPlot * first(a) / nh),
+                             var(vcPlot * dplyr::first(a) / nh),
                              (sum(vcPlot^2) - sum(nh * vcStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 vpV = ifelse(first(ESTN_METHOD == 'simple'),
-                             var(vpPlot * first(a) / nh),
+                             var(vpPlot * dplyr::first(a) / nh),
                              (sum(vpPlot^2) - sum(nh * vpStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 vV = ifelse(first(ESTN_METHOD == 'simple'),
-                            var(vPlot * first(a) / nh),
+                            var(vPlot * dplyr::first(a) / nh),
                             (sum(vPlot^2) - sum(nh * vStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 bdV = ifelse(first(ESTN_METHOD == 'simple'),
-                              var(bdPlot * first(a) / nh),
+                              var(bdPlot * dplyr::first(a) / nh),
                               (sum(bdPlot^2) - sum(nh * bdStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 blV = ifelse(first(ESTN_METHOD == 'simple'),
-                              var(blPlot * first(a) / nh),
+                              var(blPlot * dplyr::first(a) / nh),
                               (sum(blPlot^2) - sum(nh * blStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 bsmV = ifelse(first(ESTN_METHOD == 'simple'),
-                              var(bsmPlot * first(a) / nh),
+                              var(bsmPlot * dplyr::first(a) / nh),
                               (sum(bsmPlot^2) - sum(nh * bsmStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 bmdV = ifelse(first(ESTN_METHOD == 'simple'),
-                              var(bmdPlot * first(a) / nh),
+                              var(bmdPlot * dplyr::first(a) / nh),
                               (sum(bmdPlot^2) - sum(nh * bmdStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 blgV = ifelse(first(ESTN_METHOD == 'simple'),
-                              var(blgPlot * first(a) / nh),
+                              var(blgPlot * dplyr::first(a) / nh),
                               (sum(blgPlot^2) - sum(nh * blgStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 bcV = ifelse(first(ESTN_METHOD == 'simple'),
-                             var(bcPlot * first(a) / nh),
+                             var(bcPlot * dplyr::first(a) / nh),
                              (sum(bcPlot^2) - sum(nh * bcStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 bpV = ifelse(first(ESTN_METHOD == 'simple'),
-                             var(bpPlot * first(a) / nh),
+                             var(bpPlot * dplyr::first(a) / nh),
                              (sum(bpPlot^2) - sum(nh * bpStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 bV = ifelse(first(ESTN_METHOD == 'simple'),
-                            var(bPlot * first(a) / nh),
+                            var(bPlot * dplyr::first(a) / nh),
                             (sum(bPlot^2) - sum(nh * bStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 cdV = ifelse(first(ESTN_METHOD == 'simple'),
-                             var(cdPlot * first(a) / nh),
+                             var(cdPlot * dplyr::first(a) / nh),
                              (sum(cdPlot^2) - sum(nh * cdStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 clV = ifelse(first(ESTN_METHOD == 'simple'),
-                             var(clPlot * first(a) / nh),
+                             var(clPlot * dplyr::first(a) / nh),
                              (sum(clPlot^2) - sum(nh * clStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 csmV = ifelse(first(ESTN_METHOD == 'simple'),
-                              var(csmPlot * first(a) / nh),
+                              var(csmPlot * dplyr::first(a) / nh),
                               (sum(csmPlot^2) - sum(nh * csmStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 cmdV = ifelse(first(ESTN_METHOD == 'simple'),
-                              var(cmdPlot * first(a) / nh),
+                              var(cmdPlot * dplyr::first(a) / nh),
                               (sum(cmdPlot^2) - sum(nh * cmdStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 clgV = ifelse(first(ESTN_METHOD == 'simple'),
-                              var(clgPlot * first(a) / nh),
+                              var(clgPlot * dplyr::first(a) / nh),
                               (sum(clgPlot^2) - sum(nh * clgStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 ccV = ifelse(first(ESTN_METHOD == 'simple'),
-                             var(ccPlot * first(a) / nh),
+                             var(ccPlot * dplyr::first(a) / nh),
                              (sum(ccPlot^2) - sum(nh * ccStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 cpV = ifelse(first(ESTN_METHOD == 'simple'),
-                             var(cpPlot * first(a) / nh),
+                             var(cpPlot * dplyr::first(a) / nh),
                              (sum(cpPlot^2) - sum(nh * cpStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 cV = ifelse(first(ESTN_METHOD == 'simple'),
-                            var(cPlot * first(a) / nh),
+                            var(cPlot * dplyr::first(a) / nh),
                             (sum(cPlot^2) - sum(nh * cStrat^2)) / (nh * (nh-1))), # Stratified and double cases
                 # Strata level covariances
                 vsmCV = ifelse(first(ESTN_METHOD == 'simple'),

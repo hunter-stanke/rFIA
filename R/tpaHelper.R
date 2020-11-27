@@ -3,15 +3,10 @@ tpaHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
   ## Selecting the plots for one county
   db$PLOT <- plts[[x]]
 
-  ## Which grpByNames are in which table? Helps us subset below
-  grpP <- names(db$PLOT)[names(db$PLOT) %in% grpBy]
-  grpC <- names(db$COND)[names(db$COND) %in% grpBy & names(db$COND) %in% grpP == FALSE]
-  grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
-
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', grpP, 'aD_p', 'sp')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ', 'SUBP', 'TREE', grpT, 'tD', 'typeD')), by = c('PLT_CN', 'CONDID')) %>%
+  data <- db$PLOT %>%
+    left_join(db$COND, by = c('PLT_CN')) %>%
+    left_join(db$TREE, by = c('PLT_CN', 'CONDID')) %>%
     ## Need a code that tells us where the tree was measured
     ## macroplot, microplot, subplot
     mutate(PLOT_BASIS = dplyr::case_when(
@@ -22,12 +17,7 @@ tpaHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
       ## When DIA is greater than 5", use subplot value
       DIA >= 5 & is.na(MACRO_BREAKPOINT_DIA) ~ 'SUBP',
       DIA >= 5 & DIA < MACRO_BREAKPOINT_DIA ~ 'SUBP',
-      DIA >= MACRO_BREAKPOINT_DIA ~ 'MACR')) #%>%
-  #filter(!is.na(PLOT_BASIS))
-  # rename(YEAR = INVYR) %>%
-  # mutate_if(is.factor,
-  #           as.character) %>%
-  # filter(!is.na(YEAR))
+      DIA >= MACRO_BREAKPOINT_DIA ~ 'MACR'))
 
   ## Comprehensive indicator function
   data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
@@ -36,16 +26,24 @@ tpaHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
 
 
   if (byPlot){
+
     grpBy <- c('YEAR', grpBy, 'PLOT_STATUS_CD')
+    grpSyms <- syms(grpBy)
+
     t <- data %>%
       mutate(YEAR = MEASYEAR) %>%
       distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
-      group_by(.dots = grpBy, PLT_CN) %>%
+      lazy_dt() %>%
+      group_by(!!!grpSyms, PLT_CN) %>%
       summarize(TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE),
                 BAA = sum(basalArea(DIA) * TPA_UNADJ * tDI, na.rm = TRUE),
-                TPA_PERC = TPA / sum(TPA_UNADJ * pDI, na.rm = TRUE) * 100,
-                BAA_PERC = BAA / sum(basalArea(DIA) * TPA_UNADJ * pDI, na.rm = TRUE) * 100,
-                nStems = length(which(tDI == 1)))
+                tT = sum(TPA_UNADJ * pDI, na.rm = TRUE),
+                bT = sum(basalArea(DIA) * TPA_UNADJ * pDI, na.rm = TRUE),
+                nStems = length(which(tDI == 1))) %>%
+      mutate(TPA_PERC = TPA / tT,
+             BAA_PERC = BAA / bT) %>%
+      as.data.frame() %>%
+      select(-c(tT, bT))
 
     a = NULL
 
@@ -92,8 +90,8 @@ tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
     grpBy <- c(grpBy, 'INVYR')
     aGrpBy <- c(aGrpBy, 'INVYR')
     popState[[x]]$P2POINTCNT <- popState[[x]]$P2POINTCNT_INVYR
+    popState[[x]]$P1POINTCNT <- popState[[x]]$P1POINTCNT_INVYR
     popState[[x]]$p2eu <- popState[[x]]$p2eu_INVYR
-
   }
 
   aGrpSyms <- syms(aGrpBy)
@@ -115,12 +113,12 @@ tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
         PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
       fa = fa * aAdj) %>%
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, !!!aGrpSyms) %>%
-    summarize(nh = first(P2POINTCNT),
+    summarize(nh = dplyr::first(P2POINTCNT),
               aStrat = sum(fa, na.rm = TRUE),
               plotIn_AREA = sum(plotIn, na.rm = TRUE),
-              a = first(AREA_USED),
-              w = first(P1POINTCNT) / first(P1PNTCNT_EU),
-              p2eu = first(p2eu),
+              a = dplyr::first(AREA_USED),
+              w = dplyr::first(P1POINTCNT) / dplyr::first(P1PNTCNT_EU),
+              p2eu = dplyr::first(p2eu),
               av = sum(fa^2, na.rm = TRUE)) %>%
     mutate(aStrat = aStrat / nh,
            av = (av - (nh * aStrat^2)) / (nh * (nh-1))) %>%
@@ -130,7 +128,7 @@ tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
   aEst <- aStrat %>%
     group_by(ESTN_UNIT_CN, !!!aGrpSyms) %>%
     summarize(aEst = unitMean(ESTN_METHOD, a, nh,  w, aStrat),
-              aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, av, aStrat, aEst),
+              aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, av, aStrat, aEst),
               plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
 
 
@@ -236,16 +234,16 @@ tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
               tTEst = unitMean(ESTN_METHOD, a, nh,  w, tTStrat),
               bTEst = unitMean(ESTN_METHOD, a, nh,  w, bTStrat),
               plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE),
-              N = first(p2eu),
-              tVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tv, tStrat, tEst),
-              bVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bv, bStrat, bEst),
-              tTVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, tTv, tTStrat, tTEst),
-              bTVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, first(p2eu), w, bTv, bTStrat, bTEst),
+              N = dplyr::first(p2eu),
+              tVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, tv, tStrat, tEst),
+              bVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, bv, bStrat, bEst),
+              tTVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, tTv, tTStrat, tTEst),
+              bTVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, bTv, bTStrat, bTEst),
               # Unit Covariance
-              cvEst_t = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_t, tStrat, tEst, aStrat, aEst),
-              cvEst_b = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_b, bStrat, bEst, aStrat, aEst),
-              cvEst_tT = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_t, tStrat, tEst, tTStrat, tTEst),
-              cvEst_bT = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, first(p2eu), w, cvStrat_b, bStrat, bEst, bTStrat, bTEst))
+              cvEst_t = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_t, tStrat, tEst, aStrat, aEst),
+              cvEst_b = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_b, bStrat, bEst, aStrat, aEst),
+              cvEst_tT = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_t, tStrat, tEst, tTStrat, tTEst),
+              cvEst_bT = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_b, bStrat, bEst, bTStrat, bTEst))
 
 
   out <- list(tEst = tEst, aEst = aEst)
