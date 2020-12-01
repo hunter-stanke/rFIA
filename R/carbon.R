@@ -120,10 +120,9 @@ carbonStarter <- function(x,
   ## to estimate variance of annual panels w/ post-stratified estimator. That is,
   ## the number of plots within a panel within an stratum is less than 2. When
   ## this happens, merge strata so that all have at least two obs
-  if (method != 'TI') {
+  if (str_to_upper(method) != 'TI') {
     pops <- mergeSmallStrata(db, pops)
   }
-
 
 
 
