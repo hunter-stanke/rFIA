@@ -126,7 +126,7 @@ arealSumPrep2 <- function(db, grpBy, polys, nCores){
 
 ## Helper function to read remote database by state within
 ## estimator functions
-readRemoteHelper <- function(db, remote, reqTables, nCores){
+readRemoteHelper <- function(x, db, remote, reqTables, nCores){
   if (remote){
     ## Store the original parameters here
     params <- db
@@ -492,7 +492,9 @@ handlePops <- function(db, evalType, method, mr, pltList = NULL, ga = FALSE){
     rename(ESTN_UNIT_CN = CN) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'CN', 'P1POINTCNT', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MICR', "ADJ_FACTOR_MACR")), by = c('ESTN_UNIT_CN')) %>%
     rename(STRATUM_CN = CN) %>%
+    distinct(EVALID, ESTN_UNIT_CN, STRATUM_CN, .keep_all = TRUE) %>%
     left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN', 'INVYR', 'STATECD')), by = 'STRATUM_CN') %>%
+    distinct(EVALID, ESTN_UNIT_CN, STRATUM_CN, PLT_CN, .keep_all = TRUE) %>%
     ungroup() %>%
     mutate_if(is.factor,
               as.character) %>%
@@ -568,30 +570,33 @@ mergeSmallStrata <- function(db, pops) {
     ungroup() %>%
     arrange(P2POINTCNT_INVYR)
 
+  ## Check if any fail
+  warnMe <- c()
 
   ## If any are too small, i.e., only one plot --> do some merging
   if (sum(stratYr$wrong, na.rm = TRUE) > 0){
 
-    for ( i in stratYr$stratID ) {
+    for ( i in stratYr$stratID[stratYr$wrong == 1] ) {
 
       ## Subset the row
       dat <- filter(stratYr, stratID == i)
 
-      ## Only merge those that have a single point for now
-      ## Can specify a minimum later, maybe
-      if (dat$wrong == 1) {
 
-        ## Use fuzzy string matching if any other strata are available to merge with
-        if (dat$nStrata_INVYR > 1) {
-          ## Find its nearest neighbor of those in the same estimation
-          ## unit and INVYR
-          neighbors <- stratYr %>%
-            filter(ESTN_UNIT_CN == dat$ESTN_UNIT_CN) %>%
-            filter(buff == dat$buff) %>%
-            filter(INVYR == dat$INVYR) %>%
-            filter(stratID != i)
+      ## Use fuzzy string matching if any other strata are available to merge with
+      if (dat$nStrata_INVYR > 1) {
+        ## Find its nearest neighbor of those in the same estimation
+        ## unit and INVYR
+        neighbors <- stratYr %>%
+          filter(ESTN_UNIT_CN == dat$ESTN_UNIT_CN) %>%
+          #filter(buff == dat$buff) %>%
+          filter(INVYR == dat$INVYR) %>%
+          filter(stratID != i)
 
-          #if (nrow(neighbors) < 1) {stop('Bad stratification, i.e, strata too small to compute variance of annual panels. If possible, please report this error with a short reproducible example on our active issues page: www.github.com/hunter-stanke/rFIA/issues')}
+        if (nrow(neighbors) < 1) {
+          warnMe <- c(warnMe, TRUE)
+
+        } else {
+          warnMe <- c(warnMe, FALSE)
 
           ## Find the most similar neighbor in terms of stratum description
           msn <- adist(dat$STRATUM_DESCR, neighbors$STRATUM_DESCR)
@@ -605,47 +610,56 @@ mergeSmallStrata <- function(db, pops) {
           pops[pops$stratID == i, 'STRATUM_CN'] <- unique(pops[pops$stratID == msnID, 'STRATUM_CN'])
           pops[pops$stratID == i, 'P1POINTCNT_INVYR'] <- unique(pops[pops$stratID == msnID, 'P1POINTCNT_INVYR']) + dat$P1POINTCNT_INVYR
           pops[pops$stratID == i, 'P2POINTCNT_INVYR'] <- unique(pops[pops$stratID == msnID, 'P2POINTCNT_INVYR']) + dat$P2POINTCNT_INVYR
+          #pops[pops$stratID == i, 'stratID'] <- unique(pops[pops$stratID == msnID, 'stratID'])
+
 
           ## Receiving stratum -------------------------------------------------
           pops[pops$stratID == msnID, 'P1POINTCNT_INVYR'] <- unique(pops[pops$stratID == msnID, 'P1POINTCNT_INVYR']) + dat$P1POINTCNT_INVYR
           pops[pops$stratID == msnID, 'P2POINTCNT_INVYR'] <- unique(pops[pops$stratID == msnID, 'P2POINTCNT_INVYR']) + dat$P2POINTCNT_INVYR
 
+        }
+
+
+
 
         ## If the small stratum is the only one available in the estimation unit in a given year,
         ## merge the INVYR within the same stratum
+      } else {
+
+        ## No other strata measured in the same year, so merge years instead
+        neighbors <- stratYr %>%
+          filter(STRATUM_CN == dat$STRATUM_CN) %>%
+          filter(stratID != i)
+
+        if (nrow(neighbors) > 0) {
+          warnMe <- c(warnMe, FALSE)
+
+          ## Find the most similar neighbor in terms of stratum description
+          msn <- abs(neighbors$INVYR - (dat$INVYR + .01))
+          msnID <- neighbors$stratID[which.min(msn)]
+
+          ## Giving stratum ----------------------------------------------------
+          pops[pops$stratID == i, 'P2POINTCNT_INVYR'] <- unique(pops[pops$stratID == msnID, 'P2POINTCNT_INVYR']) + dat$P2POINTCNT_INVYR
+          pops[pops$stratID == i, 'INVYR'] <- unique(pops[pops$stratID == msnID, 'INVYR'])
+          #pops[pops$stratID == i, 'stratID'] <- unique(pops[pops$stratID == msnID, 'stratID'])
+
+
+          ## Receiving stratum -------------------------------------------------
+          pops[pops$stratID == msnID, 'P2POINTCNT_INVYR'] <- unique(pops[pops$stratID == msnID, 'P2POINTCNT_INVYR']) + dat$P2POINTCNT_INVYR
+
         } else {
-
-          ## No other strata measured in the same year, so merge years instead
-          neighbors <- stratYr %>%
-            filter(STRATUM_CN == dat$STRATUM_CN) %>%
-            filter(stratID != i)
-
-          if (nrow(neighbors) > 0) {
-
-
-            ## Find the most similar neighbor in terms of stratum description
-            msn <- abs(neighbors$INVYR - (dat$INVYR + .01))
-            msnID <- neighbors$stratID[which.min(msn)]
-
-            ## Giving stratum ----------------------------------------------------
-            pops[pops$stratID == i, 'P2POINTCNT_INVYR'] <- unique(pops[pops$stratID == msnID, 'P2POINTCNT_INVYR']) + dat$P2POINTCNT_INVYR
-
-            ## Receiving stratum -------------------------------------------------
-            pops[pops$stratID == msnID, 'P2POINTCNT_INVYR'] <- unique(pops[pops$stratID == msnID, 'P2POINTCNT_INVYR']) + dat$P2POINTCNT_INVYR
-
-          } else {
-            #stop('Bad stratification, i.e, strata too small to compute variance of annual panels. If possible, please report this error with a short reproducible example on our active issues page: www.github.com/hunter-stanke/rFIA/issues')
-          }
+          warnMe <- c(warnMe, TRUE)
         }
       }
     }
 
-    ## Update adjustment factors plot counts in estimation unit
+    ## Keeps it from repeating above
+    if (any(warnMe)) warning('Bad stratification, i.e., strata too small to compute variance of annual panels. If you are only interested in totals and/or ratio estimates, disregard this. However, if interested in variance (e.g., for confidence intervals) try using method = "TI".')
+
+
+    ## Update adjustment factors in estimation unit
     pops <- pops %>%
-      ## By unit / INVYR
-      group_by(EVALID, ESTN_UNIT_CN, INVYR) %>%
-      mutate(p2eu_INVYR = n()) %>%
-      ungroup() %>%
+      distinct(EVALID, ESTN_UNIT_CN, STRATUM_CN, INVYR, PLT_CN, .keep_all = TRUE) %>%
       ## Fix adjustment factors
       group_by(STRATUM_CN) %>%
       mutate(ADJ_FACTOR_MICR = mean(ADJ_FACTOR_MICR, na.rm = TRUE),
@@ -663,19 +677,28 @@ mergeSmallStrata <- function(db, pops) {
   ## Adjust stratum weights when not all strata are sampled in an INVYR
   stratYr <- pops %>%
     distinct(ESTN_UNIT_CN, STRATUM_CN, INVYR,
-             P1POINTCNT_INVYR, P1PNTCNT_EU) %>%
-    group_by(STRATUM_CN) %>%
+             P1POINTCNT_INVYR, P1PNTCNT_EU,
+             P2POINTCNT_INVYR) %>%
+    ## If multiple stratum were merged onto one, choose the maximum value (i.e.,
+    ## the result of the last iteration)
+    group_by(ESTN_UNIT_CN, STRATUM_CN, INVYR) %>%
+    mutate(P1POINTCNT_INVYR = max(P1POINTCNT_INVYR),
+           P2POINTCNT_INVYR = max(P2POINTCNT_INVYR)) %>%
+    distinct() %>%
     mutate(stratWgt = P1POINTCNT_INVYR / P1PNTCNT_EU) %>%
     group_by(ESTN_UNIT_CN, INVYR) %>%
     mutate(propSampled = sum(stratWgt, na.rm = TRUE),
            stratWgt_INVYR = stratWgt / propSampled,
-           P1POINTCNT_INVYR = P1PNTCNT_EU * stratWgt_INVYR) %>%
+           P1POINTCNT_INVYR = P1PNTCNT_EU * stratWgt_INVYR,
+           p2eu_INVYR = sum(P2POINTCNT_INVYR, na.rm = TRUE)) %>%
     ungroup() %>%
-    select(STRATUM_CN, INVYR, P1POINTCNT_INVYR)
+    select(STRATUM_CN, INVYR, P1POINTCNT_INVYR, P2POINTCNT_INVYR, p2eu_INVYR)
 
   pops <- pops %>%
-    select(-c(P1POINTCNT_INVYR)) %>%
-    left_join(stratYr, by = c('STRATUM_CN', 'INVYR'))
+    select(-c(P1POINTCNT_INVYR, stratID, P2POINTCNT_INVYR, p2eu_INVYR)) %>%
+    left_join(stratYr, by = c('STRATUM_CN', 'INVYR')) %>%
+    distinct(EVALID, ESTN_UNIT_CN, STRATUM_CN, PLT_CN, .keep_all = TRUE)
+
 
   return(pops)
 
@@ -811,6 +834,33 @@ prettyNamesSF <- function (tOut, polys, byPlot, grpBy, grpByOrig, tNames, return
 
   return(tOut)
 }
+
+## Choose annual panels to return
+filterAnnual <- function(x, grpBy, pltsVar) {
+  pltquo <- rlang::enquo(pltsVar)
+  x <- x %>%
+    mutate(nplts = !!pltquo) %>%
+    group_by(INVYR, .dots = grpBy) %>%
+    summarize(across(.cols = everything(),  sum, na.rm = TRUE)) %>%
+    ## Keep these
+    group_by(INVYR) %>%
+    mutate(keep = ifelse(INVYR %in% YEAR,
+                         ifelse(YEAR == INVYR, 1, 0), ## When TRUE
+                         ifelse(nplts == max(nplts, na.rm = TRUE), 1, 0))) %>% ## When INVYR not in YEAR, keep estimates from the inventory where panel has the most plots
+    ungroup() %>%
+    filter(keep == 1) %>%
+    ## If there are multiple reporting years where a panel has the same number of plots
+    ## then the estimate will be way too big, we fix this by taking the first row from each output group
+    ## If the above worked it will have no effect. If the above failed, it will save our ass.
+    mutate(YEAR = INVYR) %>%
+    group_by(.dots = grpBy) %>%
+    summarize(across(.cols = everything(), first)) %>%
+    ungroup()
+
+  return(x)
+}
+
+
 
 
 ## Estimate skewness in a distribution of values
