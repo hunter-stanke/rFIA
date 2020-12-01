@@ -23,7 +23,7 @@ bioStarter <- function(x,
                  'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
 
   ## If remote, read in state by state. Otherwise, drop all unnecessary tables
-  db <- readRemoteHelper(db, remote, reqTables, nCores)
+  db <- readRemoteHelper(x, db, remote, reqTables, nCores)
 
   ## IF the object was clipped
   if ('prev' %in% names(db$PLOT)){
@@ -321,49 +321,11 @@ bioStarter <- function(x,
       ## If using an ANNUAL estimator --------------------------------------------
     } else if (str_to_upper(method) == 'ANNUAL') {
 
-      ## ANNUAL ESTIMATOR is when END_INVYR = INVYR
-      aEst <- aEst %>%
-        group_by(INVYR, .dots = aGrpBy) %>%
-        summarize(across(.cols = everything(),  sum, na.rm = TRUE)) %>%
-        filter(YEAR == INVYR) %>%
-        mutate(YEAR = INVYR)
-      tEst <- tEst %>%
-        group_by(INVYR, .dots = grpBy) %>%
-        summarize(across(.cols = everything(),  sum, na.rm = TRUE)) %>%
-        filter(YEAR == INVYR)%>%
-        mutate(YEAR = INVYR)
+      # If INVYR is in YEAR, choose the estimates when INVYR == YEAR
+      # Otherwise, choose the estimates produced with the most plots
+      aEst <- filterAnnual(aEst, aGrpBy, plotIn_AREA)
+      tEst <- filterAnnual(tEst, grpBy, plotIn_TREE)
 
-
-
-      ## Rather than choose the annual panel estimate when INVYR = END_INVYR,
-      ## choose the END_INVYR that has the highest N for each INVYR. Doing this
-      ## because maybe not all 2018 data had been entered by the time the 2018
-      ## END_INVYR cycle was produced. Maybe 2019 has more info on 2018 plots.
-      ## So, ideally we would choose the cycle with the most plots for a given
-      ## panel. Doing that here, important distinction from previous.
-      ## NOT USED CURRENTLY --------------------------------------------------
-
-      # aEst <- aEst %>%
-      #   left_join(select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-      #   group_by(STATECD, INVYR, .dots = aGrpBy[aGrpBy != 'STATECD']) %>%
-      #   summarize(across(.cols = everything(),  sum, na.rm = TRUE)) %>%
-      #   group_by(STATECD, INVYR, .dots = aGrpBy[aGrpBy %in% c('STATECD', 'YEAR') == FALSE]) %>%
-      #   filter(plotIn_AREA == max(plotIn_AREA, na.rm = TRUE)) %>%
-      #   filter(YEAR == max(YEAR, na.rm = TRUE)) %>%
-      #   select(-c(YEAR)) %>%
-      #   mutate(YEAR = INVYR)
-
-
-
-      # tEst <- tEst %>%
-      #   left_join(select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-      #   group_by(STATECD, INVYR, .dots = aGrpBy[aGrpBy != 'STATECD']) %>%
-      #   summarize(across(.cols = everything(),  sum, na.rm = TRUE)) %>%
-      #   group_by(STATECD, INVYR, .dots = aGrpBy[aGrpBy %in% c('STATECD', 'YEAR') == FALSE]) %>%
-      #   filter(plotIn_TREE == max(plotIn_TREE, na.rm = TRUE)) %>%
-      #   filter(YEAR == max(YEAR, na.rm = TRUE)) %>%
-      #   select(-c(YEAR)) %>%
-      #   mutate(YEAR = INVYR)
     }
 
     out <- list(tEst = tEst, aEst = aEst, grpBy = grpBy, aGrpBy = aGrpBy, grpByOrig = grpByOrig)

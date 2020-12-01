@@ -3,14 +3,22 @@ areaHelper1 <- function(x, plts, db, grpBy, byPlot){
   ## Selecting the plots for one county
   db$PLOT <- plts[[x]]
 
+  ## was treeDomain NULL? If so, replace NAs w/ 1
+  treeD <- ifelse(mean(db$TREE$tD, na.rm = TRUE) == 1, 1, 0)
+
+  grpSyms <- syms(grpBy)
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   data <- db$PLOT %>%
     left_join(db$COND, by = c('PLT_CN')) %>%
     left_join(db$TREE, by = c('PLT_CN', 'CONDID')) %>%
-    group_by(PLT_CN, PROP_BASIS, .dots = grpBy) %>%
+    lazy_dt() %>%
+    mutate(tD = tidyr::replace_na(tD, treeD)) %>%
+    group_by(PLT_CN, PROP_BASIS, CONDID, !!!grpSyms) %>%
     mutate(tD = ifelse(sum(tD, na.rm = TRUE) > 0, 1, 0)) %>%
-    ungroup()
+    ungroup() %>%
+    as.data.frame()
+
 
   ## Comprehensive indicator function
   data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp * data$tD
@@ -101,7 +109,8 @@ areaHelper2 <- function(x, popState, t, grpBy, method){
     summarize(aEst = unitMean(ESTN_METHOD, a, nh,  w, aStrat),
               aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, av, aStrat, aEst),
               N = dplyr::first(p2eu),
-              plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
+              plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE)) %>%
+    distinct()
 
   out <- list(tEst = tEst)
 
