@@ -270,7 +270,7 @@ dwmStarter <- function(x,
 
       # If INVYR is in YEAR, choose the estimates when INVYR == YEAR
       # Otherwise, choose the estimates produced with the most plots
-      tEst <- filterAnnual(tEst, grpBy, plotIn)
+      tEst <- filterAnnual(tEst, grpBy, plotIn, db$POP_ESTN_UNIT)
     }
 
 

@@ -500,26 +500,35 @@ If not already installed, you can install JAGS from SourceForge:
       betas$grps = 1
 
     }
+
+    ## Clean up names of betas
+    betas <- betas %>%
+      select(grps, alpha = int, rate, alpha_lower = lower_int, alpha_upper = upper_int,
+             rate_lower = lower_rate, rate_upper = upper_rate,
+             fixed_alpha = fe_int, fixed_rate = fe_rate,
+             fixed_alpha_lower = lower_fe_int, fixed_alpha_upper = upper_fe_int,
+             fixed_rate_lower = lower_fe_rate, fixed_rate_upper = upper_fe_rate,
+             n)
   }
 
 
   ## If groups are missing, assume the fixed effects
-  if ('fe_int' %in% names(betas)) {
+  if ('fixed_alpha' %in% names(betas)) {
     t <- t %>%
-      left_join(select(betas, c(grps, int, fe_int, fe_rate, rate)), by = 'grps') %>%
-      mutate(int = case_when(!is.na(int) ~ fe_int,
-                             TRUE ~ int),
-             rate = case_when(!is.na(rate) ~ fe_rate,
+      left_join(select(betas, c(grps, alpha, fixed_alpha, fixed_rate, rate)), by = 'grps') %>%
+      mutate(alpha = case_when(!is.na(alpha) ~ fixed_alpha,
+                             TRUE ~ alpha),
+             rate = case_when(!is.na(rate) ~ fixed_rate,
                              TRUE ~ rate)) %>%
       mutate(ba = BAA / TPA_UNADJ,
-             tmax = int * (ba^rate),
+             tmax = alpha * (ba^rate),
              rd = TPA_UNADJ / tmax)
   } else {
     ## Add the betas onto t
     t <- t %>%
-      left_join(select(betas, c(grps, int, rate)), by = 'grps') %>%
+      left_join(select(betas, c(grps, alpha, rate)), by = 'grps') %>%
       mutate(ba = BAA / TPA_UNADJ,
-             tmax = int * (ba^rate),
+             tmax = alpha * (ba^rate),
              rd = TPA_UNADJ / tmax)
   }
 
@@ -710,7 +719,7 @@ If not already installed, you can install JAGS from SourceForge:
 
       # If INVYR is in YEAR, choose the estimates when INVYR == YEAR
       # Otherwise, choose the estimates produced with the most plots
-      tEst <- filterAnnual(tEst, grpBy, plotIn_t)
+      tEst <- filterAnnual(tEst, grpBy, plotIn_t, db$POP_ESTN_UNIT)
 
     }
 
@@ -833,15 +842,6 @@ If not already installed, you can install JAGS from SourceForge:
   }
 
   if (returnBetas) {
-    ## Clean up names of betas
-    betas <- betas %>%
-      select(grps, alpha = int, rate, alpha_lower = lower_int, alpha_upper = upper_int,
-             rate_lower = lower_rate, rate_upper = upper_rate,
-             fixed_alpha = fe_int, fixed_rate = fe_rate,
-             fixed_alpha_lower = lower_fe_int, fixed_alpha_upper = upper_fe_int,
-             fixed_rate_lower = lower_fe_rate, fixed_rate_upper = upper_fe_rate,
-             n)
-
     tOut <- list(results = tOut, betas = betas)
   }
 

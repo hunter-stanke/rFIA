@@ -836,14 +836,15 @@ prettyNamesSF <- function (tOut, polys, byPlot, grpBy, grpByOrig, tNames, return
 }
 
 ## Choose annual panels to return
-filterAnnual <- function(x, grpBy, pltsVar) {
+filterAnnual <- function(x, grpBy, pltsVar, ESTN_UNIT) {
   pltquo <- rlang::enquo(pltsVar)
   x <- x %>%
+    left_join(distinct(select(ESTN_UNIT, CN, STATECD)), by = c('ESTN_UNIT_CN' = 'CN')) %>%
     mutate(nplts = !!pltquo) %>%
-    group_by(INVYR, .dots = grpBy) %>%
-    summarize(across(.cols = everything(),  sum, na.rm = TRUE)) %>%
+    group_by(STATECD, INVYR, .dots = grpBy[!c(grpBy %in% 'STATECD')]) %>%
+    summarize(across(.cols = everything(), sum, na.rm = TRUE)) %>%
     ## Keep these
-    group_by(INVYR) %>%
+    group_by(STATECD, INVYR) %>%
     mutate(keep = ifelse(INVYR %in% YEAR,
                          ifelse(YEAR == INVYR, 1, 0), ## When TRUE
                          ifelse(nplts == max(nplts, na.rm = TRUE), 1, 0))) %>% ## When INVYR not in YEAR, keep estimates from the inventory where panel has the most plots
@@ -853,7 +854,7 @@ filterAnnual <- function(x, grpBy, pltsVar) {
     ## then the estimate will be way too big, we fix this by taking the first row from each output group
     ## If the above worked it will have no effect. If the above failed, it will save our ass.
     mutate(YEAR = INVYR) %>%
-    group_by(.dots = grpBy) %>%
+    group_by(STATECD, .dots = grpBy[!c(grpBy %in% 'STATECD')]) %>%
     summarize(across(.cols = everything(), first)) %>%
     ungroup()
 

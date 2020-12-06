@@ -285,7 +285,7 @@ carbonStarter <- function(x,
 
       # If INVYR is in YEAR, choose the estimates when INVYR == YEAR
       # Otherwise, choose the estimates produced with the most plots
-      tEst <- filterAnnual(tEst, grpBy, plotIn_TREE)
+      tEst <- filterAnnual(tEst, grpBy, plotIn_TREE, db$POP_ESTN_UNIT)
 
 
 

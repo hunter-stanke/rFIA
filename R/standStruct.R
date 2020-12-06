@@ -266,7 +266,7 @@ standStructStarter <- function(x,
 
       # If INVYR is in YEAR, choose the estimates when INVYR == YEAR
       # Otherwise, choose the estimates produced with the most plots
-      tEst <- filterAnnual(tEst, grpBy, plotIn_AREA)
+      tEst <- filterAnnual(tEst, grpBy, plotIn_AREA, db$POP_ESTN_UNIT)
     }
 
     out <- list(tEst = tEst, grpBy = grpBy, grpByOrig = grpByOrig)

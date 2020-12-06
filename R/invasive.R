@@ -304,8 +304,8 @@ invasiveStarter <- function(x,
 
       # If INVYR is in YEAR, choose the estimates when INVYR == YEAR
       # Otherwise, choose the estimates produced with the most plots
-      aEst <- filterAnnual(aEst, aGrpBy, plotIn_AREA)
-      tEst <- filterAnnual(tEst, grpBy, plotIn_INV)
+      aEst <- filterAnnual(aEst, aGrpBy, plotIn_AREA, db$POP_ESTN_UNIT)
+      tEst <- filterAnnual(tEst, grpBy, plotIn_INV, db$POP_ESTN_UNIT)
 
 
     }
