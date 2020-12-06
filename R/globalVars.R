@@ -239,7 +239,7 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                            'propSampled', 'scale_colour_viridis_c', 'scale_colour_viridis_d',
                          'scale_fill_viridis_c', 'stratID', 'stratWgt', 'stratWgt_INVYR', 'tD', 'tT', 'theme',
                          'theme_bw', 'theme_minimal', 'transition_manual', 'unit', 'waiver', 'xlab', 'ylab',
-                         'lower_fe_int', 'lower_fe_rate', 'lower_int', 'lower_rate', 'upper_fe_int',
-                         'upper_fe_rate', 'upper_int', 'upper_rate', 'keep', 'nplts', 'p2eu_INVYR'
+                         'lower_fe_int', 'lower_fe_rate', 'lower_int', 'lower_rate', 'upper_fe_int', 'fixed_rate',
+                         'upper_fe_rate', 'upper_int', 'upper_rate', 'keep', 'nplts', 'p2eu_INVYR', 'fixed_alpha'
 
 ))
