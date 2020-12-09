@@ -229,7 +229,7 @@ areaStarter <- function(x,
     ## back to dataframes
     out <- unlist(out, recursive = FALSE)
     t <- bind_rows(out[names(out) == 't'])
-
+    a <- bind_rows(out[names(out) == 'a'])
 
     ## Adding YEAR to groups
     grpBy <- c('YEAR', grpBy)
@@ -240,10 +240,10 @@ areaStarter <- function(x,
     suppressWarnings({
       ## Compute estimates in parallel -- Clusters in windows, forking otherwise
       if (Sys.info()['sysname'] == 'Windows'){
-        out <- parLapply(cl, X = names(popState), fun = areaHelper2, popState, t, grpBy, method)
+        out <- parLapply(cl, X = names(popState), fun = areaHelper2, popState, t, a, grpBy, method)
         stopCluster(cl)
       } else { # Unix systems
-        out <- mclapply(names(popState), FUN = areaHelper2, popState, t, grpBy, method, mc.cores = nCores)
+        out <- mclapply(names(popState), FUN = areaHelper2, popState, t, a, grpBy, method, mc.cores = nCores)
       }
     })
     ## back to dataframes
@@ -275,8 +275,8 @@ areaStarter <- function(x,
       tEst <- tEst %>%
         left_join(select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN')) %>%
         left_join(wgts, by = joinCols) %>%
-        mutate(across(aEst, ~(.*wgt))) %>%
-        mutate(across(aVar, ~(.*(wgt^2)))) %>%
+        mutate(across(c(aEst, atEst), ~(.*wgt))) %>%
+        mutate(across(c(aVar, atVar), ~(.*(wgt^2)))) %>%
         group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
         summarize(across(aEst:plotIn_AREA, sum, na.rm = TRUE))
 
@@ -381,12 +381,18 @@ area <- function(db,
       tOut <- tTotal %>%
         #left_join(aTotal, by = grpBy) %>%
         # Renaming, computing ratios, and SE
-        mutate(AREA_TOTAL = aEst,
+        mutate(PERC_AREA = aEst / atEst * 100,
+               AREA_TOTAL = aEst,
                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL *100,
+
+               ## ratio variance
+               rVar = (1/atEst^2) * (aVar + (PERC_AREA^2 * atVar) - 2 * PERC_AREA * aCV),
+               PERC_AREA_SE = sqrt(rVar) / PERC_AREA * 100,
+               PERC_AREA_VAR = rVar,
                #N = sum(N),
                AREA_TOTAL_VAR = aVar,
                nPlots_AREA = plotIn_AREA) %>%
-        select(grpBy, AREA_TOTAL, AREA_TOTAL_SE, AREA_TOTAL_VAR, nPlots_AREA, N)
+        select(grpBy, PERC_AREA, AREA_TOTAL, PERC_AREA_SE, AREA_TOTAL_SE, PERC_AREA_VAR, AREA_TOTAL_VAR, nPlots_AREA, N)
     })
 
     # Snag the names
@@ -394,10 +400,10 @@ area <- function(db,
 
     if (variance) {
       tOut <- tOut %>%
-        select(-c(AREA_TOTAL_SE))
+        select(-c(AREA_TOTAL_SE, PERC_AREA_SE))
     } else {
       tOut <- tOut %>%
-        select(-c(AREA_TOTAL_VAR, N))
+        select(-c(AREA_TOTAL_VAR, PERC_AREA_VAR, N))
     }
 
   }

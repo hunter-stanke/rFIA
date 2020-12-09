@@ -22,6 +22,7 @@ areaHelper1 <- function(x, plts, db, grpBy, byPlot){
 
   ## Comprehensive indicator function
   data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp * data$tD
+  data$pDI <- data$landD * data$aD_p * data$aD_c
 
   if (byPlot){
 
@@ -40,6 +41,7 @@ areaHelper1 <- function(x, plts, db, grpBy, byPlot){
                 nCond = sum(aDI >  0, na.rm = TRUE)) %>%
       as.data.frame()
 
+    a = NULL
 
   } else {
 
@@ -56,16 +58,36 @@ areaHelper1 <- function(x, plts, db, grpBy, byPlot){
                 plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0)) %>%
       as.data.frame()
 
+    ## Total land area in areaDomain and landType, for proportions
+    a <- data %>%
+      distinct(PLT_CN, CONDID, .keep_all = TRUE) %>%
+      lazy_dt() %>%
+      group_by(PLT_CN, PROP_BASIS) %>%
+      summarize(fa = sum(CONDPROP_UNADJ * pDI, na.rm = TRUE)) %>%
+      as.data.frame()
+
+    ## If any grpBy are NA in t, then those plots need to be NA in a as well
+    ## to simplify interpretation of the proportions
+    naPlts <- t %>%
+      distinct(PLT_CN, !!!grpSyms) %>%
+      tidyr::drop_na() %>%
+      mutate(good = 1)
+    a <- a %>%
+      left_join(naPlts, by = 'PLT_CN') %>%
+      ## Make fa NA when grps are NA
+      mutate(fa = dplyr::case_when(good == 1 ~ fa,
+                                   TRUE ~ NA_real_)) %>%
+      select(-c(good))
   }
 
-  pltOut <- list(t = t)
+  pltOut <- list(t = t, a = a)
   return(pltOut)
 
 }
 
 
 
-areaHelper2 <- function(x, popState, t, grpBy, method){
+areaHelper2 <- function(x, popState, t, a, grpBy, method){
 
   ## DOES NOT MODIFY OUTSIDE ENVIRONMENT
   if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
@@ -75,10 +97,11 @@ areaHelper2 <- function(x, popState, t, grpBy, method){
     popState[[x]]$p2eu <- popState[[x]]$p2eu_INVYR
   }
 
-  grpSyms <- syms(grpBy)
+  aGrps <- grpBy[grpBy %in% c('YEAR', 'INVYR')]
+  aGrpSyms <- syms(aGrps)
 
-  ## Strata level estimates
-  tEst <- t %>%
+  ## Totals for proportions
+  aStrat <- a %>%
     lazy_dt() %>%
     ## Rejoin with population tables
     inner_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
@@ -93,24 +116,74 @@ areaHelper2 <- function(x, popState, t, grpBy, method){
         ## Otherwise, use the subpplot value
         PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
       fa = fa * aAdj) %>%
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, !!!aGrpSyms) %>%
+    summarize(nh = dplyr::first(P2POINTCNT),
+              atStrat = sum(fa, na.rm = TRUE),
+              a = dplyr::first(AREA_USED),
+              w = dplyr::first(P1POINTCNT) / dplyr::first(P1PNTCNT_EU),
+              p2eu = dplyr::first(p2eu),
+              atv = sum(fa^2, na.rm = TRUE)) %>%
+    mutate(atStrat = atStrat / nh, # Strata mean
+           atv = (atv - (nh * atStrat^2)) / (nh * (nh-1))) %>% # Strata variance
+    as.data.frame()
+  aEst <- aStrat %>%
+    ## Estimation unit
+    group_by(ESTN_UNIT_CN, !!!aGrpSyms) %>%
+    summarize(atEst = unitMean(ESTN_METHOD, a, nh,  w, atStrat),
+              atVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, atv, atStrat, atEst)) %>%
+    distinct()
+
+
+  grpSyms <- syms(grpBy)
+
+  ## Strata level estimates
+  tEst <- t %>%
+    lazy_dt() %>%
+    ## Rejoin with population tables
+    inner_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
+    ## For covariance
+    left_join(select(a, at = fa, PLT_CN), by = c('PLT_CN')) %>%
+    mutate(
+      ## AREA
+      aAdj = dplyr::case_when(
+        ## When NA, stay NA
+        is.na(PROP_BASIS) ~ NA_real_,
+        ## If the proportion was measured for a macroplot,
+        ## use the macroplot value
+        PROP_BASIS == 'MACR' ~ as.numeric(ADJ_FACTOR_MACR),
+        ## Otherwise, use the subpplot value
+        PROP_BASIS == 'SUBP' ~ ADJ_FACTOR_SUBP),
+      fa = fa * aAdj,
+      at = at * aAdj) %>%
+    left_join(select(aStrat, atStrat, atv, ESTN_UNIT_CN, STRATUM_CN, ESTN_METHOD, all_of(aGrps)),
+              by = c('ESTN_UNIT_CN', 'ESTN_METHOD', 'STRATUM_CN', aGrps)) %>%
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, !!!grpSyms) %>%
     summarize(nh = dplyr::first(P2POINTCNT),
               aStrat = sum(fa, na.rm = TRUE),
+              atStrat = dplyr::first(atStrat),
               plotIn_AREA = sum(plotIn, na.rm = TRUE),
               a = dplyr::first(AREA_USED),
               w = dplyr::first(P1POINTCNT) / dplyr::first(P1PNTCNT_EU),
               p2eu = dplyr::first(p2eu),
-              av = sum(fa^2, na.rm = TRUE)) %>%
+              av = sum(fa^2, na.rm = TRUE),
+              acv = sum(fa*at, na.rm = TRUE)) %>%
     mutate(aStrat = aStrat / nh, # Strata mean
-           av = (av - (nh * aStrat^2)) / (nh * (nh-1))) %>% # Strata variance
+           adj = nh * (nh-1),
+           av = (av - (nh * aStrat^2)) / adj,
+           acv = (acv - (nh * aStrat * atStrat)) / adj) %>% # Strata variance/covariance
     as.data.frame() %>%
+    left_join(select(aEst, ESTN_UNIT_CN, atEst, atVar, aGrps), by = c('ESTN_UNIT_CN', aGrps)) %>%
     ## Estimation unit
     group_by(ESTN_UNIT_CN, !!!grpSyms) %>%
     summarize(aEst = unitMean(ESTN_METHOD, a, nh,  w, aStrat),
+              atEst = dplyr::first(atEst),
+              atVar = dplyr::first(atVar),
               aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, av, aStrat, aEst),
+              aCV = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, acv, aStrat, aEst, atStrat, atEst),
               N = dplyr::first(p2eu),
               plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE)) %>%
     distinct()
+
 
   out <- list(tEst = tEst)
 
