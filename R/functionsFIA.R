@@ -844,7 +844,7 @@ filterAnnual <- function(x, grpBy, pltsVar, ESTN_UNIT) {
     group_by(STATECD, INVYR, .dots = grpBy[!c(grpBy %in% 'STATECD')]) %>%
     summarize(across(.cols = everything(), sum, na.rm = TRUE)) %>%
     ## Keep these
-    group_by(STATECD, INVYR) %>%
+    group_by(STATECD, INVYR, .dots = grpBy[!c(grpBy %in% 'STATECD')]) %>%
     mutate(keep = ifelse(INVYR %in% YEAR,
                          ifelse(YEAR == INVYR, 1, 0), ## When TRUE
                          ifelse(nplts == max(nplts, na.rm = TRUE), 1, 0))) %>% ## When INVYR not in YEAR, keep estimates from the inventory where panel has the most plots
