@@ -22,6 +22,8 @@ clipFIA <- function(db,
 
       db['designCD'] = list(designCD)
 
+      db['matchEval'] = list(matchEval)
+
       return(db)
     }
     stop('db must be of class "FIA.Database". Use readFIA() to load your FIA data.')
