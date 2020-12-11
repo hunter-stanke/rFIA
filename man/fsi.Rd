@@ -13,8 +13,8 @@ fsi(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
     landType = "forest", treeType = "live", method = "TI",
     lambda = 0.5, treeDomain = NULL, areaDomain = NULL,
     totals = TRUE, variance = TRUE, byPlot = FALSE,
-    useSeries = FALSE, scaleBy = NULL, betas = NULL,
-    returnBetas = FALSE, nCores = 1)
+    useSeries = FALSE, mostRecent = FALSE, scaleBy = NULL,
+    betas = NULL, returnBetas = FALSE, nCores = 1)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -49,6 +49,8 @@ fsi(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations instead of population estimates.}
 
   \item{useSeries}{logical; If TRUE, use multiple remeasurements to estimate annual change in relative density on each plot, when available.}
+
+  \item{mostRecent}{logical; If TRUE, only return results for the most recent inventory in each state. Only useful when \code{useSeries=TRUE}, as in this case, using \code{clipFIA} to select the most recent inventory will drop all but the most recent remeasurement.}
 
   \item{scaleBy}{variables from PLOT or COND tables to use as 'random effects' in model of size-density relationships. Multiple variables should be combined with \code{c()}.}
 
