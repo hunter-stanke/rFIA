@@ -93,7 +93,11 @@ arealSumPrep2 <- function(db, grpBy, polys, nCores){
     st_transform(crs = st_crs(polys))
 
   ## Crop the polygon to the bounding box of the FIA plots first
+<<<<<<< HEAD
   suppressWarnings({suppressMessages({
+=======
+  suppressWarnings({suppressMessage({
+>>>>>>> 8ea97991a7c0fcf69c8dc0fd57740ff8c4d0501e
     polys <- sf::st_crop(polys, st_bbox(pltSF))
   })})
 
