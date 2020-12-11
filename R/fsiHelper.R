@@ -296,13 +296,13 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, useSeries){
             mutate(fullRemp = sum(REMPER, na.rm = TRUE),
                    wgt = REMPER / fullRemp) %>%
             ungroup() %>%
-            select(PLT_CN, n, series, wgt)
+            select(PLT_CN, n, series, wgt, fullRemp)
 
           dat <- tEst %>%
             left_join(wgts, by = c('PLT_CN')) %>%
             filter(series <= nRems[i] & n >= nRems[i]) %>%
             lazy_dt() %>%
-            group_by(pltID, PLOT_BASIS, !!!grpSyms) %>%
+            group_by(pltID, PLOT_BASIS, fullRemp, !!!grpSyms) %>%
             summarize(FSI = sum(FSI*wgt, na.rm = TRUE),
                       CHNG_TPA = sum(CHNG_TPA*wgt, na.rm = TRUE),
                       CHNG_BA = sum(CHNG_BA*wgt, na.rm = TRUE),
@@ -314,6 +314,7 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, useSeries){
                       plotIn_t = if_else(any(plotIn_t > 0), 1, 0)) %>%
             ungroup() %>%
             select(-c(pltID)) %>%
+            rename(REMPER = fullRemp) %>%
             ungroup() %>%
             as.data.frame()
           remsList[[i]] <- dat
@@ -323,7 +324,7 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, useSeries){
 
         ## Update columns in tEst
         tEst <- tEst %>%
-          select(-c(CHNG_TPA:FSI)) %>%
+          select(-c(CHNG_TPA:FSI, REMPER)) %>%
           left_join(dat, by = c('PLT_CN', 'PLOT_BASIS', grpBy[!c(grpBy %in% c('YEAR', 'INVYR'))]))
     }
   }
@@ -352,9 +353,10 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, useSeries){
       PREV_TPA = PREV_TPA * tAdj,
       PREV_BA = PREV_BA * tAdj,
       PREV_RD = PREV_RD * tAdj,
+      REMPER = REMPER * tAdj,
       FSI = FSI * tAdj) %>%
     ## Extra step for variance issues - summing micro, subp, and macr components
-    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, !!!grpSyms) %>%
+    group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, REMPER, !!!grpSyms) %>%
     summarize(CHNG_TPA = sum(CHNG_TPA, na.rm = TRUE),
               CHNG_BA = sum(CHNG_BA, na.rm = TRUE),
               PREV_TPA = sum(PREV_TPA, na.rm = TRUE),
@@ -393,7 +395,9 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, useSeries){
               ra1Strat = sum(ra1, na.rm = TRUE),
               ra2Strat = sum(ra2, na.rm = TRUE),
               faStrat = sum(fa, na.rm = TRUE),
+              rempStrat = sum(REMPER, na.rm = TRUE),
               plotIn_t = sum(plotIn_t, na.rm = TRUE),
+
               # ## Strata level variances
               ctv = sum(CHNG_TPA^2, na.rm = TRUE),
               cbv = sum(CHNG_BA^2, na.rm = TRUE),
@@ -403,6 +407,7 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, useSeries){
               ra1v = sum(ra1^2, na.rm = TRUE),
               ra2v = sum(ra2^2, na.rm = TRUE),
               fav = sum(fa^2, na.rm = TRUE),
+              rempv = sum(REMPER^2, na.rm = TRUE),
 
               # Strata level covariances
               cvStrat_ct = sum(CHNG_TPA*PREV_TPA, na.rm = TRUE),
@@ -410,7 +415,8 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, useSeries){
               cvStrat_si = sum(si*fa, na.rm = TRUE),
               cvStrat_ra1 = sum(ra1*fa, na.rm = TRUE),
               cvStrat_ra2 = sum(ra2*fa, na.rm = TRUE),
-              cvStrat_psi = sum(si*ra1, na.rm = TRUE)) %>%
+              cvStrat_psi = sum(si*ra1, na.rm = TRUE),
+              cvStrat_remp = sum(REMPER * fa, na.rm = TRUE)) %>%
     mutate(ctStrat = ctStrat / nh,
            cbStrat = cbStrat / nh,
            ptStrat = ptStrat / nh,
@@ -419,6 +425,7 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, useSeries){
            ra1Strat = ra1Strat / nh,
            ra2Strat = ra2Strat / nh,
            faStrat = faStrat / nh,
+           rempStrat = rempStrat / nh,
            adj = nh * (nh-1),
            ctv = (ctv - (nh*ctStrat^2)) / adj,
            cbv = (cbv - (nh*cbStrat^2)) / adj,
@@ -428,12 +435,15 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, useSeries){
            ra1v = (ra1v - (nh*ra1Strat^2)) / adj,
            ra2v = (ra2v - (nh*ra2Strat^2)) / adj,
            fav = (fav - (nh*faStrat^2)) / adj,
+           rempv = (rempv - (nh*rempStrat^2)) / adj,
+
            cvStrat_ct = (cvStrat_ct - (nh * ctStrat * ptStrat)) / adj,
            cvStrat_cb = (cvStrat_cb - (nh * cbStrat * pbStrat)) / adj,
            cvStrat_si = (cvStrat_si - (nh * siStrat * faStrat)) / adj,
            cvStrat_ra1 = (cvStrat_ra1 - (nh * ra1Strat * faStrat)) / adj,
            cvStrat_ra2 = (cvStrat_ra2 - (nh * ra2Strat * faStrat)) / adj,
-           cvStrat_psi = (cvStrat_psi - (nh * siStrat * ra1Strat)) / adj) %>%
+           cvStrat_psi = (cvStrat_psi - (nh * siStrat * ra1Strat)) / adj,
+           cvStrat_remp = (cvStrat_remp - (nh * rempStrat * faStrat)) / adj) %>%
     as.data.frame() %>%
 
     ## Estimation unit
@@ -446,6 +456,8 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, useSeries){
               ra1Est = unitMean(ESTN_METHOD, a, nh, w, ra1Strat),
               ra2Est = unitMean(ESTN_METHOD, a, nh, w, ra2Strat),
               faEst = unitMean(ESTN_METHOD, a, nh, w, faStrat),
+              rempEst = unitMean(ESTN_METHOD, a, nh, w, rempStrat),
+
               p2eu = dplyr::first(p2eu),
               nh = dplyr::first(nh),
               # Estimation of unit variance
@@ -457,6 +469,7 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, useSeries){
               ra1Var = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, ra1v, ra1Strat, ra1Est),
               ra2Var = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, ra2v, ra2Strat, ra2Est),
               faVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, fav, faStrat, faEst),
+              rempVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, rempv, rempStrat, rempEst),
 
               ## Covariances
               cvEst_ct = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_ct, ctStrat, ctEst, ptStrat, ptEst),
@@ -465,6 +478,7 @@ fsiHelper2 <- function(x, popState, t, a, grpBy, scaleBy, method, useSeries){
               cvEst_ra1 = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_ra1, ra1Strat, ra1Est, faStrat, faEst),
               cvEst_ra2 = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_ra2, ra2Strat, ra2Est, faStrat, faEst),
               cvEst_psi = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_psi, siStrat, siEst, ra1Strat, ra1Est),
+              cvEst_remp = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_remp, rempStrat, rempEst, faStrat, faEst),
 
               plotIn_t = sum(plotIn_t, na.rm = TRUE)) %>%
     ungroup()

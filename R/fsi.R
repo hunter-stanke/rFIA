@@ -735,8 +735,8 @@ If not already installed, you can install JAGS from SourceForge:
       tEst <- tEst %>%
         left_join(select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN')) %>%
         left_join(wgts, by = joinCols) %>%
-        mutate(across(ctEst:faEst, ~(.*wgt))) %>%
-        mutate(across(ctVar:cvEst_psi, ~(.*(wgt^2)))) %>%
+        mutate(across(ctEst:rempEst, ~(.*wgt))) %>%
+        mutate(across(ctVar:cvEst_remp, ~(.*(wgt^2)))) %>%
         group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
         summarize(across(ctEst:plotIn_t, sum, na.rm = TRUE))
 
@@ -779,6 +779,7 @@ If not already installed, you can install JAGS from SourceForge:
                PERC_FSI = siEst / ra1Est,
                PREV_RD = ra1Est / faEst,
                CURR_RD = ra2Est / faEst,
+               REMPER = rempEst / faEst,
 
                ## Ratio variance
                ctVar = (1/ptEst^2) * (ctVar + (TPA_RATE^2 * ptVar) - (2 * TPA_RATE * cvEst_ct)),
@@ -787,6 +788,7 @@ If not already installed, you can install JAGS from SourceForge:
                siVar = (1/faEst^2) * (siVar + (FSI^2 * faVar) - (2 * FSI * cvEst_si)),
                ra1Var = (1/faEst^2) * (ra1Var + (PREV_RD^2 * faVar) - (2 * PREV_RD * cvEst_ra1)),
                ra2Var = (1/faEst^2) * (ra2Var + (CURR_RD^2 * faVar) - (2 * CURR_RD * cvEst_ra2)),
+               rempVar = (1/faEst^2) * (rempVar + (REMPER^2 * faVar) - (2 * REMPER * cvEst_remp)),
 
                ## Make it a percent
                PERC_FSI = PERC_FSI * 100,
@@ -800,6 +802,7 @@ If not already installed, you can install JAGS from SourceForge:
                BA_RATE_VAR = cbVar,
                PREV_RD_VAR = ra1Var,
                CURR_RD_VAR = ra2Var,
+               REMPER_VAR = rempVar,
 
                nPlots = plotIn_t,
                N = p2eu,
@@ -818,18 +821,18 @@ If not already installed, you can install JAGS from SourceForge:
       tOut <- tOut %>%
         select(grpBy, FSI, PERC_FSI, FSI_STATUS,
                FSI_INT, PERC_FSI_INT,
-               PREV_RD, CURR_RD, TPA_RATE, BA_RATE,
+               PREV_RD, CURR_RD, TPA_RATE, BA_RATE, REMPER,
                FSI_VAR, PERC_FSI_VAR, PREV_RD_VAR, CURR_RD_VAR,
-               TPA_RATE_VAR, BA_RATE_VAR,
+               TPA_RATE_VAR, BA_RATE_VAR, REMPER_VAR,
                nPlots, N)
 
     } else {
       tOut <- tOut %>%
         select(grpBy, FSI, PERC_FSI, FSI_STATUS,
                FSI_INT, PERC_FSI_INT,
-               PREV_RD, CURR_RD, TPA_RATE, BA_RATE,
+               PREV_RD, CURR_RD, TPA_RATE, BA_RATE, REMPER,
                FSI_VAR, PERC_FSI_VAR, PREV_RD_VAR, CURR_RD_VAR,
-               TPA_RATE_VAR, BA_RATE_VAR,
+               TPA_RATE_VAR, BA_RATE_VAR, REMPER_VAR,
                nPlots, N)
     }
 
