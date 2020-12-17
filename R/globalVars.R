@@ -245,6 +245,6 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'REMPER_VAR', 'cvEst_remp', 'cvStrat_remp', 'rempEst', 'rempStrat', 'rempVar', 'rempv',
                          'bio', 'MORT_TREE_TOTAL', 'MORT_TREE_TOTAL_SE', 'MORT_TREE_TOTAL_VAR',
                          'RECR_TREE_TOTAL', 'RECR_TREE_TOTAL_SE', 'RECR_TREE_TOTAL_VAR',
-                         'REMV_TREE_TOTAL', 'REMV_TREE_TOTAL_SE', 'REMV_TREE_TOTAL_VAR'
+                         'REMV_TREE_TOTAL', 'REMV_TREE_TOTAL_SE', 'REMV_TREE_TOTAL_VAR', 'aZero'
 
 ))
