@@ -485,16 +485,16 @@ growMort <- function(db,
         left_join(aTotal, by = aGrpBy) %>%
         # Renaming, computing ratios, and SE
         mutate(TREE_TOTAL = tEst,
-               RECR_TOTAL = rEst,
-               MORT_TOTAL = mEst,
-               REMV_TOTAL = hEst,
+               RECR_TREE_TOTAL = rEst,
+               MORT_TREE_TOTAL = mEst,
+               REMV_TREE_TOTAL = hEst,
                AREA_TOTAL = aEst,
-               RECR_TPA = RECR_TOTAL / AREA_TOTAL,
-               MORT_TPA = MORT_TOTAL / AREA_TOTAL,
-               REMV_TPA = REMV_TOTAL / AREA_TOTAL,
-               RECR_PERC = RECR_TOTAL / TREE_TOTAL * 100,
-               MORT_PERC = MORT_TOTAL / TREE_TOTAL * 100,
-               REMV_PERC = REMV_TOTAL / TREE_TOTAL * 100,
+               RECR_TPA = RECR_TREE_TOTAL / AREA_TOTAL,
+               MORT_TPA = MORT_TREE_TOTAL / AREA_TOTAL,
+               REMV_TPA = REMV_TREE_TOTAL / AREA_TOTAL,
+               RECR_PERC = RECR_TREE_TOTAL / TREE_TOTAL * 100,
+               MORT_PERC = MORT_TREE_TOTAL / TREE_TOTAL * 100,
+               REMV_PERC = REMV_TREE_TOTAL / TREE_TOTAL * 100,
                ## Ratio Var
                raVar = (1/AREA_TOTAL^2) * (rVar + (RECR_TPA^2 * aVar) - 2 * RECR_TPA * cvEst_r),
                maVar = (1/AREA_TOTAL^2) * (mVar + (MORT_TPA^2 * aVar) - 2 * MORT_TPA * cvEst_m),
@@ -519,15 +519,15 @@ growMort <- function(db,
                ## SE TOTAL
                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL *100,
                TREE_TOTAL_SE = sqrt(tVar) / TREE_TOTAL *100,
-               RECR_TOTAL_SE = sqrt(rVar) / RECR_TOTAL *100,
-               MORT_TOTAL_SE = sqrt(mVar) / MORT_TOTAL *100,
-               REMV_TOTAL_SE = sqrt(hVar) / REMV_TOTAL *100,
+               RECR_TREE_TOTAL_SE = sqrt(rVar) / RECR_TREE_TOTAL *100,
+               MORT_TREE_TOTAL_SE = sqrt(mVar) / MORT_TREE_TOTAL *100,
+               REMV_TREE_TOTAL_SE = sqrt(hVar) / REMV_TREE_TOTAL *100,
                ## VAR TOTAL
                AREA_TOTAL_VAR = aVar,
                TREE_TOTAL_VAR = tVar,
-               RECR_TOTAL_VAR = rVar,
-               MORT_TOTAL_VAR = mVar,
-               REMV_TOTAL_VAR = hVar,
+               RECR_TREE_TOTAL_VAR = rVar,
+               MORT_TREE_TOTAL_VAR = mVar,
+               REMV_TREE_TOTAL_VAR = hVar,
                ## nPlots
                # Non-zero plots
                nPlots_TREE = plotIn_t,
@@ -542,16 +542,16 @@ growMort <- function(db,
       if (variance){
         tOut <- tOut %>%
           select(grpBy, RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC,
-                 TREE_TOTAL, RECR_TOTAL, MORT_TOTAL, REMV_TOTAL, AREA_TOTAL,
+                 TREE_TOTAL, RECR_TREE_TOTAL, MORT_TREE_TOTAL, REMV_TREE_TOTAL, AREA_TOTAL,
                  RECR_TPA_VAR, MORT_TPA_VAR, REMV_TPA_VAR, RECR_PERC_VAR, MORT_PERC_VAR, REMV_PERC_VAR,
-                 TREE_TOTAL_VAR, RECR_TOTAL_VAR, MORT_TOTAL_VAR, REMV_TOTAL_VAR, AREA_TOTAL_VAR,
+                 TREE_TOTAL_VAR, RECR_TREE_TOTAL_VAR, MORT_TREE_TOTAL_VAR, REMV_TREE_TOTAL_VAR, AREA_TOTAL_VAR,
                  nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV, nPlots_AREA, N)
       } else {
         tOut <- tOut %>%
           select(grpBy, RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC,
-                 TREE_TOTAL, RECR_TOTAL, MORT_TOTAL, REMV_TOTAL, AREA_TOTAL,
+                 TREE_TOTAL, RECR_TREE_TOTAL, MORT_TREE_TOTAL, REMV_TREE_TOTAL, AREA_TOTAL,
                  RECR_TPA_SE, MORT_TPA_SE, REMV_TPA_SE, RECR_PERC_SE, MORT_PERC_SE, REMV_PERC_SE,
-                 TREE_TOTAL_SE, RECR_TOTAL_SE, MORT_TOTAL_SE, REMV_TOTAL_SE, AREA_TOTAL_SE,
+                 TREE_TOTAL_SE, RECR_TREE_TOTAL_SE, MORT_TREE_TOTAL_SE, REMV_TREE_TOTAL_SE, AREA_TOTAL_SE,
                  nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV, nPlots_AREA)
       }
 
@@ -578,7 +578,10 @@ growMort <- function(db,
   }
 
   ## Modify some names if a different state variable was given
-  if (stateVar != 'TPA') names(tOut) <- str_replace(names(tOut), 'TPA', paste(stateVar, 'ACRE', sep = '_'))
+  if (stateVar != 'TPA') {
+    names(tOut) <- str_replace(names(tOut), 'TPA', paste(stateVar, 'ACRE', sep = '_'))
+    names(tOut) <- str_replace(names(tOut), 'TREE', ifelse(stateVar == 'BAA', 'BA', stateVar))
+  }
   names(tOut) <- str_replace(names(tOut), 'BAA_ACRE', 'BAA')
 
   # Snag the names

@@ -243,6 +243,8 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'upper_fe_rate', 'upper_int', 'upper_rate', 'keep', 'nplts', 'p2eu_INVYR', 'fixed_alpha',
                          'PERC_AREA_VAR', 'aCV', 'acv', 'at', 'atEst', 'atStrat', 'atVar', 'atv', 'good',
                          'REMPER_VAR', 'cvEst_remp', 'cvStrat_remp', 'rempEst', 'rempStrat', 'rempVar', 'rempv',
-                         'bio'
+                         'bio', 'MORT_TREE_TOTAL', 'MORT_TREE_TOTAL_SE', 'MORT_TREE_TOTAL_VAR',
+                         'RECR_TREE_TOTAL', 'RECR_TREE_TOTAL_SE', 'RECR_TREE_TOTAL_VAR',
+                         'REMV_TREE_TOTAL', 'REMV_TREE_TOTAL_SE', 'REMV_TREE_TOTAL_VAR'
 
 ))
