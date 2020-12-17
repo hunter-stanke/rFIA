@@ -121,6 +121,9 @@ growMortStarter <- function(x,
   } else if (str_to_upper(stateVar) == 'NETVOL'){
     db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$VOLCFNET
     db$TREE$state_recr <- db$TREE$VOLCFNET
+  } else if (str_to_upper(stateVar) == 'SNDVOL'){
+    db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$VOLCFSND
+    db$TREE$state_recr <- db$TREE$VOLCFSND
   } else if (str_to_upper(stateVar) == 'BIO_AG'){
     db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$DRYBIO_AG
     db$TREE$state_recr <- db$TREE$DRYBIO_AG
