@@ -11,6 +11,7 @@ acStarter <- function(x,
                       areaDomain = NULL,
                       totals = FALSE,
                       byPlot = FALSE,
+                      chngType = 'net',
                       nCores = 1,
                       remote,
                       mr){
@@ -90,6 +91,21 @@ acStarter <- function(x,
                                   db$COND$SITECLCD,
                                   db$COND$RESERVCD)
 
+  ## Make land status a grouping variable if estimating change components
+  if (chngType == 'component') {
+    grpBy <- c('STATUS', grpBy)
+
+    if (landType == 'forest') {
+      db$COND <- db$COND %>%
+        mutate(STATUS = case_when(landD == 1 ~ 'Forest',
+                                  TRUE ~ 'Non-forest'))
+    } else {
+      db$COND <- db$COND %>%
+        mutate(STATUS = case_when(landD == 1 ~ 'Timber',
+                                  TRUE ~ 'Non-timber'))
+    }
+  }
+
   ## Spatial boundary
   if(!is.null(polys)){
     db$PLOT$sp <- ifelse(!is.na(db$PLOT$polyID), 1, 0)
@@ -102,7 +118,6 @@ acStarter <- function(x,
 
   # User defined domain indicator for tree (ex. trees > 20 ft tall)
   db <- udTreeDomain(db, treeDomain)
-
 
 
 
@@ -197,12 +212,13 @@ acStarter <- function(x,
       })
       out <- parLapply(cl, X = names(plts), fun = acHelper1, plts,
                        db[names(db) %in% c('COND', 'TREE', 'SUBP_COND_CHNG_MTRX')],
-                       grpBy, byPlot, keepThese)
+                       grpBy, byPlot, keepThese, chngType, areaDomain, treeDomain)
       #stopCluster(cl) # Keep the cluster active for the next run
     } else { # Unix systems
       out <- mclapply(names(plts), FUN = acHelper1, plts,
                       db[names(db) %in% c('COND', 'TREE', 'SUBP_COND_CHNG_MTRX')],
-                      grpBy, byPlot, keepThese, mc.cores = nCores)
+                      grpBy, byPlot, keepThese, chngType, areaDomain, treeDomain,
+                      mc.cores = nCores)
     }
   })
 
@@ -232,6 +248,7 @@ acStarter <- function(x,
     ## back to dataframes
     out <- unlist(out, recursive = FALSE)
     t <- bind_rows(out[names(out) == 't'])
+    grpBy <- out[names(out) == 'grpBy'][[1]]
 
     ## Adding YEAR to groups
     grpBy <- c('YEAR', grpBy)
@@ -317,6 +334,7 @@ areaChange <- function (db,
                         totals = FALSE,
                         variance = FALSE,
                         byPlot = FALSE,
+                        chngType = 'net',
                         nCores = 1) {
 
   ##  don't have to change original code
@@ -341,7 +359,7 @@ areaChange <- function (db,
                 grpBy_quo = grpBy_quo, polys, returnSpatial,
                 byLandType, landType, method,
                 lambda, treeDomain, areaDomain,
-                totals, byPlot, nCores, remote, mr)
+                totals, byPlot, chngType, nCores, remote, mr)
   ## Bring the results back
   out <- unlist(out, recursive = FALSE)
   tEst <- bind_rows(out[names(out) == 'tEst'])
@@ -376,52 +394,92 @@ areaChange <- function (db,
       summarize_all(sum,na.rm = TRUE)
 
 
-    suppressWarnings({
-      ## Bring them together
-      tOut <- tTotal %>%
-        #left_join(aTotal, by = grpBy) %>%
-        # Renaming, computing ratios, and SE
-        mutate(PERC_CHNG = cEst / pEst * 100,
-               AREA_CHNG = cEst,
-               PREV_AREA = pEst,
+    if (chngType == 'net') {
+      suppressWarnings({
+        ## Bring them together
+        tOut <- tTotal %>%
+          #left_join(aTotal, by = grpBy) %>%
+          # Renaming, computing ratios, and SE
+          mutate(PERC_CHNG = cEst / pEst * 100,
+                 AREA_CHNG = cEst,
+                 PREV_AREA = pEst,
 
-               AREA_CHNG_SE = sqrt(cVar) / abs(AREA_CHNG) *100,
-               PREV_AREA_SE = sqrt(pVar) / PREV_AREA *100,
+                 AREA_CHNG_SE = sqrt(cVar) / abs(AREA_CHNG) *100,
+                 PREV_AREA_SE = sqrt(pVar) / PREV_AREA *100,
 
-               ## ratio variance
-               rVar = (1/pEst^2) * (cVar + (PERC_CHNG^2 * pVar) - 2 * PERC_CHNG * cCV),
-               PERC_CHNG_SE = sqrt(rVar) / abs(PERC_CHNG) * 100,
-               PERC_CHNG_VAR = rVar,
-               #N = sum(N),
-               AREA_CHNG_VAR = cVar,
-               PREV_AREA_VAR = pVar,
-               nPlots_AREA = plotIn_AREA) %>%
-        select(grpBy, PERC_CHNG, AREA_CHNG, PREV_AREA,
-               PERC_CHNG_SE, AREA_CHNG_SE, PREV_AREA_SE,
-               PERC_CHNG_VAR, AREA_CHNG_VAR, PREV_AREA_VAR,
-               nPlots_AREA, N)
-    })
+                 ## ratio variance
+                 rVar = (1/pEst^2) * (cVar + (PERC_CHNG^2 * pVar) - 2 * PERC_CHNG * cCV),
+                 PERC_CHNG_SE = sqrt(rVar) / abs(PERC_CHNG) * 100,
+                 PERC_CHNG_VAR = rVar,
+                 #N = sum(N),
+                 AREA_CHNG_VAR = cVar,
+                 PREV_AREA_VAR = pVar,
+                 nPlots_AREA = plotIn_AREA) %>%
+          select(grpBy, PERC_CHNG, AREA_CHNG, PREV_AREA,
+                 PERC_CHNG_SE, AREA_CHNG_SE, PREV_AREA_SE,
+                 PERC_CHNG_VAR, AREA_CHNG_VAR, PREV_AREA_VAR,
+                 nPlots_AREA, N)
+      })
 
-    # Snag the names
-    tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
+      # Snag the names
+      tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
 
-    if (variance) {
+      if (variance) {
+        tOut <- tOut %>%
+          select(-c(PERC_CHNG_SE, AREA_CHNG_SE, PREV_AREA_SE))
+      } else {
+        tOut <- tOut %>%
+          select(-c(PERC_CHNG_VAR, AREA_CHNG_VAR, PREV_AREA_VAR, N))
+      }
+
+      ## Pretty output
       tOut <- tOut %>%
-        select(-c(PERC_CHNG_SE, AREA_CHNG_SE, PREV_AREA_SE))
+        ungroup() %>%
+        mutate_if(is.factor, as.character) %>%
+        drop_na(grpBy) %>%
+        arrange(YEAR) %>%
+        as_tibble()
+
+
+    ## Change by component
     } else {
-      tOut <- tOut %>%
-        select(-c(PERC_CHNG_VAR, AREA_CHNG_VAR, PREV_AREA_VAR, N))
+      suppressWarnings({
+        ## Bring them together
+        tOut <- tTotal %>%
+          filter(cEst > 0) %>%
+          mutate(AREA_CHNG = cEst,
+                 AREA_CHNG_SE = sqrt(cVar) / abs(AREA_CHNG) *100,
+                 AREA_CHNG_VAR = cVar,
+                 nPlots_AREA = plotIn_AREA) %>%
+          select(grpBy, AREA_CHNG,
+                 AREA_CHNG_SE,
+                 AREA_CHNG_VAR,
+                 nPlots_AREA, N)
+      })
+
+      # Snag the names
+      tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
+
+      if (variance) {
+        tOut <- tOut %>%
+          select(-c(AREA_CHNG_SE))
+      } else {
+        tOut <- tOut %>%
+          select(-c(AREA_CHNG_VAR, N))
+      }
     }
+
+    ## Pretty output
+    tOut <- tOut %>%
+      ungroup() %>%
+      mutate_if(is.factor, as.character) %>%
+      arrange(YEAR) %>%
+      as_tibble()
+
 
   }
 
-  ## Pretty output
-  tOut <- tOut %>%
-    ungroup() %>%
-    mutate_if(is.factor, as.character) %>%
-    drop_na(grpBy) %>%
-    arrange(YEAR) %>%
-    as_tibble()
+
 
 
 

@@ -3,8 +3,8 @@
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{Estimate land area change from the FIADB}
 \description{
-\lifecycle{maturing}
-Produces estimates of net annual change in land area (acreage) from FIA data. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by species, size class, and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. grpBy = STATECD). }
+\lifecycle{experimental}
+Produces estimates of annual net and component change in land area (acreage) from FIA data. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by species, size class, and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. grpBy = STATECD). }
 
 
 \usage{
@@ -12,7 +12,7 @@ areaChange(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
            byLandType = FALSE, landType = "forest", method = "TI",
            lambda = 0.5, treeDomain = NULL, areaDomain = NULL,
            totals = FALSE, variance = FALSE, byPlot = FALSE,
-           nCores = 1)
+           chngType = 'net', nCores = 1)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -42,6 +42,8 @@ areaChange(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations instead of population estimates.}
 
+  \item{chngType}{character, one of "net" or "component"; if "net", produce estimates of net change in land area, and if "component", produce estimates of component change in land area (i.e., showing all shifts across classified attributes).}
+
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }
 
@@ -49,7 +51,9 @@ areaChange(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
 \details{
 \strong{Estimation Details}
 
-Estimation of forest variables follows the procedures documented in Bechtold and Patterson (2005) and \href{https://www.fs.fed.us/nrs/pubs/jrnl/2020/nrs_2020_stanke_001.pdf}{Stanke et al 2020}. Estimates returned are in terms of \emph{net} annual change in land area, including reversion and diversion components.
+Estimation of forest variables follows the procedures documented in Bechtold and Patterson (2005) and \href{https://www.fs.fed.us/nrs/pubs/jrnl/2020/nrs_2020_stanke_001.pdf}{Stanke et al 2020}.
+
+Estimates are returned in terms of \emph{net} annual change in land area by default, however users may choose to estimate components of land area change by setting \code{chngType = 'component'}. For example, imagine we are interested in estimating the change in forestland area across a region. During our sampling period, 4000 acres of forestland was \emph{diverted} to non-forest and an additional 6000 acres of non-forest \emph{reverted} to forestland. rFIA considers these shifts in land classifications change \emph{components}, and hence these point estimates would be returned when \code{chngType = 'component'}. However, we are often intereseted in \emph{net} change in land area, rather than individual components. Here net change in forestland area is +2000 acres (6000-4000) and represents the net result of diversion and reversion processes in the region over our study period.
 
 Users may specify alternatives to the 'Temporally Indifferent' estimator using the \code{method} argument. Alternative design-based estimators include the annual estimator ("ANNUAL"; annual panels, or estimates from plots measured in the same year), simple moving average ("SMA"; combines annual panels with equal weight), linear moving average ("LMA"; combine annual panels with weights that decay \emph{linearly} with time since measurement), and exponential moving average ("EMA"; combine annual panels with weights that decay \emph{exponentially} with time since measurement). The "best" estimator depends entirely on user-objectives, see \href{https://www.fs.fed.us/nrs/pubs/jrnl/2020/nrs_2020_stanke_001.pdf}{Stanke et al 2020} for a complete description of these estimators and tradeoffs between precision and temporal specificity.
 
@@ -83,6 +87,8 @@ Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}
       \item{\strong{PREV_AREA}: estimate of total land area within domain of interest at first measurement (acres)}
       \item{\strong{nPlots}: number of non-zero plots used to compute area change estimates}
       }
+
+Importantly, when \code{chngType = 'component'}, individual change components will be returned. If no grouping variables are specified in \code{grpBy}, results will be grouped by variables named \strong{STATUS1} and \strong{STATUS2}, indicating the land classification at first and second measurements, respectively. Otherwise, if \code{grpBy} is specified, change components will be estimated for all shifts in land area across classified attributes represented by the variables (first and second measurements again denoted by the suffix 1 and 2).
 }
 
 \references{

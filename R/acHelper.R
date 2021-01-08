@@ -1,4 +1,5 @@
-acHelper1 <- function(x, plts, db, grpBy, byPlot, keepThese) {
+acHelper1 <- function(x, plts, db, grpBy, byPlot, keepThese, chngType,
+                      areaDomain, treeDomain) {
 
   ## Selecting the plots for one county
   db$PLOT <- plts[[x]]
@@ -30,6 +31,13 @@ acHelper1 <- function(x, plts, db, grpBy, byPlot, keepThese) {
     as.data.frame()
 
 
+  ## Current and previous groups
+  grp1 <- if (length(grpBy) > 0 ) { paste0(grpBy, '1') } else { character(0) }
+  grp2 <- if (length(grpBy) > 0 ) { paste0(grpBy, '2') } else { character(0) }
+  grp1Syms <- syms(grp1)
+  grp2Syms <- syms(grp2)
+
+
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   data <- db$PLOT %>%
     filter(PLT_CN %in% keepThese$PLT_CN) %>%
@@ -55,31 +63,68 @@ acHelper1 <- function(x, plts, db, grpBy, byPlot, keepThese) {
     mutate(dropThese = case_when(macro == 1 & SUBPTYP == 1 ~ 0,
                                  TRUE ~ 1)) %>%
     filter(dropThese == 1) %>%
-    select(-c(dropThese)) %>%
-    # Clean up domain indicator and drop unnecessary cols
-    mutate(tDI1 = landD1 * aD_c1 * sp1 * aD_p1 * tD1,
-           tDI2 = landD2 * aD_c2 * sp2 * aD_p2 * tD2) %>%
-    select(PLT_CN, REMPER, SUBP, MEASYEAR, PLOT_STATUS_CD, PROP_BASIS,
-           tDI1, tDI2,
-           ifelse(length(grpP) > 0, all_of(paste0(grpP, '1')), 'PLT_CN'), # If none, cheat and return nothing
-           ifelse(length(grpP) > 0, all_of(paste0(grpP, '2')), 'PLT_CN'), # If none, cheat and return nothing
-           ifelse(length(grpC) > 0, all_of(paste0(grpC, '1')), 'PLT_CN'), # If none, cheat and return nothing
-           ifelse(length(grpC) > 0, all_of(paste0(grpC, '2')), 'PLT_CN'), # If none, cheat and return nothing
-           CONDID1, CONDID2,
-           SUBPTYP_PROP_CHNG) %>%
-    pivot_longer(cols = tDI1:CONDID2,
-                 names_to = c(".value", 'ONEORTWO'),
-                 names_sep = -1) %>%
-    #distinct() %>%
-    ## Adjust for subplot, negate previous values, and apply domain indicator
-    mutate(PREV_CONDPROP = case_when(ONEORTWO == 1 ~ SUBPTYP_PROP_CHNG * tDI / 4,
-                                     TRUE ~ 0),
-           CONDPROP_CHNG = case_when(ONEORTWO == 1 ~ -SUBPTYP_PROP_CHNG * tDI / 4 / REMPER,
-                                         TRUE ~ SUBPTYP_PROP_CHNG * tDI / 4 / REMPER))
+    select(-c(dropThese))
 
 
 
 
+
+  # Use growth accounting for net change
+  if (chngType == 'net') {
+
+    data <- data %>%
+      # Clean up domain indicator and drop unnecessary cols
+      mutate(tDI1 = landD1 * aD_c1 * sp1 * aD_p1 * tD1,
+             tDI2 = landD2 * aD_c2 * sp2 * aD_p2 * tD2) %>%
+      select(PLT_CN, REMPER, SUBP, MEASYEAR, PLOT_STATUS_CD, PROP_BASIS,
+             tDI1, tDI2, all_of(grp1), all_of(grp2),
+             CONDID1, CONDID2,
+             SUBPTYP_PROP_CHNG) %>%
+      pivot_longer(cols = tDI1:CONDID2,
+                   names_to = c(".value", 'ONEORTWO'),
+                   names_sep = -1) %>%
+      ## Adjust for subplot, negate previous values, and apply domain indicator
+      mutate(PREV_CONDPROP = case_when(ONEORTWO == 1 ~ SUBPTYP_PROP_CHNG * tDI / 4,
+                                       TRUE ~ 0),
+             CONDPROP_CHNG = case_when(ONEORTWO == 1 ~ -SUBPTYP_PROP_CHNG * tDI / 4 / REMPER,
+                                       TRUE ~ SUBPTYP_PROP_CHNG * tDI / 4 / REMPER))
+
+
+  ## Change by component
+  } else {
+
+    data <- data %>%
+      # Clean up domain indicator and drop unnecessary cols
+      mutate(TREE_DOMAIN1 = tD1,
+             TREE_DOMAIN2 = tD2,
+             AREA_DOMAIN1 = landD1 * aD_c1 * sp1 * aD_p1,
+             AREA_DOMAIN2 = landD2 * aD_c2 * sp2 * aD_p2) %>%
+      select(PLT_CN, REMPER, SUBP, MEASYEAR, PLOT_STATUS_CD, PROP_BASIS,
+             TREE_DOMAIN1, TREE_DOMAIN2, AREA_DOMAIN1, AREA_DOMAIN2,
+             all_of(grp1), all_of(grp2),
+             CONDID1, CONDID2,
+             SUBPTYP_PROP_CHNG) %>%
+      ## Did the groups change? If so, track them and drop the rest
+      mutate(chng = case_when(paste(TREE_DOMAIN1, AREA_DOMAIN1, !!!grp1Syms) != paste(TREE_DOMAIN2, AREA_DOMAIN2, !!!grp2Syms) ~ 1,
+                              TRUE ~ 0)) %>%
+      ## Adjust for subplot, negate previous values, and apply domain indicator
+      mutate(tDI1 = TREE_DOMAIN1 * AREA_DOMAIN1,
+             tDI2 = TREE_DOMAIN2 * AREA_DOMAIN2,
+             tDI = ifelse(tDI1 + tDI2 > 0, 1, 0), # for nPlots
+             PREV_CONDPROP = SUBPTYP_PROP_CHNG * tDI / 4,
+             CONDPROP_CHNG = case_when(chng == 1 ~ SUBPTYP_PROP_CHNG / 4 / REMPER,
+                                       TRUE ~ 0))
+
+    ## Update grpBy
+    grpBy = sort(c(grp1, grp2))
+
+    if (quo_name(treeDomain) != 'NULL') grpBy <- c('TREE_DOMAIN1', 'TREE_DOMAIN2', grpBy)
+    if (quo_name(areaDomain) != 'NULL') grpBy <- c('AREA_DOMAIN1', 'AREA_DOMAIN2', grpBy)
+
+
+  }
+
+  ## Summarize
   if (byPlot){
 
     grpBy <- c('YEAR', grpBy, 'PLOT_STATUS_CD')
@@ -89,8 +134,7 @@ acHelper1 <- function(x, plts, db, grpBy, byPlot, keepThese) {
       mutate(YEAR = MEASYEAR) %>%
       lazy_dt() %>%
       group_by(!!!grpSyms, PLT_CN, REMPER) %>%
-      summarize(PROP_CHNG = sum(CONDPROP_CHNG, na.rm = TRUE) * 100,
-                nCond = length(unique(CONDID[tDI == 1]))) %>%
+      summarize(PROP_CHNG = sum(CONDPROP_CHNG, na.rm = TRUE) * 100) %>%
       as.data.frame()
 
 
@@ -106,22 +150,12 @@ acHelper1 <- function(x, plts, db, grpBy, byPlot, keepThese) {
                 prev = sum(PREV_CONDPROP, na.rm = TRUE),
                 plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0)) %>%
       as.data.frame()
-
-    # t <- data %>%
-    #   lazy_dt() %>%
-    #   distinct(PLT_CN, ONEORTWO, CONDID, .keep_all = TRUE) %>%
-    #   group_by(PLT_CN, REMPER, PROP_BASIS, !!!grpSyms) %>%
-    #   summarize(ac = sum(CONDPROP_UNADJ, na.rm = TRUE),
-    #             prev = sum(-CONDPROP_UNADJ[ONEORTWO == 1], na.rm = TRUE),
-    #             plotIn = ifelse(sum(tDI >  0, na.rm = TRUE), 1,0)) %>%
-    #   mutate(ac = ac / REMPER) %>%
-    #   as.data.frame()
-
-
   }
 
 
-  pltOut <- list(t = t)
+
+
+  pltOut <- list(t = t, grpBy = grpBy)
   return(pltOut)
 
 

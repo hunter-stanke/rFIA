@@ -249,6 +249,7 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'dropThese', 'landD1', 'landD2', 'sp1', 'sp2', 'tD1', 'tD2',
                          'bio', 'MORT_TREE_TOTAL', 'MORT_TREE_TOTAL_SE', 'MORT_TREE_TOTAL_VAR',
                          'RECR_TREE_TOTAL', 'RECR_TREE_TOTAL_SE', 'RECR_TREE_TOTAL_VAR',
-                         'REMV_TREE_TOTAL', 'REMV_TREE_TOTAL_SE', 'REMV_TREE_TOTAL_VAR', 'aZero', 'macro'
+                         'REMV_TREE_TOTAL', 'REMV_TREE_TOTAL_SE', 'REMV_TREE_TOTAL_VAR', 'aZero', 'macro',
+                         'AREA_DOMAIN1', 'AREA_DOMAIN2', 'TREE_DOMAIN1', 'TREE_DOMAIN2'
 
 ))
