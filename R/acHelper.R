@@ -45,9 +45,14 @@ acHelper1 <- function(x, plts, db, grpBy, byPlot, keepThese) {
     ## Don't want to drop non-treed forestland
     mutate(tD1 = replace_na(tD1, treeD),
            tD2 = replace_na(tD2, treeD)) %>%
-    ## Drop these proportions, wrong plot basis
-    mutate(dropThese = case_when(PROP_BASIS == 'SUBP' & SUBPTYP == 1 ~ 0,
-                                 PROP_BASIS == 'MACR' & SUBPTYP == 3 ~ 0,
+    ## Drop all microplot proportions
+    filter(SUBPTYP != 2) %>%
+    ## Check if macroplot is available
+    group_by(PLT_CN) %>%
+    mutate(macro = ifelse(3 %in% unique(SUBPTYP), 1, 0)) %>%
+    ungroup() %>%
+    ## If so, drop the subplot entries
+    mutate(dropThese = case_when(macro == 1 & SUBPTYP == 1 ~ 0,
                                  TRUE ~ 1)) %>%
     filter(dropThese == 1) %>%
     select(-c(dropThese)) %>%
