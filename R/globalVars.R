@@ -242,6 +242,10 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'lower_fe_int', 'lower_fe_rate', 'lower_int', 'lower_rate', 'upper_fe_int', 'fixed_rate',
                          'upper_fe_rate', 'upper_int', 'upper_rate', 'keep', 'nplts', 'p2eu_INVYR', 'fixed_alpha',
                          'PERC_AREA_VAR', 'aCV', 'acv', 'at', 'atEst', 'atStrat', 'atVar', 'atv', 'good',
-                         'REMPER_VAR', 'cvEst_remp', 'cvStrat_remp', 'rempEst', 'rempStrat', 'rempVar', 'rempv'
+                         'REMPER_VAR', 'cvEst_remp', 'cvStrat_remp', 'rempEst', 'rempStrat', 'rempVar', 'rempv',
+                         'AREA_CHNG', 'AREA_CHNG_SE', 'AREA_CHNG_VAR', 'CONDID1', 'CONDID2', 'CONDPROP_CHNG',
+                         'PERC_CHNG', 'PERC_CHNG_SE', 'PERC_CHNG_VAR', 'PREV_AREA', 'PREV_AREA_SE',
+                         'PREV_AREA_VAR', 'PREV_CONDPROP', 'aD_c1', 'aD_c2', 'aD_p1', 'aD_p2', 'ac', 'cov_cv',
+                         'dropThese', 'landD1', 'landD2', 'sp1', 'sp2', 'tD1', 'tD2'
 
 ))
