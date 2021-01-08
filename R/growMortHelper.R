@@ -264,6 +264,7 @@ gmHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
               rPlot = sum(rPlot, na.rm = TRUE),
               mPlot = sum(mPlot, na.rm = TRUE),
               hPlot = sum(hPlot, na.rm = TRUE),
+              aZero = sum(fa, na.rm = TRUE),
               fa = dplyr::first(fa),
               plotIn_t = ifelse(sum(plotIn_t >  0, na.rm = TRUE), 1,0),
               plotIn_r = ifelse(sum(plotIn_r >  0, na.rm = TRUE), 1,0),
@@ -273,6 +274,16 @@ gmHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
               p2eu = dplyr::first(p2eu),
               a = dplyr::first(AREA_USED),
               w = dplyr::first(P1POINTCNT) / dplyr::first(P1PNTCNT_EU)) %>%
+    # If area is 0, so is numerator
+    mutate(aZero = ifelse(aZero > 0, 1, 0), # Binary, zero if 0 and 1 otherwise
+           tPlot = tPlot * aZero,
+           rPlot = rPlot * aZero,
+           mPlot = mPlot * aZero,
+           hPlot = hPlot * aZero,
+           plotIn_t = plotIn_t * aZero,
+           plotIn_r = plotIn_r * aZero,
+           plotIn_m = plotIn_m * aZero,
+           plotIn_h = plotIn_h * aZero) %>%
     ## Joining area data so we can compute ratio variances
     left_join(select(aStrat, aStrat, av, ESTN_UNIT_CN, STRATUM_CN, ESTN_METHOD, aGrpBy), by = c('ESTN_UNIT_CN', 'ESTN_METHOD', 'STRATUM_CN', aGrpBy)) %>%
     ## Strata level

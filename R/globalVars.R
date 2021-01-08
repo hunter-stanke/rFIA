@@ -246,6 +246,9 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'AREA_CHNG', 'AREA_CHNG_SE', 'AREA_CHNG_VAR', 'CONDID1', 'CONDID2', 'CONDPROP_CHNG',
                          'PERC_CHNG', 'PERC_CHNG_SE', 'PERC_CHNG_VAR', 'PREV_AREA', 'PREV_AREA_SE',
                          'PREV_AREA_VAR', 'PREV_CONDPROP', 'aD_c1', 'aD_c2', 'aD_p1', 'aD_p2', 'ac', 'cov_cv',
-                         'dropThese', 'landD1', 'landD2', 'sp1', 'sp2', 'tD1', 'tD2'
+                         'dropThese', 'landD1', 'landD2', 'sp1', 'sp2', 'tD1', 'tD2',
+                         'bio', 'MORT_TREE_TOTAL', 'MORT_TREE_TOTAL_SE', 'MORT_TREE_TOTAL_VAR',
+                         'RECR_TREE_TOTAL', 'RECR_TREE_TOTAL_SE', 'RECR_TREE_TOTAL_VAR',
+                         'REMV_TREE_TOTAL', 'REMV_TREE_TOTAL_SE', 'REMV_TREE_TOTAL_VAR', 'aZero'
 
 ))

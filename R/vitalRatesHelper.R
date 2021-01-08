@@ -90,25 +90,25 @@ vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
       mutate(YEAR = MEASYEAR) %>%
       distinct(PLT_CN, SUBP, TREE, ONEORTWO, .keep_all = TRUE) %>%
       lazy_dt() %>%
-      group_by(!!!grpSyms1, PLT_CN, SUBP, TREE) %>%
-      summarize(d = sum(DIA * tDI, na.rm = TRUE),
-                ba = sum(BA * tDI, na.rm = TRUE),
-                baa = sum(TPAGROW_UNADJ * BA * tDI, na.rm = TRUE),
-                vol = sum(VOLCFNET * tDI, na.rm = TRUE),
-                volA = sum(TPAGROW_UNADJ * VOLCFNET * tDI, na.rm = TRUE),
-                bio = sum(DRYBIO_AG * tDI, na.rm = TRUE),
-                bioA = sum(TPAGROW_UNADJ * DRYBIO_AG * tDI, na.rm = TRUE)) %>%
-      # Compute estimates at plot level
-      group_by(!!!grpSyms, PLT_CN) %>%
-      summarize(DIA_GROW = mean(d, na.rm = TRUE),
-                BA_GROW = mean(ba, na.rm = TRUE),
-                BAA_GROW = sum(baa, na.rm = TRUE),
-                NETVOL_GROW = mean(vol, na.rm = TRUE),
-                NETVOL_GROW_AC = sum(volA, na.rm = TRUE),
-                BIO_GROW = mean(vol, na.rm = TRUE),
-                BIO_GROW_AC = sum(volA, na.rm = TRUE),
-                nStems = length(which(!is.na(d)))) %>%
-      as.data.frame()
+      group_by(!!!grpSyms1, PLT_CN) %>%
+      summarize(t = sum(TPAGROW_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), ## Previous only
+                d = sum(DIA * TPAGROW_UNADJ * tDI, na.rm = TRUE),
+                ba = sum(BA * TPAGROW_UNADJ * tDI, na.rm = TRUE),
+                vol = sum(VOLCFNET * TPAGROW_UNADJ * tDI, na.rm = TRUE),
+                bio = sum(DRYBIO_AG * TPAGROW_UNADJ * tDI, na.rm = TRUE),
+                nStems = length(unique(TRE_CN))) %>%
+      mutate(DIA_GROW = d / t,
+             BA_GROW = ba / t,
+             NETVOL_GROW = vol / t,
+             BIO_GROW = bio / t,
+             BAA_GROW = ba,
+             NETVOL_GROW_AC = vol,
+             BIO_GROW_AC = bio,
+             PREV_TPA = t) %>%
+      select(-c(t:bio)) %>%
+      as.data.frame() %>%
+      relocate(nStems, .after = PREV_TPA)
+
 
     a = NULL
 
@@ -126,14 +126,11 @@ vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
       lazy_dt() %>%
       distinct(PLT_CN, SUBP, TREE, ONEORTWO, .keep_all = TRUE) %>%
       group_by(!!!grpSyms, PLT_CN, SUBPTYP_GRM) %>%
-      summarize(tPlot = sum(TPAGROW_UNADJ  * tDI, na.rm = TRUE),
-                dPlot = sum(DIA  * tDI, na.rm = TRUE),
-                bPlot = sum(BA  * tDI, na.rm = TRUE),
-                baaPlot = sum(TPAGROW_UNADJ * BA  * tDI, na.rm = TRUE),
-                gPlot = sum(VOLCFNET  * tDI, na.rm = TRUE),
-                gaPlot = sum(TPAGROW_UNADJ *VOLCFNET  * tDI, na.rm = TRUE),
-                bioPlot = sum(DRYBIO_AG * tDI / 2000, na.rm = TRUE),
-                bioAPlot = sum(TPAGROW_UNADJ * DRYBIO_AG * tDI / 2000, na.rm = TRUE),
+      summarize(tPlot = sum(TPAGROW_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), ## Previous only
+                dPlot = sum(DIA * TPAGROW_UNADJ * tDI, na.rm = TRUE),
+                bPlot = sum(BA * TPAGROW_UNADJ * tDI, na.rm = TRUE),
+                gPlot = sum(VOLCFNET * TPAGROW_UNADJ * tDI, na.rm = TRUE),
+                bioPlot = sum(DRYBIO_AG * TPAGROW_UNADJ * tDI / 2000, na.rm = TRUE),
                 plotIn_t = ifelse(sum(tDI, na.rm = TRUE) > 0, 1,0)) %>%
       as.data.frame()
   }
@@ -231,21 +228,15 @@ vrHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
       tPlot = tPlot * tAdj,
       dPlot = dPlot * tAdj,
       bPlot = bPlot * tAdj,
-      baaPlot = baaPlot * tAdj,
       gPlot = gPlot * tAdj,
-      gaPlot = gaPlot * tAdj,
-      bioPlot = bioPlot * tAdj,
-      bioAPlot = bioAPlot * tAdj) %>%
+      bioPlot = bioPlot * tAdj) %>%
     ## Extra step for variance issues
     group_by(ESTN_UNIT_CN, ESTN_METHOD, STRATUM_CN, PLT_CN, !!!grpSyms) %>%
     summarize(tPlot = sum(tPlot, na.rm = TRUE),
               dPlot = sum(dPlot, na.rm = TRUE),
               bPlot = sum(bPlot, na.rm = TRUE),
-              baaPlot = sum(baaPlot, na.rm = TRUE),
               gPlot = sum(gPlot, na.rm = TRUE),
-              gaPlot = sum(gaPlot, na.rm = TRUE),
               bioPlot = sum(bioPlot, na.rm = TRUE),
-              bioAPlot = sum(bioAPlot, na.rm = TRUE),
               fa = dplyr::first(fa),
               plotIn_TREE = ifelse(sum(plotIn_t >  0, na.rm = TRUE), 1,0),
               nh = dplyr::first(P2POINTCNT),
@@ -267,54 +258,42 @@ vrHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
               tStrat = sum(tPlot , na.rm = TRUE),
               dStrat = sum(dPlot , na.rm = TRUE),
               bStrat = sum(bPlot , na.rm = TRUE),
-              baaStrat = sum(baaPlot , na.rm = TRUE),
               gStrat = sum(gPlot , na.rm = TRUE),
-              gaStrat = sum(gaPlot , na.rm = TRUE),
               bioStrat = sum(bioPlot , na.rm = TRUE),
-              bioAStrat = sum(bioAPlot , na.rm = TRUE),
               aStrat = dplyr::first(aStrat),
               plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE),
               # ## Strata level variances
               tv = sum(tPlot^2, na.rm = TRUE),
               dv = sum(dPlot^2, na.rm = TRUE),
               bv = sum(bPlot^2, na.rm = TRUE),
-              baav = sum(baaPlot^2, na.rm = TRUE),
               gv = sum(gPlot^2, na.rm = TRUE),
-              gav = sum(gaPlot^2, na.rm = TRUE),
               biov = sum(bioPlot^2, na.rm = TRUE),
-              bioAv = sum(bioAPlot^2, na.rm = TRUE),
               # Strata level covariances
               cvStrat_d = sum(dPlot*tPlot, na.rm = TRUE),
               cvStrat_b = sum(bPlot*tPlot, na.rm = TRUE),
-              cvStrat_baa = sum(baaPlot*fa, na.rm = TRUE),
+              cvStrat_baa = sum(bPlot*fa, na.rm = TRUE),
               cvStrat_g = sum(gPlot*tPlot, na.rm = TRUE),
-              cvStrat_ga = sum(gaPlot*fa, na.rm = TRUE),
+              cvStrat_ga = sum(gPlot*fa, na.rm = TRUE),
               cvStrat_bio = sum(bioPlot*tPlot, na.rm = TRUE),
-              cvStrat_bioA = sum(bioAPlot*fa, na.rm = TRUE)) %>%
-    mutate(tStrat = tStrat/ nh,
+              cvStrat_bioA = sum(bioPlot*fa, na.rm = TRUE)) %>%
+    mutate(tStrat = tStrat / nh,
            dStrat = dStrat / nh,
            bStrat = bStrat / nh,
-           baaStrat = baaStrat / nh,
            gStrat = gStrat / nh,
-           gaStrat = gaStrat / nh,
            bioStrat = bioStrat / nh,
-           bioAStrat = bioAStrat / nh,
            adj = nh * (nh-1),
            tv = (tv - (nh*tStrat^2)) / adj,
            dv = (dv - (nh*dStrat^2)) / adj,
            bv = (bv - (nh*bStrat^2)) / adj,
-           baav = (baav - (nh*baaStrat^2)) / adj,
            gv = (gv - (nh*gStrat^2)) / adj,
-           gav = (gav - (nh*gaStrat^2)) / adj,
            biov = (biov - (nh*bioStrat^2)) / adj,
-           bioAv = (bioAv - (nh*bioAStrat^2)) / adj,
            cvStrat_d = (cvStrat_d - (nh * dStrat * tStrat)) / adj,
            cvStrat_b = (cvStrat_b - (nh * bStrat * tStrat)) / adj,
-           cvStrat_baa = (cvStrat_baa - (nh * baaStrat * aStrat)) / adj,
+           cvStrat_baa = (cvStrat_baa - (nh * bStrat * aStrat)) / adj,
            cvStrat_g = (cvStrat_g - (nh * gStrat * tStrat)) / adj,
-           cvStrat_ga = (cvStrat_ga - (nh * gaStrat * aStrat)) / adj,
+           cvStrat_ga = (cvStrat_ga - (nh * gStrat * aStrat)) / adj,
            cvStrat_bio = (cvStrat_bio - (nh * bioStrat * tStrat)) / adj,
-           cvStrat_bioA = (cvStrat_bioA - (nh * bioAStrat * aStrat)) / adj) %>%
+           cvStrat_bioA = (cvStrat_bioA - (nh * bioStrat * aStrat)) / adj) %>%
     as.data.frame() %>%
 
     ## Estimation unit
@@ -323,11 +302,8 @@ vrHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
     summarize(tEst = unitMean(ESTN_METHOD, a, nh, w, tStrat),
               dEst = unitMean(ESTN_METHOD, a, nh, w, dStrat),
               bEst = unitMean(ESTN_METHOD, a, nh, w, bStrat),
-              baaEst = unitMean(ESTN_METHOD, a, nh, w, baaStrat),
               gEst = unitMean(ESTN_METHOD, a, nh, w, gStrat),
-              gaEst = unitMean(ESTN_METHOD, a, nh, w, gaStrat),
               bioEst = unitMean(ESTN_METHOD, a, nh, w, bioStrat),
-              bioAEst = unitMean(ESTN_METHOD, a, nh, w, bioAStrat),
 
               N = dplyr::first(p2eu),
               #aEst = dplyr::first(aEst),
@@ -335,19 +311,16 @@ vrHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
               tVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, tv, tStrat, tEst),
               dVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, dv, dStrat, dEst),
               bVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, bv, bStrat, bEst),
-              baaVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, baav, baaStrat, baaEst),
               gVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, gv, gStrat, gEst),
-              gaVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, gav, gaStrat, gaEst),
               bioVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, biov, bioStrat, bioEst),
-              bioAVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, bioAv, bioAStrat, bioAEst),
 
               cvEst_d = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_d, dStrat, dEst, tStrat, tEst),
               cvEst_b = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_b, bStrat, bEst, tStrat, tEst),
               cvEst_g = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_g, gStrat, gEst, tStrat, tEst),
               cvEst_bio = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_bio, bioStrat, bioEst, tStrat, tEst),
-              cvEst_baa = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_baa, baaStrat, baaEst, aStrat, aEst),
-              cvEst_ga = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_ga, gaStrat, gaEst, aStrat, aEst),
-              cvEst_bioA = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_bioA, bioAStrat, bioAEst, aStrat, aEst),
+              cvEst_baa = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_baa, bStrat, bEst, aStrat, aEst),
+              cvEst_ga = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_ga, gStrat, gEst, aStrat, aEst),
+              cvEst_bioA = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_bioA, bioStrat, bioEst, aStrat, aEst),
               plotIn_TREE = sum(plotIn_TREE, na.rm = TRUE))
 
   out <- list(tEst = tEst, aEst = aEst)

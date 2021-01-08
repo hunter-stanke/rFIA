@@ -345,7 +345,7 @@ vrStarter <- function(x,
       tEst <- tEst %>%
         left_join(select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN')) %>%
         left_join(wgts, by = joinCols) %>%
-        mutate(across(tEst:bioAEst, ~(.*wgt))) %>%
+        mutate(across(tEst:bioEst, ~(.*wgt))) %>%
         mutate(across(tVar:cvEst_bioA, ~(.*(wgt^2)))) %>%
         group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
         summarize(across(tEst:plotIn_TREE, sum, na.rm = TRUE))
@@ -461,25 +461,22 @@ vitalRates <- function(db,
                BA_TOTAL = bEst,
                NETVOL_TOTAL = gEst,
                BIO_TOTAL = bioEst,
-               BAA_TOTAL = baaEst,
-               NETVOLA_TOTAL = gaEst,
-               BIOA_TOTAL = bioAEst,
                AREA_TOTAL = aEst,
                DIA_GROW = DIA_TOTAL / TREE_TOTAL,
                BA_GROW = BA_TOTAL / TREE_TOTAL,
                NETVOL_GROW = NETVOL_TOTAL / TREE_TOTAL,
                BIO_GROW = BIO_TOTAL / TREE_TOTAL,
-               BA_GROW_AC = BAA_TOTAL / AREA_TOTAL,
-               NETVOL_GROW_AC = NETVOLA_TOTAL / AREA_TOTAL,
-               BIO_GROW_AC = BIOA_TOTAL / AREA_TOTAL,
+               BA_GROW_AC = BA_TOTAL / AREA_TOTAL,
+               NETVOL_GROW_AC = NETVOL_TOTAL / AREA_TOTAL,
+               BIO_GROW_AC = BIO_TOTAL / AREA_TOTAL,
                ## Ratio Var
                dgVar = (1/TREE_TOTAL^2) * (dVar + (DIA_GROW^2 * tVar) - 2 * DIA_GROW * cvEst_d),
                bgVar = (1/TREE_TOTAL^2) * (bVar + (BA_GROW^2 * tVar) - 2 * BA_GROW * cvEst_b),
                ggVar = (1/TREE_TOTAL^2) * (gVar + (NETVOL_GROW^2 * tVar) - 2 * NETVOL_GROW * cvEst_g),
                biogVar = (1/TREE_TOTAL^2) * (bioVar + (BIO_GROW^2 * tVar) - 2 * BIO_GROW * cvEst_bio),
-               baagVar = (1/AREA_TOTAL^2) * (baaVar + (BA_GROW_AC^2 * aVar) - 2 * BA_GROW_AC * cvEst_baa),
-               gagVar = (1/AREA_TOTAL^2) * (gaVar + (NETVOL_GROW_AC^2 * aVar) - 2 * NETVOL_GROW_AC * cvEst_ga),
-               bioAgVar = (1/AREA_TOTAL^2) * (bioAVar + (BIO_GROW_AC^2 * aVar) - 2 * BIO_GROW_AC * cvEst_bioA),
+               baagVar = (1/AREA_TOTAL^2) * (bVar + (BA_GROW_AC^2 * aVar) - 2 * BA_GROW_AC * cvEst_baa),
+               gagVar = (1/AREA_TOTAL^2) * (gVar + (NETVOL_GROW_AC^2 * aVar) - 2 * NETVOL_GROW_AC * cvEst_ga),
+               bioAgVar = (1/AREA_TOTAL^2) * (bioVar + (BIO_GROW_AC^2 * aVar) - 2 * BIO_GROW_AC * cvEst_bioA),
 
                ## SE RATIO
                DIA_GROW_SE = sqrt(dgVar) / DIA_GROW * 100,
@@ -504,9 +501,6 @@ vitalRates <- function(db,
                BA_TOTAL_SE = sqrt(bVar) / BA_TOTAL *100,
                NETVOL_TOTAL_SE = sqrt(gVar) / NETVOL_TOTAL *100,
                BIO_TOTAL_SE = sqrt(bioVar) / BIO_TOTAL *100,
-               BAA_TOTAL_SE = sqrt(baaVar) / BAA_TOTAL *100,
-               NETVOLA_TOTAL_SE = sqrt(gaVar) / NETVOLA_TOTAL *100,
-               BIOA_TOTAL_SE = sqrt(bioAVar) / BIOA_TOTAL *100,
                ## VAR TOTAL
                AREA_TOTAL_VAR = aVar,
                TREE_TOTAL_VAR = tVar,
@@ -514,9 +508,6 @@ vitalRates <- function(db,
                BA_TOTAL_VAR = bVar,
                NETVOL_TOTAL_VAR = gVar,
                BIO_TOTAL_VAR = bioVar,
-               BAA_TOTAL_VAR = baaVar,
-               NETVOLA_TOTAL_VAR = gaVar,
-               BIOA_TOTAL_VAR = bioAVar,
                ## nPlots
                # Non-zero plots
                nPlots_TREE = plotIn_TREE,
@@ -531,19 +522,17 @@ vitalRates <- function(db,
           select(grpBy, DIA_GROW, BA_GROW, NETVOL_GROW, BIO_GROW, BA_GROW_AC, NETVOL_GROW_AC,
                  BIO_GROW_AC, DIA_GROW_VAR, BA_GROW_VAR, NETVOL_GROW_VAR, BIO_GROW_VAR,
                  BA_GROW_AC_VAR, NETVOL_GROW_AC_VAR, BIO_GROW_AC_VAR,
-                 TREE_TOTAL, DIA_TOTAL, BA_TOTAL, NETVOL_TOTAL, BIO_TOTAL, BAA_TOTAL,
-                 NETVOLA_TOTAL,  BIOA_TOTAL, AREA_TOTAL,
-                 TREE_TOTAL_VAR, DIA_TOTAL_VAR, BA_TOTAL_VAR, NETVOL_TOTAL_VAR, BIO_TOTAL_VAR, BAA_TOTAL_VAR,
-                 NETVOLA_TOTAL_VAR,  BIOA_TOTAL_VAR, AREA_TOTAL_VAR, nPlots_TREE, nPlots_AREA, N)
+                 TREE_TOTAL, DIA_TOTAL, BA_TOTAL, NETVOL_TOTAL, BIO_TOTAL, AREA_TOTAL,
+                 TREE_TOTAL_VAR, DIA_TOTAL_VAR, BA_TOTAL_VAR, NETVOL_TOTAL_VAR, BIO_TOTAL_VAR,
+                 AREA_TOTAL_VAR, nPlots_TREE, nPlots_AREA, N)
       } else {
         tOut <- tOut %>%
           select(grpBy, DIA_GROW, BA_GROW, NETVOL_GROW, BIO_GROW, BA_GROW_AC, NETVOL_GROW_AC,
                  BIO_GROW_AC, DIA_GROW_SE, BA_GROW_SE, NETVOL_GROW_SE, BIO_GROW_SE,
                  BA_GROW_AC_SE, NETVOL_GROW_AC_SE, BIO_GROW_AC_SE,
-                 TREE_TOTAL, DIA_TOTAL, BA_TOTAL, NETVOL_TOTAL, BIO_TOTAL, BAA_TOTAL,
-                 NETVOLA_TOTAL,  BIOA_TOTAL, AREA_TOTAL,
-                 TREE_TOTAL_SE, DIA_TOTAL_SE, BA_TOTAL_SE, NETVOL_TOTAL_SE, BIO_TOTAL_SE, BAA_TOTAL_SE,
-                 NETVOLA_TOTAL_SE,  BIOA_TOTAL_SE, AREA_TOTAL_SE, nPlots_TREE, nPlots_AREA)
+                 TREE_TOTAL, DIA_TOTAL, BA_TOTAL, NETVOL_TOTAL, BIO_TOTAL, AREA_TOTAL,
+                 TREE_TOTAL_SE, DIA_TOTAL_SE, BA_TOTAL_SE, NETVOL_TOTAL_SE, BIO_TOTAL_SE,
+                 AREA_TOTAL_SE, nPlots_TREE, nPlots_AREA)
       }
 
     } else {
