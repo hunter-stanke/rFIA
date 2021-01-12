@@ -71,7 +71,8 @@ areaHelper1 <- function(x, plts, db, grpBy, byPlot){
     naPlts <- t %>%
       distinct(PLT_CN, !!!grpSyms) %>%
       tidyr::drop_na() %>%
-      mutate(good = 1)
+      mutate(good = 1) %>%
+      distinct(PLT_CN, good)
     a <- a %>%
       left_join(naPlts, by = 'PLT_CN') %>%
       ## Make fa NA when grps are NA
@@ -125,7 +126,8 @@ areaHelper2 <- function(x, popState, t, a, grpBy, method){
               atv = sum(fa^2, na.rm = TRUE)) %>%
     mutate(atStrat = atStrat / nh, # Strata mean
            atv = (atv - (nh * atStrat^2)) / (nh * (nh-1))) %>% # Strata variance
-    as.data.frame()
+    as.data.frame() %>%
+    distinct()
   aEst <- aStrat %>%
     ## Estimation unit
     group_by(ESTN_UNIT_CN, !!!aGrpSyms) %>%
