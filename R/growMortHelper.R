@@ -52,20 +52,23 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
   data$tDI <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev
   data$tDI_r <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
 
-  ### DOING AREA SEPARATELY NOW FOR GROWTH ACCOUNTING PLOTS
-  aData <- select(db$PLOT,c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp')) %>%
-    left_join(select(db$SUBP_COND_CHNG_MTRX, PLT_CN, PREV_PLT_CN, SUBPTYP, SUBPTYP_PROP_CHNG, PREVCOND, CONDID), by = c('PLT_CN', 'PREV_PLT_CN')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN', 'CONDID')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
-    mutate(aChng = if_else(COND_STATUS_CD == 1 &
-                             COND_STATUS_CD.prev == 1 &
-                             !is.null(CONDPROP_UNADJ) &
-                             SUBPTYP == 1,
-                           1, 0),
-           SUBPTYP_PROP_CHNG = SUBPTYP_PROP_CHNG * .25)
+  if ('SUBP_COND_CHNG_MTRX' %in% names(db)) {
+    ### DOING AREA SEPARATELY NOW FOR GROWTH ACCOUNTING PLOTS
+    aData <- select(db$PLOT,c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp')) %>%
+      left_join(select(db$SUBP_COND_CHNG_MTRX, PLT_CN, PREV_PLT_CN, SUBPTYP, SUBPTYP_PROP_CHNG, PREVCOND, CONDID), by = c('PLT_CN', 'PREV_PLT_CN')) %>%
+      left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN', 'CONDID')) %>%
+      left_join(select(db$COND, c('PLT_CN', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
+      mutate(aChng = if_else(COND_STATUS_CD == 1 &
+                               COND_STATUS_CD.prev == 1 &
+                               !is.null(CONDPROP_UNADJ) &
+                               SUBPTYP == 1,
+                             1, 0),
+             SUBPTYP_PROP_CHNG = SUBPTYP_PROP_CHNG * .25)
 
-  aData$landD <- ifelse(aData$landD == 1 & aData$landD.prev == 1, 1, 0)
-  aData$aDI_ga <- aData$landD * aData$aD_p * aData$aD_c * aData$sp * aData$aChng
+    aData$landD <- ifelse(aData$landD == 1 & aData$landD.prev == 1, 1, 0)
+    aData$aDI_ga <- aData$landD * aData$aD_p * aData$aD_c * aData$sp * aData$aChng
+
+  }
 
 
   if (byPlot){
@@ -90,14 +93,7 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
     a = NULL
 
   } else {
-    ### Plot-level estimates -- growth accounting
-    a_ga <- aData %>%
-      ## Will be lots of trees here, so CONDPROP listed multiple times
-      ## Adding PROP_BASIS so we can handle adjustment factors at strata level
-      #distinct(PLT_CN, SUBP, CONDID, .keep_all = TRUE) %>%
-      group_by(PLT_CN, PROP_BASIS, .dots = aGrpBy) %>%
-      summarize(fa_ga = sum(SUBPTYP_PROP_CHNG * aDI_ga, na.rm = TRUE),
-                plotIn_ga = ifelse(sum(aDI_ga >  0, na.rm = TRUE), 1,0))
+
     ### Plot-level estimates
     a <- data %>%
       ## Will be lots of trees here, so CONDPROP listed multiple times
@@ -105,8 +101,26 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
       distinct(PLT_CN, CONDID, .keep_all = TRUE) %>%
       group_by(PLT_CN, PROP_BASIS, .dots = aGrpBy) %>%
       summarize(fa = sum(CONDPROP_UNADJ * aDI, na.rm = TRUE),
-                plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0)) %>%
-      left_join(select(a_ga, PLT_CN, PROP_BASIS, aGrpBy, fa_ga, plotIn_ga), by = c('PLT_CN', 'PROP_BASIS', aGrpBy))
+                plotIn = ifelse(sum(aDI >  0, na.rm = TRUE), 1,0))
+
+    if ('SUBP_COND_CHNG_MTRX' %in% names(db)) {
+      ### Plot-level estimates -- growth accounting
+      a_ga <- aData %>%
+        ## Will be lots of trees here, so CONDPROP listed multiple times
+        ## Adding PROP_BASIS so we can handle adjustment factors at strata level
+        #distinct(PLT_CN, SUBP, CONDID, .keep_all = TRUE) %>%
+        group_by(PLT_CN, PROP_BASIS, .dots = aGrpBy) %>%
+        summarize(fa_ga = sum(SUBPTYP_PROP_CHNG * aDI_ga, na.rm = TRUE),
+                  plotIn_ga = ifelse(sum(aDI_ga >  0, na.rm = TRUE), 1,0))
+
+      a <- a %>%
+        left_join(select(a_ga, PLT_CN, PROP_BASIS, aGrpBy, fa_ga, plotIn_ga), by = c('PLT_CN', 'PROP_BASIS', aGrpBy))
+    } else {
+      a <- a %>%
+        mutate(fa_ga = fa,
+               plotIn_ga = plotIn)
+    }
+
 
     grpSyms <- syms(grpBy)
 

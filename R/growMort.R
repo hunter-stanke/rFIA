@@ -48,7 +48,7 @@ growMortStarter <- function(x,
   if (treeType %in% c('live', 'dead', 'gs', 'all') == FALSE){
     stop('treeType must be one of: "live", "dead", "gs", or "all".')
   }
-  if (any(reqTables %in% names(db) == FALSE)){
+  if (any(reqTables[!c(reqTables %in% 'SUBP_COND_CHNG_MTRX')] %in% names(db) == FALSE)){
     missT <- reqTables[reqTables %in% names(db) == FALSE]
     stop(paste('Tables', paste (as.character(missT), collapse = ', '),
                'not found in object db.'))
@@ -248,9 +248,13 @@ growMortStarter <- function(x,
   db$TREE_GRM_MIDPT <- db$TREE_GRM_MIDPT %>%
     select(c('TRE_CN', 'DIA', 'state')) %>%
     filter(TRE_CN %in% db$TREE$TRE_CN)
-  db$SUBP_COND_CHNG_MTRX <- select(db$SUBP_COND_CHNG_MTRX, PLT_CN, PREV_PLT_CN,
-                                   SUBPTYP, SUBPTYP_PROP_CHNG, PREVCOND, CONDID) %>%
-    filter(PLT_CN %in% c(db$PLOT$PLT_CN, db$PLOT$PREV_PLT_CN))
+
+  if ('SUBP_COND_CHNG_MTRX' %in% names(db)) {
+    db$SUBP_COND_CHNG_MTRX <- select(db$SUBP_COND_CHNG_MTRX, PLT_CN, PREV_PLT_CN,
+                                     SUBPTYP, SUBPTYP_PROP_CHNG, PREVCOND, CONDID) %>%
+      filter(PLT_CN %in% c(db$PLOT$PLT_CN, db$PLOT$PREV_PLT_CN))
+  }
+
 
 
   # Separate area grouping names from tree grouping names

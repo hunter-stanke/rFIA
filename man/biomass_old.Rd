@@ -5,7 +5,6 @@
 
 \description{
 \lifecycle{deprecated}
-
 This function is deprecated and will be dropped in a future release. Please use \code{biomass} for tree biomass and carbon estimates, and \code{volume} for merchantable tree volume estimates.}
 
 \usage{
