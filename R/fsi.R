@@ -821,18 +821,18 @@ If not already installed, you can install JAGS from SourceForge:
       tOut <- tOut %>%
         select(grpBy, FSI, PERC_FSI, FSI_STATUS,
                FSI_INT, PERC_FSI_INT,
-               PREV_RD, CURR_RD, TPA_RATE, BA_RATE, REMPER,
+               PREV_RD, CURR_RD, TPA_RATE, BA_RATE,
                FSI_VAR, PERC_FSI_VAR, PREV_RD_VAR, CURR_RD_VAR,
-               TPA_RATE_VAR, BA_RATE_VAR, REMPER_VAR,
+               TPA_RATE_VAR, BA_RATE_VAR,
                nPlots, N)
 
     } else {
       tOut <- tOut %>%
         select(grpBy, FSI, PERC_FSI, FSI_STATUS,
                FSI_INT, PERC_FSI_INT,
-               PREV_RD, CURR_RD, TPA_RATE, BA_RATE, REMPER,
+               PREV_RD, CURR_RD, TPA_RATE, BA_RATE,
                FSI_VAR, PERC_FSI_VAR, PREV_RD_VAR, CURR_RD_VAR,
-               TPA_RATE_VAR, BA_RATE_VAR, REMPER_VAR,
+               TPA_RATE_VAR, BA_RATE_VAR,
                nPlots, N)
     }
 
