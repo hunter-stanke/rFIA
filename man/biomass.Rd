@@ -1,18 +1,21 @@
 \name{biomass}
 \alias{biomass}
 
-\title{Estimate volume, biomass, and carbon stocks from the FIADB}
+\title{Estimate tree biomass and carbon stocks from the FIADB}
 
 \description{
-\lifecycle{stable}
-Produces estimates of volume, biomass, and carbon on a per acre basis from FIA data, along with population estimates for each variable. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by species, size class, and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}).
+\lifecycle{maturing}
+Produces estimates of tree biomass and carbon on a per acre basis from FIA data, along with population estimates for each variable. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by species, size class, and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}).
 }
 
+
 \usage{
-biomass(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE,
-        bySizeClass = FALSE, landType = 'forest', treeType = 'live',
-        method = 'TI', lambda = .5, treeDomain = NULL, areaDomain = NULL,
-        totals = FALSE, variance = FALSE, byPlot = FALSE, nCores = 1)
+biomass(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
+        bySpecies = FALSE, bySizeClass = FALSE, byComponent = FALSE,
+        landType = "forest", treeType = "live", method = "TI",
+        lambda = 0.5, treeDomain = NULL, areaDomain = NULL,
+        totals = FALSE, variance = FALSE, byPlot = FALSE,
+        component = "AG", nCores = 1)
 }
 
 \arguments{
@@ -27,6 +30,8 @@ biomass(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE
 \item{bySpecies}{logical; if TRUE, returns estimates grouped by species.}
 
   \item{bySizeClass}{logical; if TRUE, returns estimates grouped by size class (2-inch intervals, see \code{\link{makeClasses}} to compute different size class intervals).}
+
+  \item{byComponent}{logical; if TRUE, returns estimates grouped by the following biomass components: foliage, tops and limbs, merchantable bole, stump, coarse roots, sapling, and woodland species.}
 
   \item{landType}{character ("forest" or "timber"); Type of land that estimates will be produced for. Timberland is a subset of forestland (default) which has high site potential and non-reserve status (see details).}
 
@@ -46,6 +51,8 @@ biomass(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations instead of population estimates.}
 
+  \item{component}{character, combination of: "TOTAL", "AG", "FOLIAGE", "TOP", "BOLE", "STUMP", "SAPLING", "WDLD_SPP"; biomass component to use in estimation. "TOTAL" is a sum of all components, "AG" is a sum of aboveground components, exluding foliage (i.e., top and limbs, merchantable bole, stump, sapling, and woodland species). "FOLIAGE" includes sapling foliage as well as stems larger than 5 in dbh. Foliage biomass of dead stems is assumed to be zero.}
+
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }
 
@@ -53,11 +60,9 @@ biomass(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE
 \details{
 \strong{Estimation Details}
 
-Estimation of forest variables follows the procedures documented in Bechtold and Patterson (2005) and \href{https://www.fs.fed.us/nrs/pubs/jrnl/2020/nrs_2020_stanke_001.pdf}{Stanke et al 2020}. Specifically, volume, biomass, and carbon mass per acre are computed using a sample-based ratio-of-means estimator of total volume (carbon or biomass) / total land area within the domain of interest.
+Estimation of forest variables follows the procedures documented in Bechtold and Patterson (2005) and \href{https://www.fs.fed.us/nrs/pubs/jrnl/2020/nrs_2020_stanke_001.pdf}{Stanke et al 2020}. Specifically, tree biomass and carbon per acre are computed using a sample-based ratio-of-means estimator of total biomass / total land area within the domain of interest.
 
-Net volume estimates (\code{NETVOL}) include only the volume of wood in the central stem of a sample tree, from a 1-foot stump to a minimum 4-inch top diameter, or to where the central stem breaks into limbs all of which are greater than 4.0 inches in diameter. Does not include rotten, missing, and form cull portions of the main stem. Saw volume estimates (\code{SAWVOL}) incldue the net volume in the sawlog portion of the tree, from a 1-foot stump to a 9 inches (hardwood) or 7 inches (softwood) top. All volume estimates are reported in cubic feet (cu. ft. / acre). For estimates in board feet, multiply output values by 12.
-
-Biomass (\code{BIO}) and carbon (\code{CARB}) estimates are computed seperately for aboveground (AG) and belowground (BG) stocks, and their totals are the summation of above and belowground stocks. All biomass and carbon estimates are reported in oven-dry mass (short tons). Belowground mass for an individual tree includes modeled estimates for coarse roots (> 0.1"). Above ground mass includes all portions of a tree above the root collar, excluding foliage.
+A sum of aboveground biomass components, excluding foliage, is estimated by default (\code{component = 'AG'}). However, users may specify unique combinations of biomass components if they wish to do so. For example, to estimate aboveground biomass, including foliage, specify \code{component = c('AG', 'FOLIAGE') in the call to \code{biomass}}. To estimate all biomass components simultaneously (i.e., grouped by component), specify \code{byComponent = TRUE}. All biomass components are computed using the component ratio method. See references for further details.
 
 Users may specify alternatives to the 'Temporally Indifferent' estimator using the \code{method} argument. Alternative design-based estimators include the annual estimator ("ANNUAL"; annual panels, or estimates from plots measured in the same year), simple moving average ("SMA"; combines annual panels with equal weight), linear moving average ("LMA"; combine annual panels with weights that decay \emph{linearly} with time since measurement), and exponential moving average ("EMA"; combine annual panels with weights that decay \emph{exponentially} with time since measurement). The "best" estimator depends entirely on user-objectives, see \href{https://www.fs.fed.us/nrs/pubs/jrnl/2020/nrs_2020_stanke_001.pdf}{Stanke et al 2020} for a complete description of these estimators and tradeoffs between precision and temporal specificity.
 
@@ -86,15 +91,9 @@ Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}
 
 \itemize{
       \item{\strong{YEAR}: reporting year associated with estimates}
-      \item{\strong{NETVOL_ACRE}: estimate of mean net volume per acre (cu.ft./acre)}
-      \item{\strong{SAWVOL_ACRE}: estimate of mean merchantable saw volume per acre (cu.ft./acre)}
-      \item{\strong{BIO_AG_ACRE}: estimate of mean aboveground biomass per acre (tons/acre)}
-      \item{\strong{BIO_BG_ACRE}: estimate of mean belowground biomass per acre (tons/acre)}
-      \item{\strong{BIO_ACRE}: estimate of mean total biomass per acre (tons/acre)}
-      \item{\strong{CARB_AG_ACRE}: estimate of mean aboveground carbon per acre (tons/acre)}
-      \item{\strong{CARB_BG_ACRE}: estimate of mean belowground carbon per acre (tons/acre)}
-      \item{\strong{CARB_ACRE}: estimate of mean total carbon per acre (tons/acre)}
-      \item{\strong{nPlots_VOL}: number of non-zero plots used to compute volume, biomass, and carbon estimates}
+      \item{\strong{BIO_ACRE}: estimate of mean tree biomass per acre (tons/acre)}
+      \item{\strong{CARB_ACRE}: estimate of mean tree carbon per acre (tons/acre)}
+      \item{\strong{nPlots_TREE}: number of non-zero plots used to compute biomass and carbon estimates}
       \item{\strong{nPlots_AREA}: number of non-zero plots used to compute land area estimates}
       }
 }
@@ -118,8 +117,10 @@ Hunter Stanke and Andrew Finley
 
 
 \seealso{
-\code{\link{tpa}}, \code{\link{vitalRates}}, \code{\link{growMort}}
+\code{\link{volume}}, \code{\link{vitalRates}}, \code{\link{growMort}}
 }
+
+
 
 \examples{
 ## Load data from the rFIA package
@@ -130,17 +131,33 @@ data(countiesRI)
 fiaRI_mr <- clipFIA(fiaRI)
 
 
-## Most recent estimates for growing-stock on timber land by species
+## Most recent estimates of aboveground biomass (excluding foliage)
+## for growing-stock trees on timber land
 biomass(db = fiaRI_mr,
         landType = 'timber',
         treeType = 'gs')
+
+## Same as above but include foliage
+biomass(db = fiaRI_mr,
+        landType = 'timber',
+        treeType = 'gs',
+        component = c('AG', 'FOLIAGE'))
 \donttest{
 
 ## Same as above, but at the plot-level
 biomass(db = fiaRI_mr,
         landType = 'timber',
         treeType = 'gs',
+        component = c('AG', 'FOLIAGE'),
         byPlot = TRUE)
+
+## Belowground (i.e., coarse roots) and stump biomass only
+biomass(db = fiaRI_mr,
+        component = c('ROOT', 'STUMP'))
+
+## Estimate all biomass components simultaneosly
+biomass(db = fiaRI_mr,
+        byComponent = TRUE)
 
 ## Estimates for live white pine ( > 12" DBH) on forested mesic sites (all available inventories)
 biomass(fiaRI_mr,
@@ -181,7 +198,6 @@ ctSF <- biomass(fiaRI_mr,
                 polys = countiesRI,
                 returnSpatial = TRUE)
 plot(ctSF) # Plot multiple variables simultaneously
-plotFIA(ctSF, BIO_AG_ACRE) # Plot of aboveground biomass per acre
+plotFIA(ctSF, BIO_ACRE) # Plot of aboveground biomass per acre
 }
 }
-
