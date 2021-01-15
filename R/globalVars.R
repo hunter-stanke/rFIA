@@ -256,6 +256,15 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'JENKINS_FOLIAGE_RATIO_B2', 'JENKINS_STEM_BARK_RATIO_B1',
                          'JENKINS_STEM_BARK_RATIO_B2', 'JENKINS_STEM_WOOD_RATIO_B1',
                          'JENKINS_STEM_WOOD_RATIO_B2', 'JENKINS_TOTAL_B1', 'JENKINS_TOTAL_B2',
-                         'barkRatio', 'jTotal', 'leafRatio', 'stemRatio'
+                         'barkRatio', 'jTotal', 'leafRatio', 'stemRatio',
+                         'BOLE_CF_ACRE', 'BOLE_CF_ACRE_SE', 'BOLE_CF_ACRE_VAR', 'BOLE_CF_TOTAL',
+                         'BOLE_CF_TOTAL_SE', 'BOLE_CF_TOTAL_VAR', 'SAW_CF_ACRE', 'SAW_CF_ACRE_SE',
+                         'SAW_CF_ACRE_VAR', 'SAW_CF_TOTAL', 'SAW_CF_TOTAL_SE', 'SAW_CF_TOTAL_VAR',
+                         'SAW_MBF_ACRE', 'SAW_MBF_ACRE_SE', 'SAW_MBF_ACRE_VAR', 'SAW_MBF_TOTAL',
+                         'SAW_MBF_TOTAL_SE', 'SAW_MBF_TOTAL_VAR', 'bcf', 'bcfEst', 'bcfPlot', 'bcfStrat', 'bcfVar',
+                         'bcfVar_ratio', 'bcfv', 'cvEst_bcf', 'cvEst_sbf', 'cvEst_scf', 'cvStrat_bcf',
+                         'cvStrat_sbf', 'cvStrat_scf', 'sbf', 'sbfEst', 'sbfPlot', 'sbfStrat', 'sbfVar',
+                         'sbfVar_ratio', 'sbfv', 'scf', 'scfEst', 'scfPlot', 'scfStrat', 'scfVar', 'scfVar_ratio',
+                         'scfv'
 
 ))

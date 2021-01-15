@@ -5,15 +5,15 @@
 
 \description{
 \lifecycle{deprecated}
-This function is deprecated and will be dropped in a future release. Please use \code{biomass} for tree biomass and carbon estimates, and \code{volume} for merchantable tree volume estimates.
-}
+
+This function is deprecated and will be dropped in a future release. Please use \code{biomass} for tree biomass and carbon estimates, and \code{volume} for merchantable tree volume estimates.}
 
 \usage{
 biomass_old(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
-            bySpecies = FALSE, bySizeClass = FALSE, landType = 'forest'
-            treeType = 'live', method = 'TI', lambda = .5, treeDomain = NULL,
-            areaDomain = NULL, totals = FALSE, variance = FALSE,
-            byPlot = FALSE, nCores = 1)
+            bySpecies = FALSE, bySizeClass = FALSE, landType = 'forest',
+            treeType = 'live', method = 'TI', lambda = .5,
+            treeDomain = NULL, areaDomain = NULL, totals = FALSE,
+            variance = FALSE, byPlot = FALSE, nCores = 1)
 }
 
 \arguments{
