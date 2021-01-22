@@ -6,7 +6,7 @@ vrStarter <- function(x,
                       bySpecies = FALSE,
                       bySizeClass = FALSE,
                       landType = 'forest',
-                      treeType = 'live',
+                      treeType = 'all',
                       method = 'TI',
                       lambda = .5,
                       treeDomain = NULL,
@@ -54,8 +54,8 @@ vrStarter <- function(x,
   if (landType %in% c('timber', 'forest') == FALSE){
     stop('landType must be one of: "forest" or "timber".')
   }
-  if (treeType %in% c('live', 'dead', 'gs', 'all') == FALSE){
-    stop('treeType must be one of: "live", "dead", "gs", or "all".')
+  if (treeType %in% c('live', 'gs', 'all') == FALSE){
+    stop('treeType must be one of: "live", "gs", or "all".')
   }
   if (any(reqTables %in% names(db) == FALSE)){
     missT <- reqTables[reqTables %in% names(db) == FALSE]
@@ -207,7 +207,7 @@ vrStarter <- function(x,
   db$TREE <- select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN',
                                'PREV_TRE_CN', 'SUBP', 'TREE', all_of(grpT), 'tD',
                                'typeD', 'DIA', 'DRYBIO_AG', 'VOLCFNET',
-                               'VOLCSNET')) %>%
+                               'VOLCSNET', 'STATUSCD')) %>%
     filter(PLT_CN %in% c(db$PLOT$PLT_CN, db$PLOT$PREV_PLT_CN))
   db$TREE_GRM_COMPONENT <- db$TREE_GRM_COMPONENT %>%
     select(c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ',
@@ -250,14 +250,14 @@ vrStarter <- function(x,
                        db[names(db) %in% c('COND', 'TREE', 'TREE_GRM_COMPONENT',
                                            'TREE_GRM_MIDPT', 'TREE_GRM_BEGIN',
                                            'SUBP_COND_CHNG_MTRX')],
-                       grpBy, aGrpBy, byPlot)
+                       grpBy, aGrpBy, byPlot, treeType)
       #stopCluster(cl) # Keep the cluster active for the next run
     } else { # Unix systems
       out <- mclapply(names(plts), FUN = vrHelper1, plts,
                       db[names(db) %in% c('COND', 'TREE', 'TREE_GRM_COMPONENT',
                                           'TREE_GRM_MIDPT', 'TREE_GRM_BEGIN',
                                           'SUBP_COND_CHNG_MTRX')],
-                      grpBy, aGrpBy, byPlot, mc.cores = nCores)
+                      grpBy, aGrpBy, byPlot, treeType, mc.cores = nCores)
     }
   })
 
@@ -378,7 +378,7 @@ vitalRates <- function(db,
                        bySpecies = FALSE,
                        bySizeClass = FALSE,
                        landType = 'forest',
-                       treeType = 'live',
+                       treeType = 'all',
                        method = 'TI',
                        lambda = .5,
                        treeDomain = NULL,

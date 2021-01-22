@@ -1,4 +1,4 @@
-vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
+vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, treeType){
 
   ## Selecting the plots for one county
   db$PLOT <- plts[[x]]
@@ -12,17 +12,19 @@ vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
-    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'DIA', 'DRYBIO_AG', 'VOLCFNET', 'VOLCSNET')), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'DIA', 'DRYBIO_AG', 'VOLCFNET', 'VOLCSNET', 'STATUSCD')), by = c('PLT_CN', 'CONDID')) %>%
     left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT')), by = c('TRE_CN')) %>%
     left_join(select(db$TREE_GRM_MIDPT, c('TRE_CN', 'DIA', 'VOLCFNET', 'VOLCSNET', 'DRYBIO_AG')), by = c('TRE_CN'), suffix = c('', '.mid')) %>%
     left_join(select(db$TREE_GRM_BEGIN, c('TRE_CN', 'DIA', 'VOLCFNET', 'VOLCSNET', 'DRYBIO_AG')), by = c('TRE_CN'), suffix = c('', '.beg')) %>%
     left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
     left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
-    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'DIA',  'DRYBIO_AG', 'VOLCFNET', 'VOLCSNET')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
+    left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'DIA',  'DRYBIO_AG', 'VOLCFNET', 'VOLCSNET', 'STATUSCD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
     mutate_if(is.factor,
               as.character) %>%
     mutate(aChng = ifelse(COND_STATUS_CD.prev == 1 & COND_STATUS_CD == 1 & !is.null(CONDPROP_UNADJ), 1, 0),
-           tChng = ifelse(COND_STATUS_CD.prev == 1 & COND_STATUS_CD == 1, 1, 0))
+           tChng = ifelse(COND_STATUS_CD.prev == 1 & COND_STATUS_CD == 1, 1, 0),
+           status = case_when(STATUSCD == 1 & STATUSCD.prev == 1 ~ 1,
+                                                            TRUE ~ 0))
 
   #If previous attributes are unavailable for trees, default to current (otherwise we get NAs for early inventories)
   data$tD.prev <- ifelse(is.na(data$tD.prev), data$tD, data$tD.prev)
@@ -37,6 +39,8 @@ vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
   data$aDI <- data$landD.prev * data$aD_p * data$aD_c * data$sp * data$aChng
   data$tDI <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev * data$tChng
 
+  ## Only if we're only considering live trees that stayed live
+  if (tolower(treeType) == 'live') {data$tDI <- data$tDI * data$status}
 
   ## Modify  attributes depending on component (mortality uses midpoint)
   data <- data %>%

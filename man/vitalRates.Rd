@@ -9,7 +9,7 @@ Computes estimates of average annual DBH, basal area, height, and net volume gro
 
 \usage{
 vitalRates(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE,
-         bySizeClass = FALSE, landType = 'forest', treeType = 'live',
+         bySizeClass = FALSE, landType = 'forest', treeType = 'all',
          method = 'TI', lambda = .5, treeDomain = NULL,
          areaDomain = NULL, totals = FALSE, variance = FALSE,
          byPlot = FALSE, nCores = 1)
@@ -30,7 +30,7 @@ vitalRates(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FA
 
   \item{landType}{character ("forest" or "timber"); Type of land which estimates will be produced for. Timberland is a subset of forestland (default) which has high site potential and non-reserve status (see details).}
 
-  \item{treeType}{character ("live" or "gs"); Type of tree which estimates will be produced for. All (default) includes all stems, live and dead, greater than 1 in. DBH. Live/Dead includes all stems greater than 1 in. DBH which are live or dead (leaning less than 45 degrees), respectively. GS (growing-stock) includes live stems greater than 5 in. DBH which contain at least one 8 ft merchantable log.}
+  \item{treeType}{character ("all", "live", or "gs"); Type of tree which estimates will be produced for. See details for more info.}
 
   \item{method}{character; design-based estimator to use. One of:  "TI" (temporally indifferent, default), "annual" (annual), "SMA"" (simple moving average), "LMA" (linear moving average), or "EMA" (exponential moving average). See \href{https://www.fs.fed.us/nrs/pubs/jrnl/2020/nrs_2020_stanke_001.pdf}{Stanke et al 2020} for a complete description of these estimators.}
 
@@ -57,7 +57,7 @@ Estimation of forest variables follows the procedures documented in Bechtold and
 
 Average annual diameter, basal area, height, and net volume growth of a stem is computed using a sample-based ratio of means estimator of total diameter (basal area, height, net volume) growth / total trees, and average annual basal area and net volume growth per acre is computed as total basal area (net volume) growth / total area. All estimates are returned as average annual rates. Only conditions which were forest in time 1 and in time 2 are included in estimates (excluding converted stands). Only stems 5 inches DBH or greater are included in estimates.
 
-As estimates are of net growth rates, they may attain a negative value. Negative growth estimates most likely indicate a substantial change in an attribute of the tree or area between time 1 and time 2, which caused the attribute to decrease. Implementation of the growth accounting method allows us to more accurately represent shifts in forest attributes (biomass) between classified groups (size classes) over time.
+When \code{treeType = 'all'} (default), estimates are of \emph{net} growth rates (including recruitment and mortality), and hence they may attain a negative value. Negative growth estimates most likely indicate a substantial change in an attribute of the tree or area between time 1 and time 2, which caused the attribute to decrease. Implementation of the growth accounting method allows us to more accurately represent shifts in forest attributes (biomass) between classified groups (size classes) over time. Alternatively, when \code{treeType = 'live'}, growth rates are calculated using only trees that were alive at both plot visits and give a more realistic representation of individual tree growth.
 
 Users may specify alternatives to the 'Temporally Indifferent' estimator using the \code{method} argument. Alternative design-based estimators include the annual estimator ("ANNUAL"; annual panels, or estimates from plots measured in the same year), simple moving average ("SMA"; combines annual panels with equal weight), linear moving average ("LMA"; combine annual panels with weights that decay \emph{linearly} with time since measurement), and exponential moving average ("EMA"; combine annual panels with weights that decay \emph{exponentially} with time since measurement). The "best" estimator depends entirely on user-objectives, see \href{https://www.fs.fed.us/nrs/pubs/jrnl/2020/nrs_2020_stanke_001.pdf}{Stanke et al 2020} for a complete description of these estimators and tradeoffs between precision and temporal specificity.
 

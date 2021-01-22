@@ -310,7 +310,7 @@ typeDomain_grow <- function(db, treeType, landType, type) {
     if (tolower(landType) == 'forest'){
       db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1, 1, 0)
       # Tree Type domain indicator
-      if (tolower(treeType) == 'live'){
+      if (tolower(treeType) %in% c('live', 'all')){
         db$TREE$typeD <- 1
         ## Rename some variables in grm
         db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
@@ -332,7 +332,7 @@ typeDomain_grow <- function(db, treeType, landType, type) {
     } else if (tolower(landType) == 'timber'){
       db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
       # Tree Type domain indicator
-      if (tolower(treeType) == 'live'){
+      if (tolower(treeType)  %in% c('live', 'all')){
         db$TREE$typeD <- 1
         ## Rename some variables in grm
         db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
@@ -352,6 +352,22 @@ typeDomain_grow <- function(db, treeType, landType, type) {
                                         COMPONENT = SUBP_COMPONENT_GS_TIMBER)
       }
     }
+
+
+    # ## If 'live' then we exclude trees that have died or recruited during remeasurement
+    # if (tolower(treeType) == 'live') {
+    #   status <- db$TREE %>%
+    #     select(CN, PREV_TRE_CN, STATUSCD) %>%
+    #     left_join(select(db$TREE, CN, STATUSCD),
+    #               by = c('PREV_TRE_CN' = 'CN'),
+    #               suffix = c('1', '2')) %>%
+    #     ## If statuscd is ever anything but 1,
+    #     ## exclude it from analysis
+    #     mutate(typeD = case_when(STATUSCD1 == 1 & STATUSCD2 == 1 ~ 1,
+    #                              TRUE ~ 0))
+    #   db$TREE$typeD <- status$typeD
+    # }
+
   } else if (type == 'gm') {
     ## Build domain indicator function which is 1 if observation meets criteria, and 0 otherwise
     # Land type domain indicator
