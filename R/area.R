@@ -395,8 +395,6 @@ area <- function(db,
         select(grpBy, PERC_AREA, AREA_TOTAL, PERC_AREA_SE, AREA_TOTAL_SE, PERC_AREA_VAR, AREA_TOTAL_VAR, nPlots_AREA, N)
     })
 
-    # Snag the names
-    tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
 
     if (variance) {
       tOut <- tOut %>%
@@ -405,6 +403,9 @@ area <- function(db,
       tOut <- tOut %>%
         select(-c(AREA_TOTAL_VAR, PERC_AREA_VAR, N))
     }
+
+    # Snag the names
+    tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
 
   }
 

@@ -421,8 +421,7 @@ areaChange <- function (db,
                  nPlots_AREA, N)
       })
 
-      # Snag the names
-      tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
+
 
       if (variance) {
         tOut <- tOut %>%
@@ -431,6 +430,9 @@ areaChange <- function (db,
         tOut <- tOut %>%
           select(-c(PERC_CHNG_VAR, AREA_CHNG_VAR, PREV_AREA_VAR, N))
       }
+
+      # Snag the names
+      tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
 
       ## Pretty output
       tOut <- tOut %>%
