@@ -396,7 +396,7 @@ carbon <- function(db,
                CARB_TOTAL_SE = sqrt(caVar) / CARB_TOTAL *100,
                ## Var total
                AREA_TOTAL_VAR = aVar,
-               CARB_TOTAL_VAR = caVar,
+               CARB_TOTAL_VAR = cVar,
                ## nPlots
                nPlots_TREE = plotIn_TREE,
                nPlots_AREA = plotIn_AREA)
