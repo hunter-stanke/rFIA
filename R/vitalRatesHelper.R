@@ -87,14 +87,14 @@ vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, treeType){
   if (byPlot){
 
     grpBy <- c('YEAR', grpBy, 'PLOT_STATUS_CD')
-    grpSyms1 <- syms(grpBy[grpBy %in% c('SUBP', 'TREE') == FALSE])
+    #grpSyms1 <- syms(grpBy[grpBy %in% c('SUBP', 'TREE') == FALSE])
     grpSyms <- syms(grpBy)
 
     t <- data %>%
       mutate(YEAR = MEASYEAR) %>%
       distinct(PLT_CN, SUBP, TREE, ONEORTWO, .keep_all = TRUE) %>%
       lazy_dt() %>%
-      group_by(!!!grpSyms1, PLT_CN) %>%
+      group_by(!!!grpSyms, PLT_CN) %>%
       summarize(t = sum(TPAGROW_UNADJ[ONEORTWO == 1] * tDI[ONEORTWO == 1], na.rm = TRUE), ## Previous only
                 d = sum(DIA * TPAGROW_UNADJ * tDI, na.rm = TRUE),
                 ba = sum(BA * TPAGROW_UNADJ * tDI, na.rm = TRUE),

@@ -554,6 +554,7 @@ vitalRates <- function(db,
     tNames <- names(tOut)[names(tOut) %in% grpBy == FALSE]
 
   }
+
   ## Pretty output
   tOut <- tOut %>%
     ungroup() %>%
