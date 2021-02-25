@@ -24,7 +24,7 @@ ssHelper1 <- function(x, plts, db, grpBy, byPlot){
       lazy_dt() %>%
       group_by(!!!grpSyms, PLT_CN) %>%
       summarize(stage = structHelper(DIA, CCLCD),
-                nStems = length(which(tDI == 1))) %>%
+                nStems = length(which(aDI == 1))) %>%
       as.data.frame() %>%
       ungroup() %>%
       mutate_if(is.factor, as.character)
