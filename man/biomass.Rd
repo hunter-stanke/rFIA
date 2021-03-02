@@ -91,8 +91,8 @@ Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}
 
 \itemize{
       \item{\strong{YEAR}: reporting year associated with estimates}
-      \item{\strong{BIO_ACRE}: estimate of mean tree biomass per acre (tons/acre)}
-      \item{\strong{CARB_ACRE}: estimate of mean tree carbon per acre (tons/acre)}
+      \item{\strong{BIO_ACRE}: estimate of mean tree biomass per acre (short tons/acre)}
+      \item{\strong{CARB_ACRE}: estimate of mean tree carbon per acre (short tons/acre)}
       \item{\strong{nPlots_TREE}: number of non-zero plots used to compute biomass and carbon estimates}
       \item{\strong{nPlots_AREA}: number of non-zero plots used to compute land area estimates}
       }

@@ -78,8 +78,8 @@ Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}
 \itemize{
       \item{\strong{YEAR}: reporting year associated with estimates}
       \item{\strong{VOL_ACRE}: estimate of mean volume per acre of dwm (cu.ft/acre)}
-      \item{\strong{BIO_ACRE}: estimate of mean biomass per acre of dwm (tons/acre)}
-      \item{\strong{CARB_ACRE}: estimate of mean carbon mass per acre of dwm (tons/acre)}
+      \item{\strong{BIO_ACRE}: estimate of mean biomass per acre of dwm (short tons/acre)}
+      \item{\strong{CARB_ACRE}: estimate of mean carbon mass per acre of dwm (short tons/acre)}
       \item{\strong{nPlots}: number of non-zero plots used to compute estimates}
       }
 }

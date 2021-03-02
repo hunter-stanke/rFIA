@@ -5,7 +5,7 @@
 
 \description{
 \lifecycle{stable}
-Produces estimates of carbon (tons) on a per acre basis from FIA data, along with population estimates for each variable. Estimates are consistent with those used in the EPA's Greenhouse Gas Inventory Estimates. Can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by species, size class, and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}).}
+Produces estimates of carbon (\emph{metric tonnes}) on a per acre basis from FIA data, along with population estimates for each variable. Estimates are consistent with those used in the EPA's Greenhouse Gas Inventory Estimates. Can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by species, size class, and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}).}
 \usage{
 carbon(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
        byPool = TRUE, byComponent = FALSE, modelSnag = TRUE,
@@ -50,7 +50,7 @@ carbon(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
 
 Estimation of forest variables follows the procedures documented in Bechtold and Patterson (2005) and \href{https://www.fs.fed.us/nrs/pubs/jrnl/2020/nrs_2020_stanke_001.pdf}{Stanke et al 2020}. Specifically, carbon mass per acre is computed using a sample-based ratio-of-means estimator of total volume (carbon or biomass) / total land area within the domain of interest.
 
-Estimation of carbon stocks draws on measured (e.g., tree carbon) and modeled attributes (e.g., soil organic carbon). This function is intended to produce estimates consistent with those in the EPA's Greenhouse Gas Inventory Estimates. See the following for more info: http://www.epa.gov/climatechange/ghgemissions/usinventoryreport/archive.html
+Estimation of carbon stocks draws on measured (e.g., tree carbon) and modeled attributes (e.g., soil organic carbon). This function is intended to produce estimates consistent with those in the EPA's Greenhouse Gas Inventory Estimates. Importantly, estimates are reported in \emph{metric tonnes} - this is a key distinction relative to other \code{rFIA} functions, which report estimates in Imperial units. See the following for more info: http://www.epa.gov/climatechange/ghgemissions/usinventoryreport/archive.html
 
 Users may specify alternatives to the 'Temporally Indifferent' estimator using the \code{method} argument. Alternative design-based estimators include the annual estimator ("ANNUAL"; annual panels, or estimates from plots measured in the same year), simple moving average ("SMA"; combines annual panels with equal weight), linear moving average ("LMA"; combine annual panels with weights that decay \emph{linearly} with time since measurement), and exponential moving average ("EMA"; combine annual panels with weights that decay \emph{exponentially} with time since measurement). The "best" estimator depends entirely on user-objectives, see \href{https://www.fs.fed.us/nrs/pubs/jrnl/2020/nrs_2020_stanke_001.pdf}{Stanke et al 2020} for a complete description of these estimators and tradeoffs between precision and temporal specificity.
 
@@ -78,7 +78,7 @@ Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}
 
 \itemize{
       \item{\strong{YEAR}: reporting year associated with estimates}
-      \item{\strong{CARB_ACRE}: estimate of mean total carbon per acre (tons/acre)}
+      \item{\strong{CARB_ACRE}: estimate of mean total carbon per acre ( metric tonnes/acre)}
       \item{\strong{nPlots_TREE}: number of non-zero plots used to compute carbon estimates}
       \item{\strong{nPlots_AREA}: number of non-zero plots used to compute land area estimates}
       }
