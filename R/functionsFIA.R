@@ -835,19 +835,25 @@ maWeights <- function(pops, method, lambda){
 ## most recent in WI, combine them and label as 2017
 combineMR <- function(x, grpBy){
 
-  suppressMessages({suppressWarnings({
+  ## Used to let max year vary by group -- causes issues for ratio estimates though
+  ## so scrapping it and taking the most recent independent of group
+  # suppressMessages({suppressWarnings({
+  #
+  #   maxyears <- x %>%
+  #     select(all_of(grpBy)) %>%
+  #     group_by(.dots = grpBy[!c(grpBy %in% 'YEAR')]) %>%
+  #     summarise(YEAR = max(YEAR, na.rm = TRUE))
+  #
+  #   out <- x %>%
+  #     ungroup() %>%
+  #     select(-c(YEAR)) %>%
+  #     left_join(maxyears, by = grpBy[!c(grpBy %in% 'YEAR')])
+  #
+  # })})
 
-    maxyears <- x %>%
-      select(all_of(grpBy)) %>%
-      group_by(.dots = grpBy[!c(grpBy %in% 'YEAR')]) %>%
-      summarise(YEAR = max(YEAR, na.rm = TRUE))
-
-    out <- x %>%
-      ungroup() %>%
-      select(-c(YEAR)) %>%
-      left_join(maxyears, by = grpBy[!c(grpBy %in% 'YEAR')])
-
-  })})
+  out <- x %>%
+    ungroup() %>%
+    mutate(YEAR = max(YEAR, na.rm = TRUE))
 
   return(out)
 }

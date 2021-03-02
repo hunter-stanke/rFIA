@@ -412,8 +412,6 @@ volume <- function(db,
 
 
 
-
-
   ## Plot-level estimates
   if (byPlot){
 
