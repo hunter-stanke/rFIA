@@ -101,7 +101,7 @@ vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, treeType){
                 d = sum(DIA * TPAGROW_UNADJ * tDI, na.rm = TRUE),
                 ba = sum(BA * TPAGROW_UNADJ * tDI, na.rm = TRUE),
                 vol = sum(VOLCFNET * TPAGROW_UNADJ * tDI, na.rm = TRUE),
-                svol = sum(VOLBFNET * TPAGROW_UNADJ * tDI, na.rm = TRUE),
+                svol = sum(VOLBFNET * TPAGROW_UNADJ * tDI, na.rm = TRUE) / 1000,
                 bio = sum(DRYBIO_AG * TPAGROW_UNADJ * tDI, na.rm = TRUE),
                 nStems = length(unique(TRE_CN))) %>%
       mutate(DIA_GROW = d / t,
@@ -139,7 +139,7 @@ vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, treeType){
                 dPlot = sum(DIA * TPAGROW_UNADJ * tDI, na.rm = TRUE),
                 bPlot = sum(BA * TPAGROW_UNADJ * tDI, na.rm = TRUE),
                 gPlot = sum(VOLCFNET * TPAGROW_UNADJ * tDI, na.rm = TRUE),
-                sPlot = sum(VOLBFNET * TPAGROW_UNADJ * tDI, na.rm = TRUE),
+                sPlot = sum(VOLBFNET * TPAGROW_UNADJ * tDI, na.rm = TRUE) / 1000,
                 bioPlot = sum(DRYBIO_AG * TPAGROW_UNADJ * tDI / 2000, na.rm = TRUE),
                 plotIn_t = ifelse(sum(tDI, na.rm = TRUE) > 0, 1,0)) %>%
       as.data.frame()
