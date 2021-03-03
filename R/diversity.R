@@ -91,7 +91,10 @@ diversityStarter <- function(x,
     ## Add shapefile names to grpBy
     grpBy = c(grpBy, 'polyID')
     ## Do the intersection
-    db <- arealSumPrep2(db, grpBy, polys, nCores)
+    db <- arealSumPrep2(db, grpBy, polys, nCores, remote)
+
+    ## If there's nothing there, skip the state
+    if (is.null(db)) return('no plots in polys')
   }
 
   ## If we want to return spatial plots
@@ -365,6 +368,7 @@ diversity <- function(db,
                 byPlot, totals, nCores, remote, mr)
   ## Bring the results back
   out <- unlist(out, recursive = FALSE)
+  if (remote) out <- dropStatesOutsidePolys(out)
   tEst <- bind_rows(out[names(out) == 'tEst'])
   full <- bind_rows(out[names(out) == 'full'])
   grpBy <- out[names(out) == 'grpBy'][[1]]

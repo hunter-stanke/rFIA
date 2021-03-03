@@ -82,7 +82,7 @@ arealSumPrep1 <- function(polys){
 }
 
 ## Do the spatial intersection of plots w/ polgyons
-arealSumPrep2 <- function(db, grpBy, polys, nCores){
+arealSumPrep2 <- function(db, grpBy, polys, nCores, remote){
 
   ## Make plot data spatial, projected same as polygon layer
   pltSF <- select(db$PLOT, c('LON', 'LAT', pltID)) %>%
@@ -120,13 +120,31 @@ arealSumPrep2 <- function(db, grpBy, polys, nCores){
 
   # A warning
   if (length(unique(pltSF$pltID)) < 1){
-    stop('No plots in db overlap with polys.')
+    if (!remote) {
+      stop('No plots in db overlap with polys.')
+    } else {
+      return()
+    }
   }
+
   ## Add polygon names to PLOT
   db$PLOT <- db$PLOT %>%
     left_join(select(pltSF, polyID, pltID), by = 'pltID')
 
   return(db)
+
+}
+
+## If a state missing a ROI completely, skip it when remote
+## Primary purpose is to throw a warning when no overlap is present
+dropStatesOutsidePolys <- function(x) {
+  x <- x[x != 'no plots in polys']
+
+  if (length(x) < 1) {
+    stop('No plots in db overlap with polys.')
+  }
+
+  return(x)
 
 }
 

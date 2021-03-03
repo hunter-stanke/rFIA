@@ -90,7 +90,10 @@ fsiStarter <- function(x,
     ## Add shapefile names to grpBy
     grpBy = c(grpBy, 'polyID')
     ## Do the intersection
-    db <- arealSumPrep2(db, grpBy, polys, nCores)
+    db <- arealSumPrep2(db, grpBy, polys, nCores, remote)
+
+    ## If there's nothing there, skip the state
+    if (is.null(db)) return('no plots in polys')
   }
 
   ## If we want to return spatial plots
@@ -340,6 +343,7 @@ If not already installed, you can install JAGS from SourceForge:
 
   ## Bring the results back
   out <- unlist(out, recursive = FALSE)
+  if (remote) out <- dropStatesOutsidePolys(out)
   t <- bind_rows(out[names(out) == 't'])
   t1 <- bind_rows(out[names(out) == 't1'])
   a <- bind_rows(out[names(out) == 'a'])
