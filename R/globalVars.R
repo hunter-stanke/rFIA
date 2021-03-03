@@ -265,6 +265,9 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'bcfVar_ratio', 'bcfv', 'cvEst_bcf', 'cvEst_sbf', 'cvEst_scf', 'cvStrat_bcf',
                          'cvStrat_sbf', 'cvStrat_scf', 'sbf', 'sbfEst', 'sbfPlot', 'sbfStrat', 'sbfVar',
                          'sbfVar_ratio', 'sbfv', 'scf', 'scfEst', 'scfPlot', 'scfStrat', 'scfVar', 'scfVar_ratio',
-                         'scfv'
+                         'scfv', 'SAWVOL_GROW', 'SAWVOL_GROW_AC', 'SAWVOL_GROW_AC_SE', 'SAWVOL_GROW_AC_VAR',
+                         'SAWVOL_GROW_SE', 'SAWVOL_GROW_VAR', 'SAWVOL_TOTAL_SE', 'SAWVOL_TOTAL_VAR',
+                         'VOLBFNET', 'VOLBFNET.beg', 'VOLBFNET.mid', 'VOLBFNET.prev', 'VOLBFNET1', 'VOLBFNET2',
+                         'cvEst_sa', 'cvStrat_sa', 'sagVar', 'sgVar', 'svol'
 
 ))
