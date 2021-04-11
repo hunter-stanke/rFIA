@@ -15,6 +15,7 @@ bioStarter <- function(x,
                        totals = FALSE,
                        byPlot = FALSE,
                        component = 'AG',
+                       bioMethod = 'CRM',
                        nCores = 1,
                        remote,
                        mr){
@@ -65,6 +66,14 @@ bioStarter <- function(x,
     stop('Unknown component. Must be a combination of: "AG", "ROOTS", "BOLE", "TOP", "FOLIAGE", "STUMP", "SAPLING", and "WDLD_SPP". Alternatively, use "TOTAL" for a sum of all components, and set "byComponent=TRUE" to estimate all components simultaneously.')
   }
 
+  ## Biomass method warnings
+  bioMethod <- stringr::str_to_upper(bioMethod)
+  if (length(bioMethod) > 1) {
+    stop('Only one "bioMethod" allowed at this time. Please choose one of "CRM" (Component Ratio Method) or "JENKINS" (Jenkins et al 2003).')
+  }
+  if (!c(bioMethod %in% c('CRM', 'JENKINS'))) {
+    stop('"bioMethod" not recognized. Please choose one of "CRM" (Component Ratio Method) or "JENKINS" (Jenkins et al 2003).')
+  }
 
   ## Prep other variables ------------------------------------------------------
   ## Need a plotCN, and a new ID
@@ -196,6 +205,23 @@ bioStarter <- function(x,
            DRYBIO_FOLIAGE = case_when(STATUSCD == 1 ~ jLeafBio * adj,
                                       STATUSCD == 2 ~ 0,
                                       TRUE ~ NA_real_))
+
+  ## If we want to use Jenkin's methods instead of Component Ratio,
+  ## swap out the bole and adjust other components
+  if (bioMethod == 'JENKINS') {
+    db$TREE <- db$TREE %>%
+      ## Replacing component ratio biomass estimates w/ Jenkins
+      mutate(DRYBIO_BOLE = jBoleBio,
+             ## adj defined above - ratio of volume-based biomass estimates and
+             ## diameter-based estimates for bole volume
+             DRYBIO_TOP = DRYBIO_TOP / adj,
+             DRYBIO_STUMP = DRYBIO_STUMP / adj,
+             DRYBIO_BG = DRYBIO_BG / adj,
+             DRYBIO_SAPLING = DRYBIO_SAPLING / adj,
+             DRYBIO_WDLD_SPP = DRYBIO_WDLD_SPP / adj,
+             DRYBIO_FOLIAGE = DRYBIO_WDLD_SPP / adj)
+  }
+
 
   ## Add component to grpBy
   if (byComponent){
@@ -400,6 +426,7 @@ biomass <- function(db,
                     variance = FALSE,
                     byPlot = FALSE,
                     component = 'AG',
+                    bioMethod = 'CRM',
                     nCores = 1) {
 
   ##  don't have to change original code
@@ -426,7 +453,8 @@ biomass <- function(db,
                 bySpecies, bySizeClass, byComponent,
                 landType, treeType, method,
                 lambda, treeDomain, areaDomain,
-                totals, byPlot, component, nCores, remote, mr)
+                totals, byPlot, component, bioMethod,
+                nCores, remote, mr)
   ## Bring the results back
   out <- unlist(out, recursive = FALSE)
   if (remote) out <- dropStatesOutsidePolys(out)

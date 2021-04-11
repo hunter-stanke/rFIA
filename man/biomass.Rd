@@ -15,7 +15,7 @@ biomass(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
         landType = "forest", treeType = "live", method = "TI",
         lambda = 0.5, treeDomain = NULL, areaDomain = NULL,
         totals = FALSE, variance = FALSE, byPlot = FALSE,
-        component = "AG", nCores = 1)
+        component = "AG", bioMethod = "CRM", nCores = 1)
 }
 
 \arguments{
@@ -53,6 +53,8 @@ biomass(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
 
   \item{component}{character, combination of: "TOTAL", "AG", "FOLIAGE", "TOP", "BOLE", "STUMP", "SAPLING", "WDLD_SPP"; biomass component to use in estimation. "TOTAL" is a sum of all components, "AG" is a sum of aboveground components, exluding foliage (i.e., top and limbs, merchantable bole, stump, sapling, and woodland species). "FOLIAGE" includes sapling foliage as well as stems larger than 5 in dbh. Foliage biomass of dead stems is assumed to be zero.}
 
+  \item{bioMethod}{character;  tree-level biomass estimation procedures to use. One of:  "CRM" (Component Ratio Method, default), or "JENKINS" (Jenkins et al 2003 allometric equations, previously used by the FIA Program, now replaced by CRM). See Estimation Details for references.}
+
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }
 
@@ -62,7 +64,7 @@ biomass(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
 
 Estimation of forest variables follows the procedures documented in Bechtold and Patterson (2005) and \href{https://www.fs.fed.us/nrs/pubs/jrnl/2020/nrs_2020_stanke_001.pdf}{Stanke et al 2020}. Specifically, tree biomass and carbon per acre are computed using a sample-based ratio-of-means estimator of total biomass / total land area within the domain of interest.
 
-A sum of aboveground biomass components, excluding foliage, is estimated by default (\code{component = 'AG'}). However, users may specify unique combinations of biomass components if they wish to do so. For example, to estimate aboveground biomass, including foliage, specify \code{component = c('AG', 'FOLIAGE')} in the call to \code{biomass}. To estimate all biomass components simultaneously (i.e., grouped by component), specify \code{byComponent = TRUE}. All biomass components are computed using the component ratio method. See references for further details.
+A sum of aboveground biomass components, excluding foliage, is estimated by default (\code{component = 'AG'}). However, users may specify unique combinations of biomass components if they wish to do so. For example, to estimate aboveground biomass, including foliage, specify \code{component = c('AG', 'FOLIAGE')} in the call to \code{biomass}. To estimate all biomass components simultaneously (i.e., grouped by component), specify \code{byComponent = TRUE}. All biomass components are computed using the component ratio method by default (method currently used by the FIA program). Alternatively, biomass components may be computed using allometric equations previously used by the FIA program (i.e., Jenkins equations) by setting \code{bioMethod = "JENKINS"}. See \href{https://www.nrs.fs.fed.us/pubs/39555}{Woodall et al (2011)} for a complete description of the component ratio method, and \href{https://www.fs.usda.gov/treesearch/pubs/7058}{Jenkins et al (2003)} for the Jenkins approach.
 
 Users may specify alternatives to the 'Temporally Indifferent' estimator using the \code{method} argument. Alternative design-based estimators include the annual estimator ("ANNUAL"; annual panels, or estimates from plots measured in the same year), simple moving average ("SMA"; combines annual panels with equal weight), linear moving average ("LMA"; combine annual panels with weights that decay \emph{linearly} with time since measurement), and exponential moving average ("EMA"; combine annual panels with weights that decay \emph{exponentially} with time since measurement). The "best" estimator depends entirely on user-objectives, see \href{https://www.fs.fed.us/nrs/pubs/jrnl/2020/nrs_2020_stanke_001.pdf}{Stanke et al 2020} for a complete description of these estimators and tradeoffs between precision and temporal specificity.
 
