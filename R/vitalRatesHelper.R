@@ -23,8 +23,9 @@ vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, treeType){
               as.character) %>%
     mutate(aChng = ifelse(COND_STATUS_CD.prev == 1 & COND_STATUS_CD == 1 & !is.null(CONDPROP_UNADJ), 1, 0),
            tChng = ifelse(COND_STATUS_CD.prev == 1 & COND_STATUS_CD == 1, 1, 0),
-           status = case_when(STATUSCD == 1 & STATUSCD.prev == 1 ~ 1,
-                                                            TRUE ~ 0))
+           status = case_when(COMPONENT == 'SURVIVOR' ~ 1,
+                                                 TRUE ~ 0)) %>%
+     distinct()
 
   #If previous attributes are unavailable for trees, default to current (otherwise we get NAs for early inventories)
   data$tD.prev <- ifelse(is.na(data$tD.prev), data$tD, data$tD.prev)
