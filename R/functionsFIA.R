@@ -294,13 +294,13 @@ landTypeDomain <- function(landType, COND_STATUS_CD, SITECLCD, RESERVCD) {
   } else if (tolower(landType) == 'timber'){
     landD <- ifelse(COND_STATUS_CD == 1 & SITECLCD %in% c(1, 2, 3, 4, 5, 6) & RESERVCD == 0, 1, 0)
   } else if (tolower(landType) == 'non-forest'){
-    landD <- ifelse(COND_STATUS_CD == 2)
+    landD <- ifelse(COND_STATUS_CD == 2, 1, 0)
   } else if (tolower(landType) == 'water'){
-    landD <- ifelse(COND_STATUS_CD == 3 | COND_STATUS_CD == 4)
+    landD <- ifelse(COND_STATUS_CD == 3 | COND_STATUS_CD == 4, 1, 0)
   } else if (tolower(landType) == 'census water'){
-    landD <- ifelse(COND_STATUS_CD == 4)
+    landD <- ifelse(COND_STATUS_CD == 3, 1, 0)
   } else if (tolower(landType) == 'non-census water'){
-    landD <- ifelse(COND_STATUS_CD == 4)
+    landD <- ifelse(COND_STATUS_CD == 4, 1, 0)
   } else if (tolower(landType) == 'all') {
     landD <- 1
   }

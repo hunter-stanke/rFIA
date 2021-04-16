@@ -143,7 +143,8 @@ areaStarter <- function(x,
         COND_STATUS_CD == 1 & SITECLCD %in% c(1:6) & RESERVCD ==0 ~ 'Timber',
         COND_STATUS_CD == 1 ~ 'Non-Timber Forest',
         COND_STATUS_CD == 2 ~ 'Non-Forest',
-        COND_STATUS_CD == 3 | COND_STATUS_CD == 4 ~ 'Water'))
+        COND_STATUS_CD == 3 | COND_STATUS_CD == 4 ~ 'Water'),
+        landD = 1) # Reset the land basis to all
     db$COND <- db$COND[!is.na(db$COND$landType),]
   }
 
