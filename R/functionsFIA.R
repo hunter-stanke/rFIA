@@ -287,6 +287,18 @@ handleTX <- function(db){
   return(db)
 }
 
+## As of Apr 2021, WY labels 2018 and 2019 inventories as 2020. This breaks rFIA,
+## so we manually reset these labels to their appropriate values here
+handleWY <- function(db){
+  if ('POP_EVAL' %in% names(db)) {
+    db$POP_EVAL <- db$POP_EVAL %>%
+      mutate(END_INVYR = case_when(EVALID %in% c(561800, 561801, 561803, 561807) ~ as.numeric(2018),
+                                   EVALID %in% c(561900, 561901, 561903, 561907, 561909, 561910) ~ as.numeric(2019),
+                                   TRUE ~ as.numeric(END_INVYR)))
+  }
+  return(db)
+}
+
 ## Land type domain indicator
 landTypeDomain <- function(landType, COND_STATUS_CD, SITECLCD, RESERVCD) {
   if (tolower(landType) == 'forest'){

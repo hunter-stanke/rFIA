@@ -154,13 +154,12 @@ readFIA <- function(dir,
     }
 
     # NEW CLASS NAME FOR FIA DATABASE OBJECTS
-    outTables <- lapply(outTables, as.data.frame)
-    class(outTables) <- 'FIA.Database'
+    out <- lapply(outTables, as.data.frame)
+    class(out) <- 'FIA.Database'
 
     ## If you are on windows, close explicitly
     #closeAllConnections()
 
-    return(outTables)
 
     ### Methods for keeping data remote until they are needed
     ### Chunking up data into states
@@ -188,8 +187,15 @@ readFIA <- function(dir,
                 ... = ...)
 
     class(out) <- 'Remote.FIA.Database'
-    return(out)
   }
+
+  ## If WY updates the END_INVYR for 2018 & 2019 (i.e., not set it as 2020)
+  ## then we can drop this. Until then, we have to strong arm END_INVYR
+  if (inMemory) {
+    out <- handleWY(out)
+  }
+
+  return(out)
 
 }
 
