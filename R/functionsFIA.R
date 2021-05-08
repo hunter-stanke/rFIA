@@ -922,6 +922,14 @@ prettyNamesSF <- function (tOut, polys, byPlot, grpBy, grpByOrig, tNames, return
 
 ## Choose annual panels to return
 filterAnnual <- function(x, grpBy, pltsVar, ESTN_UNIT) {
+
+  ## Have to handle statecd carefully in grp by
+  if ('STATECD' %in% grpBy) {
+    grpBy <- grpBy[!c(grpBy %in% 'STATECD')]
+    x <- x %>%
+      ungroup() %>%
+      select(-c(STATECD))
+  }
   pltquo <- rlang::enquo(pltsVar)
   x <- x %>%
     left_join(distinct(select(ESTN_UNIT, CN, STATECD)), by = c('ESTN_UNIT_CN' = 'CN')) %>%
