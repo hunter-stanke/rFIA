@@ -88,7 +88,6 @@ vegStructStarter <- function(x,
            GROWTH_HABIT = case_when(is.na(GROWTH_HABIT_CD) ~ NA_character_,
                                     GROWTH_HABIT_CD == 'TT' ~ 'Tally tree',
                                     GROWTH_HABIT_CD == 'NT' ~ 'Non-tally tree',
-                                    GROWTH_HABIT_CD == 'SH' ~ 'Tally Tree',
                                     GROWTH_HABIT_CD == 'SH' ~ 'Shrubs/ vines',
                                     GROWTH_HABIT_CD == 'FB' ~ 'Forbs',
                                     GROWTH_HABIT_CD == 'GR' ~ 'Graminoids'))
