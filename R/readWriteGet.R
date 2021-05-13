@@ -25,7 +25,6 @@ readFIA <- function(dir,
   files <- list.files(dir)
 
 
-
   if (inMemory){
 
     inTables <- list()
@@ -165,6 +164,11 @@ readFIA <- function(dir,
     ### Chunking up data into states
     ## inMemory = FALSE
   } else {
+
+    ## Can't use remote methods w/ full database
+    if (any(str_detect(str_to_upper(states), 'ENTIRE'))) {
+      stop('Remote methods undefind for ENTIRE. Please use `inMemory=TRUE`. Resulting FIA.Database will be quite large (~50GB).')
+    }
 
     ## IF states isn't given, default to all
     ## states in the directory
