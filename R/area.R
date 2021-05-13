@@ -131,8 +131,6 @@ areaStarter <- function(x,
 
 
 
-
-
   ## Canned groups -------------------------------------------------------------
   # Make a new column that describes the land type and hold in COND
   if (byLandType){

@@ -118,8 +118,47 @@ clipFIA <- function(db,
   ##  of clipFIA is primarily intended to reduce the amount of data which must be held in RAM. As long as all
   ##  plot data is avaliable for any intersecting ESTN_UNIT, we can cut back on memory requirements and still
   ##  produce valid estimates
+  ##
+  ## We also want to make modifications (additions) to the population tables here, as folks may want to use
+  ## an alternative estimator in subsequent estimation. Any modifications to design info needs to happen
+  ## before we slim down the plot lists, so handling that here.
   if (!is.null(mask)){
 
+    ## Make additions to pops tables before spatial intersection
+    if (all(c('POP_EVAL', 'POP_ESTN_UNIT', 'POP_STRATUM', 'POP_PLOT_STRATUM_ASSGN') %in% names(db))) {
+      ### The population tables
+      pops <- select(db$POP_EVAL, c('EVALID', 'ESTN_METHOD', 'CN')) %>%
+        rename(EVAL_CN = CN) %>%
+        left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN')), by = c('EVAL_CN')) %>%
+        rename(ESTN_UNIT_CN = CN) %>%
+        left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'P2POINTCNT', 'CN')), by = c('ESTN_UNIT_CN')) %>%
+        rename(STRATUM_CN = CN) %>%
+        distinct(EVALID, ESTN_UNIT_CN, STRATUM_CN, .keep_all = TRUE) %>%
+        left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN', 'INVYR', 'STATECD')), by = 'STRATUM_CN') %>%
+        distinct(EVALID, ESTN_UNIT_CN, STRATUM_CN, PLT_CN, .keep_all = TRUE) %>%
+        ungroup() %>%
+        ## Count of plots by Stratum/INVYR
+        group_by(EVALID, ESTN_UNIT_CN, STRATUM_CN, INVYR) %>%
+        mutate(P2POINTCNT_INVYR = n()) %>%
+        ## By unit / INVYR
+        group_by(EVALID, ESTN_UNIT_CN, INVYR) %>%
+        mutate(p2eu_INVYR = n(),
+               nStrata_INVYR = length(unique(STRATUM_CN))) %>%
+        ## By unit for entire cycle
+        group_by(EVALID, ESTN_UNIT_CN) %>%
+        mutate(p2eu = n(),
+               nStrata = length(unique(STRATUM_CN))) %>%
+        ungroup() %>%
+        filter(!is.na(PLT_CN))
+
+      ## Append TI variables on estn unit
+      db$POP_ESTN_UNIT <- db$POP_ESTN_UNIT %>%
+        left_join(distinct(select(pops, ESTN_UNIT_CN, p2eu, nStrata)), by = c('CN' = 'ESTN_UNIT_CN'))
+
+      ## Append annual variables on PLOT_ASSGN
+      db$POP_PLOT_STRATUM_ASSGN <- db$POP_PLOT_STRATUM_ASSGN %>%
+        left_join(distinct(select(pops, PLT_CN, STRATUM_CN, p2eu_INVYR, nStrata_INVYR, P2POINTCNT_INVYR)), by = c('PLT_CN', 'STRATUM_CN'))
+    }
 
     # Convert polygons to an sf object
     mask <- mask %>%
@@ -362,7 +401,9 @@ clipFIA <- function(db,
     clippedData <- list(db$PLOT, db$OZONE_PLOT)
   }
 
+  ## Add flags so estimator functions can adapt to modified inputs
   if (mostRecent) clippedData$mostRecent <- TRUE
+  if(!is.null(mask)) clippedData$mask <- TRUE
 
   class(clippedData) <- 'FIA.Database'
   return(clippedData)

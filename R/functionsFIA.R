@@ -567,12 +567,13 @@ handlePops <- function(db, evalType, method, mr, pltList = NULL, ga = FALSE){
   ### The population tables
   pops <- select(db$POP_EVAL, c('EVALID', 'ESTN_METHOD', 'CN', 'END_INVYR', 'EVAL_TYP', any_of(gaVars))) %>%
     rename(EVAL_CN = CN) %>%
-    left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU')), by = c('EVAL_CN')) %>%
+    left_join(select(db$POP_ESTN_UNIT, c('CN', 'EVAL_CN', 'AREA_USED', 'P1PNTCNT_EU', any_of(c('p2eu', 'nStrata')))), by = c('EVAL_CN')) %>%
     rename(ESTN_UNIT_CN = CN) %>%
     left_join(select(db$POP_STRATUM, c('ESTN_UNIT_CN', 'EXPNS', 'P2POINTCNT', 'CN', 'P1POINTCNT', 'ADJ_FACTOR_SUBP', 'ADJ_FACTOR_MICR', "ADJ_FACTOR_MACR")), by = c('ESTN_UNIT_CN')) %>%
     rename(STRATUM_CN = CN) %>%
     distinct(EVALID, ESTN_UNIT_CN, STRATUM_CN, .keep_all = TRUE) %>%
-    left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN', 'INVYR', 'STATECD')), by = 'STRATUM_CN') %>%
+    left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('STRATUM_CN', 'PLT_CN', 'INVYR', 'STATECD',
+                                                  any_of(c('p2eu_INVYR', 'nStrata_INVYR', 'P2POINTCNT_INVYR')))), by = 'STRATUM_CN') %>%
     distinct(EVALID, ESTN_UNIT_CN, STRATUM_CN, PLT_CN, .keep_all = TRUE) %>%
     ungroup() %>%
     mutate_if(is.factor,
@@ -587,17 +588,23 @@ handlePops <- function(db, evalType, method, mr, pltList = NULL, ga = FALSE){
 
   ## P2POINTCNT column is NOT consistent for annual estimates, plots
   ## within individual strata and est units are related to different INVYRs
-  pops <- pops %>%
-    ## Count of plots by Stratum/INVYR
-    group_by(EVALID, ESTN_UNIT_CN, STRATUM_CN, INVYR) %>%
-    mutate(P2POINTCNT_INVYR = n()) %>%
-    ## By unit / INVYR
-    group_by(EVALID, ESTN_UNIT_CN, INVYR) %>%
-    mutate(p2eu_INVYR = n()) %>%
-    ## By unit for entire cycle
-    group_by(EVALID, ESTN_UNIT_CN) %>%
-    mutate(p2eu = n()) %>%
-    ungroup()
+
+  ## Only run if this wasn't already done in clipFIA
+  if (!any(c('p2eu', 'p2eu_INVYR', 'P2POINTCNT_INVYR') %in% names(pops))) {
+    pops <- pops %>%
+      ## Count of plots by Stratum/INVYR
+      group_by(EVALID, ESTN_UNIT_CN, STRATUM_CN, INVYR) %>%
+      mutate(P2POINTCNT_INVYR = n()) %>%
+      ## By unit / INVYR
+      group_by(EVALID, ESTN_UNIT_CN, INVYR) %>%
+      mutate(p2eu_INVYR = n()) %>%
+      ## By unit for entire cycle
+      group_by(EVALID, ESTN_UNIT_CN) %>%
+      mutate(p2eu = n()) %>%
+      ungroup()
+
+  }
+
 
   ## Recode a few of the estimation methods to make things easier below
   pops$ESTN_METHOD = recode(.x = pops$ESTN_METHOD,
@@ -632,22 +639,38 @@ mergeSmallStrata <- function(db, pops) {
   ## strata are sampled in a given year
   pops$P1POINTCNT_INVYR <- pops$P1POINTCNT
 
-  ## Stratum year pairs
-  stratYr <- pops %>%
-    left_join(select(db$POP_STRATUM, CN, STRATUM_DESCR), by = c('STRATUM_CN' = 'CN')) %>%
-    distinct(STATECD, ESTN_UNIT_CN, STRATUM_CN, STRATUM_DESCR, INVYR,
-             P2POINTCNT, P1POINTCNT, P2POINTCNT_INVYR, P1POINTCNT_INVYR, stratID) %>%
-    ## If buffer is present in the name, then the stratum has a different intensity
-    ## than other strata in the same estimation unit (PNW only).
-    ## Only combine buffer w/ buffer
-    mutate(buff = str_detect(STRATUM_DESCR, 'buff') & STATECD %in% c(53, 41, 6)) %>%
-    mutate(wrong = P2POINTCNT_INVYR < 2) %>%
-    group_by(ESTN_UNIT_CN, INVYR) %>%
-    mutate(nStrata_INVYR = length(unique(STRATUM_CN))) %>%
-    group_by(ESTN_UNIT_CN) %>%
-    mutate(nStrata = length(unique(STRATUM_CN))) %>%
-    ungroup() %>%
-    arrange(P2POINTCNT_INVYR)
+  if (any(c('nStrata', 'nStrata_INVYR') %in% names(pops))) {
+    ## Stratum year pairs
+    stratYr <- pops %>%
+      left_join(select(db$POP_STRATUM, CN, STRATUM_DESCR), by = c('STRATUM_CN' = 'CN')) %>%
+      distinct(STATECD, ESTN_UNIT_CN, STRATUM_CN, STRATUM_DESCR, INVYR,
+               P2POINTCNT, P1POINTCNT, P2POINTCNT_INVYR, P1POINTCNT_INVYR, stratID,
+               nStrata, nStrata_INVYR) %>%
+      ## If buffer is present in the name, then the stratum has a different intensity
+      ## than other strata in the same estimation unit (PNW only).
+      ## Only combine buffer w/ buffer
+      mutate(buff = str_detect(STRATUM_DESCR, 'buff') & STATECD %in% c(53, 41, 6)) %>%
+      mutate(wrong = P2POINTCNT_INVYR < 2) %>%
+      arrange(P2POINTCNT_INVYR)
+  } else {
+    ## Stratum year pairs
+    stratYr <- pops %>%
+      left_join(select(db$POP_STRATUM, CN, STRATUM_DESCR), by = c('STRATUM_CN' = 'CN')) %>%
+      distinct(STATECD, ESTN_UNIT_CN, STRATUM_CN, STRATUM_DESCR, INVYR,
+               P2POINTCNT, P1POINTCNT, P2POINTCNT_INVYR, P1POINTCNT_INVYR, stratID) %>%
+      ## If buffer is present in the name, then the stratum has a different intensity
+      ## than other strata in the same estimation unit (PNW only).
+      ## Only combine buffer w/ buffer
+      mutate(buff = str_detect(STRATUM_DESCR, 'buff') & STATECD %in% c(53, 41, 6)) %>%
+      mutate(wrong = P2POINTCNT_INVYR < 2) %>%
+      group_by(ESTN_UNIT_CN, INVYR) %>%
+      mutate(nStrata_INVYR = length(unique(STRATUM_CN))) %>%
+      group_by(ESTN_UNIT_CN) %>%
+      mutate(nStrata = length(unique(STRATUM_CN))) %>%
+      ungroup() %>%
+      arrange(P2POINTCNT_INVYR)
+  }
+
 
   ## Check if any fail
   warnMe <- c()
