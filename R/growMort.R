@@ -121,6 +121,9 @@ growMortStarter <- function(x,
   } else if (str_to_upper(stateVar) == 'SAWVOL'){
     db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$VOLCSNET
     db$TREE$state_recr <- db$TREE$VOLCSNET
+  } else if (str_to_upper(stateVar) == 'SAWVOL_BF'){
+    db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$VOLBFNET
+    db$TREE$state_recr <- db$TREE$VOLBFNET
   } else if (str_to_upper(stateVar) == 'NETVOL'){
     db$TREE_GRM_MIDPT$state <- db$TREE_GRM_MIDPT$VOLCFNET
     db$TREE$state_recr <- db$TREE$VOLCFNET
@@ -146,7 +149,7 @@ growMortStarter <- function(x,
     db$TREE_GRM_MIDPT$state <- (db$TREE_GRM_MIDPT$DRYBIO_AG + db$TREE_GRM_MIDPT$DRYBIO_BG) * .5
     db$TREE$state_recr <- (db$TREE$DRYBIO_AG + db$TREE$DRYBIO_BG) * .5
   } else {
-    stop(paste0('Method not known for stateVar: ', stateVar, '. Please choose one of: TPA, BAA, SAWVOL, NETVOL, BIO_AG, BIO_BG, BIO, CARB_AG, CARB_BG, or CARB.' ))
+    stop(paste0('Method not known for stateVar: ', stateVar, '. Please choose one of: TPA, BAA, SAWVOL, SAWVOL_BF, NETVOL, BIO_AG, BIO_BG, BIO, CARB_AG, CARB_BG, or CARB.' ))
   }
 
 
