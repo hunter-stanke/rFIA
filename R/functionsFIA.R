@@ -334,7 +334,7 @@ treeTypeDomain <- function(treeType, STATUSCD, DIA, TREECLCD) {
   return(typeD)
 }
 
-typeDomain_grow <- function(db, treeType, landType, type) {
+typeDomain_grow <- function(db, treeType, landType, type, stateVar = NULL) {
 
   if (type == 'vr'){
     if (tolower(landType) == 'forest'){
@@ -403,8 +403,24 @@ typeDomain_grow <- function(db, treeType, landType, type) {
     # Land type domain indicator
     if (tolower(landType) == 'forest'){
       db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1, 1, 0)
+
       # Tree Type domain indicator
-      if (tolower(treeType) == 'all'){
+      if (toupper(stateVar) %in% c('SAWVOL', 'SAWVOL_BF')) {
+        db$TREE$typeD <- 1
+        ## Rename some variables in grm
+        db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
+                                        TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_SL_FOREST,
+                                        TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_SL_FOREST,
+                                        TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_SL_FOREST,
+                                        SUBPTYP_GRM = SUBP_SUBPTYP_GRM_SL_FOREST,
+                                        COMPONENT = SUBP_COMPONENT_SL_FOREST) %>%
+          mutate(TPARECR_UNADJ = case_when(
+            is.na(COMPONENT) ~ NA_real_,
+            COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2') ~ TPAGROW_UNADJ,
+            TRUE ~ 0))
+
+
+      } else if (tolower(treeType) == 'all'){
         db$TREE$typeD <- 1
         ## Rename some variables in grm
         db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
@@ -436,11 +452,32 @@ typeDomain_grow <- function(db, treeType, landType, type) {
             COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2') ~ TPAGROW_UNADJ,
             TRUE ~ 0))
       }
+
     } else if (tolower(landType) == 'timber'){
       db$COND$landD <- ifelse(db$COND$COND_STATUS_CD == 1 & db$COND$SITECLCD %in% c(1, 2, 3, 4, 5, 6) & db$COND$RESERVCD == 0, 1, 0)
+
+      ## A general fix for land domain issues on timberland, i.e., trees on non-timberland being included
+      db$TREE <- db$TREE %>%
+        left_join(select(db$COND, PLT_CN, CONDID, landD), by = c('PLT_CN', 'CONDID')) %>%
+        mutate(typeD = landD) %>%
+        select(-c('landD'))
+
       # Tree Type domain indicator
-      if (tolower(treeType) == 'all'){
-        db$TREE$typeD <- 1
+      if (toupper(stateVar) %in% c('SAWVOL', 'SAWVOL_BF')) {
+        ## Rename some variables in grm
+        db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
+                                        TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_SL_TIMBER,
+                                        TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_SL_TIMBER,
+                                        TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_SL_TIMBER,
+                                        SUBPTYP_GRM = SUBP_SUBPTYP_GRM_SL_TIMBER,
+                                        COMPONENT = SUBP_COMPONENT_SL_TIMBER) %>%
+          mutate(TPARECR_UNADJ = case_when(
+            is.na(COMPONENT) ~ NA_real_,
+            COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2') ~ TPAGROW_UNADJ,
+            TRUE ~ 0))
+
+
+      } else if (tolower(treeType) == 'all'){
         ## Rename some variables in grm
         db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
                                         TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_AL_TIMBER,
@@ -459,17 +496,17 @@ typeDomain_grow <- function(db, treeType, landType, type) {
         #     STATUSCD %in% 1:2 & DIA >=5 ~ 1,
         #     STATUSCD == 3 & PREVDIA >=5 ~ 1,
         #     TRUE ~ 0))
-        db$TREE$typeD <- 1
         db$TREE_GRM_COMPONENT <- rename(db$TREE_GRM_COMPONENT,
                                         TPAMORT_UNADJ = SUBP_TPAMORT_UNADJ_GS_TIMBER,
                                         TPAREMV_UNADJ = SUBP_TPAREMV_UNADJ_GS_TIMBER,
                                         TPAGROW_UNADJ = SUBP_TPAGROW_UNADJ_GS_TIMBER,
                                         SUBPTYP_GRM = SUBP_SUBPTYP_GRM_GS_TIMBER,
-                                        COMPONENT = SUBP_COMPONENT_GS_TIMBER)%>%
+                                        COMPONENT = SUBP_COMPONENT_GS_TIMBER )%>%
           mutate(TPARECR_UNADJ = case_when(
             is.na(COMPONENT) ~ NA_real_,
             COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2') ~ TPAGROW_UNADJ,
             TRUE ~ 0))
+
       }
     }
   }

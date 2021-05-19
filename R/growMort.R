@@ -159,7 +159,7 @@ growMortStarter <- function(x,
 
   ## Build a domain indicator for each observation (1 or 0) --------------------
   ## Land type and tree type combined
-  db <- typeDomain_grow(db, treeType, landType, type = 'gm')
+  db <- typeDomain_grow(db, treeType, landType, type = 'gm', stateVar)
 
   ## Spatial boundary
   if(!is.null(polys)){

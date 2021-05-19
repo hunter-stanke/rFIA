@@ -29,27 +29,26 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
            ## So we can estimate live TPA at t2 (t1 unavailable w/out growth accounting) with:
            TPA_UNADJ = TPA_UNADJ * state_recr * if_else(STATUSCD == 1 & DIA >= 5, 1, 0),
            aChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.prev == 1 & !is.null(CONDPROP_UNADJ), 1, 0),
-           tChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.prev == 1, 1, 0),
-           test = if_else(COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2'), 1, 0))
+           tChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.prev == 1, 1, 0))
 
 
   # If previous attributes are unavailable for trees, default to current (otherwise we get NAs for early inventories)
   data$tD.prev <- ifelse(is.na(data$tD.prev), data$tD, data$tD.prev)
   data$typeD.prev <- ifelse(is.na(data$typeD.prev), data$typeD, data$typeD.prev)
-  data$landD.prev <- ifelse(is.na(data$landD.prev), data$landD, data$landD.prev)
+  data$landD.prev.noga <- ifelse(is.na(data$landD.prev), data$landD, data$landD.prev)
   ## Issue is here for pre-growth accounting
-  #data$landD.prev <- ifelse(data$landD == 1 & data$landD.prev == 1, 1, 0)
+  data$landD.prev.ga <- ifelse(data$landD == 1 & data$landD.prev == 1, 1, 0)
   data$aD_p.prev <- ifelse(is.na(data$aD_p.prev), data$aD_p, data$aD_p.prev)
   data$aD_c.prev <- ifelse(is.na(data$aD_c.prev), data$aD_c, data$aD_c.prev)
   data$sp.prev <- ifelse(is.na(data$sp.prev), data$sp, data$sp.prev)
 
   ## Comprehensive indicator function -- w/ growth accounting
-  data$tDI_ga <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev * data$tChng
+  data$tDI_ga <- data$landD.prev.ga * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev * data$tChng
   data$tDI_ga_r <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp * data$tChng
 
   ## Comprehensive indicator function
   data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
-  data$tDI <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev
+  data$tDI <- data$landD.prev.noga * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev
   data$tDI_r <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
 
   if ('SUBP_COND_CHNG_MTRX' %in% names(db)) {
