@@ -384,14 +384,25 @@ area <- function(db,
       tOut <- tTotal %>%
         #left_join(aTotal, by = grpBy) %>%
         # Renaming, computing ratios, and SE
-        mutate(PERC_AREA = aEst / atEst * 100,
+        mutate(PERC_AREA = aEst / atEst,
                AREA_TOTAL = aEst,
                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL *100,
 
                ## ratio variance
                rVar = (1/atEst^2) * (aVar + (PERC_AREA^2 * atVar) - 2 * PERC_AREA * aCV),
-               PERC_AREA_SE = sqrt(rVar) / PERC_AREA * 100,
-               PERC_AREA_VAR = rVar,
+
+               ## Convert to percentage
+               PERC_AREA = PERC_AREA * 100,
+               rVar = rVar * (100^2),
+
+               ## Ratio variances
+               # These aren't truly negative values, but come from rounding errors
+               # when PERC_AREA = 100, i.e., estimated variance is 0
+               PERC_AREA_SE = case_when(rVar < 0 ~ 0,
+                                        TRUE ~ sqrt(rVar) / PERC_AREA * 100),
+               PERC_AREA_VAR = case_when(rVar < 0 ~ 0,
+                                         TRUE ~ rVar),
+
                #N = sum(N),
                AREA_TOTAL_VAR = aVar,
                nPlots_AREA = plotIn_AREA) %>%
