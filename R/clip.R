@@ -194,6 +194,9 @@ clipFIA <- function(db,
     pltSF <- bind_rows(out) %>%
       left_join(select(db$PLOT, PLT_CN, PREV_PLT_CN, pltID), by = 'pltID')
 
+    if (length(unique(pltSF$pltID)) < 1){
+      stop('No plots in db overlap with mask')
+    }
     #if(mostRecent == FALSE & is.null(evalid)) PPLOT <- filter(db$PLOT, db$PLOT$PLT_CN %in% pltSF$PREV_PLT_CN)
     if(mostRecent == FALSE & is.null(evalid)) {
       PPLOT <- NULL
