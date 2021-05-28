@@ -43,80 +43,97 @@ readFIA <- function(dir,
       stop('Cannot merge ENITRE with other state tables. ENTIRE includes all state tables combined. Do you only need data for a particular region?')
     }
 
-    # Only read in the specified tables
-    if (!is.null(tables)){
-      if (any(str_sub(files, 3, 3) == '_')){
-        files <- files[str_sub(files,4,-5) %in% tables]
-      } else {
-        files <- files[str_sub(files,1,-5) %in% tables]
-      }
-    }
-
     # Only csvs
     files <- files[str_sub(files,-4,-1) == '.csv']
 
-    ## Only csvs that have FIA names
-    if (any(str_sub(files, 3, 3) == '_')){
-      files <- files[str_sub(files,4,-5) %in% intData$fiaTableNames]
-    } else{
-      files <- files[str_sub(files,1,-5) %in% intData$fiaTableNames]
-    }
+    ## All states present in the directory, adding reference if present
+    allStates <- unique(str_to_upper(str_sub(files, 1, 2)))
+    allStates <- allStates[allStates %in% intData$stateNames$STATEAB]
+    if (any(str_to_upper(str_sub(files, 1, 3)) == 'REF')) allStates <- c(allStates, 'REF')
 
-    # Only extract the tables needed to run functions in rFIA
-    if (common){
-      cFiles <- c('COND', 'COND_DWM_CALC', 'INVASIVE_SUBPLOT_SPP', 'PLOT', 'POP_ESTN_UNIT',
-                  'POP_EVAL', 'POP_EVAL_GRP', 'POP_EVAL_TYP', 'POP_PLOT_STRATUM_ASSGN', 'POP_STRATUM',
-                  'SUBPLOT', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_MIDPT', 'TREE_GRM_BEGIN', 'SUBP_COND_CHNG_MTRX',
-                  'SEEDLING', 'SURVEY', 'SUBP_COND', 'P2VEG_SUBP_STRUCTURE')
-      if (any(str_sub(files, 3, 3) == '_')){
-        files <- files[str_sub(files,4,-5) %in% cFiles]
-      } else{
-        files <- files[str_sub(files,1,-5) %in% cFiles]
-      }
-    }
-
-
-    ## If individual tables are specified, then just grab those .csvs, otherwise download the .zip file, extract and read with fread. Should be quite a bit quicker.
+    ## If states are given, then subset files now,
+    ## otherwise, bring them all in
     if (!is.null(states)){
+
       ### I'm not very smart and like specify the name twice sometimes,
       ### --> making the function smarter than me
       states <- str_to_upper(unique(states))
 
-      ## Check to make sure states exist
-      allStates <- unique(str_to_upper(str_sub(files, 1, 2)))
-
+      ## Make sure the states exist to begin with
       if (any(states %in% allStates == FALSE)){
         missStates <- states[states %in% allStates == FALSE]
         stop(paste('Data unavailable for: ', paste(as.character(missStates),collapse = ', '), '. States not found in specified directory.'))
       }
 
-      files <- files[str_to_upper(str_sub(files, 1, 2)) %in% states]
-
+      state.files <- files[str_to_upper(str_sub(files, 1, 2)) %in% states]
+      if ('REF' %in% states) {
+        ref.files <- files[str_to_upper(str_sub(files, 1,3)) == 'REF']
+        files <- c(state.files, ref.files)
+      } else {
+        files <- c(state.files)
+      }
 
     } else {
       ## Checking if state files and merged state files are mixed in the directory.
       states <- unique(str_to_upper(str_sub(files, 1, 3)))
+      ## Dropping lichen spp summary and project reference tables
       trueStates <- states[str_sub(states, 3,3) == '_']
+      if ("REF" %in% states) {
+        trueStates <- c(trueStates, 'REF')
+      }
 
       ## If length is zero, then all merged states - great
       ## If length states is the same as true States, then all state files - great
       ## Otherwise, they're probably mixed. Throw a warning and read only the states
       if (length(trueStates) > 0 & length(trueStates) < length(states)) {
         warning('Found data from merged states and individual states in same directory. Reading only individual states files.')
-        files <- files[str_sub(files, 3,3) == '_']
+        state.files <- files[str_to_upper(str_sub(files, 3, 3)) == '_']
+        ref.files <- files[str_to_upper(str_sub(files, 1,3)) == 'REF']
+        files <- c(state.files, ref.files)
       }
+    }
+
+    ## Common file names to consider
+    ## All reference tables should be common
+    cFiles <- c('COND', 'COND_DWM_CALC', 'INVASIVE_SUBPLOT_SPP', 'PLOT', 'POP_ESTN_UNIT',
+                'POP_EVAL', 'POP_EVAL_GRP', 'POP_EVAL_TYP', 'POP_PLOT_STRATUM_ASSGN', 'POP_STRATUM',
+                'SUBPLOT', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_MIDPT', 'TREE_GRM_BEGIN', 'SUBP_COND_CHNG_MTRX',
+                'SEEDLING', 'SURVEY', 'SUBP_COND', 'P2VEG_SUBP_STRUCTURE')
+
+    if ('REF' %in% allStates) {
+      cFiles <- c(cFiles,
+                  "CITATION", "DIFFERENCE_TEST_PER_ACRE", "DIFFERENCE_TEST_TOTALS", "FIADB_VERSION",
+                  "FOREST_TYPE_GROUP", "FOREST_TYPE", "GRM_TYPE", "HABTYP_DESCRIPTION", "HABTYP_PUBLICATION",
+                  "INVASIVE_SPECIES", "LICHEN_SPECIES", "LICHEN_SPP_COMMENTS", "NVCS_HIERARCHY_STRCT",
+                  "NVCS_LEVEL_1_CODES", "NVCS_LEVEL_2_CODES", "NVCS_LEVEL_3_CODES", "NVCS_LEVEL_4_CODES",
+                  "NVCS_LEVEL_5_CODES", "NVCS_LEVEL_6_CODES", "NVCS_LEVEL_7_CODES", "NVCS_LEVEL_8_CODES",
+                  "OWNGRPCD", "PLANT_DICTIONARY", "POP_ATTRIBUTE", "POP_EVAL_TYP_DESCR", "RESEARCH_STATION",
+                  "SPECIES_GROUP", "SPECIES", "STATE_ELEV", "UNIT")
+    }
+
+    ## Drop state/ref abbreviations and .csv
+    abbs <- c(paste0('start_here_', intData$stateNames$STATEAB, '_'), 'start_here_REF_')
+    file.sub <- paste0('start_here_', str_remove(files, '.csv'))
+    ## only allow subset at the start at the beginning of string
+    for ( i in abbs ) file.sub <- str_remove(file.sub, i)
+
+
+    # Only read in the specified tables
+    if (!is.null(tables)){
+      files <- files[file.sub %in% tables]
+
+    # Otherwise if common=TRUE, grab all common
+    } else if (common) {
+      files <- files[file.sub %in% cFiles]
+
+    # Otherwise only known FIA tables
+    } else {
+      files <- files[file.sub %in% intData$fiaTableNames]
     }
 
 
 
-
-    # ## Compute estimates in parallel -- Clusters in windows, forking otherwise
-    # if (Sys.info()['sysname'] == 'Windows'){
-    #   cl <- makeCluster(nCores) # Set up snow cluster
-    #   inTables <- parLapply(cl, X = files, fun = readFIAHelper1, dir)
-    # } else { # Unix systems
-    #   inTables <- mclapply(files, FUN = readFIAHelper1, dir, mc.cores = nCores)
-    # }
+    ## Now read them in
     inTables <- list()
     for (n in 1:length(files)){
       ## If MODIFIED_DATE is not present, will warn
@@ -152,12 +169,14 @@ readFIA <- function(dir,
       outTables[[uniqueNames[i]]] <- rbindlist(inTables[names(inTables) == uniqueNames[i]], fill = TRUE)
     }
 
+
     # NEW CLASS NAME FOR FIA DATABASE OBJECTS
     out <- lapply(outTables, as.data.frame)
     class(out) <- 'FIA.Database'
 
-    ## If you are on windows, close explicitly
-    #closeAllConnections()
+
+    ## Add REF to the reference tables, will have _ prefix
+    names(out)[str_sub(names(out), 1, 1) == '_'] <- paste0('REF', names(out)[str_sub(names(out), 1, 1) == '_'])
 
 
     ### Methods for keeping data remote until they are needed
@@ -382,6 +401,11 @@ Did you accidentally include the state abbreviation in front of the table name? 
     # Make sure state Abbs are in right format
     states <- str_to_upper(states)
 
+    ## If you want all of the reference tables zipped together
+    if ('REF' %in% states) {
+      states[states == 'REF'] <- 'FIADB_REFERENCE'
+    }
+
     ## Download each state and extract to directory
     for (i in 1:length(states)){
       # Temporary directory to download to
@@ -401,6 +425,12 @@ Did you accidentally include the state abbreviation in front of the table name? 
     }
 
     if (load){
+
+      ## If you want all of the reference tables read in, change it back
+      if ('FIADB_REFERENCE' %in% states) {
+        states[states == 'FIADB_REFERENCE'] <- 'REF'
+      }
+
       ## Read in the files w/ readFIA
       if (is.null(dir)){
         outTables <- readFIA(tempDir, nCores = nCores, common = common, states = states)

@@ -389,7 +389,7 @@ area <- function(db,
                AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL *100,
 
                ## ratio variance
-               rVar = (1/atEst^2) * (aVar + (PERC_AREA^2 * atVar) - 2 * PERC_AREA * aCV),
+               rVar = (1/atEst^2) * (aVar + (PERC_AREA^2 * atVar) - (2 * PERC_AREA * aCV)),
 
                ## Convert to percentage
                PERC_AREA = PERC_AREA * 100,
