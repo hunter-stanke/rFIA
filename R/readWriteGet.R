@@ -441,13 +441,9 @@ Did you accidentally include the state abbreviation in front of the table name? 
     }
 
 
-    ## If you are on windows, close explicitly
-    #closeAllConnections()
-    #unlink(temp)
 
   }
-  #unlink(tempDir, recursive = TRUE)
-  #closeAllConnections()
+
 
   if (is.null(dir)){
     tmp <- list.files(tempDir, full.names = TRUE, pattern = '.csv')
@@ -531,8 +527,5 @@ writeFIA <- function(db,
       }
     }
   }
-
-  ## If you are on windows, close explicitly
-  closeAllConnections()
 
 }
