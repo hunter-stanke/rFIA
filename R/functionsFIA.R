@@ -278,9 +278,10 @@ handleTX <- function(db){
       distinct(EVALID, UNITCD) %>%
       group_by(EVALID) %>%
       summarise(n = n()) %>%
+      ungroup() %>%
       filter(n != 7) ## i.e., only keep EVALIDs w/out all 7 units
 
-    db$POP_EVAL <- filter(db$POP_EVAL, !c(EVALID %in% badIDS))
+    db$POP_EVAL <- filter(db$POP_EVAL, !c(EVALID %in% badIDS$EVALID))
 
   }
 
