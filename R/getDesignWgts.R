@@ -51,6 +51,14 @@ getDesignInfo <- function(db,
   ## Fix TX problems with incomplete labeling of E v. W TX
   db <- handleTX(db)
 
+  ## WY and NM list early FHM inventories, but they don't work, so dropping
+  if (any(c(35, 56) %in% unique(db$POP_EVAL$STATECD))) {
+    db$POP_EVAL <- db$POP_EVAL %>%
+      mutate(cut.these = case_when(STATECD %in% c(35, 56) & END_INVYR < 2001 ~ 1,
+                                   TRUE ~ 0)) %>%
+      filter(cut.these == 0) %>%
+      select(-c(cut.these))
+  }
 
   ## Pull together info for all evals listed in db
   evals <- db$POP_EVAL %>%
