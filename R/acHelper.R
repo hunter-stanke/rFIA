@@ -218,6 +218,7 @@ acHelper2 <- function(x, popState, t, grpBy, method) {
               cVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cv, cStrat, cEst),
               cCV = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cov_cv, cStrat, cEst, pStrat, pEst),
               N = dplyr::first(p2eu),
+              A = dplyr::first(a),
               plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE)) %>%
     distinct()
 

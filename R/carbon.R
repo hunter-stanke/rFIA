@@ -42,8 +42,8 @@ carbonStarter <- function(x,
       c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
   }
-  if (landType %in% c('timber', 'forest') == FALSE){
-    stop('landType must be one of: "forest" or "timber".')
+  if (landType %in% c('timber', 'forest', 'all') == FALSE){
+    stop('landType must be one of: "forest", "timber", or "all".')
   }
   if (any(reqTables %in% names(db) == FALSE)){
     missT <- reqTables[reqTables %in% names(db) == FALSE]
@@ -279,7 +279,7 @@ carbonStarter <- function(x,
         left_join(wgts, by = joinCols) %>%
         mutate(across(c(cEst,aEst), ~(.*wgt))) %>%
         mutate(across(cVar:cvEst_c, ~(.*(wgt^2)))) %>%
-        group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+        group_by(ESTN_UNIT_CN, A, .dots = grpBy) %>%
         summarize(across(cEst:plotIn_TREE, sum, na.rm = TRUE))
 
 
@@ -416,7 +416,7 @@ carbon <- function(db,
       } else {
         tOut <- tOut %>%
           select(grpBy, "CARB_ACRE","CARB_TOTAL", "AREA_TOTAL","CARB_ACRE_SE", "CARB_TOTAL_SE",
-                 "AREA_TOTAL_SE","nPlots_TREE","nPlots_AREA")
+                 "AREA_TOTAL_SE","nPlots_TREE","nPlots_AREA", 'N')
       }
 
 
@@ -430,7 +430,7 @@ carbon <- function(db,
       } else {
         tOut <- tOut %>%
           select(grpBy, "CARB_ACRE","CARB_ACRE_SE",
-                 "nPlots_TREE","nPlots_AREA")
+                 "nPlots_TREE","nPlots_AREA", 'N')
       }
 
     }

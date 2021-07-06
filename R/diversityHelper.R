@@ -155,6 +155,7 @@ divHelper2 <- function(x, popState, t, full, grpBy, method){
               ehEst = unitMean(ESTN_METHOD, a, nh,  w, ehStrat),
               sEst = unitMean(ESTN_METHOD, a, nh,  w, sStrat),
               N = dplyr::first(p2eu),
+              A = dplyr::first(a),
               aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, av, aStrat, aEst),
               hVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, hv, hStrat, hEst),
               ehVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, ehv, ehStrat, ehEst),

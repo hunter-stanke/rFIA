@@ -315,7 +315,7 @@ tpaStarter <- function(x,
         left_join(wgts, by = joinCols) %>%
         mutate(across(tEst:bTEst, ~(.*wgt))) %>%
         mutate(across(tVar:cvEst_bT, ~(.*(wgt^2)))) %>%
-        group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+        group_by(ESTN_UNIT_CN, A, .dots = grpBy) %>%
         summarize(across(tEst:cvEst_bT, sum, na.rm = TRUE))
 
 
@@ -450,7 +450,7 @@ tpa <- function(db,
             #N = sum(N, na.rm = TRUE),
             nPlots_TREE = plotIn_TREE) %>%
       select(grpBy, TREE_TOTAL, BA_TOTAL, treeVar, baVar, cvT, cvB, TREE_SE, BA_SE, TREE_VAR, BA_VAR,
-             nPlots_TREE, N)
+             nPlots_TREE, N, A)
 
     ## IF using polys, we treat each zone as a unique population
     if (!is.null(polys)){
@@ -504,7 +504,7 @@ tpa <- function(db,
       } else {
         tOut <- tTotal %>%
           select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC, TREE_TOTAL, BA_TOTAL, AREA_TOTAL, TPA_SE, BAA_SE,
-                 TPA_PERC_SE, BAA_PERC_SE, TREE_SE, BA_SE, AREA_TOTAL_SE, nPlots_TREE, nPlots_AREA)
+                 TPA_PERC_SE, BAA_PERC_SE, TREE_SE, BA_SE, AREA_TOTAL_SE, nPlots_TREE, nPlots_AREA, N)
       }
 
     } else {
@@ -515,7 +515,7 @@ tpa <- function(db,
       } else {
         tOut <- tTotal %>%
           select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC,  TPA_SE, BAA_SE,
-                 TPA_PERC_SE, BAA_PERC_SE, nPlots_TREE, nPlots_AREA)
+                 TPA_PERC_SE, BAA_PERC_SE, nPlots_TREE, nPlots_AREA, N)
       }
 
     }

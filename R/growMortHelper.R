@@ -356,6 +356,7 @@ gmHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
               mEst = unitMean(ESTN_METHOD, a, nh, w, mStrat),
               hEst = unitMean(ESTN_METHOD, a, nh, w, hStrat),
               N = dplyr::first(p2eu),
+              A = dplyr::first(a),
               #aEst = dplyr::first(aEst),
               # Estimation of unit variance
               tVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, tv, tStrat, tEst),

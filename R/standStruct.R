@@ -256,7 +256,7 @@ standStructStarter <- function(x,
         left_join(wgts, by = joinCols) %>%
         mutate(across(aEst:moEst, ~(.*wgt))) %>%
         mutate(across(aVar:cvEst_mo, ~(.*(wgt^2)))) %>%
-        group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+        group_by(ESTN_UNIT_CN, A, .dots = grpBy) %>%
         summarize(across(aEst:plotIn_AREA, sum, na.rm = TRUE))
 
 
@@ -408,7 +408,7 @@ standStruct <- function(db,
                  "POLE_AREA","MATURE_AREA","LATE_AREA","MOSAIC_AREA","AREA_TOTAL",
                  "POLE_PERC_SE","MATURE_PERC_SE","LATE_PERC_SE",   "MOSAIC_PERC_SE",
                  "POLE_AREA_SE",   "MATURE_AREA_SE", "LATE_AREA_SE",   "MOSAIC_AREA_SE",
-                 "AREA_TOTAL_SE","nPlots_AREA")
+                 "AREA_TOTAL_SE","nPlots_AREA", 'N')
       }
 
     } else {
@@ -421,7 +421,7 @@ standStruct <- function(db,
         tOut <- tOut %>%
           select(grpBy,"POLE_PERC","MATURE_PERC", "LATE_PERC", "MOSAIC_PERC",
                  "POLE_PERC_SE","MATURE_PERC_SE","LATE_PERC_SE",   "MOSAIC_PERC_SE",
-                 "nPlots_AREA")
+                 "nPlots_AREA", 'N')
       }
 
     }

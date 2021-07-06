@@ -350,7 +350,7 @@ vrStarter <- function(x,
         left_join(wgts, by = joinCols) %>%
         mutate(across(tEst:bioEst, ~(.*wgt))) %>%
         mutate(across(tVar:cvEst_bioA, ~(.*(wgt^2)))) %>%
-        group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+        group_by(ESTN_UNIT_CN, A, .dots = grpBy) %>%
         summarize(across(tEst:plotIn_TREE, sum, na.rm = TRUE))
 
 
@@ -547,7 +547,7 @@ vitalRates <- function(db,
                  BA_GROW_AC_SE, NETVOL_GROW_AC_SE, SAWVOL_GROW_AC_SE, BIO_GROW_AC_SE,
                  TREE_TOTAL, DIA_TOTAL, BA_TOTAL, NETVOL_TOTAL, SAWVOL_TOTAL, BIO_TOTAL, AREA_TOTAL,
                  TREE_TOTAL_SE, DIA_TOTAL_SE, BA_TOTAL_SE, NETVOL_TOTAL_SE,  SAWVOL_TOTAL_SE, BIO_TOTAL_SE,
-                 AREA_TOTAL_SE, nPlots_TREE, nPlots_AREA)
+                 AREA_TOTAL_SE, nPlots_TREE, nPlots_AREA, N)
       }
 
     } else {
@@ -560,7 +560,7 @@ vitalRates <- function(db,
         tOut <- tOut %>%
           select(grpBy, DIA_GROW, BA_GROW, NETVOL_GROW,  SAWVOL_GROW, BIO_GROW, BA_GROW_AC, NETVOL_GROW_AC, SAWVOL_GROW_AC,
                  BIO_GROW_AC, DIA_GROW_SE, BA_GROW_SE, NETVOL_GROW_SE, SAWVOL_GROW_SE, BIO_GROW_SE,
-                 BA_GROW_AC_SE, NETVOL_GROW_AC_SE,  SAWVOL_GROW_AC_SE, BIO_GROW_AC_SE, nPlots_TREE, nPlots_AREA)
+                 BA_GROW_AC_SE, NETVOL_GROW_AC_SE,  SAWVOL_GROW_AC_SE, BIO_GROW_AC_SE, nPlots_TREE, nPlots_AREA, N)
       }
 
     }

@@ -63,8 +63,8 @@ carbonHelper1 <- function(x, plts, db, grpBy, byPlot, byPool, byComponent, model
     as.data.frame()
 
     ## Join these back together
-    t <- t %>%
-      left_join(a, by = c('PLT_CN', grpBy))
+    t <- a %>%
+      left_join(t, by = c('PLT_CN', grpBy))
 
     ## Decide which estimate to use for snags
     if (modelSnag){
@@ -201,10 +201,16 @@ carbonHelper2 <- function(x, popState, t, a, grpBy, method, byPool, byComponent,
   grpSyms <- syms(grpBy)
   grpSyms_noCan <- syms(grpBy[!(grpBy %in% c('POOL', 'COMPONENT'))])
 
+  ## Select the rows of popState that are necessary. Usually do this in a
+  ## filtering join, but this simplifies cases more non-zero area plots exist
+  ## than non-zero tree plots
+  pop.sub <- select(popState[[x]], -c(STATECD)) %>%
+    filter(PLT_CN %in% unique(c(a$PLT_CN, t$PLT_CN)))
+
   t <- t %>%
     lazy_dt() %>%
     ## Rejoin with population tables
-    inner_join(select(popState[[x]], -c(STATECD)), by = 'PLT_CN') %>%
+    right_join(pop.sub, by = 'PLT_CN') %>%
     #Add adjustment factors
     mutate(tAdj = dplyr::case_when(
       ## When NA, stay NA
@@ -331,6 +337,7 @@ carbonHelper2 <- function(x, popState, t, a, grpBy, method, byPool, byComponent,
     summarize(cEst = unitMean(ESTN_METHOD, a, nh, w, cStrat),
               aEst = unitMean(ESTN_METHOD, a, nh,  w, aStrat),
               N = dplyr::first(p2eu),
+              A = dplyr::first(a),
               # Estimation of unit variance
               cVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cv, cStrat, cEst),
               aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, av, aStrat, aEst),

@@ -1,13 +1,13 @@
 
 model {
 
-  ## Priors on the coefficients
+  ## Informative priors on the regression coefficients
   alpha ~ dnorm(6, pow(1, -2))
   beta ~ dnorm(-.8025, pow(.1, -2))
 
-  ## Priors on the residual SD
+  ## Prior on the residual SD
   sigma_res ~ dunif(0, 100) # Residual standard deviation
-  tau_res <- 1 / (sigma_res*sigma_res) # Residual precision
+  tau_res <- 1 / pow(sigma_res, 2) # Residual precision
 
   ## Likelihood
   for (i in 1:I){
@@ -16,9 +16,13 @@ model {
     mu[i] <- alpha + beta*x[i]
 
     ## Quantile regression parameters
+    ## See here for background on formulation: https://bura.brunel.ac.uk/bitstream/2438/3593/1/fulltext.pdf
     w[i]  ~ dexp(tau_res)
-    me[i] <- (1 - 2 * p) / (p * (1 - p)) * w[i] + mu[i]
+    me[i] <- ( (1 - (2*p)) / (p * (1 - p)) ) * w[i] + mu[i]
     pe[i] <- (p * (1 - p) * tau_res) / (2 * w[i])
+    #pe[i] <- ( (2*w[i]) / (tau_res * p * (1-p)))
+
+    ## Likelihood
     y[i]  ~ dnorm(me[i], pe[i])
 
   }

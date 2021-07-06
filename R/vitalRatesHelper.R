@@ -328,6 +328,8 @@ vrHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
               bioEst = unitMean(ESTN_METHOD, a, nh, w, bioStrat),
 
               N = dplyr::first(p2eu),
+              A = dplyr::first(a),
+
               #aEst = dplyr::first(aEst),
               # Estimation of unit variance
               tVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, tv, tStrat, tEst),

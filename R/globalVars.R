@@ -273,6 +273,7 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'SUBP_SUBPTYP_GRM_SL_FOREST', 'SUBP_SUBPTYP_GRM_SL_TIMBER',
                          'SUBP_TPAGROW_UNADJ_SL_FOREST', 'SUBP_TPAGROW_UNADJ_SL_TIMBER',
                          'SUBP_TPAMORT_UNADJ_SL_FOREST', 'SUBP_TPAMORT_UNADJ_SL_TIMBER',
-                         'SUBP_TPAREMV_UNADJ_SL_FOREST', 'SUBP_TPAREMV_UNADJ_SL_TIMBER'
+                         'SUBP_TPAREMV_UNADJ_SL_FOREST', 'SUBP_TPAREMV_UNADJ_SL_TIMBER',
+                         'STRATUM_WGT', 'A', 'cut.these'
 
 ))

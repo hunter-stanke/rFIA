@@ -333,7 +333,7 @@ volStarter <- function(x,
         left_join(wgts, by = joinCols) %>%
         mutate(across(bcfEst:sbfEst, ~(.*wgt))) %>%
         mutate(across(bcfVar:cvEst_sbf, ~(.*(wgt^2)))) %>%
-        group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+        group_by(ESTN_UNIT_CN, A, .dots = grpBy) %>%
         summarize(across(bcfEst:plotIn_TREE, sum, na.rm = TRUE))
 
 
@@ -505,7 +505,7 @@ volume <- function(db,
                  BOLE_CF_TOTAL, SAW_CF_TOTAL, SAW_MBF_TOTAL, AREA_TOTAL,
                  BOLE_CF_ACRE_SE, SAW_CF_ACRE_SE, SAW_MBF_ACRE_SE,
                  BOLE_CF_TOTAL_SE, SAW_CF_TOTAL_SE, SAW_MBF_TOTAL_SE, AREA_TOTAL_SE,
-                 nPlots_TREE,nPlots_AREA)
+                 nPlots_TREE,nPlots_AREA, N)
       }
 
 
@@ -522,7 +522,7 @@ volume <- function(db,
           select(grpBy,
                  BOLE_CF_ACRE, SAW_CF_ACRE, SAW_MBF_ACRE,
                  BOLE_CF_ACRE_SE, SAW_CF_ACRE_SE, SAW_MBF_ACRE_SE,
-                 nPlots_TREE,nPlots_AREA)
+                 nPlots_TREE, nPlots_AREA, N)
       }
 
     }

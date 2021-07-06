@@ -156,6 +156,7 @@ vegStructHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
     summarize(cEst = unitMean(ESTN_METHOD, a, nh,  w, cStrat),
               plotIn_VEG = sum(plotIn_VEG, na.rm = TRUE),
               N = dplyr::first(p2eu),
+              A = dplyr::first(a),
               cVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cv, aStrat, aEst),
               # Unit Covariance
               cvEst_c = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cvStrat_c, cStrat, cEst, cTStrat, cTEst))

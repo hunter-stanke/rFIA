@@ -296,7 +296,7 @@ invasiveStarter <- function(x,
         left_join(wgts, by = joinCols) %>%
         mutate(across(iEst, ~(.*wgt))) %>%
         mutate(across(iVar:cvEst_i, ~(.*(wgt^2)))) %>%
-        group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+        group_by(ESTN_UNIT_CN, A, .dots = grpBy) %>%
         summarize(across(iEst:cvEst_i, sum, na.rm = TRUE))
 
 
@@ -431,7 +431,7 @@ invasive <- function(db,
         tOut <- tOut %>%
           select(grpBy, "COVER_PCT","INV_AREA_TOTAL", "AREA_TOTAL",
                  "COVER_PCT_SE","INV_AREA_TOTAL_SE", "AREA_TOTAL_SE",
-                 "nPlots_INV", "nPlots_AREA")
+                 "nPlots_INV", "nPlots_AREA", 'N')
       }
 
     } else {
@@ -440,7 +440,7 @@ invasive <- function(db,
           select(grpBy,"COVER_PCT","COVER_PCT_VAR","nPlots_INV", "nPlots_AREA", 'N')
       } else {
         tOut <- tOut %>%
-          select(grpBy,"COVER_PCT","COVER_PCT_SE","nPlots_INV", "nPlots_AREA")
+          select(grpBy,"COVER_PCT","COVER_PCT_SE","nPlots_INV", "nPlots_AREA", 'N')
       }
 
     }

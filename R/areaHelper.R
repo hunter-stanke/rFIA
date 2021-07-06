@@ -183,6 +183,7 @@ areaHelper2 <- function(x, popState, t, a, grpBy, method){
               aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, av, aStrat, aEst),
               aCV = unitVarNew(method = 'cov', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, acv, aStrat, aEst, atStrat, atEst),
               N = dplyr::first(p2eu),
+              A = dplyr::first(a),
               plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE)) %>%
     distinct()
 

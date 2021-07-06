@@ -303,6 +303,7 @@ dwmHelper2 <- function(x, popState, t, grpBy, method){
               cEst = unitMean(ESTN_METHOD, a, nh, w, cStrat),
               plotIn = sum(plotIn, na.rm = TRUE),
               N = dplyr::first(p2eu),
+              A = dplyr::first(a),
               # Estimation of unit variance
               aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, av, aStrat, aEst),
               vsmVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, vsmVar, vsmStrat, vsmEst),

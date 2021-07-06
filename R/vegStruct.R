@@ -297,7 +297,7 @@ vegStructStarter <- function(x,
         left_join(wgts, by = joinCols) %>%
         mutate(across(cEst, ~(.*wgt))) %>%
         mutate(across(cVar:cvEst_c, ~(.*(wgt^2)))) %>%
-        group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+        group_by(ESTN_UNIT_CN, A, .dots = grpBy) %>%
         summarize(across(cEst:cvEst_c, sum, na.rm = TRUE))
 
 
@@ -428,7 +428,7 @@ vegStruct <- function(db,
         tOut <- tOut %>%
           select(grpBy, "COVER_PCT","TOTAL_COVER_AREA", "AREA_TOTAL",
                  "COVER_PCT_SE","TOTAL_COVER_AREA_SE", "AREA_TOTAL_SE",
-                 "nPlots_VEG", "nPlots_AREA")
+                 "nPlots_VEG", "nPlots_AREA", N)
       }
 
     } else {
@@ -437,7 +437,7 @@ vegStruct <- function(db,
           select(grpBy,"COVER_PCT","COVER_PCT_VAR","nPlots_VEG", "nPlots_AREA", N)
       } else {
         tOut <- tOut %>%
-          select(grpBy,"COVER_PCT","COVER_PCT_SE","nPlots_VEG", "nPlots_AREA")
+          select(grpBy,"COVER_PCT","COVER_PCT_SE","nPlots_VEG", "nPlots_AREA", N)
       }
 
     }

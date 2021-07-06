@@ -297,7 +297,7 @@ diversityStarter <- function(x,
         left_join(wgts, by = joinCols) %>%
         mutate(across(aEst:sEst, ~(.*wgt))) %>%
         mutate(across(aVar:cvEst_s, ~(.*(wgt^2)))) %>%
-        group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+        group_by(ESTN_UNIT_CN, A, .dots = grpBy) %>%
         summarize(across(aEst:plotIn_AREA, sum, na.rm = TRUE))
 
 
@@ -444,7 +444,7 @@ diversity <- function(db,
 
       } else {
         tOut <- tOut %>%
-          select(grpBy, H_a, H_b, H_g, Eh_a, Eh_b, Eh_g, S_a, S_b, S_g, AREA_TOTAL, H_a_SE, Eh_a_SE, S_a_SE, AREA_TOTAL_SE, nPlots)
+          select(grpBy, H_a, H_b, H_g, Eh_a, Eh_b, Eh_g, S_a, S_b, S_g, AREA_TOTAL, H_a_SE, Eh_a_SE, S_a_SE, AREA_TOTAL_SE, nPlots, N)
       }
 
     } else {
@@ -454,7 +454,7 @@ diversity <- function(db,
 
       } else {
         tOut <- tOut %>%
-          select(grpBy, H_a, H_b, H_g, Eh_a, Eh_b, Eh_g, S_a, S_b, S_g,  H_a_SE, Eh_a_SE, S_a_SE,  nPlots)
+          select(grpBy, H_a, H_b, H_g, Eh_a, Eh_b, Eh_g, S_a, S_b, S_g,  H_a_SE, Eh_a_SE, S_a_SE,  nPlots, N)
       }
     }
 

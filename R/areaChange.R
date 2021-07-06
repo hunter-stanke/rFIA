@@ -299,7 +299,7 @@ acStarter <- function(x,
         left_join(wgts, by = joinCols) %>%
         mutate(across(c(pEst, cEst), ~(.*wgt))) %>%
         mutate(across(c(pVar, cVar), ~(.*(wgt^2)))) %>%
-        group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+        group_by(ESTN_UNIT_CN, A, .dots = grpBy) %>%
         summarize(across(pEst:plotIn_AREA, sum, na.rm = TRUE))
 
 
@@ -432,7 +432,7 @@ areaChange <- function (db,
           select(-c(PERC_CHNG_SE, AREA_CHNG_SE, PREV_AREA_SE))
       } else {
         tOut <- tOut %>%
-          select(-c(PERC_CHNG_VAR, AREA_CHNG_VAR, PREV_AREA_VAR, N))
+          select(-c(PERC_CHNG_VAR, AREA_CHNG_VAR, PREV_AREA_VAR))
       }
 
       # Snag the names
@@ -471,7 +471,7 @@ areaChange <- function (db,
           select(-c(AREA_CHNG_SE))
       } else {
         tOut <- tOut %>%
-          select(-c(AREA_CHNG_VAR, N))
+          select(-c(AREA_CHNG_VAR))
       }
     }
 

@@ -29,7 +29,7 @@ carbon(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
 
   \item{modelSnag}{logical; if TRUE, return modeled estimates of standing dead wood (i.e., snag) carbon (not a direct sum of actual dead wood observatiosn). Otherwise use observations (P2) of standing dead wood carbon in estimation.}
 
-  \item{landType}{character ("forest" or "timber"); Type of land that estimates will be produced for. Timberland is a subset of forestland (default) which has high site potential and non-reserve status (see details).}
+  \item{landType}{character ("forest", "timber", or "all"); Type of land that estimates will be produced for. Timberland is a subset of forestland (default) which has high site potential and non-reserve status (see details). When "forest" or "all", ratios represent average forest carbon density \emph{on forest or timberland}, i.e., non-forested conditions are excluded. When "all", ratios represent average forest carbon density across all land uses, including non-forest. }
 
   \item{method}{character; design-based estimator to use. One of:  "TI" (temporally indifferent, default), "annual" (annual), "SMA"" (simple moving average), "LMA" (linear moving average), or "EMA" (exponential moving average). See \href{https://www.fs.fed.us/nrs/pubs/jrnl/2020/nrs_2020_stanke_001.pdf}{Stanke et al 2020} for a complete description of these estimators.}
 

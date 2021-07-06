@@ -387,7 +387,7 @@ growMortStarter <- function(x,
         left_join(wgts, by = joinCols) %>%
         mutate(across(tEst:hEst, ~(.*wgt))) %>%
         mutate(across(tVar:cvEst_hp, ~(.*(wgt^2)))) %>%
-        group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+        group_by(ESTN_UNIT_CN, A, .dots = grpBy) %>%
         summarize(across(tEst:plotIn_h, sum, na.rm = TRUE))
 
 
@@ -566,7 +566,7 @@ growMort <- function(db,
                  TREE_TOTAL, RECR_TREE_TOTAL, MORT_TREE_TOTAL, REMV_TREE_TOTAL, AREA_TOTAL,
                  RECR_TPA_SE, MORT_TPA_SE, REMV_TPA_SE, RECR_PERC_SE, MORT_PERC_SE, REMV_PERC_SE,
                  TREE_TOTAL_SE, RECR_TREE_TOTAL_SE, MORT_TREE_TOTAL_SE, REMV_TREE_TOTAL_SE, AREA_TOTAL_SE,
-                 nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV, nPlots_AREA)
+                 nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV, nPlots_AREA, N)
       }
 
     } else {
@@ -579,7 +579,7 @@ growMort <- function(db,
         tOut <- tOut %>%
           select(grpBy, RECR_TPA, MORT_TPA, REMV_TPA, RECR_PERC, MORT_PERC, REMV_PERC,
                  RECR_TPA_SE, MORT_TPA_SE, REMV_TPA_SE, RECR_PERC_SE, MORT_PERC_SE, REMV_PERC_SE,
-                 nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV,nPlots_AREA)
+                 nPlots_TREE, nPlots_RECR, nPlots_MORT, nPlots_REMV,nPlots_AREA, N)
       }
 
     }

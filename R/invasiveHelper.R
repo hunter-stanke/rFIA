@@ -160,6 +160,7 @@ invHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
     group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
     summarize(iEst = unitMean(ESTN_METHOD, a, nh,  w, iStrat),
               N =dplyr::first(p2eu),
+              A = dplyr::first(a),
               plotIn_INV = sum(plotIn_INV, na.rm = TRUE),
               iVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh,dplyr::first(p2eu), w, iv, iStrat, iEst),
               # Unit Covariance

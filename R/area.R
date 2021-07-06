@@ -279,7 +279,7 @@ areaStarter <- function(x,
         left_join(wgts, by = joinCols) %>%
         mutate(across(c(aEst, atEst), ~(.*wgt))) %>%
         mutate(across(c(aVar, atVar), ~(.*(wgt^2)))) %>%
-        group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+        group_by(ESTN_UNIT_CN, A, .dots = grpBy) %>%
         summarize(across(aEst:plotIn_AREA, sum, na.rm = TRUE))
 
 
@@ -415,7 +415,7 @@ area <- function(db,
         select(-c(AREA_TOTAL_SE, PERC_AREA_SE))
     } else {
       tOut <- tOut %>%
-        select(-c(AREA_TOTAL_VAR, PERC_AREA_VAR, N))
+        select(-c(AREA_TOTAL_VAR, PERC_AREA_VAR))
     }
 
     # Snag the names

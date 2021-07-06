@@ -261,7 +261,7 @@ dwmStarter <- function(x,
         left_join(wgts, by = joinCols) %>%
         mutate(across(aEst:cEst, ~(.*wgt))) %>%
         mutate(across(aVar:cvEst_c, ~(.*(wgt^2)))) %>%
-        group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+        group_by(ESTN_UNIT_CN, A, .dots = grpBy) %>%
         summarize(across(aEst:cvEst_c, sum, na.rm = TRUE))
       }
 

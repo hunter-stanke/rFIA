@@ -218,6 +218,8 @@ volHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
               scfEst = unitMean(ESTN_METHOD, a, nh, w, scfStrat),
               sbfEst = unitMean(ESTN_METHOD, a, nh, w, sbfStrat),
               N = dplyr::first(p2eu),
+              A = dplyr::first(a),
+
               # Estimation of unit variance
               bcfVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, bcfv, bcfStrat, bcfEst),
               scfVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, scfv, scfStrat, scfEst),

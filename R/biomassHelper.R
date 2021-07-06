@@ -131,7 +131,9 @@ bioHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
     group_by(ESTN_UNIT_CN, !!!aGrpSyms) %>%
     summarize(aEst = unitMean(ESTN_METHOD, a, nh,  w, aStrat),
               aVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, av, aStrat, aEst),
-              plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE))
+              plotIn_AREA = sum(plotIn_AREA, na.rm = TRUE),
+              N = dplyr::first(p2eu),
+              A = dplyr::first(a))
 
 
 
@@ -218,7 +220,6 @@ bioHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
     group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
     summarize(bEst = unitMean(ESTN_METHOD, a, nh, w, bStrat),
               cEst = unitMean(ESTN_METHOD, a, nh, w, cStrat),
-              N = dplyr::first(p2eu),
               # Estimation of unit variance
               bVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, bv, bStrat, bEst),
               cVar = unitVarNew(method = 'var', ESTN_METHOD, a, nh, dplyr::first(p2eu), w, cv, cStrat, cEst),

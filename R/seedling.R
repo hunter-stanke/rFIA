@@ -292,7 +292,7 @@ seedStarter <- function(x,
         left_join(wgts, by = joinCols) %>%
         mutate(across(tEst:tTEst, ~(.*wgt))) %>%
         mutate(across(tVar:cvEst_tT, ~(.*(wgt^2)))) %>%
-        group_by(ESTN_UNIT_CN, .dots = grpBy) %>%
+        group_by(ESTN_UNIT_CN, A, .dots = grpBy) %>%
         summarize(across(tEst:cvEst_tT, sum, na.rm = TRUE))
 
 
@@ -446,7 +446,7 @@ seedling <- function(db,
       } else {
         tOut <- tTotal %>%
           select(grpBy, TPA, TPA_PERC, TREE_TOTAL, AREA_TOTAL, TPA_SE,
-                 TPA_PERC_SE, TREE_SE, AREA_TOTAL_SE, nPlots_SEEDLING, nPlots_AREA)
+                 TPA_PERC_SE, TREE_SE, AREA_TOTAL_SE, nPlots_SEEDLING, nPlots_AREA, N)
       }
 
     } else {
@@ -457,7 +457,7 @@ seedling <- function(db,
       } else {
         tOut <- tTotal %>%
           select(grpBy, TPA, TPA_PERC,  TPA_SE,
-                 TPA_PERC_SE, nPlots_SEEDLING, nPlots_AREA)
+                 TPA_PERC_SE, nPlots_SEEDLING, nPlots_AREA, N)
       }
 
     }
