@@ -76,17 +76,26 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
     t <- data %>%
       lazy_dt() %>%
       mutate(YEAR = MEASYEAR) %>%
-      distinct(PLT_CN, SUBP, TREE, .keep_all = TRUE) %>%
+      distinct(PLT_CN, TRE_CN, COMPONENT, .keep_all = TRUE) %>%
       # Compute estimates at plot level
-      group_by(!!!grpSyms, PLT_CN) %>%
+      group_by(!!!grpSyms, PLT_CN, REMPER) %>%
+      # summarize(rPlot_ga = sum(TPARECR_UNADJ * tDI_ga_r, na.rm = TRUE),
+      #           mPlot_ga = sum(TPAMORT_UNADJ * tDI_ga, na.rm = TRUE),
+      #           hPlot_ga = sum(TPAREMV_UNADJ * tDI_ga, na.rm = TRUE),
+      #           tPlot_ga = sum(TPA_UNADJ * tDI_ga, na.rm = TRUE),
+      #           ## No growth accounting
+      #           rPlot = sum(TPARECR_UNADJ * tDI_r, na.rm = TRUE),
+      #           mPlot = sum(TPAMORT_UNADJ * tDI, na.rm = TRUE),
+      #           hPlot = sum(TPAREMV_UNADJ * tDI, na.rm = TRUE),
+      #           tPlot = sum(TPA_UNADJ * tDI, na.rm = TRUE))
       summarize(RECR_TPA = sum(TPARECR_UNADJ * tDI, na.rm = TRUE),
                 MORT_TPA = sum(TPAMORT_UNADJ * tDI, na.rm = TRUE),
                 REMV_TPA = sum(TPAREMV_UNADJ * tDI, na.rm = TRUE),
-                TOTAL_TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE),
-                nStems = length(which(tDI == 1))) %>%
-      mutate(RECR_PERC = RECR_TPA / TOTAL_TPA * 100,
-             MORT_PERC = MORT_TPA / TOTAL_TPA * 100,
-             REMV_PERC = REMV_TPA / TOTAL_TPA * 100) %>%
+                CURR_TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE)) %>%
+      mutate(PREV_TPA = CURR_TPA - ((RECR_TPA + MORT_TPA + REMV_TPA) * REMPER)) %>%
+      mutate(RECR_PERC = RECR_TPA / PREV_TPA * 100,
+             MORT_PERC = MORT_TPA / PREV_TPA * 100,
+             REMV_PERC = REMV_TPA / PREV_TPA * 100) %>%
       as.data.frame()
 
     a = NULL
@@ -133,7 +142,7 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
                 mPlot_ga = sum(TPAMORT_UNADJ * tDI_ga, na.rm = TRUE),
                 hPlot_ga = sum(TPAREMV_UNADJ * tDI_ga, na.rm = TRUE),
                 tPlot_ga = sum(TPA_UNADJ * tDI_ga, na.rm = TRUE),
-                ## No growth accoutning
+                ## No growth accounting
                 rPlot = sum(TPARECR_UNADJ * tDI_r, na.rm = TRUE),
                 mPlot = sum(TPAMORT_UNADJ * tDI, na.rm = TRUE),
                 hPlot = sum(TPAREMV_UNADJ * tDI, na.rm = TRUE),
