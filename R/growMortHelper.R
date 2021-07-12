@@ -92,7 +92,7 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
                 MORT_TPA = sum(TPAMORT_UNADJ * tDI, na.rm = TRUE),
                 REMV_TPA = sum(TPAREMV_UNADJ * tDI, na.rm = TRUE),
                 CURR_TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE)) %>%
-      mutate(PREV_TPA = CURR_TPA - ((RECR_TPA + MORT_TPA + REMV_TPA) * REMPER)) %>%
+      mutate(PREV_TPA = CURR_TPA + ((-RECR_TPA + MORT_TPA + REMV_TPA) * REMPER)) %>%
       mutate(RECR_PERC = RECR_TPA / PREV_TPA * 100,
              MORT_PERC = MORT_TPA / PREV_TPA * 100,
              REMV_PERC = REMV_TPA / PREV_TPA * 100) %>%
