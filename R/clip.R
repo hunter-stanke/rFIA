@@ -44,16 +44,57 @@ clipFIA <- function(db,
   ######### IF USER SPECIES EVALID (OR MOST RECENT), EXTRACT APPROPRIATE PLOTS ##########
   if (!is.null(evalid)){
     if (mostRecent) warning('Returning subset by EVALID only. For most recent subset, specify `evalid = NULL` and `mostRecent = TRUE`.')
+
     # Join appropriate tables and filter out specified EVALIDs
-    tempData <- select(db$PLOT, CN, PREV_PLT_CN) %>%
+    tempData <- select(db$PLOT, CN, PREV_PLT_CN, STATECD) %>%
       mutate(PLT_CN = CN) %>%
       left_join(select(db$POP_PLOT_STRATUM_ASSGN, c('PLT_CN', 'EVALID')), by = 'PLT_CN') %>%
       #inner_join(select(POP_ESTN_UNIT, c('EVAL_GRP_CN', 'EVALID')), by = 'EVAL_GRP_CN') %>%
       filter(EVALID %in% evalid)
+
+
+    ## If no EVALIDs are found, then stop, and tell us what's going on
+    if ( nrow(tempData) < 1 ) {
+
+      ## First off, what states are we dealing with? This will be really useful to
+      ## know for a remote, multi-state DB
+      states <- intData$stateNames %>%
+        filter(STATECD %in% unique(db$PLOT$STATECD)) %>%
+        .$STATEAB
+
+      ## Throw an error
+      if (length(states) > 2){
+        states <- paste0(paste(states[1:(length(states)-1)], collapse = ', '), paste0(', or ', states[length(states)]))
+      } else if (length(states) > 1) {
+        states <- paste0(paste(states, collapse = ' or '))
+      }
+      stop(paste0('None of specified EVALIDs are affiliated with ', states, '. To resolve, either add EVALIDs for these states in the list provided to `clipFIA`, or drop these states from the call to `readFIA` using the `states` argument.'))
+    }
+
+    ## If in memory and some states missing from evalid list, warn us
+    if ( !all(unique(db$PLOT$STATECD) %in% unique(tempData$STATECD)) ) {
+
+      ## Who's missing?
+      states <- intData$stateNames %>%
+        filter(STATECD %in% unique(db$PLOT$STATECD)) %>%
+        filter(!c(STATECD %in% unique(tempData$STATECD))) %>%
+        .$STATEAB
+
+      ## Throw an error
+      if (length(states) > 2){
+        states <- paste0(paste(states[1:(length(states)-1)], collapse = ', '), paste0(', or ', states[length(states)]))
+      } else if (length(states) > 1) {
+        states <- paste0(paste(states, collapse = ' or '))
+      }
+      warning(paste0('None of specified EVALIDs are affiliated with ', states, '. Estimates will not include data from these states.'))
+    }
+
     # Extract plots which relate to specified EVALID (previous for change estimation)
     PPLOT <- db$PLOT[db$PLOT$CN %in% tempData$PREV_PLT_CN,]
     if (nrow(PPLOT) < 1) PPLOT <- NULL
     db$PLOT <- db$PLOT[db$PLOT$CN %in% tempData$PLT_CN,]
+
+
   }
 
   ## Locate the most recent EVALID and subset plots
