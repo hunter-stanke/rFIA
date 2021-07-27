@@ -18,7 +18,7 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
       left_join(select(db$TREE_GRM_MIDPT, c('TRE_CN', 'DIA', 'state')), by = c('TRE_CN'), suffix = c('', '.mid')) %>%
       left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
       left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
-      left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
+      left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'TPA_UNADJ')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
     mutate_if(is.factor,
               as.character) %>%
     mutate(TPAGROW_UNADJ = TPAGROW_UNADJ * state,
@@ -28,6 +28,7 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
            ## State recruit is the state variable adjustment for ALL TREES at T2,
            ## So we can estimate live TPA at t2 (t1 unavailable w/out growth accounting) with:
            TPA_UNADJ = TPA_UNADJ * state_recr * if_else(STATUSCD == 1 & DIA >= 5, 1, 0),
+           TPA_UNADJ.prev = TPA_UNADJ.prev * state,
            aChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.prev == 1 & !is.null(CONDPROP_UNADJ), 1, 0),
            tChng = ifelse(COND_STATUS_CD == 1 & COND_STATUS_CD.prev == 1, 1, 0))
 
@@ -91,8 +92,9 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
       summarize(RECR_TPA = sum(TPARECR_UNADJ * tDI, na.rm = TRUE),
                 MORT_TPA = sum(TPAMORT_UNADJ * tDI, na.rm = TRUE),
                 REMV_TPA = sum(TPAREMV_UNADJ * tDI, na.rm = TRUE),
-                CURR_TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE)) %>%
-      mutate(PREV_TPA = CURR_TPA + ((-RECR_TPA + MORT_TPA + REMV_TPA) * REMPER)) %>%
+                CURR_TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE),
+                PREV_TPA = sum(TPA_UNADJ.prev * tDI, na.rm = TRUE)) %>%
+      #mutate(PREV_TPA = CURR_TPA + ((-RECR_TPA + MORT_TPA + REMV_TPA) * REMPER)) %>%
       mutate(RECR_PERC = RECR_TPA / PREV_TPA * 100,
              MORT_PERC = MORT_TPA / PREV_TPA * 100,
              REMV_PERC = REMV_TPA / PREV_TPA * 100) %>%
