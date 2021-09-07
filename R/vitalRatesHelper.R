@@ -10,14 +10,14 @@ vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, treeType){
   grpT <- names(db$TREE)[names(db$TREE) %in% grpBy & names(db$TREE) %in% c(grpP, grpC) == FALSE]
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'sp')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD', 'landD')), by = c('PLT_CN')) %>%
     left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'DIA', 'DRYBIO_AG', 'VOLCFNET', 'VOLBFNET', 'STATUSCD')), by = c('PLT_CN', 'CONDID')) %>%
     left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT')), by = c('TRE_CN')) %>%
     left_join(select(db$TREE_GRM_MIDPT, c('TRE_CN', 'DIA', 'VOLCFNET', 'VOLBFNET', 'DRYBIO_AG')), by = c('TRE_CN'), suffix = c('', '.mid')) %>%
     left_join(select(db$TREE_GRM_BEGIN, c('TRE_CN', 'DIA', 'VOLCFNET', 'VOLBFNET', 'DRYBIO_AG')), by = c('TRE_CN'), suffix = c('', '.beg')) %>%
-    left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
+    left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
     left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'DIA',  'DRYBIO_AG', 'VOLCFNET',  'VOLBFNET', 'STATUSCD')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
     mutate_if(is.factor,
               as.character) %>%
@@ -32,13 +32,12 @@ vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, treeType){
   data$typeD.prev <- ifelse(is.na(data$typeD.prev), data$typeD, data$typeD.prev)
   data$landD.prev <- ifelse(data$landD == 1 & data$landD.prev == 1, 1, 0)
     #ifelse(is.na(data$landD.prev), data$landD, data$landD.prev)
-  data$aD_p.prev <- ifelse(is.na(data$aD_p.prev), data$aD_p, data$aD_p.prev)
-  data$aD_c.prev <- ifelse(is.na(data$aD_c.prev), data$aD_c, data$aD_c.prev)
+  data$aD.prev <- ifelse(is.na(data$aD.prev), data$aD, data$aD.prev)
   data$sp.prev <- ifelse(is.na(data$sp.prev), data$sp, data$sp.prev)
 
   ## Comprehensive indicator function
-  data$aDI <- data$landD.prev * data$aD_p * data$aD_c * data$sp * data$aChng
-  data$tDI <- data$landD.prev * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev * data$tChng
+  data$aDI <- data$landD.prev * data$aD * data$sp * data$aChng
+  data$tDI <- data$landD.prev * data$aD.prev * data$tD.prev * data$typeD.prev * data$sp.prev * data$tChng
 
   ## Only if we're only considering live trees that stayed live
   if (tolower(treeType) == 'live') {data$tDI <- data$tDI * data$status}
@@ -71,10 +70,10 @@ vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, treeType){
                  names_sep = -1)
 
   ### DOING AREA SEPARATELY NOW FOR GROWTH ACCOUNTING PLOTS
-  aData <- select(db$PLOT,c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp')) %>%
+  aData <- select(db$PLOT,c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'sp')) %>%
     left_join(select(db$SUBP_COND_CHNG_MTRX, PLT_CN, PREV_PLT_CN, SUBPTYP, SUBPTYP_PROP_CHNG, PREVCOND, CONDID), by = c('PLT_CN', 'PREV_PLT_CN')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN', 'CONDID')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD', 'landD')), by = c('PLT_CN', 'CONDID')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD', 'landD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
     #left_join(select(db$POP_PLOT_STRATUM_ASSGN, by = 'PLT_CN')) %>%
     #left_join(select(db$POP_STRATUM, by = c('STRATUM_CN' = 'CN'))) %>%
     mutate(aChng = if_else(COND_STATUS_CD == 1 &
@@ -84,7 +83,7 @@ vrHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, treeType){
                            1, 0),
            SUBPTYP_PROP_CHNG = SUBPTYP_PROP_CHNG * .25)
 
-  aData$aDI <- aData$landD * aData$landD.prev * aData$aD_p * aData$aD_c * aData$sp * aData$aChng
+  aData$aDI <- aData$landD * aData$landD.prev * aData$aD * aData$sp * aData$aChng
 
 
   if (byPlot){

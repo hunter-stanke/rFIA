@@ -12,7 +12,8 @@ Produces estimates of down woody material stocks on a per acre basis from the Fo
 \usage{
 dwm(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = 'forest',
     method = 'TI', lambda = .5, areaDomain = NULL, totals = FALSE,
-    variance = FALSE, byPlot = FALSE, tidy = TRUE, nCores = 1)
+    variance = FALSE, byPlot = FALSE, condList = FALSE,
+    byFuelType = TRUE, nCores = 1)
 }
 
 \arguments{
@@ -38,7 +39,9 @@ dwm(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = 'forest',
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations instead of population estimates.}
 
-  \item{tidy}{logical; if TRUE, returns estimates grouped by fuel type, rather than including individual columns for each fuel type (For use in tidyverse packages, e.g. \code{ggplot2}, \code{\link{dplyr}}). Not recommended when returning spatial objects (\code{returnSpatial = TRUE}), for consistency with shapefile data structures. }
+  \item{condList}{logical; if TRUE, returns condition-level summaries intended for subsequent use with \code{\link{customPSE}}}.
+
+  \item{byFuelType}{logical; if TRUE, returns estimates grouped by fuel type (e.g., 1HR, 10HR, 100HR, 1000HR fuels). }
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }
@@ -126,11 +129,6 @@ dwm(fiaRI_mr, byPlot = TRUE)
 ## Estimates of all forestland, over time
 dwm(fiaRI)
 
-## Same as above, but output contains seperate column for each structural stage,
-##   rathern than grouping variable
-dwm(fiaRI,
-    tidy = FALSE)
-
 ## Estimates of all forestland on mesic sites (most recent)
 dwm(fiaRI_mr,
     areaDomain = PHYSCLCD \%in\% 21:29)
@@ -139,18 +137,11 @@ dwm(fiaRI_mr,
 dwm(fiaRI_mr,
     grpBy = OWNGRPCD)
 
-## Same as above, but implemented in parallel (much quicker)
-parallel::detectCores(logical = FALSE) # 4 cores available, we will take 2
-dwm(fiaRI_mr,
-    tidy = FALSE,
-    nCores = 2)
-
 ## Estimates of all forestland by county and return
-#   return spatial object
+## return spatial object
 dwmSF <- dwm(fiaRI_mr,
              polys = countiesRI,
-             returnSpatial = TRUE,
-             tidy = FALSE)
+             returnSpatial = TRUE)
 plot(dwmSF)
 plotFIA(dwmSF, BIO_ACRE) # TOTAL BIOMASS / ACRE (tons)
 }

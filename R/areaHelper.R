@@ -21,8 +21,8 @@ areaHelper1 <- function(x, plts, db, grpBy, byPlot){
 
 
   ## Comprehensive indicator function
-  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp * data$tD
-  data$pDI <- data$landD * data$aD_p * data$aD_c
+  data$aDI <- data$landD * data$aD * data$sp * data$tD
+  data$pDI <- data$landD * data$aD
 
   if (byPlot){
 

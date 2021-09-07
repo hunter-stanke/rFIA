@@ -13,7 +13,7 @@ Estimates the stand structural stage distribution of an area of forest/ timberla
 standStruct(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
             landType = 'forest', method = 'TI', lambda = .5,
             areaDomain = NULL, totals = FALSE, variance = FALSE,
-            byPlot = FALSE, tidy = TRUE, nCores = 1)
+            byPlot = FALSE, nCores = 1)
 }
 
 %- maybe also 'usage' for other objects documented here.
@@ -39,8 +39,6 @@ standStruct(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
     \item{variance}{logical; if TRUE, return estimated variance (\code{VAR}) and sample size (\code{N}). If FALSE, return 'sampling error' (\code{SE}) as returned by EVALIDator. Note: sampling error cannot be used to construct confidence intervals.}
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations instead of population estimates.}
-
-  \item{tidy}{logical; if TRUE, returns estimates grouped by structural stage, rather than including individual columns for each stand structural stage (For use in tidyverse packages, e.g. \code{ggplot2}, \code{\link{dplyr}}). Not recommended when returning spatial objects (\code{returnSpatial = TRUE}), for consistency with shapefile data structures. }
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }
@@ -136,21 +134,12 @@ standStruct(fiaRI_mr)
 
 \donttest{
 ## Same as above at plot-level (classify stands)
-standStruct(fiaRI_mr)
-
-## Same as above, but output contains seperate column for each structural stage,
-##   rathern than grouping variable
-standStruct(fiaRI_mr, tidy = FALSE)
+standStruct(fiaRI_mr,
+            byPlot = TRUE)
 
 ## Calculate structural stage distribution of all forestland by owner group, over time
 standStruct(fiaRI_mr,
             grpBy = OWNGRPCD)
-
-## Same as above, but implemented in parallel
-parallel::detectCores(logical = FALSE) # 4 cores available, we will take 2
-standStruct(fiaRI_mr,
-            grpBy = OWNGRPCD,
-            nCores = 2)
 
 ## Calculate structural stage distribution of all forestland on xeric sites, over time
 standStruct(fiaRI_mr,
@@ -159,13 +148,5 @@ standStruct(fiaRI_mr,
 ## Calculate structural stage distribution of all forestland, over time
 standStruct(fiaRI)
 
-## Calculate structural stage distribution of all forestland by county and return
-#   return spatial object
-sdSF <- standStruct(fiaRI_mr,
-            polys = countiesRI,
-            returnSpatial = TRUE,
-            tidy = FALSE)
-plot(sdSF)
-plotFIA(sdSF, POLE_PERC)
 }
 }

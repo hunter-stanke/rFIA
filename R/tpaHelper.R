@@ -20,9 +20,9 @@ tpaHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
       DIA >= MACRO_BREAKPOINT_DIA ~ 'MACR'))
 
   ## Comprehensive indicator function
-  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
-  data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
-  data$pDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$sp
+  data$aDI <- data$landD * data$aD * data$sp
+  data$tDI <- data$landD * data$aD * data$tD * data$typeD * data$sp
+  data$pDI <- data$landD * data$aD * data$tD * data$sp
 
 
   if (byPlot){
@@ -86,7 +86,7 @@ tpaHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
 tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
 
   ## DOES NOT MODIFY OUTSIDE ENVIRONMENT
-  if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL')) {
+  if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA', 'ANNUAL', 'ANNUAL_COV')) {
     grpBy <- c(grpBy, 'INVYR')
     aGrpBy <- c(aGrpBy, 'INVYR')
     popState[[x]]$P2POINTCNT <- popState[[x]]$P2POINTCNT_INVYR
@@ -189,7 +189,7 @@ tpaHelper2 <- function(x, popState, a, t, grpBy, aGrpBy, method){
               p2eu = dplyr::first(p2eu),
 
               ## dtplyr is fast, but requires a few extra steps, so we'll finish
-              ## means and variances in subseqent mutate step
+              ## means and variances in subsequent mutate step
 
               ## Strata means
               tStrat = sum(tPlot, na.rm = TRUE),

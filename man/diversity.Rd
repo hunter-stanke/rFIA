@@ -11,8 +11,8 @@ Produces estimates of diversity from FIA data. Returns shannon's index, shannon'
 diversity(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySizeClass = FALSE,
           landType = 'forest', treeType = 'live', method = 'TI', lambda = .5,
           stateVar = TPA_UNADJ, grpVar = SPCD, treeDomain = NULL,
-          areaDomain = NULL, byPlot = FALSE, totals = FALSE, variance = FALSE,
-          nCores = 1)
+          areaDomain = NULL, byPlot = FALSE, condList = FALSE, totals = FALSE,
+          variance = FALSE, nCores = 1)
 }
 
 \arguments{
@@ -47,6 +47,8 @@ diversity(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySizeClass = F
     \item{variance}{logical; if TRUE, return estimated variance (\code{VAR}) and sample size (\code{N}). If FALSE, return 'sampling error' (\code{SE}) as returned by EVALIDator. Note: sampling error cannot be used to construct confidence intervals.}
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations instead of population estimates.}
+
+  \item{condList}{logical; if TRUE, returns condition-level summaries intended for subsequent use with \code{\link{customPSE}}}.
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }

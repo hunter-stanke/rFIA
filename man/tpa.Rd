@@ -13,7 +13,8 @@ Produces tree per acre (TPA) and basal area per acre (BAA) estimates from FIA da
 tpa(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE,
     bySizeClass = FALSE, landType = 'forest', treeType = 'live',
      method = 'TI', lambda = .5, treeDomain = NULL, areaDomain = NULL,
-     totals = FALSE, variance = FALSE, byPlot = FALSE, nCores = 1)
+     totals = FALSE, variance = FALSE, byPlot = FALSE, treeList = FALSE,
+     nCores = 1)
 }
 
 \arguments{
@@ -46,6 +47,8 @@ tpa(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE,
     \item{variance}{logical; if TRUE, return estimated variance (\code{VAR}) and sample size (\code{N}). If FALSE, return 'sampling error' (\code{SE}) as returned by EVALIDator. Note: sampling error cannot be used to construct confidence intervals.}
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations instead of population estimates.}
+
+  \item{treeList}{logical; if TRUE, returns tree-level summaries intended for subsequent use with \code{\link{customPSE}}}.
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }

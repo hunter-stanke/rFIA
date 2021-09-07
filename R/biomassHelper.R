@@ -20,8 +20,8 @@ bioHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot, component){
       DIA >= MACRO_BREAKPOINT_DIA ~ 'MACR'))
 
   ## Comprehensive indicator function
-  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
-  data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
+  data$aDI <- data$landD * data$aD * data$sp
+  data$tDI <- data$landD * data$aD * data$tD * data$typeD * data$sp
 
 
   ## Convert to long format, where biomass component is the observation (multiple per tree)

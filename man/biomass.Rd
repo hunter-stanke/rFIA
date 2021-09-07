@@ -15,7 +15,8 @@ biomass(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
         landType = "forest", treeType = "live", method = "TI",
         lambda = 0.5, treeDomain = NULL, areaDomain = NULL,
         totals = FALSE, variance = FALSE, byPlot = FALSE,
-        component = "AG", bioMethod = "CRM", nCores = 1)
+        treeList = FALSE, component = "AG",
+        bioMethod = "CRM", nCores = 1)
 }
 
 \arguments{
@@ -50,6 +51,8 @@ biomass(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
     \item{variance}{logical; if TRUE, return estimated variance (\code{VAR}) and sample size (\code{N}). If FALSE, return 'sampling error' (\code{SE}) as returned by EVALIDator. Note: sampling error cannot be used to construct confidence intervals.}
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations instead of population estimates.}
+
+  \item{treeList}{logical; if TRUE, returns tree-level summaries intended for subsequent use with \code{\link{customPSE}}}.
 
   \item{component}{character, combination of: "TOTAL", "AG", "FOLIAGE", "TOP", "BOLE", "STUMP", "SAPLING", "WDLD_SPP"; biomass component to use in estimation. "TOTAL" is a sum of all components, "AG" is a sum of aboveground components, exluding foliage (i.e., top and limbs, merchantable bole, stump, sapling, and woodland species). "FOLIAGE" includes sapling foliage as well as stems larger than 5 in dbh. Foliage biomass of dead stems is assumed to be zero.}
 

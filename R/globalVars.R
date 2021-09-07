@@ -274,6 +274,25 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'SUBP_TPAGROW_UNADJ_SL_FOREST', 'SUBP_TPAGROW_UNADJ_SL_TIMBER',
                          'SUBP_TPAMORT_UNADJ_SL_FOREST', 'SUBP_TPAMORT_UNADJ_SL_TIMBER',
                          'SUBP_TPAREMV_UNADJ_SL_FOREST', 'SUBP_TPAREMV_UNADJ_SL_TIMBER',
-                         'STRATUM_WGT', 'A', 'cut.these'
+                         'STRATUM_WGT', 'A', 'cut.these',
+                         'AREA_BASIS', 'BIO_ACRE_VAR', 'BIO_cv', 'BIO_mean', 'BIO_var', 'CARB_ACRE_VAR',
+                         'CARB_TOTAL_VAR', 'CARB_cv', 'CARB_mean', 'CARB_var', 'COVER_AREA_TOTAL',
+                         'COVER_AREA_TOTAL_SE', 'COVER_AREA_TOTAL_VAR', 'COVER_PCT_VAR',
+                         'ESTN_UNIT_DESCR', 'Eh', 'Eh_cv', 'Eh_mean', 'Eh_var', 'H', 'H_cv', 'H_mean', 'H_var',
+                         'INV_AREA_TOTAL_SE', 'INV_AREA_TOTAL_VAR', 'P2PNTCNT_EU', 'P2PNTCNT_EU_INVYR',
+                         'PROP_FOREST', 'SCIENTIFIC_NAME', 'STAGE_AREA_TOTAL', 'STAGE_AREA_TOTAL_SE',
+                         'STAGE_AREA_TOTAL_VAR', 'STATUS1', 'STATUS2', 'S_cv', 'S_mean', 'S_var', 'TREE_BASIS',
+                         'VOL_ACRE_VAR', 'VOL_TOTAL_VAR', 'VOL_cv', 'VOL_mean', 'VOL_var', 'aChng', 'aD.prev', 'aD1',
+                         'aD2', 'aGrpBy', 'ac_cv', 'ac_mean', 'ac_var', 'bPlot_cv', 'bPlot_cv_t', 'bPlot_mean',
+                         'bPlot_var', 'bcf_cv', 'bcf_mean', 'bcf_var', 'bioPlot_cv', 'bioPlot_cv_t',
+                         'bioPlot_mean', 'bioPlot_var', 'cPlot_cv', 'cPlot_mean', 'cPlot_var', 'cover_cv',
+                         'cover_mean', 'cover_var', 'dPlot_cv', 'dPlot_cv_t', 'dPlot_mean', 'dPlot_var', 'fa_cv',
+                         'fa_mean', 'fa_var', 'fad', 'fad_mean', 'fad_var', 'full.area', 'gPlot_cv', 'gPlot_cv_t',
+                         'gPlot_mean', 'gPlot_var', 'grpByOrig', 'hPlot_cv', 'hPlot_cv_t', 'hPlot_mean',
+                         'hPlot_var', 'landD.prev', 'mPlot_cv', 'mPlot_cv_t', 'mPlot_mean', 'mPlot_var', 'method',
+                         'nPlots.x', 'nPlots.y', 'nPlots_VEG', 'prev_mean', 'prev_var', 'rPlot_cv', 'rPlot_cv_t',
+                         'rPlot_mean', 'rPlot_var', 'sPlot_cv', 'sPlot_cv_t', 'sPlot_mean', 'sPlot_var', 'sbf_cv',
+                         'sbf_mean', 'sbf_var', 'scf_cv', 'scf_mean', 'scf_var', 'sp.prev', 'tChng', 'tD.prev',
+                         'tPlot_cv', 'tPlot_mean', 'tPlot_var', 'typeD.prev'
 
 ))

@@ -9,7 +9,7 @@ ssHelper1 <- function(x, plts, db, grpBy, byPlot){
     left_join(db$TREE, by = c('PLT_CN', 'CONDID'))
 
   ## Comprehensive indicator function
-  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
+  data$aDI <- data$landD * data$aD * data$sp
 
 
 

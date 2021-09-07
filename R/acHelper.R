@@ -45,8 +45,8 @@ acHelper1 <- function(x, plts, db, grpBy, byPlot, keepThese, chngType,
     left_join(tree, by = c('PLT_CN', 'CONDID')) %>%
     filter(!is.na(PROP_BASIS) & !is.na(CONDPROP_UNADJ)) %>%
     left_join(db$SUBP_COND_CHNG_MTRX, by = c('PLT_CN', 'CONDID')) %>%
-    left_join(select(db$PLOT, PLT_CN, sp, all_of(grpP), aD_p), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
-    left_join(select(db$COND, PLT_CN, landD, all_of(grpC), aD_c, CONDPROP_UNADJ, CONDID), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('2', '1')) %>%
+    left_join(select(db$PLOT, PLT_CN, sp, all_of(grpP)), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
+    left_join(select(db$COND, PLT_CN, landD, all_of(grpC), aD, CONDPROP_UNADJ, CONDID), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('2', '1')) %>%
     left_join(tree, by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('2', '1')) %>%
     rename(CONDID1 = PREVCOND,
            CONDID2 = CONDID) %>%
@@ -74,8 +74,8 @@ acHelper1 <- function(x, plts, db, grpBy, byPlot, keepThese, chngType,
 
     data <- data %>%
       # Clean up domain indicator and drop unnecessary cols
-      mutate(tDI1 = landD1 * aD_c1 * sp1 * aD_p1 * tD1,
-             tDI2 = landD2 * aD_c2 * sp2 * aD_p2 * tD2) %>%
+      mutate(tDI1 = landD1 * aD1 * sp1 * tD1,
+             tDI2 = landD2 * aD2 * sp2 * tD2) %>%
       select(PLT_CN, REMPER, SUBP, MEASYEAR, PLOT_STATUS_CD, PROP_BASIS,
              tDI1, tDI2, all_of(grp1), all_of(grp2),
              CONDID1, CONDID2,
@@ -97,8 +97,8 @@ acHelper1 <- function(x, plts, db, grpBy, byPlot, keepThese, chngType,
       # Clean up domain indicator and drop unnecessary cols
       mutate(TREE_DOMAIN1 = tD1,
              TREE_DOMAIN2 = tD2,
-             AREA_DOMAIN1 = landD1 * aD_c1 * sp1 * aD_p1,
-             AREA_DOMAIN2 = landD2 * aD_c2 * sp2 * aD_p2) %>%
+             AREA_DOMAIN1 = landD1 * aD1 * sp1,
+             AREA_DOMAIN2 = landD2 * aD2 * sp2) %>%
       select(PLT_CN, REMPER, SUBP, MEASYEAR, PLOT_STATUS_CD, PROP_BASIS,
              TREE_DOMAIN1, TREE_DOMAIN2, AREA_DOMAIN1, AREA_DOMAIN2,
              all_of(grp1), all_of(grp2),
@@ -121,8 +121,8 @@ acHelper1 <- function(x, plts, db, grpBy, byPlot, keepThese, chngType,
     if (quo_name(treeDomain) != 'NULL') grpBy <- c('TREE_DOMAIN1', 'TREE_DOMAIN2', grpBy)
     if (quo_name(areaDomain) != 'NULL') grpBy <- c('AREA_DOMAIN1', 'AREA_DOMAIN2', grpBy)
 
-
   }
+
 
   ## Summarize
   if (byPlot){

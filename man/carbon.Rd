@@ -11,7 +11,7 @@ carbon(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
        byPool = TRUE, byComponent = FALSE, modelSnag = TRUE,
        landType = "forest", method = "TI", lambda = 0.5,
        areaDomain = NULL, totals = FALSE, variance = FALSE,
-       byPlot = FALSE, nCores = 1)
+       byPlot = FALSE, condList = FALSE, nCores = 1)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -42,6 +42,8 @@ carbon(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
     \item{variance}{logical; if TRUE, return estimated variance (\code{VAR}) and sample size (\code{N}). If FALSE, return 'sampling error' (\code{SE}) as returned by EVALIDator. Note: sampling error cannot be used to construct confidence intervals.}
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations instead of population estimates.}
+
+  \item{condList}{logical; if TRUE, returns condition-level summaries intended for subsequent use with \code{\link{customPSE}}}.
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }

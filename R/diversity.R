@@ -1,4 +1,4 @@
-diversityStarter <- function(x,
+diversityStarter_old <- function(x,
                              db,
                              grpBy_quo = NULL,
                              polys = NULL,
@@ -139,14 +139,14 @@ diversityStarter <- function(x,
   ## Filtering out all inventories that are not relevant to the current estimation
   ## type. If using estimator other than TI, handle the differences in P2POINTCNT
   ## and in assigning YEAR column (YEAR = END_INVYR if method = 'TI')
-  pops <- handlePops(db, evalType = c('EXPVOL', 'EXPCURR'), method, mr)
+  pops <- handlePops_old(db, evalType = c('EXPVOL', 'EXPCURR'), method, mr)
 
   ## A lot of states do their stratification in such a way that makes it impossible
   ## to estimate variance of annual panels w/ post-stratified estimator. That is,
   ## the number of plots within a panel within an stratum is less than 2. When
   ## this happens, merge strata so that all have at least two obs
   if (str_to_upper(method) != 'TI') {
-    pops <- mergeSmallStrata(db, pops)
+    pops <- mergeSmallStrata_old(db, pops)
   }
 
 
@@ -182,10 +182,10 @@ diversityStarter <- function(x,
   ### Only joining tables necessary to produce plot level estimates
   db$PLOT <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA',
                                'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD',
-                               all_of(grpP), 'aD_p', 'sp', 'COUNTYCD'))
+                               all_of(grpP), 'sp', 'COUNTYCD'))
   db$COND <- select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS',
                                'COND_STATUS_CD', 'CONDID',
-                               all_of(grpC), 'aD_c', 'landD')) %>%
+                               all_of(grpC), 'aD', 'landD')) %>%
     filter(PLT_CN %in% db$PLOT$PLT_CN)
   db$TREE <- select(db$TREE, c('PLT_CN', 'TRE_CN', 'CONDID', 'DIA', 'grp',
                                 'state', 'SUBP', 'TREE',
@@ -319,8 +319,7 @@ diversityStarter <- function(x,
 }
 
 
-#' @export
-diversity <- function(db,
+diversity_old <- function(db,
                       grpBy = NULL,
                       polys = NULL,
                       returnSpatial = FALSE,
@@ -359,7 +358,7 @@ diversity <- function(db,
 
 
   ## Run the main portion
-  out <- lapply(X = iter, FUN = diversityStarter, db,
+  out <- lapply(X = iter, FUN = diversityStarter_old, db,
                 grpBy_quo = grpBy_quo, polys, returnSpatial,
                 bySizeClass,
                 landType, treeType, method,

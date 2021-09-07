@@ -12,7 +12,7 @@ areaChange(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
            byLandType = FALSE, landType = "forest", method = "TI",
            lambda = 0.5, treeDomain = NULL, areaDomain = NULL,
            totals = FALSE, variance = FALSE, byPlot = FALSE,
-           chngType = 'net', nCores = 1)
+           condList = FALSE, chngType = 'net', nCores = 1)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -41,6 +41,8 @@ areaChange(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
     \item{variance}{logical; if TRUE, return estimated variance (\code{VAR}) and sample size (\code{N}). If FALSE, return 'sampling error' (\code{SE}) as returned by EVALIDator. Note: sampling error cannot be used to construct confidence intervals.}
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations instead of population estimates.}
+
+  \item{condList}{logical; if TRUE, returns condition-level summaries intended for subsequent use with \code{\link{customPSE}}}.
 
   \item{chngType}{character, one of "net" or "component"; if "net", produce estimates of net change in land area, and if "component", produce estimates of component change in land area (i.e., showing all shifts across classified attributes).}
 

@@ -41,33 +41,33 @@ fsiHelper1 <- function(x, plts, db, grpBy, scaleBy, byPlot){
     filter(DESIGNCD %in% c(1, 501:505) & PLOT_STATUS_CD != 3 & !is.na(REMPER) & !is.na(PREV_PLT_CN)) %>%
     left_join(db$COND, by = c('PLT_CN')) %>%
     left_join(db$TREE, by = c('PLT_CN', 'CONDID')) %>%
-    left_join(select(db$PLOT, c('PLT_CN', 'sp', 'aD_p', 'DESIGNCD', 'PLOT_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('2', '1')) %>%
+    left_join(select(db$PLOT, c('PLT_CN', 'sp', 'DESIGNCD', 'PLOT_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('2', '1')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD', 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('2', '1')) %>%
     left_join(select(db$TREE, c('TRE_CN', all_of(grpT), treID, 'typeD', 'tD', 'TPA_UNADJ', 'BAA', 'DIA', 'STATUSCD', SPCD)), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('2', '1')) %>%
     filter(DESIGNCD1 %in% c(1, 501:505) & PLOT_STATUS_CD1 != 3) %>%
     mutate_if(is.factor,
               as.character)
 
   ## Comprehensive indicator function -- w/ growth accounting
-  data$tDI2 <- data$landD2 * data$aD_p2 * data$aD_c2 * data$tD2 * data$typeD2 * data$sp2 *
+  data$tDI2 <- data$landD2 * data$aD2 * data$tD2 * data$typeD2 * data$sp2 *
     if_else(data$STATUSCD2 == 1, 1, 0)
 
-  data$tDI1 <- data$landD1 * data$aD_p1 * data$aD_c1 * data$tD1 * data$typeD1 * data$sp1 *
+  data$tDI1 <- data$landD1 * data$aD1 * data$tD1 * data$typeD1 * data$sp1 *
     if_else(data$STATUSCD1 == 1, 1, 0)
 
   ## Comprehensive indicator function -- w/ growth accounting
-  data$pDI2 <- data$landD2 * data$aD_p2 * data$aD_c2 * data$typeD2 * data$sp2 *
+  data$pDI2 <- data$landD2 * data$aD2 * data$typeD2 * data$sp2 *
     if_else(data$STATUSCD2 == 1, 1, 0)
 
-  data$pDI1 <- data$landD1 * data$aD_p1 * data$aD_c1 * data$typeD1 * data$sp1 *
+  data$pDI1 <- data$landD1 * data$aD1 * data$typeD1 * data$sp1 *
     if_else(data$STATUSCD1 == 1, 1, 0)
 
   ## Save a copy for area calculations
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
-  aData <- select(db$PLOT, c('PLT_CN', 'PREV_PLT_CN', 'pltID', 'DESIGNCD', 'REMPER', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'MEASMON', 'MEASDAY', 'PLOT_STATUS_CD', all_of(grpP), 'aD_p', 'sp')) %>%
+  aData <- select(db$PLOT, c('PLT_CN', 'PREV_PLT_CN', 'pltID', 'DESIGNCD', 'REMPER', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'MEASMON', 'MEASDAY', 'PLOT_STATUS_CD', all_of(grpP), 'sp')) %>%
     filter(DESIGNCD %in% c(1, 501:505) & PLOT_STATUS_CD != 3) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
-    mutate(aDI = landD * aD_p * aD_c * sp)
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD', 'landD')), by = c('PLT_CN')) %>%
+    mutate(aDI = landD * aD * sp)
 
 
   ## PREVIOUS and CURRENT attributes

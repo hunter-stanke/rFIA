@@ -9,9 +9,9 @@ seedHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
     left_join(db$SEEDLING, by = c('PLT_CN', 'CONDID'))
 
   ## Comprehensive indicator function
-  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
-  data$tDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$sp
-  data$pDI <- data$landD * data$aD_p * data$aD_c * data$tD * data$sp
+  data$aDI <- data$landD * data$aD * data$sp
+  data$tDI <- data$landD * data$aD * data$tD * data$sp
+  data$pDI <- data$landD * data$aD * data$tD * data$sp
 
 
   if (byPlot){

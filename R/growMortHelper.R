@@ -11,13 +11,13 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
 
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
-  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp')) %>%
-    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN')) %>%
+  data <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'sp')) %>%
+    left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD', 'landD')), by = c('PLT_CN')) %>%
       left_join(select(db$TREE, c('PLT_CN', 'CONDID', 'PREVCOND', 'TRE_CN', 'PREV_TRE_CN', 'SUBP', 'TREE', grpT, 'tD', 'typeD', 'state_recr', TPA_UNADJ, STATUSCD, DIA)), by = c('PLT_CN', 'CONDID')) %>%
       left_join(select(db$TREE_GRM_COMPONENT, c('TRE_CN', 'SUBPTYP_GRM', 'TPAGROW_UNADJ', 'TPARECR_UNADJ', 'TPAREMV_UNADJ', 'TPAMORT_UNADJ', 'COMPONENT')), by = c('TRE_CN')) %>%
       left_join(select(db$TREE_GRM_MIDPT, c('TRE_CN', 'DIA', 'state')), by = c('TRE_CN'), suffix = c('', '.mid')) %>%
-      left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp', 'aD_p')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
-      left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD_c', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
+      left_join(select(db$PLOT, c('PLT_CN', grpP, 'sp')), by = c('PREV_PLT_CN' = 'PLT_CN'), suffix = c('', '.prev')) %>%
+      left_join(select(db$COND, c('PLT_CN', 'CONDID', 'landD', 'aD', grpC, 'COND_STATUS_CD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
       left_join(select(db$TREE, c('TRE_CN', grpT, 'typeD', 'tD', 'TPA_UNADJ')), by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
     mutate_if(is.factor,
               as.character) %>%
@@ -39,25 +39,24 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
   data$landD.prev.noga <- ifelse(is.na(data$landD.prev), data$landD, data$landD.prev)
   ## Issue is here for pre-growth accounting
   data$landD.prev.ga <- ifelse(data$landD == 1 & data$landD.prev == 1, 1, 0)
-  data$aD_p.prev <- ifelse(is.na(data$aD_p.prev), data$aD_p, data$aD_p.prev)
-  data$aD_c.prev <- ifelse(is.na(data$aD_c.prev), data$aD_c, data$aD_c.prev)
+  data$aD.prev <- ifelse(is.na(data$aD.prev), data$aD, data$aD.prev)
   data$sp.prev <- ifelse(is.na(data$sp.prev), data$sp, data$sp.prev)
 
   ## Comprehensive indicator function -- w/ growth accounting
-  data$tDI_ga <- data$landD.prev.ga * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev * data$tChng
-  data$tDI_ga_r <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp * data$tChng
+  data$tDI_ga <- data$landD.prev.ga * data$aD.prev * data$tD.prev * data$typeD.prev * data$sp.prev * data$tChng
+  data$tDI_ga_r <- data$landD * data$aD * data$tD * data$typeD * data$sp * data$tChng
 
   ## Comprehensive indicator function
-  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
-  data$tDI <- data$landD.prev.noga * data$aD_p.prev * data$aD_c.prev * data$tD.prev * data$typeD.prev * data$sp.prev
-  data$tDI_r <- data$landD * data$aD_p * data$aD_c * data$tD * data$typeD * data$sp
+  data$aDI <- data$landD * data$aD * data$sp
+  data$tDI <- data$landD.prev.noga * data$aD.prev * data$tD.prev * data$typeD.prev * data$sp.prev
+  data$tDI_r <- data$landD * data$aD * data$tD * data$typeD * data$sp
 
   if ('SUBP_COND_CHNG_MTRX' %in% names(db)) {
     ### DOING AREA SEPARATELY NOW FOR GROWTH ACCOUNTING PLOTS
-    aData <- select(db$PLOT,c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'aD_p', 'sp')) %>%
+    aData <- select(db$PLOT,c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD', 'PREV_PLT_CN', 'REMPER', grpP, 'sp')) %>%
       left_join(select(db$SUBP_COND_CHNG_MTRX, PLT_CN, PREV_PLT_CN, SUBPTYP, SUBPTYP_PROP_CHNG, PREVCOND, CONDID), by = c('PLT_CN', 'PREV_PLT_CN')) %>%
-      left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PLT_CN', 'CONDID')) %>%
-      left_join(select(db$COND, c('PLT_CN', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
+      left_join(select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD', 'landD')), by = c('PLT_CN', 'CONDID')) %>%
+      left_join(select(db$COND, c('PLT_CN', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD', 'landD')), by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'), suffix = c('', '.prev')) %>%
       mutate(aChng = if_else(COND_STATUS_CD == 1 &
                                COND_STATUS_CD.prev == 1 &
                                !is.null(CONDPROP_UNADJ) &
@@ -66,7 +65,7 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
              SUBPTYP_PROP_CHNG = SUBPTYP_PROP_CHNG * .25)
 
     aData$landD <- ifelse(aData$landD == 1 & aData$landD.prev == 1, 1, 0)
-    aData$aDI_ga <- aData$landD * aData$aD_p * aData$aD_c * aData$sp * aData$aChng
+    aData$aDI_ga <- aData$landD * aData$aD * aData$sp * aData$aChng
 
   }
 
@@ -121,7 +120,7 @@ gmHelper1 <- function(x, plts, db, grpBy, aGrpBy, byPlot){
         #distinct(PLT_CN, SUBP, CONDID, .keep_all = TRUE) %>%
         group_by(PLT_CN, PROP_BASIS, .dots = aGrpBy) %>%
         summarize(fa_ga = sum(SUBPTYP_PROP_CHNG * aDI_ga, na.rm = TRUE),
-                  plotIn_ga = ifelse(sum(aDI_ga >  0, na.rm = TRUE), 1,0))
+                  plotIn_ga = ifelse(sum(aDI_ga > 0, na.rm = TRUE), 1,0))
 
       a <- a %>%
         left_join(select(a_ga, PLT_CN, PROP_BASIS, aGrpBy, fa_ga, plotIn_ga), by = c('PLT_CN', 'PROP_BASIS', aGrpBy))

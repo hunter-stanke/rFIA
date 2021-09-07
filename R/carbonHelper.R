@@ -26,7 +26,7 @@ carbonHelper1 <- function(x, plts, db, grpBy, byPlot, byPool, byComponent, model
                             TRUE ~ 0))
 
   ## Comprehensive indicator function
-  data$aDI <- data$landD * data$aD_p * data$aD_c * data$sp
+  data$aDI <- data$landD * data$aD * data$sp
 
 
   if (byPlot){
@@ -81,7 +81,10 @@ carbonHelper1 <- function(x, plts, db, grpBy, byPlot, byPool, byComponent, model
     }
 
 
-    ## Can't think of a better way to go about this so..
+
+
+
+    ## Faster than summarizing over everything
     if (byPool & byComponent == FALSE){
       ## Pool only
       t <- t %>%
@@ -107,7 +110,7 @@ carbonHelper1 <- function(x, plts, db, grpBy, byPlot, byPool, byComponent, model
                      names_to = 'COMPONENT', values_to = 'CARB_ACRE') %>%
         mutate(CARB_ACRE = CARB_ACRE * 0.90718474)
 
-    } else{
+    } else {
       ## Totals
       t <- t %>%
         mutate(CARB_ACRE = AG_OVER_LIVE + AG_UNDER_LIVE +

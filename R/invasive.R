@@ -1,4 +1,4 @@
-invasiveStarter <- function(x,
+invasiveStarter_old <- function(x,
                             db,
                             grpBy_quo = NULL,
                             polys = NULL,
@@ -137,14 +137,14 @@ invasiveStarter <- function(x,
   ## Filtering out all inventories that are not relevant to the current estimation
   ## type. If using estimator other than TI, handle the differences in P2POINTCNT
   ## and in assigning YEAR column (YEAR = END_INVYR if method = 'TI')
-  pops <- handlePops(db, evalType = c('EXPCURR'), method, mr, pltList = db$PLOT$PLT_CN)
+  pops <- handlePops_old(db, evalType = c('EXPCURR'), method, mr, pltList = db$PLOT$PLT_CN)
 
   ## A lot of states do their stratification in such a way that makes it impossible
   ## to estimate variance of annual panels w/ post-stratified estimator. That is,
   ## the number of plots within a panel within an stratum is less than 2. When
   ## this happens, merge strata so that all have at least two obs
   if (str_to_upper(method) != 'TI') {
-    pops <- mergeSmallStrata(db, pops)
+    pops <- mergeSmallStrata_old(db, pops)
   }
 
 
@@ -165,11 +165,11 @@ invasiveStarter <- function(x,
   ### Only joining tables necessary to produce plot level estimates
   db$PLOT <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA',
                                'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD',
-                               all_of(grpP), 'aD_p', 'sp', 'COUNTYCD',
+                               all_of(grpP), 'sp', 'COUNTYCD',
                                INVASIVE_SAMPLING_STATUS_CD))
   db$COND <- select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS',
                                'COND_STATUS_CD', 'CONDID',
-                               all_of(grpC), 'aD_c', 'landD')) %>%
+                               all_of(grpC), 'aD', 'landD')) %>%
     filter(PLT_CN %in% db$PLOT$PLT_CN)
   db$SUBP_COND <- select(db$SUBP_COND, c(PLT_CN, SUBP, CONDID, SUBPCOND_PROP)) %>%
     filter(PLT_CN %in% db$PLOT$PLT_CN)
@@ -324,8 +324,8 @@ invasiveStarter <- function(x,
 
 
 
-#' @export
-invasive <- function(db,
+
+invasive_old <- function(db,
                      grpBy = NULL,
                      polys = NULL,
                      returnSpatial = FALSE,
@@ -354,7 +354,7 @@ invasive <- function(db,
 
 
   ## Run the main portion
-  out <- lapply(X = iter, FUN = invasiveStarter, db,
+  out <- lapply(X = iter, FUN = invasiveStarter_old, db,
                 grpBy_quo = grpBy_quo, polys, returnSpatial,
                 landType, method,
                 lambda, areaDomain,
@@ -366,10 +366,6 @@ invasive <- function(db,
   tEst <- bind_rows(out[names(out) == 'tEst'])
   grpBy <- out[names(out) == 'grpBy'][[1]]
   aGrpBy <- out[names(out) == 'aGrpBy'][[1]]
-  grpByOrig <- out[names(out) == 'grpByOrig'][[1]]
-
-
-
 
   ## Plot-level estimates
   if (byPlot){

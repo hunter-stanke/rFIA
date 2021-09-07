@@ -148,14 +148,14 @@ fsiStarter <- function(x,
   ## Filtering out all inventories that are not relevant to the current estimation
   ## type. If using estimator other than TI, handle the differences in P2POINTCNT
   ## and in assigning YEAR column (YEAR = END_INVYR if method = 'TI')
-  pops <- handlePops(db, evalType = c('EXPVOL'), method, mr, pltList = remPlts$PLT_CN)
+  pops <- handlePops_old(db, evalType = c('EXPVOL'), method, mr, pltList = remPlts$PLT_CN)
 
   ## A lot of states do their stratification in such a way that makes it impossible
   ## to estimate variance of annual panels w/ post-stratified estimator. That is,
   ## the number of plots within a panel within an stratum is less than 2. When
   ## this happens, merge strata so that all have at least two obs
   if (str_to_upper(method) != 'TI') {
-    pops <- mergeSmallStrata(db, pops)
+    pops <- mergeSmallStrata_old(db, pops)
   }
 
 
@@ -222,8 +222,8 @@ fsiStarter <- function(x,
 
   ### Only joining tables necessary to produce plot level estimates, adjusted for non-response
   db$PLOT <- select(db$PLOT, c('PLT_CN', pltID, 'REMPER', 'DESIGNCD', 'STATECD', 'MACRO_BREAKPOINT_DIA', 'INVYR',
-                               'MEASYEAR', 'MEASMON', 'MEASDAY', 'PLOT_STATUS_CD', PREV_PLT_CN, grpP, 'aD_p', 'sp'))
-  db$COND <- select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD_c', 'landD',
+                               'MEASYEAR', 'MEASMON', 'MEASDAY', 'PLOT_STATUS_CD', PREV_PLT_CN, grpP, 'sp'))
+  db$COND <- select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS', 'COND_STATUS_CD', 'CONDID', grpC, 'aD', 'landD',
                                DSTRBCD1, DSTRBCD2, DSTRBCD3, TRTCD1, TRTCD2, TRTCD3))
   db$TREE <- select(db$TREE, c('PLT_CN', 'TRE_CN', 'CONDID', 'DIA', 'TPA_UNADJ', 'BAA', 'SUBP', 'TREE', grpT, 'tD', 'typeD',
                                PREVCOND, PREV_TRE_CN, STATUSCD, SPCD))

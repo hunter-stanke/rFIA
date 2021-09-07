@@ -1,4 +1,4 @@
-tpaStarter <- function(x,
+tpaStarter_old <- function(x,
                        db,
                        grpBy_quo = NULL,
                        polys = NULL,
@@ -30,7 +30,7 @@ tpaStarter <- function(x,
   ## IF the object was clipped
   if ('prev' %in% names(db$PLOT)){
     ## Only want the current plots, no grm
-    db$PLOT <- filter(db$PLOT, prev == 0)
+    db$PLOT <- dplyr::filter(db$PLOT, prev == 0)
   }
 
   ## Handle TX issues - we only keep inventory years that are present in BOTH
@@ -42,7 +42,7 @@ tpaStarter <- function(x,
 
   ## Some warnings if inputs are bogus -----------------------------------------
   if (!is.null(polys) &
-      first(class(polys)) %in%
+      dplyr::first(class(polys)) %in%
       c('sf', 'SpatialPolygons', 'SpatialPolygonsDataFrame') == FALSE){
     stop('polys must be spatial polygons object of class sp or sf. ')
   }
@@ -57,7 +57,7 @@ tpaStarter <- function(x,
     stop(paste('Tables', paste (as.character(missT), collapse = ', '),
                'not found in object db.'))
   }
-  if (str_to_upper(method) %in% c('TI', 'SMA', 'LMA', 'EMA', 'ANNUAL') == FALSE) {
+  if (stringr::str_to_upper(method) %in% c('TI', 'SMA', 'LMA', 'EMA', 'ANNUAL', 'ANNUAL_COV') == FALSE) {
     warning(paste('Method', method,
                   'unknown. Defaulting to Temporally Indifferent (TI).'))
   }
@@ -66,7 +66,7 @@ tpaStarter <- function(x,
   ## Prep other variables ------------------------------------------------------
   ## Need a plotCN, and a new ID
   db$PLOT <- db$PLOT %>%
-    mutate(PLT_CN = CN,
+    dplyr::mutate(PLT_CN = CN,
            pltID = paste(UNITCD, STATECD, COUNTYCD, PLOT, sep = '_'))
 
   ## Convert grpBy to character
@@ -134,15 +134,28 @@ tpaStarter <- function(x,
   ## Filtering out all inventories that are not relevant to the current estimation
   ## type. If using estimator other than TI, handle the differences in P2POINTCNT
   ## and in assigning YEAR column (YEAR = END_INVYR if method = 'TI')
-  pops <- handlePops(db, evalType = c('EXPVOL', 'EXPCURR'), method, mr)
+  pops <- handlePops_old(db, evalType = c('EXPVOL'), method, mr)
 
   ## A lot of states do their stratification in such a way that makes it impossible
   ## to estimate variance of annual panels w/ post-stratified estimator. That is,
   ## the number of plots within a panel within an stratum is less than 2. When
   ## this happens, merge strata so that all have at least two obs
-  if (str_to_upper(method) != 'TI') {
-    pops <- mergeSmallStrata(db, pops)
+  if (stringr::str_to_upper(method) %in% c('SMA', 'LMA', 'EMA', 'ANNUAL')) {
+    pops <- mergeSmallStrata_old(db, pops)
   }
+
+  ## Same story as above, but we handle the stratum modifications differently
+  ## for the annual estimator. For the moving averages (above), we merge strata
+  ## within inventory cycles. For annual estimates, we select the post-stratified
+  ## design associated with the most recent inventory cycle, and apply it to all
+  ## observations (current and previous). This means we'll have to drop some plots,
+  ## but ensures that we are working with the same post-stratified design across
+  ## time. If the strata boundaries change, we can't compute the covariance of
+  ## annual panels, and hence difference testing is out the window. As a are
+  ## model-based approaches that smooth annual estimates
+  # if (stringr::str_to_upper(method) == 'ANNUAL_COV') {
+  #   pops <- annualStrataHelper(db, pops)
+  # }
 
 
 
@@ -150,10 +163,10 @@ tpaStarter <- function(x,
   ## Add species to groups
   if (bySpecies) {
     db$TREE <- db$TREE %>%
-      left_join(select(intData$REF_SPECIES_2018,
+      dplyr::left_join(dplyr::select(intData$REF_SPECIES_2018,
                        c('SPCD','COMMON_NAME', 'GENUS', 'SPECIES')), by = 'SPCD') %>%
-      mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' ')) %>%
-      mutate_if(is.factor,
+      dplyr::mutate(SCIENTIFIC_NAME = paste(GENUS, SPECIES, sep = ' ')) %>%
+      dplyr::mutate_if(is.factor,
                 as.character)
     grpBy <- c(grpBy, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
     grpByOrig <- c(grpByOrig, 'SPCD', 'COMMON_NAME', 'SCIENTIFIC_NAME')
@@ -174,8 +187,13 @@ tpaStarter <- function(x,
   ## Slim down the database for we hand it off to the estimators ---------------
   ## Reduces memory requirements and speeds up processing ----------------------
 
+
+  ## Filter should always be based on the tree table, and then propagate upward
+
+
+
   ## Only the necessary plots for EVAL of interest
-  db$PLOT <- filter(db$PLOT, PLT_CN %in% pops$PLT_CN)
+  db$PLOT <- dplyr::filter(db$PLOT, PLT_CN %in% pops$PLT_CN)
 
   ## Narrow up the tables to the necessary variables
   ## Which grpByNames are in which table? Helps us subset below
@@ -186,16 +204,16 @@ tpaStarter <- function(x,
                            !c(names(db$TREE) %in% c(grpP, grpC))]
 
   ### Only joining tables necessary to produce plot level estimates
-  db$PLOT <- select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA',
+  db$PLOT <- dplyr::select(db$PLOT, c('PLT_CN', 'STATECD', 'MACRO_BREAKPOINT_DIA',
                                'INVYR', 'MEASYEAR', 'PLOT_STATUS_CD',
-                               all_of(grpP), 'aD_p', 'sp', 'COUNTYCD'))
-  db$COND <- select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS',
+                               dplyr::all_of(grpP), 'sp', 'COUNTYCD'))
+  db$COND <- dplyr::select(db$COND, c('PLT_CN', 'CONDPROP_UNADJ', 'PROP_BASIS',
                                'COND_STATUS_CD', 'CONDID',
-                               all_of(grpC), 'aD_c', 'landD')) %>%
-    filter(PLT_CN %in% db$PLOT$PLT_CN)
-  db$TREE <- select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ',
-                               'SUBP', 'TREE', all_of(grpT), 'tD', 'typeD')) %>%
-    filter(PLT_CN %in% db$PLOT$PLT_CN)
+                               dplyr::all_of(grpC), 'aD', 'landD')) %>%
+    dplyr::filter(PLT_CN %in% db$PLOT$PLT_CN)
+  db$TREE <- dplyr::select(db$TREE, c('PLT_CN', 'CONDID', 'DIA', 'SPCD', 'TPA_UNADJ',
+                               'SUBP', 'TREE', dplyr::all_of(grpT), 'tD', 'typeD')) %>%
+    dplyr::filter(PLT_CN %in% db$PLOT$PLT_CN)
 
   # Separate area grouping names from tree grouping names
   if (!is.null(polys)){
@@ -212,18 +230,18 @@ tpaStarter <- function(x,
   suppressWarnings({
     ## Compute estimates in parallel -- Clusters in windows, forking otherwise
     if (Sys.info()['sysname'] == 'Windows'){
-      cl <- makeCluster(nCores)
-      clusterEvalQ(cl, {
+      cl <- parallel::makeCluster(nCores)
+      parallel::clusterEvalQ(cl, {
         library(dplyr)
         library(stringr)
         library(rFIA)
       })
-      out <- parLapply(cl, X = names(plts), fun = tpaHelper1, plts,
+      out <- parallel::parLapply(cl, X = names(plts), fun = tpaHelper1, plts,
                        db[names(db) %in% c('COND', 'TREE')],
                        grpBy, aGrpBy, byPlot)
       #stopCluster(cl) # Keep the cluster active for the next run
     } else { # Unix systems
-      out <- mclapply(names(plts), FUN = tpaHelper1, plts,
+      out <- parallel::mclapply(names(plts), FUN = tpaHelper1, plts,
                       db[names(db) %in% c('COND', 'TREE')],
                       grpBy, aGrpBy, byPlot, mc.cores = nCores)
     }
@@ -240,12 +258,12 @@ tpaStarter <- function(x,
   if (byPlot){
     ## back to dataframes
     out <- unlist(out, recursive = FALSE)
-    tOut <- bind_rows(out[names(out) == 't'])
+    tOut <- dplyr::bind_rows(out[names(out) == 't'])
     ## Make it spatial
     if (returnSpatial){
       tOut <- tOut %>%
-        filter(!is.na(LAT) & !is.na(LON)) %>%
-        st_as_sf(coords = c('LON', 'LAT'),
+        dplyr::filter(!is.na(LAT) & !is.na(LON)) %>%
+        sf::st_as_sf(coords = c('LON', 'LAT'),
                  crs = '+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs')
       grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
 
@@ -257,8 +275,8 @@ tpaStarter <- function(x,
   } else {
     ## back to dataframes
     out <- unlist(out, recursive = FALSE)
-    a <- bind_rows(out[names(out) == 'a'])
-    t <- bind_rows(out[names(out) == 't'])
+    a <- dplyr::bind_rows(out[names(out) == 'a'])
+    t <- dplyr::bind_rows(out[names(out) == 't'])
 
     ## Adding YEAR to groups
     grpBy <- c('YEAR', grpBy)
@@ -270,64 +288,69 @@ tpaStarter <- function(x,
     suppressWarnings({
       ## Compute estimates in parallel -- Clusters in windows, forking otherwise
       if (Sys.info()['sysname'] == 'Windows'){
-        out <- parLapply(cl, X = names(popState), fun = tpaHelper2, popState, a, t, grpBy, aGrpBy, method)
-        stopCluster(cl)
+        out <- parallel::parLapply(cl, X = names(popState), fun = tpaHelper2, popState, a, t, grpBy, aGrpBy, method)
+        parallel::stopCluster(cl)
       } else { # Unix systems
-        out <- mclapply(names(popState), FUN = tpaHelper2, popState, a, t, grpBy, aGrpBy, method, mc.cores = nCores)
+        out <- parallel::mclapply(names(popState), FUN = tpaHelper2, popState, a, t, grpBy, aGrpBy, method, mc.cores = nCores)
       }
     })
     ## back to dataframes
     out <- unlist(out, recursive = FALSE)
-    aEst <- bind_rows(out[names(out) == 'aEst'])
-    tEst <- bind_rows(out[names(out) == 'tEst'])
+    aEst <- dplyr::bind_rows(out[names(out) == 'aEst'])
+    tEst <- dplyr::bind_rows(out[names(out) == 'tEst'])
 
 
 
 
     ## Compute moving average weights if not TI ----------------------------------
-    if (str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){
+    if (stringr::str_to_upper(method) %in% c("SMA", 'EMA', 'LMA')){
 
       ## Compute the weights
       wgts <- maWeights(pops, method, lambda)
 
       ## If moving average ribbons, add lambda to grpBy for easier summary
-      if (str_to_upper(method) == 'EMA' & length(lambda) > 1){
+      if (stringr::str_to_upper(method) == 'EMA' & length(lambda) > 1){
         grpBy <- c('lambda', grpBy)
         aGrpBy <- c('lambda', aGrpBy)
       }
 
 
       ## Apply the weights
-      if (str_to_upper(method) %in% c('LMA', 'EMA')){
+      if (stringr::str_to_upper(method) %in% c('LMA', 'EMA')){
         joinCols <- c('YEAR', 'STATECD', 'INVYR')
       } else {
         joinCols <- c('YEAR', 'STATECD')
       }
       aEst <- aEst %>%
-        left_join(select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-        left_join(wgts, by = joinCols) %>%
-        mutate(across(aEst, ~(.*wgt))) %>%
-        mutate(across(aVar, ~(.*(wgt^2)))) %>%
-        group_by(ESTN_UNIT_CN, .dots = aGrpBy) %>%
-        summarize(across(aEst:plotIn_AREA, sum, na.rm = TRUE))
+        dplyr::left_join(dplyr::select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN')) %>%
+        dplyr::left_join(wgts, by = joinCols) %>%
+        dplyr::mutate(dplyr::across(aEst, ~(.*wgt))) %>%
+        dplyr::mutate(dplyr::across(aVar, ~(.*(wgt^2)))) %>%
+        dplyr::group_by(ESTN_UNIT_CN, .dots = aGrpBy) %>%
+        dplyr::summarize(dplyr::across(aEst:plotIn_AREA, sum, na.rm = TRUE))
       tEst <- tEst %>%
-        left_join(select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN')) %>%
-        left_join(wgts, by = joinCols) %>%
-        mutate(across(tEst:bTEst, ~(.*wgt))) %>%
-        mutate(across(tVar:cvEst_bT, ~(.*(wgt^2)))) %>%
-        group_by(ESTN_UNIT_CN, A, .dots = grpBy) %>%
-        summarize(across(tEst:cvEst_bT, sum, na.rm = TRUE))
+        dplyr::left_join(dplyr::select(db$POP_ESTN_UNIT, CN, STATECD), by = c('ESTN_UNIT_CN' = 'CN')) %>%
+        dplyr::left_join(wgts, by = joinCols) %>%
+        dplyr::mutate(dplyr::across(tEst:bTEst, ~(.*wgt))) %>%
+        dplyr::mutate(dplyr::across(tVar:cvEst_bT, ~(.*(wgt^2)))) %>%
+        dplyr::group_by(ESTN_UNIT_CN, A, .dots = grpBy) %>%
+        dplyr::summarize(dplyr::across(tEst:cvEst_bT, sum, na.rm = TRUE))
 
 
 
 
     ## If using an ANNUAL estimator --------------------------------------------
-    } else if (str_to_upper(method) == 'ANNUAL') {
+    } else if (stringr::str_to_upper(method) == 'ANNUAL') {
 
       # If INVYR is in YEAR, choose the estimates when INVYR == YEAR
       # Otherwise, choose the estimates produced with the most plots
       aEst <- filterAnnual(aEst, aGrpBy, plotIn_AREA, db$POP_ESTN_UNIT)
       tEst <- filterAnnual(tEst, grpBy, plotIn_TREE, db$POP_ESTN_UNIT)
+
+    } else if (stringr::str_to_upper(method) == 'ANNUAL_COV') {
+
+      aEst$YEAR <- aEst$INVYR
+      tEst$YEAR <- tEst$INVYR
     }
 
     out <- list(tEst = tEst, aEst = aEst, grpBy = grpBy, aGrpBy = aGrpBy, grpByOrig = grpByOrig)
@@ -351,8 +374,7 @@ tpaStarter <- function(x,
 
 
 
-#' @export
-tpa <- function(db,
+tpa_old <- function(db,
                 grpBy = NULL,
                 polys = NULL,
                 returnSpatial = FALSE,
@@ -386,7 +408,7 @@ tpa <- function(db,
 
 
   ## Run the main portion
-  out <- lapply(X = iter, FUN = tpaStarter, db,
+  out <- lapply(X = iter, FUN = tpaStarter_old, db,
                 grpBy_quo = grpBy_quo, polys, returnSpatial,
                 bySpecies, bySizeClass,
                 landType, treeType, method,
@@ -395,8 +417,8 @@ tpa <- function(db,
   ## Bring the results back
   out <- unlist(out, recursive = FALSE)
   if (remote) out <- dropStatesOutsidePolys(out)
-  aEst <- bind_rows(out[names(out) == 'aEst'])
-  tEst <- bind_rows(out[names(out) == 'tEst'])
+  aEst <- dplyr::bind_rows(out[names(out) == 'aEst'])
+  tEst <- dplyr::bind_rows(out[names(out) == 'tEst'])
   grpBy <- out[names(out) == 'grpBy'][[1]]
   aGrpBy <- out[names(out) == 'aGrpBy'][[1]]
   grpByOrig <- out[names(out) == 'grpByOrig'][[1]]
@@ -424,17 +446,17 @@ tpa <- function(db,
 
     ## Totals and ratios -------------------------------------------------------
     aTotal <- aEst %>%
-      group_by(.dots = aGrpBy) %>%
-      summarize(AREA_TOTAL = sum(aEst, na.rm = TRUE),
+      dplyr::group_by(.dots = aGrpBy) %>%
+      dplyr::summarize(AREA_TOTAL = sum(aEst, na.rm = TRUE),
                 aVar = sum(aVar, na.rm = TRUE),
                 AREA_TOTAL_SE = sqrt(aVar) / AREA_TOTAL * 100,
                 AREA_TOTAL_VAR = aVar,
                 nPlots_AREA = sum(plotIn_AREA, na.rm = TRUE))
 
     tTotal <- tEst %>%
-      group_by(.dots = grpBy) %>%
-      summarize_all(sum, na.rm = TRUE) %>%
-      mutate(TREE_TOTAL = tEst,
+      dplyr::group_by(.dots = grpBy) %>%
+      dplyr::summarize_all(sum, na.rm = TRUE) %>%
+      dplyr::mutate(TREE_TOTAL = tEst,
             BA_TOTAL = bEst,
             ## Variances
             treeVar = tVar,
@@ -449,7 +471,7 @@ tpa <- function(db,
             BA_VAR = baVar,
             #N = sum(N, na.rm = TRUE),
             nPlots_TREE = plotIn_TREE) %>%
-      select(grpBy, TREE_TOTAL, BA_TOTAL, treeVar, baVar, cvT, cvB, TREE_SE, BA_SE, TREE_VAR, BA_VAR,
+      dplyr::select(grpBy, TREE_TOTAL, BA_TOTAL, treeVar, baVar, cvT, cvB, TREE_SE, BA_SE, TREE_VAR, BA_VAR,
              nPlots_TREE, N, A)
 
     ## IF using polys, we treat each zone as a unique population
@@ -461,8 +483,8 @@ tpa <- function(db,
 
     ## Hand the proportions
     tpTotal <- tEst %>%
-      group_by(.dots = unique(propGrp)) %>%
-      summarize(TREE_TOTAL_full = sum(tTEst, na.rm = TRUE), ## Need to sum this
+      dplyr::group_by(.dots = unique(propGrp)) %>%
+      dplyr::summarize(TREE_TOTAL_full = sum(tTEst, na.rm = TRUE), ## Need to sum this
                 BA_TOTAL_full = sum(bTEst, na.rm = TRUE), ## Need to sum this
                 tTVar = sum(tTVar, na.rm = TRUE),
                 bTVar = sum(bTVar, na.rm = TRUE),
@@ -473,9 +495,9 @@ tpa <- function(db,
     suppressWarnings({
       ## Bring them together
       tTotal <- tTotal %>%
-        left_join(aTotal, by = aGrpBy) %>%
-        left_join(tpTotal, by = unique(propGrp)) %>%
-        mutate(TPA = TREE_TOTAL / AREA_TOTAL,
+        dplyr::left_join(aTotal, by = aGrpBy) %>%
+        dplyr::left_join(tpTotal, by = unique(propGrp)) %>%
+        dplyr::mutate(TPA = TREE_TOTAL / AREA_TOTAL,
                BAA = BA_TOTAL / AREA_TOTAL,
                tpaVar = (1/AREA_TOTAL^2) * (treeVar + (TPA^2 * aVar) - 2 * TPA * cvT),
                baaVar = (1/AREA_TOTAL^2) * (baVar + (BAA^2 * aVar) - (2 * BAA * cvB)),
@@ -499,22 +521,22 @@ tpa <- function(db,
     if (totals) {
       if (variance){
         tOut <- tTotal %>%
-          select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC, TREE_TOTAL, BA_TOTAL, AREA_TOTAL, TPA_VAR, BAA_VAR,
+          dplyr::select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC, TREE_TOTAL, BA_TOTAL, AREA_TOTAL, TPA_VAR, BAA_VAR,
                  TPA_PERC_VAR, BAA_PERC_VAR, TREE_VAR, BA_VAR, AREA_TOTAL_VAR, nPlots_TREE, nPlots_AREA, N)
       } else {
         tOut <- tTotal %>%
-          select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC, TREE_TOTAL, BA_TOTAL, AREA_TOTAL, TPA_SE, BAA_SE,
+          dplyr::select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC, TREE_TOTAL, BA_TOTAL, AREA_TOTAL, TPA_SE, BAA_SE,
                  TPA_PERC_SE, BAA_PERC_SE, TREE_SE, BA_SE, AREA_TOTAL_SE, nPlots_TREE, nPlots_AREA, N)
       }
 
     } else {
       if (variance) {
         tOut <- tTotal %>%
-          select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC,  TPA_VAR, BAA_VAR,
+          dplyr::select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC,  TPA_VAR, BAA_VAR,
                  TPA_PERC_VAR, BAA_PERC_VAR, nPlots_TREE, nPlots_AREA, N)
       } else {
         tOut <- tTotal %>%
-          select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC,  TPA_SE, BAA_SE,
+          dplyr::select(grpBy, TPA, BAA, TPA_PERC, BAA_PERC,  TPA_SE, BAA_SE,
                  TPA_PERC_SE, BAA_PERC_SE, nPlots_TREE, nPlots_AREA, N)
       }
 
@@ -528,7 +550,7 @@ tpa <- function(db,
   ## Pretty output
   tOut <- tOut %>%
     ungroup() %>%
-    mutate_if(is.factor, as.character) %>%
+    dplyr::mutate_if(is.factor, as.character) %>%
     drop_na(grpBy) %>%
     arrange(YEAR) %>%
     as_tibble()
@@ -543,18 +565,18 @@ tpa <- function(db,
   if (returnSpatial & byPlot) grpBy <- grpBy[grpBy %in% c('LAT', 'LON') == FALSE]
 
   ## Above converts to tibble
-  if (returnSpatial) tOut <- st_sf(tOut)
+  if (returnSpatial) tOut <- sf::st_sf(tOut)
 
   ## remove any duplicates in byPlot
   ## Also make PLOT_STATUS_CD more informative
   if (byPlot) {
     tOut <- unique(tOut)
     tOut <- tOut %>%
-      mutate(PLOT_STATUS = case_when(is.na(PLOT_STATUS_CD) ~ NA_character_,
+      dplyr::mutate(PLOT_STATUS = dplyr::case_when(is.na(PLOT_STATUS_CD) ~ NA_character_,
                                      PLOT_STATUS_CD == 1 ~ 'Forest',
                                      PLOT_STATUS_CD == 2 ~ 'Non-forest',
                                      PLOT_STATUS_CD == 3 ~ 'Non-sampled')) %>%
-      relocate(PLOT_STATUS, .after = PLOT_STATUS_CD)
+      dplyr::relocate(PLOT_STATUS, .after = PLOT_STATUS_CD)
   }
 
   return(tOut)
