@@ -169,6 +169,10 @@ readRemoteHelper <- function(x, db, remote, reqTables, nCores){
     }
 
   } else {
+    if (sum(reqTables %in% names(db)) < length(reqTables)) {
+      missing.tables <- reqTables[!c(reqTables %in% names(db))]
+      stop(paste(paste (as.character(missing.tables), collapse = ', '), 'tables not found in object `db`.'))
+    }
     ## Really only want the required tables
     db <- db[names(db) %in% reqTables]
   }

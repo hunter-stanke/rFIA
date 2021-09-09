@@ -64,19 +64,27 @@ customPSE <- function(db,
   ## Pull design info from db --------------------------------------------------
   ## Make the sure the necessary tables are present in db
   req.tables <- c('PLOT', 'POP_EVAL', 'POP_EVAL_TYP', 'POP_ESTN_UNIT', 'POP_STRATUM', 'POP_PLOT_STRATUM_ASSGN')
-  if (class(db) == 'FIA.Database') {
-    if (sum(req.tables %in% names(db)) < length(req.tables)) {
-      missing.tables <- req.tables[!c(req.tables %in% names(db))]
-      stop(paste(paste (as.character(missing.tables), collapse = ', '), 'tables not found in object db.'))
-    }
-  } else {
-    ## Read the tables we need, readFIA will throw a warning if they are missing
-    db <- readFIA(dir = db$dir,
-                  common = db$common,
-                  tables =  c('PLOT', 'POP_EVAL', 'POP_EVAL_TYP', 'POP_ESTN_UNIT', 'POP_STRATUM', 'POP_PLOT_STRATUM_ASSGN'),
-                  states = db$states)
-  }
-  mr <- checkMR(db, remote = FALSE)
+
+
+  ## If remote, read in state by state. Otherwise, drop all unnecessary tables
+  remote <- ifelse(class(db) == 'Remote.FIA.Database', 1, 0)
+  db <- readRemoteHelper(db$states, db, remote, req.tables, nCores = 1)
+
+  # if (class(db) == 'FIA.Database') {
+  #   if (sum(req.tables %in% names(db)) < length(req.tables)) {
+  #     missing.tables <- req.tables[!c(req.tables %in% names(db))]
+  #     stop(paste(paste (as.character(missing.tables), collapse = ', '), 'tables not found in object db.'))
+  #   }
+  # } else {
+  #   ## Read the tables we need, readFIA will throw a warning if they are missing
+  #   db <- readFIA(dir = db$dir,
+  #                 common = db$common,
+  #                 tables =  c('PLOT', 'POP_EVAL', 'POP_EVAL_TYP', 'POP_ESTN_UNIT', 'POP_STRATUM', 'POP_PLOT_STRATUM_ASSGN'),
+  #                 states = db$states)
+  # }
+
+  ## Pull the appropriate population tables
+  mr <- checkMR(db, remote = ifelse(class(db) == 'Remote.FIA.Database', 1, 0))
   pops <- handlePops(db, evalType, method, mr)
 
 
