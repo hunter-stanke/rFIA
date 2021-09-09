@@ -330,7 +330,7 @@ formatNames <- function(x, grpBy) {
                   !!!ratio.se.syms,
                   !!!total.se.syms,
                   !!!ratio.var.syms,
-                  !!!total.se.syms,
+                  !!!total.var.syms,
                   dplyr::any_of(c('nPlots_x', 'nPlots_y')),
                   N)
 
