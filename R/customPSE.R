@@ -1,6 +1,5 @@
 #' @export
 customPSE <- function(db,
-                      evalType,
                       x,
                       xVars,
                       xGrpBy = NULL,
@@ -26,6 +25,16 @@ customPSE <- function(db,
   if (!is.null(y)) {
     if (!c('PLT_CN' %in% names(y))) {
       stop('`PLT_CN` must be included in `y`. See our website for an example use case of `customPSE`.')
+    }
+  }
+
+  ## EVAL_TYP must be present in both x and y
+  if (!c('EVAL_TYP' %in% names(x))) {
+    stop('`EVAL_TYP` must be included in `x`. See our website for an example use case of `customPSE`.')
+  }
+  if (!is.null(y)) {
+    if (!c('EVAL_TYP' %in% names(y))) {
+      stop('`EVAL_TYP` must be included in `y`. See our website for an example use case of `customPSE`.')
     }
   }
 
@@ -85,7 +94,7 @@ customPSE <- function(db,
 
   ## Pull the appropriate population tables
   mr <- checkMR(db, remote = ifelse(class(db) == 'Remote.FIA.Database', 1, 0))
-  pops <- handlePops(db, evalType, method, mr)
+  pops <- handlePops(db, evalType = x$EVAL_TYP[[1]], method, mr)
 
 
 
