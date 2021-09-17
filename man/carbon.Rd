@@ -4,7 +4,8 @@
 \title{Estimate carbon stocks by IPCC forest carbon pools from the FIADB}
 
 \description{
-\lifecycle{stable}
+\Sexpr[results=rd, stage=render]{lifecycle::badge("stable")}
+
 Produces estimates of carbon (\emph{metric tonnes}) on a per acre basis from FIA data, along with population estimates for each variable. Estimates are consistent with those used in the EPA's Greenhouse Gas Inventory Estimates. Can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by species, size class, and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}).}
 \usage{
 carbon(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
@@ -43,7 +44,7 @@ carbon(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations instead of population estimates.}
 
-  \item{condList}{logical; if TRUE, returns condition-level summaries intended for subsequent use with \code{\link{customPSE}}}.
+  \item{condList}{logical; if TRUE, returns condition-level summaries intended for subsequent use with \code{\link{customPSE}}.}
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }

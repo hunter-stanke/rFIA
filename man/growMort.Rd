@@ -4,7 +4,8 @@
 \title{Estimate recruitment, mortality, and harvest rates from FIADB}
 
 \description{
-\lifecycle{stable}
+\Sexpr[results=rd, stage=render]{lifecycle::badge("stable")}
+
 Produces estimates of annual regeneration, recruitment, natural mortality, and harvest rates from the Forest Inventory and Analysis Database (FIADB), along with population estimates for each variable. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by species, size class, and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}). Easy options to implement parallel processing.}
 
 \usage{
@@ -48,7 +49,7 @@ growMort(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALS
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations instead of population estimates.}
 
-  \item{treeList}{logical; if TRUE, returns tree-level summaries intended for subsequent use with \code{\link{customPSE}}}.
+  \item{treeList}{logical; if TRUE, returns tree-level summaries intended for subsequent use with \code{\link{customPSE}}.}
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }

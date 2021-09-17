@@ -5,7 +5,8 @@
 }
 
 \description{
-\lifecycle{stable}
+\Sexpr[results=rd, stage=render]{lifecycle::badge("stable")}
+
 Produces estimates of down woody material stocks on a per acre basis from the Forest Inventory and Analysis Database (FIADB), along with population totals for each variable. Estimates are returned by fuel class (duff, litter, 1HR, 10HR, 100HR, 1000HR, piles) for application in fuels management. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}).
 }
 
@@ -39,7 +40,7 @@ dwm(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, landType = 'forest',
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations instead of population estimates.}
 
-  \item{condList}{logical; if TRUE, returns condition-level summaries intended for subsequent use with \code{\link{customPSE}}}.
+  \item{condList}{logical; if TRUE, returns condition-level summaries intended for subsequent use with \code{\link{customPSE}}.}
 
   \item{byFuelType}{logical; if TRUE, returns estimates grouped by fuel type (e.g., 1HR, 10HR, 100HR, 1000HR fuels). }
 

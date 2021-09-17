@@ -5,7 +5,7 @@
 \title{Extract design features for FIA inventories}
 
 \description{
-\lifecycle{maturing}
+\Sexpr[results=rd, stage=render]{lifecycle::badge("maturing")}
 
 Extracts design information for post-stratified FIA inventories, intended to aid the development of alternative model-based estimators of forest variables. Design information is currently limited to estimation unit land area (AREA_USED) and strata weights (proportion of estimation unit represented by each stratum). This is sufficient to acknowledge design features in an a-spatial model, however, inclusion probabilities and strata boundaries will be necessary to incorporate spatial predictors.
 }

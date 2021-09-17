@@ -3,7 +3,8 @@
 \title{Estimate diversity from FIADB}
 
 \description{
-\lifecycle{maturing}
+\Sexpr[results=rd, stage=render]{lifecycle::badge("maturing")}
+
 Produces estimates of diversity from FIA data. Returns shannon's index, shannon's equitability, and richness for alpha (mean/SE of stands), beta, and gamma diversity. Default behavior estimates species diversity, using \code{TPA} as a state variable and \code{SPCD} to groups of individuals. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by size class and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}).
 }
 
@@ -48,7 +49,7 @@ diversity(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySizeClass = F
 
   \item{byPlot}{logical; if TRUE, returns estimates for individual plot locations instead of population estimates.}
 
-  \item{condList}{logical; if TRUE, returns condition-level summaries intended for subsequent use with \code{\link{customPSE}}}.
+  \item{condList}{logical; if TRUE, returns condition-level summaries intended for subsequent use with \code{\link{customPSE}}.}
 
   \item{nCores}{numeric; number of cores to use for parallel implementation. Check available cores using \code{\link{detectCores}}. Default = 1, serial processing.}
 }

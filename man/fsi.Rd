@@ -6,7 +6,8 @@
 
 
 \description{
-\lifecycle{maturing}
+\Sexpr[results=rd, stage=render]{lifecycle::badge("maturing")}
+
 Estimate annual change in relative live tree density from the FIADB using the Forest Stability Index (FSI). See Stanke et al. 2020 (doi: 10.1038/s41467-020-20678-z) for a complete description of the the Forest Stability Index.   }
 
 \usage{

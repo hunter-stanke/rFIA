@@ -5,7 +5,8 @@
 \title{Estimate merchantable tree volume from the FIADB}
 
 \description{
-\lifecycle{maturing}
+\Sexpr[results=rd, stage=render]{lifecycle::badge("maturing")}
+
 Produces estimates of merchantable tree volume (i.e., merchantable bole volume and sawlog volume) on a per acre basis from FIA data, along with population estimates for each variable. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by species, size class, and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}).}
 \usage{
 volume(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE,
