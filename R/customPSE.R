@@ -28,15 +28,11 @@ customPSE <- function(db,
     }
   }
 
-  ## EVAL_TYP must be present in both x and y
+  ## EVAL_TYP must be present in x
   if (!c('EVAL_TYP' %in% names(x))) {
     stop('`EVAL_TYP` must be included in `x`. See our website for an example use case of `customPSE`.')
   }
-  if (!is.null(y)) {
-    if (!c('EVAL_TYP' %in% names(y))) {
-      stop('`EVAL_TYP` must be included in `y`. See our website for an example use case of `customPSE`.')
-    }
-  }
+
 
   ## Only one of TREE_BASIS or AREA_BASIS may exist in each dataset
   if (all(c('TREE_BASIS', 'AREA_BASIS') %in% names(x))) {
