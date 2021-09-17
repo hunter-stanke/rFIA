@@ -376,10 +376,19 @@ bioStarter <- function(x,
 
       tEst <- a %>%
         dplyr::left_join(t, by = c('PLT_CN', aGrpBy)) %>%
-        dplyr::select(PLT_CN, !!!grpSyms, CONDID, SUBP, TREE, TREE_BASIS, AREA_BASIS,
+        ## Summarize over components so output isn't confusing to end user
+        dtplyr::lazy_dt() %>%
+        dplyr::mutate(EVAL_TYP = 'VOL') %>%
+        dplyr::group_by(PLT_CN, EVAL_TYP, TREE_BASIS, AREA_BASIS,
+                        !!!grpSyms, CONDID, SUBP, TREE, fa) %>%
+        dplyr::summarise(dplyr::across(c(bPlot, cPlot), sum, na.rm = TRUE)) %>%
+        dplyr::ungroup() %>%
+        dplyr::select(PLT_CN, EVAL_TYP, TREE_BASIS, AREA_BASIS,
+                      !!!grpSyms, CONDID, SUBP, TREE,
                       BIO_ACRE = bPlot,
                       CARB_ACRE = cPlot,
-                      PROP_FOREST = fa)
+                      PROP_FOREST = fa) %>%
+        as.data.frame()
       out <- list(tEst = tEst, aEst = NULL, grpBy = grpBy, aGrpBy = aGrpBy)
 
     ## Otherwise, proceed to population estimation

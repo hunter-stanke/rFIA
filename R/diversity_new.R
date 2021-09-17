@@ -285,7 +285,9 @@ diversityStarter <- function(x,
 
       tEst <- a %>%
         dplyr::left_join(t, by = c('PLT_CN', 'CONDID', 'AREA_BASIS', grpBy)) %>%
-        dplyr::select(PLT_CN, !!!grpSyms, CONDID, AREA_BASIS,
+        dplyr::mutate(EVAL_TYP = 'VOL') %>%
+        dplyr::select(PLT_CN, EVAL_TYP, AREA_BASIS,
+                      !!!grpSyms, CONDID,
                       H:Eh,
                       PROP_FOREST = fa)
 

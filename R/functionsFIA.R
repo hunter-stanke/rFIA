@@ -129,6 +129,7 @@ arealSumPrep2 <- function(db, grpBy, polys, nCores, remote){
 
   ## Add polygon names to PLOT
   db$PLOT <- db$PLOT %>%
+    dplyr::select(-c(any_of(names(polys)))) %>%
     dplyr::left_join(pltSF, by = 'pltID')
 
   return(db)

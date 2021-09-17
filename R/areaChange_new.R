@@ -361,7 +361,8 @@ acStarter <- function(x,
 
       tEst <- t %>%
         dtplyr::lazy_dt() %>%
-        dplyr::group_by(PLT_CN, !!!grpSyms, CONDID, AREA_BASIS,) %>%
+        dplyr::mutate(EVAL_TYP = 'CHNG') %>%
+        dplyr::group_by(PLT_CN, EVAL_TYP, AREA_BASIS, !!!grpSyms, CONDID) %>%
         dplyr::summarize(PROP_CHNG = sum(ac, na.rm = TRUE),
                          PREV_PROP_FOREST = sum(prev, na.rm = TRUE)) %>%
         dplyr::ungroup() %>%

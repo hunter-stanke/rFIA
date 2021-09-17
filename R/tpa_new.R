@@ -318,7 +318,9 @@ tpaStarter <- function(x,
     if (treeList) {
       tEst <- a %>%
         dplyr::left_join(t, by = c('PLT_CN', aGrpBy)) %>%
-        dplyr::select(PLT_CN, !!!grpSyms, CONDID, SUBP, TREE, TREE_BASIS, AREA_BASIS,
+        dplyr::mutate(EVAL_TYP = 'VOL') %>%
+        dplyr::select(PLT_CN, EVAL_TYP, TREE_BASIS, AREA_BASIS,
+                      !!!grpSyms, CONDID, SUBP, TREE,
                       TPA = tPlot,
                       BAA = bPlot,
                       PROP_FOREST = fa)

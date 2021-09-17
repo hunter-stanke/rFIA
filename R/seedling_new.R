@@ -275,9 +275,11 @@ seedStarter <- function(x,
         ## customPSE requires these be present, so simply set to NA for seedling
         dplyr::mutate(SUBP = NA,
                       TREE = NA,
-                      PROP_FOREST = fa) %>%
-        dplyr::group_by(PLT_CN, !!!grpSyms, CONDID, SUBP, TREE,
-                        TREE_BASIS, AREA_BASIS, PROP_FOREST) %>%
+                      PROP_FOREST = fa,
+                      EVAL_TYP = 'VOL') %>%
+        dplyr::group_by(PLT_CN, EVAL_TYP, TREE_BASIS, AREA_BASIS,
+                        !!!grpSyms, CONDID, SUBP, TREE,
+                        PROP_FOREST) %>%
         dplyr::summarise(TPA = sum(tPlot, na.rm = TRUE)) %>%
         dplyr::ungroup()
       out <- list(tEst = tEst, aEst = NULL, grpBy = grpBy, aGrpBy = aGrpBy)

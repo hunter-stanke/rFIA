@@ -322,7 +322,9 @@ volStarter <- function(x,
 
       tEst <- a %>%
         dplyr::left_join(t, by = c('PLT_CN', aGrpBy)) %>%
-        dplyr::select(PLT_CN, !!!grpSyms, CONDID, SUBP, TREE, TREE_BASIS, AREA_BASIS,
+        dplyr::mutate(EVAL_TYP = 'VOL') %>%
+        dplyr::select(PLT_CN, EVAL_TYP, TREE_BASIS, AREA_BASIS,
+                      !!!grpSyms, CONDID, SUBP, TREE,
                       BOLE_CF_ACRE = bcf,
                       SAW_CF_ACRE = scf,
                       SAW_MBF_ACRE = sbf,

@@ -531,7 +531,9 @@ growMortStarter <- function(x,
 
       tEst <- a %>%
         dplyr::left_join(t, by = c('PLT_CN', aGrpBy)) %>%
-        dplyr::select(PLT_CN, !!!grpSyms, CONDID, SUBP, TREE, TREE_BASIS, AREA_BASIS,
+        dplyr::mutate(EVAL_TYP = list(c('GROW', 'MORT', 'REMV'))) %>%
+        dplyr::select(PLT_CN, EVAL_TYP, TREE_BASIS, AREA_BASIS,
+                      !!!grpSyms, CONDID, SUBP, TREE,
                       RECR_TPA = rPlot,
                       MORT_TPA = mPlot,
                       REMV_TPA = hPlot,

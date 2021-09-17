@@ -319,8 +319,13 @@ dwmStarter <- function(x,
 
       ## Re-order some columns
       tPlt <- tPlt %>%
-        dplyr::select(PLT_CN, !!!grpSyms, CONDID, AREA_BASIS, VOL_ACRE = VOL,
-                      BIO_ACRE = BIO, CARB_ACRE = CARB, PROP_FOREST)
+        dplyr::mutate(EVAL_TYP = 'DWM') %>%
+        dplyr::select(PLT_CN, EVAL_TYP, AREA_BASIS,
+                      !!!grpSyms, CONDID,
+                      VOL_ACRE = VOL,
+                      BIO_ACRE = BIO,
+                      CARB_ACRE = CARB,
+                      PROP_FOREST)
 
       out <- list(tEst = tPlt, aEst = NULL, grpBy = grpBy, aGrpBy = aGrpBy)
 

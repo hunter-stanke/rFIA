@@ -286,7 +286,8 @@ areaStarter <- function(x,
     if (condList) {
 
       tEst <- t %>%
-        dplyr::select(PLT_CN, !!!grpSyms, CONDID, AREA_BASIS,
+        dplyr::mutate(EVAL_TYP = 'CURR') %>%
+        dplyr::select(PLT_CN, EVAL_TYP, AREA_BASIS, !!!grpSyms, CONDID,
                       PROP_FOREST = fa)
       out <- list(tEst = tEst, aEst = NULL, grpBy = grpBy)
 

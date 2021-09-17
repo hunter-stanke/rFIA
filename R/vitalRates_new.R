@@ -444,8 +444,9 @@ vrStarter <- function(x,
         dplyr::ungroup() %>%
         as.data.frame() %>%
         dplyr::left_join(t, by = c('PLT_CN', aGrpBy)) %>%
-        dplyr::select(PLT_CN, !!!grpSyms, CONDID, SUBP, TREE, ONEORTWO,
-                      TREE_BASIS, AREA_BASIS,
+        dplyr::mutate(EVAL_TYP = 'GROW') %>%
+        dplyr::select(PLT_CN, EVAL_TYP, TREE_BASIS, AREA_BASIS,
+                      !!!grpSyms, CONDID, SUBP, TREE, ONEORTWO,
                       DIA_GROW = dPlot,
                       BAA_GROW = bPlot,
                       NETVOL_GROW = gPlot,

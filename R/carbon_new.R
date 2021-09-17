@@ -393,7 +393,10 @@ carbonStarter <- function(x,
 
       ## Reorder variable names
       t <- t %>%
-        dplyr::select(PLT_CN, CONDID, !!!grpSyms, AREA_BASIS, CARB_ACRE, PROP_FOREST)
+        dplyr::mutate(EVAL_TYP = 'VOL') %>%
+        dplyr::select(PLT_CN, EVAL_TYP, AREA_BASIS,
+                      CONDID, !!!grpSyms, CARB_ACRE,
+                      PROP_FOREST)
 
 
       out <- list(tEst = t, aEst = NULL, grpBy = grpBy, aGrpBy = aGrpBy)
