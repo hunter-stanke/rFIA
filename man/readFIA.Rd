@@ -5,8 +5,6 @@
 Load FIA database into R environment from local directory
 }
 \description{
-\Sexpr[results=rd, stage=render]{lifecycle::badge("stable")}
-
 Loads FIA Datatables into R from .csv files stored in a local directory. If you have not previously downloaded FIA Data from the FIA Datamart, use \code{\link{getFIA}} to download data for your region of interest and load it into R. Capable of merging multiple state downloads of the FIA database for regional analysis. Simply store each set of state data, as downloaded from the FIA Datamart, in the same directory and hand to \code{readFIA}.}
 
 \usage{

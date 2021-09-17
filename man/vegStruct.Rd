@@ -3,8 +3,6 @@
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{Estimate vegation cover by canopy layer with the FIADB}
 \description{
-\Sexpr[results=rd, stage=render]{lifecycle::badge("experimental")}
-
 Produces estimates of vegetation cover by canopy layer and species growth form from the Forest Inventory and Analysis Database. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. All estimates are returned by species although can be grouped by other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}). Easy options to implement parallel processing.}
 
 \usage{

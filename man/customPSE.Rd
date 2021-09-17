@@ -3,8 +3,6 @@
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{Post-stratified estimator for custom variables in FIA Data}
 \description{
-\Sexpr[results=rd, stage=render]{lifecycle::badge("maturing")}
-
 Produces estimates of population totals, ratios, and associated variances for custom variables using FIA's post-stratified inventories. Accepts tree- and condition-level summaries from rFIA estimator functions as input, with potential modifications to associated variables (e.g., custom allometrics can be applied to estimate tree biomass/carbon). See our website for example use cases.
 }
 \usage{

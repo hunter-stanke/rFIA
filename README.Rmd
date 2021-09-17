@@ -4,40 +4,30 @@ output: github_document
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-```{r, include = FALSE}
+```{r, include=FALSE, echo=FALSE,message=FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
   fig.path = "man/figures/README-",
   out.width = "100%")
-  
-#usethis::use_lifecycle_badge('maturing')
-
 ```
 # rFIA: Unlocking the FIA Database in R <a href='https://rfia.netlify.app'><img src='man/figures/logo.PNG' align="right" height="139" /></a>
 
 
 
 
-<!-- badges: start -->
-```{r, echo = FALSE, results='asis'}
-library(badger)
+```{r, echo=FALSE, results='asis', message=FALSE}
+#library(badger)
 cat(
-	badge_cran_release("rFIA", "green"),
-	badge_custom("Cite rFIA!", "in EMS", "yellow", "https://www.sciencedirect.com/science/article/abs/pii/S1364815219311089"),
-	#badge_cran_download("rFIA", "grand-total", "blue"),
-	badge_cran_download("rFIA", "last-month", "blue"),
-	badge_travis("hunter-stanke/rFIA")
+	badger::badge_cran_release("rFIA", "green"),
+	badger::badge_custom("Cite rFIA", "in EMS", "yellow", "https://www.sciencedirect.com/science/article/abs/pii/S1364815219311089"),
+	badger::badge_cran_download("rFIA", "grand-total", "blue"),
+	#badge_cran_download("rFIA", "last-month", "blue"),
+	badger::badge_travis("hunter-stanke/rFIA")
 )
 ```
 
-<!-- `r badge_custom("Cite rFIA!", "in EMS", "yellow", "https://www.sciencedirect.com/science/article/abs/pii/S1364815219311089")` -->
-<!-- [![CRAN status](https://www.r-pkg.org/badges/version/rFIA)](https://cran.r-project.org/package=rFIA) -->
-<!-- [![](https://cranlogs.r-pkg.org/badges/grand-total/rFIA)](https://cran.r-project.org/package=rFIA) -->
-<!-- `r badge_cran_download("rFIA", "last-month", "green")` -->
-<!-- [![Travis build status](https://travis-ci.org/hunter-stanke/rFIA.svg?branch=master)](https://travis-ci.org/hunter-stanke/rFIA) -->
-<!-- [![Lifecycle: maturing](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://www.tidyverse.org/lifecycle/#maturing) -->
-<!-- badges: end -->
+
 
 ![US Biomass](man/figures/usBiomass.jpg)
 
@@ -193,6 +183,7 @@ plotFIA(tpaRI_counties, BAA) # Plotting method for spatial FIA summaries, also t
 tpaRI_st <- tpa(fiaRI, polys = countiesRI, returnSpatial = TRUE)
 
 ## Animate the output
+library(gganimate)
 plotFIA(tpaRI_st, TPA, animate = TRUE, legend.title = 'Abundance (TPA)', legend.height = .8)
 
 

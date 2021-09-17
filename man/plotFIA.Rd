@@ -2,8 +2,6 @@
 \alias{plotFIA}
 \title{Static and animated plots of FIA summaries}
 \description{
-\Sexpr[results=rd, stage=render]{lifecycle::badge("questioning")}
-
 Default behavior for non-spatial summaries produces time-series plots, and for spatial summaries (class \code{sf}) produces choropleth maps. For non-spatial summaries, the user may specify the \code{grp} parameter to produce plots with multiple lines, colored by a grouping variable. Additionally, users may specify an x-axis to produce plots other than time series (e.g. BAA (\code{y}) by size class (\code{x}) colored by species (\code{grp})).
 }
 

@@ -4,8 +4,6 @@
 \title{Convert numeric variables to class intervals (factor)}
 
 \description{
-\Sexpr[results=rd, stage=render]{lifecycle::badge("maturing")}
-
 Convert continuous numeric variables to class intervals with output as factor or numeric classes. Simplified implementation of \code{\link[base]{cut}}. Example uses include computing diameter or height classes for summarization with \pkg{rFIA} functions (e.g. \code{\link{tpa}}, \code{\link{biomass}}).}
 
 \usage{

@@ -272,7 +272,7 @@ acStarter <- function(x,
 
     data <- data %>%
       dtplyr::lazy_dt() %>%
-      dplyr::mutate(STATUS1 = plyr::case_when(landD1 & stringr::str_to_lower(landType) == 'forest' ~ 'Forest',
+      dplyr::mutate(STATUS1 = dplyr::case_when(landD1 & stringr::str_to_lower(landType) == 'forest' ~ 'Forest',
                                               landD1 & stringr::str_to_lower(landType) == 'timber' ~ 'Timber',
                                               !landD1 & stringr::str_to_lower(landType) == 'forest' ~ 'Non-forest',
                                               !landD1 & stringr::str_to_lower(landType) == 'timber' ~ 'Non-timber')) %>%

@@ -3,8 +3,6 @@
 
 \title{Find EVALIDs used in the FIADB}
 \description{
-\Sexpr[results=rd, stage=render]{lifecycle::badge("maturing")}
-
 Lookup Evaluation IDs (EVALIDs) associated with reporting years and evaluation types used in the Forest Inventory and Analysis Database. NOT required to run other \pkg{rFIA} functions. Only use if you are interested in subsetting an \code{FIA.Database} object for a specific reporting year or evaluation type using \code{\link{clipFIA}}.
 }
 
