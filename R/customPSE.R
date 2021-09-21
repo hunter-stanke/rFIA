@@ -208,6 +208,7 @@ customPSE <- function(db,
     yTotalSyms <- dplyr::sym(names(yEst)[stringr::str_sub(names(yEst), -5, -1) == '_mean'])
     yVarSyms <- dplyr::sym(names(yEst)[stringr::str_sub(names(yEst), -4, -1) == '_var'])
     ratioSyms <- dplyr::syms(stringr::str_c(names(xEst)[stringr::str_sub(names(xEst), -5, -1) == '_mean'],  '_RATIO'))
+    ratioVarSyms <- dplyr::syms(stringr::str_c(names(xEst)[stringr::str_sub(names(xEst), -5, -1) == '_mean'],  '_RATIO_VAR'))
 
 
     ## Sum over estimation units
@@ -221,6 +222,7 @@ customPSE <- function(db,
       dplyr::group_by( !!!yGrpSyms) %>%
       dplyr::summarize(dplyr::across(dplyr::everything(), sum, na.rm = TRUE))
 
+
     ## Join numerator/denominator, compute ratios
     out <- left_join(xEst, yEst, by = yGrpBy) %>%
       ## Compute ratio point estimates
@@ -231,6 +233,11 @@ customPSE <- function(db,
       dplyr::mutate(dplyr::across(c(!!!xTotalSyms),
                                   .fns = ~ (1 / ((!!yTotalSyms)^2)) * (get(stringr::str_c(stringr::str_sub(dplyr::cur_column(), 1, -6), '_var')) + ((.x/!!yTotalSyms)^2 * !!yVarSyms) - (2 * (.x/!!yTotalSyms) * get(stringr::str_c(stringr::str_sub(dplyr::cur_column(), 1, -6), '_cv'))) ),
                                   .names = "{.col}_RATIO_VAR")) %>%
+      ## When we only have one non-zero plot, we'll sometimes get extremely
+      ## small negative values from rounding errors. Make these zero
+      dplyr::mutate(dplyr::across(c(!!!ratioVarSyms),
+                                  .fns = ~ case_when(.x < 0 ~ 0,
+                                                   TRUE ~ .x))) %>%
       ## Sampling error for all variables
       dplyr::mutate(dplyr::across(c(!!!xTotalSyms),
                                   .fns = ~ sqrt(get(stringr::str_c(stringr::str_sub(dplyr::cur_column(), 1, -6), '_var'))) / abs(.x) * 100,

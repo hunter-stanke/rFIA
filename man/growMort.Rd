@@ -1,10 +1,10 @@
 \name{growMort}
 \alias{growMort}
 
-\title{Estimate recruitment, mortality, and harvest rates from FIADB}
+\title{Estimate growth, recruitment, mortality, and harvest rates from FIADB}
 
 \description{
-Produces estimates of annual regeneration, recruitment, natural mortality, and harvest rates from the Forest Inventory and Analysis Database (FIADB), along with population estimates for each variable. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by species, size class, and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}). Easy options to implement parallel processing.}
+Produces estimates of annual growth, recruitment, natural mortality, and harvest rates from the Forest Inventory and Analysis Database (FIADB), along with population estimates for each variable. Estimates can be produced for regions defined within the FIA Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group estimates by species, size class, and other variables defined in the FIADB. If multiple reporting years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple states are represented by the data, estimates will be output for the full region (all area combined), unless specified otherwise (e.g. \code{grpBy = STATECD}). }
 
 \usage{
 growMort(db, grpBy = NULL, polys = NULL, returnSpatial = FALSE, bySpecies = FALSE,
@@ -89,12 +89,16 @@ Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}
 
 \itemize{
       \item{\strong{YEAR}: reporting year associated with estimates}
-      \item{\strong{RECR_TPA}: estimate of mean annual recruitment as trees per acre}
-      \item{\strong{MORT_TPA}: estimate of mean annual mortality as trees per acre}
-      \item{\strong{REMV_TPA}: estimate of mean annual removals (harvest) as trees per acre}
-      \item{\strong{RECR_PERC}: estimate of mean percent of individuals subject to recruitment annually}
-      \item{\strong{MORT_PERC}: estimate of mean percent of individuals subject to mortality annually}
-      \item{\strong{REMV_PERC}: estimate of mean percent of individuals subject to removal (harvest) annually}
+      \item{\strong{RECR_*}: estimate of mean annual recruitment}
+      \item{\strong{MORT_*}: estimate of mean annual mortality}
+      \item{\strong{REMV_*}: estimate of mean annual removals (harvest)}
+      \item{\strong{GROW_*}: estimate of mean annual growth on survivors}
+      \item{\strong{CHNG_*}: estimate of mean annual net change (i.e., growth + recruitment - mortality - removals)}
+      \item{\strong{RECR_PERC}: estimate of mean percent of individuals subject to recruitment annually (recruitment / previous total)}
+      \item{\strong{MORT_PERC}: estimate of mean percent of individuals subject to mortality annually (mortality / previous total)}
+      \item{\strong{REMV_PERC}: estimate of mean percent of individuals subject to removal (harvest) annually (removals / previous total)}
+      \item{\strong{GROW_PERC}: estimate of mean annual growth on survivors (\%) (growth / previous total)}
+      \item{\strong{CHNG_PERC}: estimate of mean annual net change (\%) (net change / previous total)}
       \item{\strong{nPlots_TREE}: number of non-zero plots used to compute total tree estimates}
       \item{\strong{nPlots_RECR}: number of non-zero plots used to compute recruitment estimates}
       \item{\strong{nPlots_MORT}: number of non-zero plots used to compute mortality estimates}

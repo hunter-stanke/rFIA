@@ -293,6 +293,11 @@ utils::globalVariables(c('ADJ_FACTOR_MACR', 'ADJ_FACTOR_MICR', 'ADJ_FACTOR_SUBP'
                          'nPlots.x', 'nPlots.y', 'nPlots_VEG', 'prev_mean', 'prev_var', 'rPlot_cv', 'rPlot_cv_t',
                          'rPlot_mean', 'rPlot_var', 'sPlot_cv', 'sPlot_cv_t', 'sPlot_mean', 'sPlot_var', 'sbf_cv',
                          'sbf_mean', 'sbf_var', 'scf_cv', 'scf_mean', 'scf_var', 'sp.prev', 'tChng', 'tD.prev',
-                         'tPlot_cv', 'tPlot_mean', 'tPlot_var', 'typeD.prev'
+                         'tPlot_cv', 'tPlot_mean', 'tPlot_var', 'typeD.prev',
+                         'CHNG_PERC', 'CHNG_PERC_SE', 'CHNG_PERC_VAR', 'CHNG_TOTAL', 'CHNG_TOTAL_SE',
+                         'CHNG_TOTAL_VAR', 'CURR_TOTAL', 'CURR_TOTAL_SE', 'CURR_TOTAL_VAR', 'GROW_PERC',
+                         'GROW_PERC_VAR', 'GROW_TOTAL', 'GROW_TOTAL_VAR', 'GROW_TPA', 'GROW_TPA_VAR',
+                         'PREV_TOTAL', 'PREV_TOTAL_SE', 'PREV_TOTAL_VAR', 'cPlot_cv_t', 'pPlot', 'pPlot_mean',
+                         'pPlot_var', 'state.prev'
 
 ))

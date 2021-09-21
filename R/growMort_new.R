@@ -22,10 +22,17 @@ growMortStarter <- function(x,
 
 
   ## Read required data, prep the database -------------------------------------
-  reqTables <- c('PLOT', 'COND', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_MIDPT',
-                 'SUBP_COND_CHNG_MTRX',
-                 'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
-                 'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
+  if ('SUBP_COND_CHNG_MTRX' %in% names(db)) {
+    reqTables <- c('PLOT', 'COND', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_MIDPT',
+                   'SUBP_COND_CHNG_MTRX',
+                   'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
+                   'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
+  } else {
+    reqTables <- c('PLOT', 'COND', 'TREE', 'TREE_GRM_COMPONENT', 'TREE_GRM_MIDPT',
+                   'POP_PLOT_STRATUM_ASSGN', 'POP_ESTN_UNIT', 'POP_EVAL',
+                   'POP_STRATUM', 'POP_EVAL_TYP', 'POP_EVAL_GRP')
+  }
+
 
   ## If remote, read in state by state. Otherwise, drop all unnecessary tables
   db <- readRemoteHelper(x, db, remote, reqTables, nCores)
@@ -64,7 +71,7 @@ growMortStarter <- function(x,
   if(any(unique(db$PLOT$STATECD) %in% noGrow)){
     vState <- unique(db$PLOT$STATECD[db$PLOT$STATECD %in% noGrow])
     fancyName <- unique(intData$EVAL_GRP$STATE[intData$EVAL_GRP$STATECD %in% vState])
-    warning(paste('Recruitment data unavailable for: ', toString(fancyName) , '. Returning 0 for all recruitment estimates which include these states.', sep = ''))
+    warning(paste('Recruitment, growth, and net change data unavailable for: ', toString(fancyName) , '. Returning 0 for all such estimates which include these states.', sep = ''))
   }
   # These states do not allow change estimates.
   if(any(unique(db$PLOT$STATECD) %in% c(69, 72, 78, 15, 02))){
@@ -269,7 +276,8 @@ growMortStarter <- function(x,
                     typeD, state_recr, TPA_UNADJ,
                     STATUSCD, DIA)) %>%
     ## Drop plots outside our domain of interest
-    dplyr::filter(TRE_CN %in% db$TREE_GRM_COMPONENT$TRE_CN)
+    dplyr::filter(PLT_CN %in% c(db$PLOT$PLT_CN, db$PLOT$PREV_PLT_CN))
+    #dplyr::filter(TRE_CN %in% c(db$TREE_GRM_COMPONENT$TRE_CN, db$TREE_GRM_COMPONENT$PREV_TRE_CN))
 
   db$TREE_GRM_MIDPT <- db$TREE_GRM_MIDPT %>%
     select(c(TRE_CN, DIA, state)) %>%
@@ -317,18 +325,21 @@ growMortStarter <- function(x,
                      by = c('PREV_PLT_CN' = 'PLT_CN', 'PREVCOND' = 'CONDID'),
                      suffix = c('', '.prev')) %>%
     dplyr::left_join(dplyr::select(db$TREE, c(TRE_CN, dplyr::all_of(grpT),
-                                              typeD, tD, TPA_UNADJ)),
+                                              typeD, tD, DIA, STATUSCD, TPA_UNADJ, state.prev = state_recr)),
                      by = c('PREV_TRE_CN' = 'TRE_CN'), suffix = c('', '.prev')) %>%
     # dplyr::mutate_if(is.factor,
     #           as.character) %>%
-    dplyr::mutate(TPAGROW_UNADJ = TPAGROW_UNADJ * state,
-                  TPAREMV_UNADJ = TPAREMV_UNADJ * state,
+    dplyr::mutate(TPAREMV_UNADJ = TPAREMV_UNADJ * state,
                   TPAMORT_UNADJ = TPAMORT_UNADJ * state,
                   TPARECR_UNADJ = TPARECR_UNADJ * state_recr / REMPER,
                   ## State recruit is the state variable adjustment for ALL TREES at T2,
                   ## So we can estimate live TPA at t2 (t1 unavailable w/out growth accounting) with:
-                  TPA_UNADJ = TPA_UNADJ * state_recr * ifelse(STATUSCD == 1 & DIA >= 5, 1, 0),
-                  TPA_UNADJ.prev = TPA_UNADJ.prev * state) %>%
+                  TPA_UNADJ = TPAGROW_UNADJ * state_recr * ifelse(COMPONENT %in% c('SURVIVOR', 'INGROWTH'), 1, 0),
+                  #TPA_UNADJ = TPA_UNADJ * state_recr * ifelse(STATUSCD == 1 & DIA >= 5, 1, 0),
+                  TPA_UNADJ.prev = TPAGROW_UNADJ * state.prev * ifelse(COMPONENT %in% c('SURVIVOR'), 1, 0),
+                  ## Add our indicator of whether or not a plot is ever associated with a,
+                  #TPA_UNADJ.prev = TPA_UNADJ.prev * state.prev * ifelse(STATUSCD.prev == 1 & STATUSCD != 0 & DIA.prev >= 5, 1, 0)
+                  ) %>%
     ## Add our indicator of whether or not a plot is ever associated with a
     ## growth accounting inventory
     dplyr::left_join(plt.ga, by = 'PLT_CN') %>%
@@ -443,14 +454,22 @@ growMortStarter <- function(x,
       dplyr::summarise(RECR_TPA = sum(TPARECR_UNADJ * tDI_r, na.rm = TRUE),
                        MORT_TPA = sum(TPAMORT_UNADJ * tDI, na.rm = TRUE),
                        REMV_TPA = sum(TPAREMV_UNADJ * tDI, na.rm = TRUE),
-                       CURR_TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE)) %>%
-      dplyr::mutate(PREV_TPA = CURR_TPA + (MORT_TPA + REMV_TPA - RECR_TPA)*REMPER) %>%
+                       CURR_TPA = sum(TPA_UNADJ * tDI, na.rm = TRUE),
+                       PREV_TPA = sum(TPA_UNADJ.prev * tDI, na.rm = TRUE)) %>%
+      dplyr::mutate(PREV_TPA = PREV_TPA + (MORT_TPA + REMV_TPA)*REMPER) %>%
       dplyr::ungroup() %>%
-      dplyr::mutate(RECR_PERC = RECR_TPA / PREV_TPA * 100,
+      dplyr::mutate(CHNG_TPA = (CURR_TPA - PREV_TPA) / REMPER,
+                    GROW_TPA = CHNG_TPA - RECR_TPA + MORT_TPA + REMV_TPA,
+                    RECR_PERC = RECR_TPA / PREV_TPA * 100,
                     MORT_PERC = MORT_TPA / PREV_TPA * 100,
-                    REMV_PERC = REMV_TPA / PREV_TPA * 100) %>%
-      dplyr::select(PLT_CN, !!!grpSyms, REMPER, RECR_TPA:REMV_TPA, RECR_PERC:REMV_PERC, PREV_TPA, CURR_TPA) %>%
+                    REMV_PERC = REMV_TPA / PREV_TPA * 100,
+                    GROW_PERC = GROW_TPA / PREV_TPA * 100,
+                    CHNG_PERC = CHNG_TPA / PREV_TPA * 100) %>%
+      dplyr::select(PLT_CN, !!!grpSyms, REMPER, RECR_TPA:REMV_TPA, GROW_TPA, CHNG_TPA, RECR_PERC:CHNG_PERC, PREV_TPA, CURR_TPA) %>%
       as.data.frame() %>%
+      ## Rounding errors will generate tiny values, make them zero
+      dplyr::mutate(GROW_TPA = dplyr::case_when(abs(GROW_TPA) < 1e-5 ~ 0,
+                                                TRUE ~ GROW_TPA)) %>%
       dplyr::left_join(a, by = c('PLT_CN', aGrpBy)) %>%
       dplyr::distinct()
 
@@ -518,13 +537,16 @@ growMortStarter <- function(x,
       dplyr::mutate(rPlot = TPARECR_UNADJ * tDI_r,
                     mPlot = TPAMORT_UNADJ * tDI,
                     hPlot = TPAREMV_UNADJ * tDI,
-                    tPlot = TPA_UNADJ * tDI) %>%
+                    tPlot = TPA_UNADJ * tDI,
+                    pPlot = (TPA_UNADJ.prev * tDI) + ((mPlot + hPlot)*REMPER),
+                    cPlot = (tPlot - pPlot) / REMPER,
+                    gPlot = cPlot - rPlot + mPlot + hPlot) %>%
       dplyr::mutate(TREE_BASIS = case_when(SUBPTYP_GRM == 0 ~ NA_character_,
                                            SUBPTYP_GRM == 1 ~ 'SUBP',
                                            SUBPTYP_GRM == 2 ~ 'MICR',
                                            SUBPTYP_GRM == 3 ~ 'MACR')) %>%
       as.data.frame() %>%
-      dplyr::select(PLT_CN, TREE_BASIS, SUBP, TREE, !!!grpSyms, rPlot:tPlot)
+      dplyr::select(PLT_CN, TREE_BASIS, SUBP, TREE, !!!grpSyms, rPlot:gPlot)
 
 
     if (treeList) {
@@ -537,7 +559,10 @@ growMortStarter <- function(x,
                       RECR_TPA = rPlot,
                       MORT_TPA = mPlot,
                       REMV_TPA = hPlot,
+                      GROW_TPA = gPlot,
+                      CHNG_TPA = cPlot,
                       CURR_TPA = tPlot,
+                      PREV_TPA = pPlot,
                       PROP_FOREST = fa)
       out <- list(tEst = tEst, aEst = NULL, grpBy = grpBy, aGrpBy = aGrpBy)
 
@@ -558,9 +583,11 @@ growMortStarter <- function(x,
       aEst <- eu.sums$y
 
       ## Have to repeat this with tree totals as the denominator
-      eu.sums <- sumToEU(db, dplyr::select(tPlt, -c(tPlot)), dplyr::select(tPlt, -c(rPlot, mPlot, hPlot)), pops, grpBy, grpBy, method)
+      eu.sums <- sumToEU(db, dplyr::select(tPlt, -c(tPlot, pPlot)), dplyr::select(tPlt, -c(rPlot, mPlot, hPlot, gPlot, cPlot, tPlot)), pops, grpBy, grpBy, method)
       ttEst <- eu.sums$x %>%
-        dplyr::select(ESTN_UNIT_CN, all_of(grpBy), rPlot_cv_t = rPlot_cv, mPlot_cv_t = mPlot_cv, hPlot_cv_t = hPlot_cv)
+        dplyr::select(ESTN_UNIT_CN, all_of(grpBy),
+                      rPlot_cv_t = rPlot_cv, mPlot_cv_t = mPlot_cv, hPlot_cv_t = hPlot_cv,
+                      gPlot_cv_t = gPlot_cv, cPlot_cv_t = cPlot_cv)
       tEst <- dplyr::left_join(tEst, ttEst, by = c('ESTN_UNIT_CN', grpBy))
 
       out <- list(tEst = tEst, aEst = aEst, grpBy = grpBy, aGrpBy = aGrpBy)
@@ -656,44 +683,65 @@ growMort <- function(db,
       dplyr::group_by(!!!grpSyms) %>%
       dplyr::summarize(dplyr::across(dplyr::everything(), sum, na.rm = TRUE)) %>%
       dplyr::left_join(aEst, by = aGrpBy) %>%
-      dplyr::mutate(TREE_TOTAL = tPlot_mean,
+      dplyr::mutate(CURR_TOTAL = tPlot_mean,
+                    PREV_TOTAL = pPlot_mean,
                     RECR_TOTAL = rPlot_mean,
                     MORT_TOTAL = mPlot_mean,
                     REMV_TOTAL = hPlot_mean,
+                    GROW_TOTAL = gPlot_mean,
+                    CHNG_TOTAL = cPlot_mean,
                     AREA_TOTAL = fa_mean,
                     # Ratios
                     RECR_TPA = rPlot_mean / fa_mean,
                     MORT_TPA = mPlot_mean / fa_mean,
                     REMV_TPA = hPlot_mean / fa_mean,
-                    RECR_PERC = rPlot_mean / tPlot_mean,
-                    MORT_PERC = mPlot_mean / tPlot_mean,
-                    REMV_PERC = hPlot_mean / tPlot_mean,
+                    GROW_TPA = gPlot_mean / fa_mean,
+                    CHNG_TPA = cPlot_mean / fa_mean,
+                    RECR_PERC = rPlot_mean / pPlot_mean,
+                    MORT_PERC = mPlot_mean / pPlot_mean,
+                    REMV_PERC = hPlot_mean / pPlot_mean,
+                    GROW_PERC = gPlot_mean / pPlot_mean,
+                    CHNG_PERC = cPlot_mean / pPlot_mean,
                     # Variances
-                    TREE_TOTAL_VAR = tPlot_var,
+                    CURR_TOTAL_VAR = tPlot_var,
+                    PREV_TOTAL_VAR = pPlot_var,
                     RECR_TOTAL_VAR = rPlot_var,
                     MORT_TOTAL_VAR = mPlot_var,
                     REMV_TOTAL_VAR = hPlot_var,
+                    GROW_TOTAL_VAR = gPlot_var,
+                    CHNG_TOTAL_VAR = cPlot_var,
                     AREA_TOTAL_VAR = fa_var,
                     RECR_TPA_VAR = ratioVar(rPlot_mean, fa_mean, rPlot_var, fa_var, rPlot_cv),
                     MORT_TPA_VAR = ratioVar(mPlot_mean, fa_mean, mPlot_var, fa_var, mPlot_cv),
                     REMV_TPA_VAR = ratioVar(hPlot_mean, fa_mean, hPlot_var, fa_var, hPlot_cv),
-                    RECR_PERC_VAR = ratioVar(rPlot_mean, tPlot_mean, rPlot_var, tPlot_var, rPlot_cv_t),
-                    MORT_PERC_VAR = ratioVar(mPlot_mean, tPlot_mean, mPlot_var, tPlot_var, mPlot_cv_t),
-                    REMV_PERC_VAR = ratioVar(hPlot_mean, tPlot_mean, hPlot_var, tPlot_var, hPlot_cv_t),
+                    GROW_TPA_VAR = ratioVar(gPlot_mean, fa_mean, gPlot_var, fa_var, gPlot_cv),
+                    CHNG_TPA_VAR = ratioVar(cPlot_mean, fa_mean, cPlot_var, fa_var, cPlot_cv),
+                    RECR_PERC_VAR = ratioVar(rPlot_mean, pPlot_mean, rPlot_var, pPlot_var, rPlot_cv_t),
+                    MORT_PERC_VAR = ratioVar(mPlot_mean, pPlot_mean, mPlot_var, pPlot_var, mPlot_cv_t),
+                    REMV_PERC_VAR = ratioVar(hPlot_mean, pPlot_mean, hPlot_var, pPlot_var, hPlot_cv_t),
+                    GROW_PERC_VAR = ratioVar(gPlot_mean, pPlot_mean, gPlot_var, pPlot_var, gPlot_cv_t),
+                    CHNG_PERC_VAR = ratioVar(cPlot_mean, pPlot_mean, cPlot_var, pPlot_var, cPlot_cv_t),
 
                     # Convert to percentages
                     RECR_PERC = RECR_PERC * 100,
                     MORT_PERC = MORT_PERC * 100,
                     REMV_PERC = REMV_PERC * 100,
+                    GROW_PERC = GROW_PERC * 100,
+                    CHNG_PERC = CHNG_PERC * 100,
                     RECR_PERC_VAR = RECR_PERC_VAR * 100^2,
                     MORT_PERC_VAR = MORT_PERC_VAR * 100^2,
                     REMV_PERC_VAR = REMV_PERC_VAR * 100^2,
+                    GROW_PERC_VAR = GROW_PERC_VAR * 100^2,
+                    CHNG_PERC_VAR = CHNG_PERC_VAR * 100^2,
 
                     # Sampling Errors
-                    TREE_TOTAL_SE = sqrt(tPlot_var) / tPlot_mean * 100,
+                    CURR_TOTAL_SE = sqrt(tPlot_var) / tPlot_mean * 100,
+                    PREV_TOTAL_SE = sqrt(pPlot_var) / pPlot_mean * 100,
                     RECR_TOTAL_SE = sqrt(rPlot_var) / rPlot_mean * 100,
                     MORT_TOTAL_SE = sqrt(mPlot_var) / mPlot_mean * 100,
                     REMV_TOTAL_SE = sqrt(hPlot_var) / rPlot_mean * 100,
+                    GROW_TOTAL_SE = sqrt(gPlot_var) / gPlot_mean * 100,
+                    CHNG_TOTAL_SE = sqrt(cPlot_var) / cPlot_mean * 100,
                     AREA_TOTAL_SE = sqrt(fa_var) / fa_mean * 100,
                     RECR_TPA_SE = sqrt(RECR_TPA_VAR) / RECR_TPA * 100,
                     MORT_TPA_SE = sqrt(MORT_TPA_VAR) / MORT_TPA * 100,
@@ -701,18 +749,26 @@ growMort <- function(db,
                     RECR_PERC_SE = sqrt(RECR_PERC_VAR) / RECR_PERC * 100,
                     MORT_PERC_SE = sqrt(MORT_PERC_VAR) / MORT_PERC * 100,
                     REMV_PERC_SE = sqrt(REMV_PERC_VAR) / REMV_PERC * 100,
+                    GROW_PERC_SE = sqrt(GROW_PERC_VAR) / GROW_PERC * 100,
+                    CHNG_PERC_SE = sqrt(CHNG_PERC_VAR) / CHNG_PERC * 100,
 
                     # Plot counts
                     nPlots_TREE = nPlots.x,
                     nPlots_AREA = nPlots.y,
                     N = P2PNTCNT_EU) %>%
-      dplyr::select(!!!grpSyms, RECR_TPA:REMV_PERC,
-                    RECR_TOTAL:REMV_TOTAL, TREE_TOTAL, AREA_TOTAL,
-                    RECR_TPA_VAR:REMV_PERC_VAR,
-                    RECR_TOTAL_VAR:REMV_TOTAL_VAR, TREE_TOTAL_VAR, AREA_TOTAL_VAR,
-                    RECR_TPA_SE:REMV_PERC_SE,
-                    RECR_TOTAL_SE:REMV_TOTAL_SE, TREE_TOTAL_SE, AREA_TOTAL_SE,
-                    nPlots_TREE, nPlots_AREA, N)
+      dplyr::select(!!!grpSyms, RECR_TPA:CHNG_PERC,
+                    RECR_TOTAL:CHNG_TOTAL, PREV_TOTAL, CURR_TOTAL, AREA_TOTAL,
+                    RECR_TPA_VAR:CHNG_PERC_VAR,
+                    RECR_TOTAL_VAR:CHNG_TOTAL_VAR, PREV_TOTAL_VAR, CURR_TOTAL_VAR, AREA_TOTAL_VAR,
+                    RECR_TPA_SE:CHNG_PERC_SE,
+                    RECR_TOTAL_SE:CHNG_TOTAL_SE, PREV_TOTAL_SE, CURR_TOTAL_SE, AREA_TOTAL_SE,
+                    nPlots_TREE, nPlots_AREA, N) %>%
+      ## Rounding errors can cause GROW_TPA to take an extremely small value instead of zero
+      ## Make it zero when this happens
+      dplyr::mutate(dplyr::across(c(GROW_TPA, GROW_PERC, GROW_TOTAL,
+                                    GROW_TPA_VAR, GROW_PERC_VAR, GROW_TOTAL_VAR),
+                                  .fns = ~case_when(abs(.x) < 1e-5 ~ 0,
+                                                   TRUE ~ .x)))
 
     ## Drop totals unless told not to
     if (!totals) {
