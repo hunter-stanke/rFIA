@@ -440,7 +440,7 @@ typeDomain_grow <- function(db, treeType, landType, type, stateVar = NULL) {
             COMPONENT %in% c('INGROWTH', 'CUT2', 'MORTALITY2') ~ TPAGROW_UNADJ,
             TRUE ~ 0))
 
-      } else if (tolower(treeType) == 'gs'){
+      } else if (tolower(treeType) == 'gs') {
         # db$TREE <- db$TREE %>%
         #   mutate(typeD = case_when(
         #     STATUSCD %in% 1:2 & DIA >=5 ~ 1,
