@@ -30,3 +30,5 @@ Suggests:
     R2jags,
     coda
 RoxygenNote: 7.1.2
+URL: https://github.com/hunter-stanke/rFIA
+BugReports: https://github.com/hunter-stanke/rFIA/issues
