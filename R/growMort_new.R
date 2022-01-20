@@ -53,8 +53,8 @@ growMortStarter <- function(x,
   if (landType %in% c('timber', 'forest') == FALSE){
     stop('landType must be one of: "forest" or "timber".')
   }
-  if (treeType %in% c('live', 'dead', 'gs', 'all') == FALSE){
-    stop('treeType must be one of: "live", "dead", "gs", or "all".')
+  if (treeType %in% c('gs', 'all') == FALSE){
+    stop('treeType must be one of: "all" or "gs".')
   }
   if (any(reqTables[!c(reqTables %in% 'SUBP_COND_CHNG_MTRX')] %in% names(db) == FALSE)){
     missT <- reqTables[reqTables %in% names(db) == FALSE]
