@@ -387,7 +387,7 @@ standStruct <- function(db,
   tEst <- tEst %>%
     dplyr::ungroup() %>%
     dplyr::mutate_if(is.factor, as.character) %>%
-    tidyr::drop_na(grpBy) %>%
+    tidyr::drop_na(grpBy[!c(grpBy %in% names(polys))]) %>%
     dplyr::arrange(YEAR) %>%
     as_tibble()
 

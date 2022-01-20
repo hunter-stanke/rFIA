@@ -787,7 +787,7 @@ growMort <- function(db,
   ## Modify some names if a different state variable was given
   if (stateVar != 'TPA') {
     names(tEst) <- str_replace(names(tEst), 'TPA', paste(stateVar, 'ACRE', sep = '_'))
-    names(tEst) <- str_replace(names(tEst), 'TREE', ifelse(stateVar == 'BAA', 'BA', stateVar))
+    #names(tEst) <- str_replace(names(tEst), 'TREE', ifelse(stateVar == 'BAA', 'BA', stateVar))
   }
   names(tEst) <- str_replace(names(tEst), 'BAA_ACRE', 'BAA')
 
@@ -801,7 +801,7 @@ growMort <- function(db,
   # for retaining non-treed forestland
   if (!treeList) {
     tEst <- tEst %>%
-      tidyr::drop_na(grpBy) %>%
+      tidyr::drop_na(grpBy[!c(grpBy %in% names(polys))]) %>%
       dplyr::arrange(YEAR)
   }
 

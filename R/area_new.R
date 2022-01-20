@@ -446,7 +446,7 @@ area <- function(db,
   # for retaining non-treed forestland
   if (!condList) {
     tEst <- tEst %>%
-      tidyr::drop_na(grpBy) %>%
+      tidyr::drop_na(grpBy[!c(grpBy %in% names(polys))]) %>%
       dplyr::arrange(YEAR)
   }
 
