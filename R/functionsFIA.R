@@ -794,7 +794,7 @@ mergeSmallStrata_old <- function(db, pops) {
       ## If buffer is present in the name, then the stratum has a different intensity
       ## than other strata in the same estimation unit (PNW only).
       ## Only combine buffer w/ buffer
-      mutate(buff = str_detect(STRATUM_DESCR, 'buff') & STATECD %in% c(53, 41, 6)) %>%
+      mutate(buff = str_detect(STRATUM_DESCR, 'buf|int') & STATECD %in% c(53, 41, 6)) %>%
       mutate(wrong = P2POINTCNT_INVYR < 2) %>%
       group_by(ESTN_UNIT_CN, INVYR) %>%
       mutate(nStrata_INVYR = length(unique(STRATUM_CN))) %>%
