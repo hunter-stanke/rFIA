@@ -5,14 +5,20 @@
 Load FIA database into R environment from local directory
 }
 \description{
-Loads FIA Datatables into R from .csv files stored in a local directory. If you have not previously downloaded FIA Data from the FIA Datamart, use \code{\link{getFIA}} to download data for your region of interest and load it into R. Capable of merging multiple state downloads of the FIA database for regional analysis. Simply store each set of state data, as downloaded from the FIA Datamart, in the same directory and hand to \code{readFIA}.}
+Loads FIA Datatables into R from .csv files stored in a local directory (common, easy), or from a database connection (uncommon, difficult). If you have not previously downloaded FIA Data from the FIA Datamart, use \code{\link{getFIA}} to download data for your region of interest and load it into R.
+}
 
 \usage{
-readFIA(dir, common = TRUE, tables = NULL, states = NULL,
-        inMemory = TRUE, nCores = 1, ...)}
+readFIA(dir = NULL, con = NULL, schema = NULL, common = TRUE, tables = NULL,
+         states = NULL, inMemory = TRUE, nCores = 1, ...)
+         }
 
 \arguments{
-  \item{dir}{directory where FIA Datatables are stored.}
+  \item{dir}{directory where .csv files of FIA tables are stored.}
+
+  \item{con}{database connection (e.g., produced with \code{DBI::dbConnect()}. Most users will want to specify \code{dir} instead, reading FIA tables from csv files.)}
+
+  \item{schema}{SQL Schema that contains FIA tables. Only required when reading tables from a database connection, which most users should avoid.}
 
   \item{common}{logical; if TRUE, only import most commonly used tables, including all required for \code{rFIA} functions (see Details for list of tables).}
 
@@ -38,7 +44,7 @@ Easy, efficient parallelization is implemented with the \code{\link{parallel}} p
 }
 
 \value{
-List object containing FIA Datatables. List elements represent individual FIA Datatables stored as \code{data.frame} objects. Names of list elements reflect names of files from which they were read into R environment (File names should not be changed after download from FIA Datamart).
+List object containing FIA tabels. List elements represent individual FIA tables stored as \code{data.frame} objects. Names of list elements reflect names of files from which they were read into R environment (File names should not be changed after download from FIA Datamart).
 
 If multiple subsets of the FIA database are held in the same directory (e.g. Michigan and Indiana state downloads), corresponding tables will be merged (e.g. PLOT table returned contains plots in both Michigan and Indiana).
 }

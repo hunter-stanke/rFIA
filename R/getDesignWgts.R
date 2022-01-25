@@ -36,6 +36,8 @@ getDesignInfo <- function(db,
   } else {
     ## Read the tables we need, readFIA will throw a warning if they are missing
     db <- readFIA(dir = db$dir,
+                  con = db$con,
+                  schema = db$schema,
                   common = db$common,
                   tables =  c('PLOT', 'POP_EVAL', 'POP_EVAL_TYP', 'POP_ESTN_UNIT', 'POP_STRATUM', 'POP_PLOT_STRATUM_ASSGN'),
                   states = db$states)

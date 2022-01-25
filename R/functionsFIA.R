@@ -157,8 +157,12 @@ readRemoteHelper <- function(x, db, remote, reqTables, nCores){
     params <- db
 
     ## Read in one state at a time
-    db <- readFIA(dir = db$dir, common = db$common,
-                  tables = reqTables, states = x, ## x is the vector of state names
+    db <- readFIA(dir = db$dir,
+                  con = db$con,
+                  schema = db$schema,
+                  common = db$common,
+                  tables = reqTables,
+                  states = x, ## x is the vector of state names
                   nCores = nCores)
 
     ## If a clip was specified, run it now

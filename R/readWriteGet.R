@@ -10,7 +10,9 @@ dropTheseCols <- function() {
 
 # Read in FIA database files (.csv) from local directory
 #' @export
-readFIA <- function(dir,
+readFIA <- function(dir = NULL,
+                    con = NULL,
+                    schema = NULL,
                     common = TRUE,
                     tables = NULL,
                     states = NULL,
@@ -18,13 +20,29 @@ readFIA <- function(dir,
                     nCores = 1,
                     ...){
 
-  ## methods for reading the full database into memory
+  ## Must specify dir or con
+  if (is.null(dir) & is.null(con)) {
+    stop('Must specify `dir` or `con`. If reading from csv files, set `dir` to the directory where your FIA data lives.')
+  }
+
+  ## Need schema if reading from a database
+  if (!is.null(con) & is.null(schema)) {
+    stop('Must specify `schema` when reading data from a database connection (`con`).')
+  }
+
+  ## Attempt to read from database
+  if (!is.null(con)) {
+    db <- readFIA.db(con, schema, states, tables, common, inMemory)
+    return(db)
+  }
+
+
   # Add a slash to end of directory name if missing
   if (str_sub(dir,-1) != '/') dir <- paste(dir, '/', sep = "")
   # Grab all the file names in directory
   files <- list.files(dir)
 
-
+  ## methods for reading the full database into memory
   if (inMemory){
 
     inTables <- list()
@@ -451,6 +469,160 @@ Did you accidentally include the state abbreviation in front of the table name? 
   }
 
   if (load) return(outTables)
+}
+
+
+## Read FIA data from a database connection
+readFIA.db <- function(con,
+                       schema,
+                       states,
+                       tables,
+                       common,
+                       inMemory) {
+
+  ## Load all data now, or wait until later (process state-by-state)?
+  if (is.null(inMemory) | !is.logical(inMemory)) stop('`inMemory` must be TRUE/FALSE.')
+  if (inMemory) {
+
+    ## Check that specified states are valid -------------------------------------
+    if (is.null(states)) states <- pull_all_states(con, schema)
+    states <- unique(stringr::str_to_upper(states))
+    stateNames <- intData$stateNames
+    badStates <- states[!c(states %in% stateNames$STATEAB)]
+    if (length(badStates) > 0) {
+      if (any(stringr::str_length(badStates) > 2)) {
+        stop (paste0('The following states are not supported: ',
+                     paste(badStates, collapse = ', '),
+                     '. Note that state abbreviations are required in place of full names (e.g., "MI" instead of "Michigan").'))
+      } else {
+        stop (paste0('The following states are not supported: ',
+                     paste(badStates, collapse = ', '), '.'))
+      }
+    }
+
+
+    ## Check that specified tables are valid -------------------------------------
+    commonTables <- c('COND', 'COND_DWM_CALC', 'INVASIVE_SUBPLOT_SPP', 'PLOT',
+                      'POP_ESTN_UNIT','POP_EVAL', 'POP_EVAL_GRP', 'POP_EVAL_TYP',
+                      'POP_PLOT_STRATUM_ASSGN', 'POP_STRATUM', 'SUBPLOT', 'TREE',
+                      'TREE_GRM_COMPONENT', 'TREE_GRM_MIDPT', 'TREE_GRM_BEGIN',
+                      'SUBP_COND_CHNG_MTRX', 'SEEDLING', 'SURVEY', 'SUBP_COND',
+                      'P2VEG_SUBP_STRUCTURE')
+    allTables <- sort(c(commonTables,
+                        'COUNTY', 'SUBP_COND', 'BOUNDARY', 'TREE_WOODLAND_STEMS',
+                        'TREE_REGIONAL_BIOMASS', 'TREE_GRM_ESTN', 'SITETREE',
+                        'P2VEG_SUBPLOT_SPP', 'GRND_CVR', 'DWM_VISIT',
+                        'DWM_COARSE_WOODY_DEBRIS', 'DWM_DUFF_LITTER_FUEL',
+                        'DWM_FINE_WOODY_DEBRIS', 'DWM_MICROPLOT_FUEL',
+                        'DWM_RESIDUAL_PILE', 'DWM_TRANSECT_SEGMENT',
+                        'COND_DWM_CALC', 'PLOT_REGEN', 'SUBPLOT_REGEN',
+                        'SEEDLING_REGEN', 'POP_EVAL_ATTRIBUTE', 'PLOTGEOM',
+                        'PLOTSNAP'))
+
+    # If `tables` isn't specified, default to common or all
+    if (is.null(common) | !is.logical(common)) stop('`common` must be TRUE/FALSE.')
+    if (is.null(tables) & common) tables <- commonTables
+    if (is.null(tables) & !common) tables <- allTables
+
+    # Checking all tables are cool
+    tables <- unique(stringr::str_to_upper(tables))
+    badTables <- tables[!c(tables %in% allTables)]
+    if (length(badTables) > 0) {
+      stop (paste0('The following tables are not supported: ',
+                   paste(badTables, collapse = ', '), '.'))
+    }
+
+
+    ## Load tables -------------------------------------------------------------
+    out <- lapply(X = tables,
+                  FUN = read_fia_table_from_db,
+                  con = con,
+                  schema = schema,
+                  states = states)
+    names(out) <- tables
+
+    ## POP_EVAL_TYP doesn't have a STATECD variable, but we can filter it by
+    ## EVAL_CN if available. Otherwise you get the whole thing.
+    if ('POP_EVAL' %in% tables & 'POP_EVAL_TYP' %in% tables) {
+      out$POP_EVAL_TYP <- out$POP_EVAL_TYP %>%
+        dplyr::filter(EVAL_CN %in% out$POP_EVAL$CN)
+    }
+
+    ## Add package class and done
+    class(out) <- 'FIA.Database'
+
+
+
+    # Set up "remote" FIA Database
+  } else {
+
+    # If states not specified, grab all available from the plot table
+    if (is.null(states)) {
+      message('`states` not provided. Defaulting to all states listed in PLOT table.')
+      allStates <- dplyr::tbl(
+        con,
+        dplyr::sql(
+          paste0("SELECT DISTINCT statecd FROM ", schema, '.plot')
+        )
+      ) %>%
+        dplyr::collect() %>%
+        dplyr::rename_with(stringr::str_to_upper) %>%
+        dplyr::left_join(intData$stateNames, by = 'STATECD')
+
+      states <- allStates$STATEAB
+    }
+
+    ## Saving the call to readFIA, for eval later
+    out <- list(con = con,
+                schema = schema,
+                common = common,
+                tables = tables,
+                states = states)
+    class(out) <- 'Remote.FIA.Database'
+
+  }
+
+  return(out)
+
+}
+
+## Load individual tables from a connection to a mirror of the FIADB
+read_fia_table_from_db <- function(table, con, schema, states) {
+
+  ## Reformat states so we can use "IN"
+  statecds <- intData$stateNames$STATECD[intData$stateNames$STATEAB %in% states]
+  states <- paste0('(', paste(statecds, collapse = ', '), ')')
+
+  ## All tables except POP_EVAL_TYP have a STATECD variable, so we can filter
+  ## tables by state and then load. For POP_EVAL_TYP we have to load the whole
+  ## thing each time, and then apply an adhoc filter from EVAL_CN if POP_EVAL
+  ## is also available
+  query <- paste0("SELECT * FROM ", schema, '.', table)
+  if (table != 'POP_EVAL_TYP') query <- paste0(query, ' WHERE statecd IN ', states)
+
+  ## Load the table
+  fiaTable <- dplyr::tbl(
+    con,
+    dplyr::sql(query)
+  ) %>%
+    dplyr::collect() %>%
+    dplyr::rename_with(stringr::str_to_upper)
+
+  return(fiaTable)
+}
+
+# If states not specified, grab all available from the plot table
+pull_all_states <- function(con, schema) {
+  allStates <- dplyr::tbl(
+    con,
+    dplyr::sql(
+      paste0("SELECT DISTINCT statecd FROM ", schema, '.plot')
+    )
+  ) %>%
+    dplyr::collect() %>%
+    dplyr::rename_with(stringr::str_to_upper) %>%
+    dplyr::left_join(intData$stateNames, by = 'STATECD')
+  return(allStates$STATEAB)
 }
 
 
