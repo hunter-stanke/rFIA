@@ -3,9 +3,11 @@ customPSE <- function(db,
                       x,
                       xVars,
                       xGrpBy = NULL,
+                      xTransform = NULL,
                       y = NULL,
                       yVars = NULL,
                       yGrpBy = NULL,
+                      yTransform = NULL,
                       method = 'TI',
                       lambda = .5,
                       totals = TRUE,
@@ -148,6 +150,26 @@ customPSE <- function(db,
   xPlt <- sumToPlot(x, pops, xGrpBy)
   if (!is.null(y)) yPlt <- sumToPlot(y, pops, yGrpBy)
 
+
+
+
+  ## Apply transformations to plot-level summaries -----------------------------
+  if (!is.null(xTransform)) {
+    xPlt <- dplyr::mutate(xPlt,
+                        dplyr::across(
+                          .cols = c(-ESTN_UNIT_CN, -STRATUM_CN,
+                                    -PLT_CN, - {{xGrpBy}}),
+                          .fns = xTransform
+                        ))
+  }
+  if (!is.null(y) & !is.null(yTransform)) {
+    yPlt <- dplyr::mutate(yPlt,
+                          dplyr::across(
+                            .cols = c(-ESTN_UNIT_CN, -STRATUM_CN,
+                                      -PLT_CN, - {{yGrpBy}}),
+                            .fns = yTransform
+                          ))
+  }
 
 
   ## Sum up to estimation unit -------------------------------------------------

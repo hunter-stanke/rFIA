@@ -6,8 +6,8 @@
 Produces estimates of population totals, ratios, and associated variances for custom variables using FIA's post-stratified inventories. Accepts tree- and condition-level summaries from rFIA estimator functions as input, with potential modifications to associated variables (e.g., custom allometrics can be applied to estimate tree biomass/carbon). See our website for example use cases.
 }
 \usage{
-customPSE(db, x, xVars, xGrpBy = NULL, y = NULL,
-          yVars = NULL, yGrpBy = NULL, method = "TI",
+customPSE(db, x, xVars, xGrpBy = NULL, xTransform = NULL, y = NULL,
+          yVars = NULL, yGrpBy = NULL, yTransform = NULL, method = "TI",
           lambda = 0.5, totals = TRUE, variance = TRUE)
 }
 %- maybe also 'usage' for other objects documented here.
@@ -20,11 +20,15 @@ customPSE(db, x, xVars, xGrpBy = NULL, y = NULL,
 
   \item{xGrpBy}{names of variables in \code{x} to be treated as grouping variables for the numerator, unquoted. Multiple variables should be combined with \code{c()}, e.g., \code{xVars = c(SPCD, OWNGRPCD)}.}
 
+  \item{xTransform}{function to be applied to plot-level summaries of numerator variables, e.g., \code{sqrt} or \code{function(x){log(x + 0.001)}}.}
+
   \item{y}{data.frame; tree- or condition-list containing denominator variable. See details more info on producing acceptable tree- and condition-lists using \code{rFIA} estimator functions.}
 
   \item{yVars}{name of variable in \code{y} to be treated as denominator variables, unquoted. Maximum one denominator variable allowed at this time.}
 
   \item{yGrpBy}{names of variables in \code{y} to be treated as grouping variables for the numerator, unquoted. Multiple variables should be combined with \code{c()}, e.g., \code{xVars = c(SPCD, OWNGRPCD)}.}
+
+  \item{yTransform}{function to be applied to plot-level summaries of denominator variable, e.g., \code{sqrt} or \code{function(x){log(x + 0.001)}}.}
 
   \item{method}{character; design-based estimator to use. One of:  "TI" (temporally indifferent, default), "annual" (annual), "SMA"" (simple moving average), "LMA" (linear moving average), or "EMA" (exponential moving average). See \href{https://www.fs.fed.us/nrs/pubs/jrnl/2020/nrs_2020_stanke_001.pdf}{Stanke et al 2020} for a complete description of these estimators.}
 
