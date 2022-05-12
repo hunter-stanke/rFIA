@@ -36,6 +36,10 @@ If multiple subsets of the FIA database are downloaded (e.g. \code{states = c('M
 \references{
 FIA DataMart: \url{https://apps.fs.usda.gov/fia/datamart/datamart.html}
 
+FIA Website Questions: \url{https://www.fia.fs.fed.us/about/about_us/#website_q}
+Direct email: SM.FS.fia@usda.gov 
+E.g., Problems accessing the state CSV files.
+                            
 FIA Database User Guide: \url{https://www.fia.fs.fed.us/library/database-documentation/}
 }
 
