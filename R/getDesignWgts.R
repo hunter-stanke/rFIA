@@ -134,8 +134,8 @@ getDesignInfo <- function(db,
     dplyr::left_join(dplyr::select(db$POP_PLOT_STRATUM_ASSGN, PLT_CN, STRATUM_CN,
                                    UNITCD, COUNTYCD, PLOT), by = 'STRATUM_CN') %>%
     ## pltID is used to track plots through time
-    dplyr::left_join(dplyr::select(db$PLOT, PLT_CN, pltID), by = 'PLT_CN') %>%
-    #dplyr::mutate(pltID = stringr::str_c(UNITCD, STATECD, COUNTYCD, PLOT, sep = "_")) %>%
+    dplyr::left_join(dplyr::select(db$PLOT, PLT_CN = CN), by = 'PLT_CN') %>%
+    dplyr::mutate(pltID = stringr::str_c(UNITCD, STATECD, COUNTYCD, PLOT, sep = "_")) %>%
     dplyr::select(STATECD, YEAR, EVAL_TYP, EVALID, EVAL_TYP, ESTN_METHOD,
                   ESTN_UNIT_CN, AREA_USED,
                   STRATUM_CN, P2POINTCNT:ADJ_FACTOR_MACR, STRATUM_WGT,
