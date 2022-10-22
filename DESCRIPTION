@@ -1,7 +1,7 @@
 Package: rFIA
 Type: Package
 Title: Estimation of Forest Variables using the FIA Database
-Version: 1.0.0
+Version: 1.0.1
 Author: Hunter Stanke [aut, cre],
   Andrew Finley [aut]
 Maintainer: Hunter Stanke <stankehu@msu.edu>
