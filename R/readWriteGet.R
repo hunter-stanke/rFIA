@@ -157,9 +157,9 @@ readFIA <- function(dir = NULL,
       ## If MODIFIED_DATE is not present, will warn
       suppressWarnings({
         # Read in and append each file to a list
-        file <- fread(paste(dir, files[n], sep = ""), showProgress = FALSE,
-                      integer64 = 'double', logical01 = FALSE, nThread = nCores,
-                      drop = dropTheseCols(), ...)
+        file <- data.table::fread(paste(dir, files[n], sep = ""), showProgress = FALSE,
+                                  integer64 = 'double', logical01 = FALSE, nThread = nCores,
+                                  drop = dropTheseCols(), ...)
       })
 
       # We don't want data.table formats
@@ -184,14 +184,12 @@ readFIA <- function(dir = NULL,
     uniqueNames <- unique(names(inTables))
     ## Works regardless of whether or not there are duplicate names (multiple states)
     for (i in 1:length(uniqueNames)){
-      outTables[[uniqueNames[i]]] <- rbindlist(inTables[names(inTables) == uniqueNames[i]], fill = TRUE)
+      outTables[[uniqueNames[i]]] <-  data.table::rbindlist(inTables[names(inTables) == uniqueNames[i]], fill = TRUE)
     }
 
 
     # NEW CLASS NAME FOR FIA DATABASE OBJECTS
     out <- lapply(outTables, as.data.frame)
-    class(out) <- 'FIA.Database'
-
 
     ## Add REF to the reference tables, will have _ prefix
     names(out)[str_sub(names(out), 1, 1) == '_'] <- paste0('REF', names(out)[str_sub(names(out), 1, 1) == '_'])
@@ -230,10 +228,17 @@ readFIA <- function(dir = NULL,
     class(out) <- 'Remote.FIA.Database'
   }
 
-  ## If WY updates the END_INVYR for 2018 & 2019 (i.e., not set it as 2020)
-  ## then we can drop this. Until then, we have to strong arm END_INVYR
+
   if (inMemory) {
+
+    ## Names of all tables forced to uppercase, since FIA changed this in Oct 2022
+    out <- lapply(out, FUN = function(x){dplyr::rename_with(x, toupper)})
+
+    ## If WY updates the END_INVYR for 2018 & 2019 (i.e., not set it as 2020)
+    ## then we can drop this. Until then, we have to strong arm END_INVYR
     out <- handleWY(out)
+
+    class(out) <- 'FIA.Database'
   }
 
   return(out)
@@ -320,7 +325,6 @@ Did you accidentally include the state abbreviation in front of the table name? 
   }
 
   ### I'm not very smart and like specify the name twice sometimes,
-  ### --> making the function smarter than me
   states <- unique(states)
 
   ## If individual tables are specified, then just grab those .csvs, otherwise download the .zip file, extract and read with fread. Should be quite a bit quicker.

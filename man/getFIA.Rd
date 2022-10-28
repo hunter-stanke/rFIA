@@ -2,7 +2,7 @@
 \alias{getFIA}
 \title{Download FIA Data and Load into R}
 \description{
-Easiest and most efficient way to access FIA Data in R. Downloads FIA Data from the FIA Datamart, loads the data into R environment, and optionally saves all downloaded tables as .csv files to local directory. Capable of merging multiple state downloads of the FIA database for regional analysis. Requires an internet connection to access and download tables from the FIA Datamart.}
+Downloads FIA Data from the FIA Datamart, loads the data into R environment, and optionally saves all downloaded tables as .csv files to local directory. Requires an internet connection to access and download tables from the FIA Datamart. \strong{R stops downloads after 60 seconds by default. To prevent this (allow download for 1 hour), run \code{options(timeout=3600)}.}}
 
 \usage{
 getFIA(states, dir = NULL, common = TRUE, tables = NULL,
@@ -37,9 +37,9 @@ If multiple subsets of the FIA database are downloaded (e.g. \code{states = c('M
 FIA DataMart: \url{https://apps.fs.usda.gov/fia/datamart/datamart.html}
 
 FIA Website Questions: \url{https://www.fia.fs.fed.us/about/about_us/#website_q}
-Direct email: SM.FS.fia@usda.gov 
+Direct email: SM.FS.fia@usda.gov
 E.g., Problems accessing the state CSV files.
-                            
+
 FIA Database User Guide: \url{https://www.fia.fs.fed.us/library/database-documentation/}
 }
 
@@ -56,6 +56,9 @@ Hunter Stanke and Andrew Finley
 
 \examples{
 \dontrun{
+## Allow downloads that take up to 1 hour (defaults to 60 seconds)
+options(timeout=3600)
+
 ## Download the common tables for Rhode Island, load into R, and save to local directory
 ## Replace tempDir() with the path to your directory (where data will be saved)
 db <- getFIA(states = 'RI', dir = tempdir())
