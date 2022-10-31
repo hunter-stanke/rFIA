@@ -4,7 +4,7 @@
 dropTheseCols <- function() {
 
   dropThese <- c("CREATED_BY", "CREATED_IN_INSTANCE", "CREATED_DATE", "MODIFIED_BY", "MODIFIED_IN_INSTANCE", "MODIFIED_DATE")
-
+  dropThese <- c(dropThese, tolower(dropThese))
   return(dropThese)
 }
 
