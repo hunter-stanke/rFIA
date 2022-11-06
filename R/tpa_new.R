@@ -306,6 +306,7 @@ tpaStarter <- function(x,
           is.na(DIA) ~ NA_character_,
           ## When DIA is less than 5", use microplot value
           DIA < 5 ~ 'MICR',
+          MACRO_BREAKPOINT_DIA <= 0 ~ 'SUBP',
           ## When DIA is greater than 5", use subplot value
           DIA >= 5 & is.na(MACRO_BREAKPOINT_DIA) ~ 'SUBP',
           DIA >= 5 & DIA < MACRO_BREAKPOINT_DIA ~ 'SUBP',
