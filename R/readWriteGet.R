@@ -433,7 +433,7 @@ Did you accidentally include the state abbreviation in front of the table name? 
       # Temporary directory to download to
       temp <- paste0(tempDir, '/', states[i],'.zip') #tempfile()
       ## Make the URL
-      url <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', states[i],'.zip')
+      url <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', states[i],'_CSV.zip')
       #newName <- paste0(str_sub(url, 1, -4), 'csv')
       ## Download as temporary file
       download.file(url, temp, timeout = 3600)
