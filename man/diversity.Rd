@@ -90,7 +90,7 @@ Dataframe or SF object (if \code{returnSpatial = TRUE}). If \code{byPlot = TRUE}
       \item{\strong{H_g}: Shannon's Diversity Index, gamma (regional) level}
       \item{\strong{Eh_a}: mean Shannon's Equitability Index, alpha (stand) level}
       \item{\strong{Eh_b}: Shannon's Equitability Index, beta (landscape) level}
-      \item{\strong{Eh_g}: Shannon's Equitability Index, alpha (stand) level}
+      \item{\strong{Eh_g}: Shannon's Equitability Index, gamma (regional) level}
       \item{\strong{S_a}: mean Species Richness, alpha (stand) level}
       \item{\strong{S_b}: Species Richness, beta (landscape) level}
       \item{\strong{S_g}: Species Richness, gamma (regional) level}
