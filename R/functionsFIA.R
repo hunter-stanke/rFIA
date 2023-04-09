@@ -2749,13 +2749,11 @@ sumToEU <- function(db,
       dtplyr::lazy_dt() %>%
       dplyr::group_by(ESTN_UNIT_CN, AREA_USED, P2PNTCNT_EU, !!!y.grp.syms) %>%
       dplyr::summarise(dplyr::across(c(!!y.var.m.syms),
-                              .fns = list(
-                                mean = ~ AREA_USED * sum(.x * STRATUM_WGT, na.rm = TRUE)
-                              )),
+                              .fns = ~ AREA_USED * sum(.x * STRATUM_WGT, na.rm = TRUE)
+                              ),
                        dplyr::across(c(!!y.var.v.syms),
-                              .fns = list(
-                                var = ~ (AREA_USED^2 / P2PNTCNT_EU) * (sum(.x * STRATUM_WGT * P2POINTCNT, na.rm = TRUE) + sum(.x * (1-STRATUM_WGT) * (P2POINTCNT / P2PNTCNT_EU), na.rm = TRUE))
-                              )),
+                              .fns = ~ (AREA_USED^2 / P2PNTCNT_EU) * (sum(.x * STRATUM_WGT * P2POINTCNT, na.rm = TRUE) + sum(.x * (1-STRATUM_WGT) * (P2POINTCNT / P2PNTCNT_EU), na.rm = TRUE))
+                              ),
                        nPlots.y = sum(nPlots.y, na.rm = TRUE)) %>%
       dplyr::ungroup() %>%
       as.data.frame()
@@ -2782,17 +2780,14 @@ sumToEU <- function(db,
       dtplyr::lazy_dt() %>%
       dplyr::group_by(ESTN_UNIT_CN, AREA_USED, P2PNTCNT_EU, !!!x.grp.syms) %>%
       dplyr::summarise(dplyr::across(c(!!!x.var.m.syms),
-                              .fns = list(
-                                mean = ~ AREA_USED * sum(.x * STRATUM_WGT, na.rm = TRUE)
-                              )),
+                              .fns = ~ AREA_USED * sum(.x * STRATUM_WGT, na.rm = TRUE)
+                              ),
                        dplyr::across(c(!!!x.var.v.syms),
-                              .fns = list(
-                                var = ~ (AREA_USED^2 / P2PNTCNT_EU) * (sum(.x * STRATUM_WGT * P2POINTCNT, na.rm = TRUE) + sum(.x * (1-STRATUM_WGT) * (P2POINTCNT / P2PNTCNT_EU), na.rm = TRUE))
-                              )),
+                              .fns = ~ (AREA_USED^2 / P2PNTCNT_EU) * (sum(.x * STRATUM_WGT * P2POINTCNT, na.rm = TRUE) + sum(.x * (1-STRATUM_WGT) * (P2POINTCNT / P2PNTCNT_EU), na.rm = TRUE))
+                              ),
                        dplyr::across(c(!!!x.var.c.syms),
-                              .fns = list(
-                                cv = ~ (AREA_USED^2 / P2PNTCNT_EU) * (sum(.x * STRATUM_WGT * P2POINTCNT, na.rm = TRUE) + sum(.x * (1-STRATUM_WGT) * (P2POINTCNT / P2PNTCNT_EU), na.rm = TRUE))
-                              )),
+                              .fns = ~ (AREA_USED^2 / P2PNTCNT_EU) * (sum(.x * STRATUM_WGT * P2POINTCNT, na.rm = TRUE) + sum(.x * (1-STRATUM_WGT) * (P2POINTCNT / P2PNTCNT_EU), na.rm = TRUE))
+                              ),
                        nPlots.x = sum(nPlots.x, na.rm = TRUE)) %>%
       dplyr::ungroup() %>%
       as.data.frame()
@@ -2885,13 +2880,11 @@ sumToEU <- function(db,
       dtplyr::lazy_dt() %>%
       dplyr::group_by(ESTN_UNIT_CN, AREA_USED, P2PNTCNT_EU, !!!x.grp.syms) %>%
       dplyr::summarise(dplyr::across(c(!!!x.var.m.syms),
-                              .fns = list(
-                                mean = ~ AREA_USED * sum(.x * STRATUM_WGT, na.rm = TRUE)
-                              )),
+                              .fns = ~ AREA_USED * sum(.x * STRATUM_WGT, na.rm = TRUE)
+                              ),
                        dplyr::across(c(!!!x.var.v.syms),
-                              .fns = list(
-                                var = ~ (AREA_USED^2 / P2PNTCNT_EU) * (sum(.x * STRATUM_WGT * P2POINTCNT, na.rm = TRUE) + sum(.x * (1-STRATUM_WGT) * (P2POINTCNT / P2PNTCNT_EU), na.rm = TRUE))
-                              )),
+                              .fns = ~ (AREA_USED^2 / P2PNTCNT_EU) * (sum(.x * STRATUM_WGT * P2POINTCNT, na.rm = TRUE) + sum(.x * (1-STRATUM_WGT) * (P2POINTCNT / P2PNTCNT_EU), na.rm = TRUE))
+                              ),
                        nPlots.x = sum(nPlots.x, na.rm = TRUE)) %>%
       dplyr::ungroup() %>%
       as.data.frame()
