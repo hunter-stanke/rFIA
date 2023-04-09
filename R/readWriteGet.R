@@ -275,6 +275,15 @@ getFIA <- function(states,
     stop('Must specify a directory ("dir") to save data when "load = FALSE".')
   }
 
+  if ('REF' %in% states & length(unique(states)) > 1) {
+    stop('Please download reference tables and state subsets seperately.')
+  }
+
+  ## All or nothing w/ new FIADB for some reason
+  if (states == 'REF') {
+    tables <- NULL
+  }
+
   ## If dir is not specified, hold in a temporary directory
   #if (is.null(dir)){tempDir <- tempdir()}
   tempDir <- tempdir()
@@ -423,17 +432,13 @@ Did you accidentally include the state abbreviation in front of the table name? 
     # Make sure state Abbs are in right format
     states <- str_to_upper(states)
 
-    ## If you want all of the reference tables zipped together
-    if ('REF' %in% states) {
-      states[states == 'REF'] <- 'FIADB_REFERENCE'
-    }
-
     ## Download each state and extract to directory
     for (i in 1:length(states)){
       # Temporary directory to download to
-      temp <- paste0(tempDir, '/', states[i],'.zip') #tempfile()
+      temp <- paste0(tempDir, '/', states[i],'_CSV.zip') #tempfile()
       ## Make the URL
-      url <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', states[i],'.zip')
+      url <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', states[i],'_CSV.zip')
+      if (states == 'REF') {url <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/FIADB_REFERENCE.zip')}
       #newName <- paste0(str_sub(url, 1, -4), 'csv')
       ## Download as temporary file
       download.file(url, temp, timeout = 3600)
@@ -447,11 +452,6 @@ Did you accidentally include the state abbreviation in front of the table name? 
     }
 
     if (load){
-
-      ## If you want all of the reference tables read in, change it back
-      if ('FIADB_REFERENCE' %in% states) {
-        states[states == 'FIADB_REFERENCE'] <- 'REF'
-      }
 
       ## Read in the files w/ readFIA
       if (is.null(dir)){
