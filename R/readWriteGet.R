@@ -280,8 +280,10 @@ getFIA <- function(states,
   }
 
   ## All or nothing w/ new FIADB for some reason
-  if (states == 'REF') {
-    tables <- NULL
+  if (length(unique(states)) == 1){
+    if (states == 'REF') {
+      tables <- NULL
+    }
   }
 
   ## If dir is not specified, hold in a temporary directory
