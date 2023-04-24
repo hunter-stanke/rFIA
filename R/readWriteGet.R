@@ -280,8 +280,10 @@ getFIA <- function(states,
   }
 
   ## All or nothing w/ new FIADB for some reason
-  if (states == 'REF') {
-    tables <- NULL
+  if (length(unique(states)) == 1){
+    if (states == 'REF') {
+      tables <- NULL
+    }
   }
 
   ## If dir is not specified, hold in a temporary directory
@@ -363,7 +365,7 @@ Did you accidentally include the state abbreviation in front of the table name? 
 
       ## Download the zip to a temporary file
       temp <- tempfile()
-      download.file(urls[n], temp, timeout = 3600)
+      download.file(urls[n], temp)
 
       # Write the data out the directory they've chosen
       if(is.null(dir)){
@@ -438,10 +440,10 @@ Did you accidentally include the state abbreviation in front of the table name? 
       temp <- paste0(tempDir, '/', states[i],'_CSV.zip') #tempfile()
       ## Make the URL
       url <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/', states[i],'_CSV.zip')
-      if (states == 'REF') {url <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/FIADB_REFERENCE.zip')}
+      if (states[i] == 'REF') {url <- paste0('https://apps.fs.usda.gov/fia/datamart/CSV/FIADB_REFERENCE.zip')}
       #newName <- paste0(str_sub(url, 1, -4), 'csv')
       ## Download as temporary file
-      download.file(url, temp, timeout = 3600)
+      download.file(url, temp)
       ## Extract
       if (is.null(dir)){
         unzip(temp, exdir = tempDir)
